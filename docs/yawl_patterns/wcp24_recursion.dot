@@ -1,0 +1,37 @@
+digraph "WCP-24: Recursion" {
+    rankdir=TB;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_call [label="p_call"];
+    p_base [label="p_base"];
+    p_recurse [label="p_recurse"];
+    p_result [label="p_result"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_enter [shape=box, label="enter"];
+    t_check [shape=box, label="base case?"];
+    t_base [shape=box, label="base"];
+    t_recurse [shape=box, label="recurse"];
+    t_return [shape=box, label="return"];
+    t_exit [shape=box, label="exit"];
+
+    // Arcs
+    p_start -> t_enter;
+    t_enter -> p_call;
+    p_call -> t_check;
+    t_check -> p_base [label="yes"];
+    t_check -> p_recurse [label="no"];
+    p_base -> t_return [label="value"];
+    p_recurse -> t_recurse [label="self call"];
+    t_recurse -> p_call [label="recursive"];
+    t_return -> p_result;
+    p_result -> t_exit;
+    t_exit -> p_end;
+
+    {rank=min; p_start};
+    {rank=max; p_end};
+}

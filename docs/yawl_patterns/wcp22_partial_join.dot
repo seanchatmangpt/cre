@@ -1,0 +1,37 @@
+digraph "WCP-22: Structured Partial Join" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_a [label="p_a"];
+    p_b [label="p_b"];
+    p_c [label="p_c"];
+    p_count [label="p_count", xlabel="K=2"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_split [shape=box, label="split"];
+    t_a [shape=box, label="A"];
+    t_b [shape=box, label="B"];
+    t_c [shape=box, label="C"];
+    t_join [shape=box, label="partial join"];
+
+    // Arcs
+    p_start -> t_split;
+    t_split -> p_a;
+    t_split -> p_b;
+    t_split -> p_c;
+    p_a -> t_a;
+    p_b -> t_b;
+    p_c -> t_c;
+    t_a -> p_count;
+    t_b -> p_count;
+    t_c -> p_count;
+    p_count -> t_join [label=">= K"];
+    t_join -> p_end;
+
+    {rank=min; p_start};
+    {rank=max; p_end};
+}

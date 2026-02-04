@@ -1,0 +1,31 @@
+digraph "WCP-18: Milestone" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_milestone [label="p_milestone", xlabel="milestone"];
+    p_enabled [label="p_enabled"];
+    p_activity [label="p_activity"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_reach [shape=box, label="reach"];
+    t_enable [shape=box, label="enable"];
+    t_exec [shape=box, label="execute"];
+    t_complete [shape=box, label="complete"];
+
+    // Arcs
+    p_start -> t_reach;
+    t_reach -> p_milestone;
+    p_milestone -> t_enable [label="reached"];
+    t_enable -> p_enabled;
+    p_enabled -> t_exec;
+    t_exec -> p_activity;
+    p_activity -> t_complete;
+    t_complete -> p_end;
+
+    {rank=min; p_start};
+    {rank=max; p_end};
+}

@@ -1,0 +1,33 @@
+digraph "WRP-3: Resource Start" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_defined [label="p_defined"];
+    p_starting [label="p_starting"];
+    p_running [label="p_running"];
+    p_stopping [label="p_stopping"];
+    p_stopped [label="p_stopped"];
+
+    // Transitions
+    t_initiate [shape=box, label="initiate"];
+    t_activate [shape=box, label="activate"];
+    t_execute [shape=box, label="execute"];
+    t_shutdown [shape=box, label="shutdown"];
+    t_terminate [shape=box, label="terminate"];
+
+    // Arcs
+    p_defined -> t_initiate;
+    t_initiate -> p_starting;
+    p_starting -> t_activate;
+    t_activate -> p_running;
+    p_running -> t_execute;
+    p_execute -> p_shutdown [label="stop"];
+    t_shutdown -> p_stopping;
+    p_stopping -> t_terminate;
+    t_terminate -> p_stopped;
+
+    {rank=min; p_defined};
+    {rank=max; p_stopped};
+}

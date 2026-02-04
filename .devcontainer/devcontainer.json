@@ -1,0 +1,43 @@
+{
+  "name": "CRE YAWL Erlang Development",
+  "image": "erlang:28",
+
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "erlang-ls.erlang",
+        "usernamehw.vslatef",
+        "zxh404.vscode-prolog"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+
+  "postCreateCommand": "git clone --depth 1 https://github.com/erlang/rebar3 /tmp/rebar3 && cd /tmp/rebar3 && ./bootstrap && mv rebar3 /usr/local/bin/ && cd /workspaces/cre && rebar3 get-deps && rebar3 compile",
+
+  "remoteUser": "root",
+  "runArgs": ["--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined"],
+
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspaces/cre,type=bind"
+  ],
+
+  "portsAttributes": {
+    "3000": {
+      "label": "CRE Status API"
+    },
+    "4142": {
+      "label": "CRE Web Service"
+    }
+  }
+}

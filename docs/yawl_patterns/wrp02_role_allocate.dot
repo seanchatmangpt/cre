@@ -1,0 +1,30 @@
+digraph "WRP-2: Role-Based Allocation" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_task [label="p_task"];
+    p_roles [label="p_roles", xlabel="role registry"];
+    p_match [label="p_match"];
+    p_assigned [label="p_assigned"];
+    p_unassigned [label="p_unassigned"];
+
+    // Transitions
+    t_request [shape=box, label="request"];
+    t_lookup [shape=box, label="lookup role"];
+    t_assign [shape=box, label="assign"];
+    t_fail [shape=box, label="no match"];
+
+    // Arcs
+    p_task -> t_request;
+    t_request -> p_match;
+    p_roles -> t_lookup;
+    t_lookup -> p_match [label="candidates"];
+    p_match -> t_assign [label="found"];
+    t_assign -> p_assigned;
+    p_match -> t_fail [label="not found"];
+    t_fail -> p_unassigned;
+
+    {rank=min; p_task; p_roles};
+}

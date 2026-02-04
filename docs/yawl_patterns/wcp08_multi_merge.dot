@@ -1,0 +1,29 @@
+digraph "WCP-8: Multi-Merge" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places from parallel branches
+    p_a [label="p_a", xlabel="from A"];
+    p_b [label="p_b", xlabel="from B"];
+    p_c [label="p_c", xlabel="from C"];
+
+    // Transitions - each can fire independently
+    t_a [shape=box, label="continue A"];
+    t_b [shape=box, label="continue B"];
+    t_c [shape=box, label="continue C"];
+
+    // Places after merge (may have multiple tokens)
+    p_end [label="p_end", xlabel="Continue"];
+
+    // Arcs
+    p_a -> t_a;
+    p_b -> t_b;
+    p_c -> t_c;
+    t_a -> p_end;
+    t_b -> p_end;
+    t_c -> p_end;
+
+    {rank=min; p_a; p_b; p_c};
+    {rank=max; p_end};
+}

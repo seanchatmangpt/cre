@@ -1,0 +1,32 @@
+digraph "WDP-3: Data Distribution" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_source [label="p_source", xlabel="data"];
+    p_copy [label="p_copy"];
+    p_a [label="p_a"];
+    p_b [label="p_b"];
+    p_c [label="p_c"];
+
+    // Transitions
+    t_read [shape=box, label="read"];
+    t_distribute [shape=box, label="distribute"];
+    t_send_a [shape=box, label="send A"];
+    t_send_b [shape=box, label="send B"];
+    t_send_c [shape=box, label="send C"];
+
+    // Arcs
+    p_source -> t_read;
+    t_read -> p_copy [label="copy data"];
+    p_copy -> t_distribute;
+    t_distribute -> p_a;
+    t_distribute -> p_b;
+    t_distribute -> p_c;
+    p_a -> t_send_a;
+    p_b -> t_send_b;
+    p_c -> t_send_c;
+
+    {rank=min; p_source};
+}

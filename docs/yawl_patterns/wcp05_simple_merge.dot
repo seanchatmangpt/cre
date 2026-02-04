@@ -1,0 +1,25 @@
+digraph "WCP-5: Simple Merge" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places from alternatives
+    p_a [label="p_a", xlabel="from A"];
+    p_b [label="p_b", xlabel="from B"];
+    p_c [label="p_c", xlabel="from C"];
+
+    // Transition
+    t_merge [shape=box, label="XOR-Join"];
+
+    // Place after merge
+    p_end [label="p_end", xlabel="Continue"];
+
+    // Arcs
+    p_a -> t_merge;
+    p_b -> t_merge;
+    p_c -> t_merge;
+    t_merge -> p_end;
+
+    {rank=min; p_a; p_b; p_c};
+    {rank=max; p_end};
+}

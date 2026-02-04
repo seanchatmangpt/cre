@@ -1,0 +1,30 @@
+digraph "WRP-4: Role-Based Distribution" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_tasks [label="p_tasks", xlabel="work items"];
+    p_roles [label="p_roles"];
+    p_matching [label="p_matching"];
+    p_assigned [label="p_assigned"];
+    p_pending [label="p_pending"];
+
+    // Transitions
+    t_distribute [shape=box, label="distribute"];
+    t_match [shape=box, label="match role"];
+    t_assign [shape=box, label="assign"];
+    t_retry [shape=box, label="retry"];
+
+    // Arcs
+    p_tasks -> t_distribute;
+    p_roles -> t_match;
+    t_distribute -> p_matching [label="for each"];
+    p_matching -> t_match;
+    t_match -> t_assign [label="matched"];
+    t_assign -> p_assigned;
+    t_match -> t_retry [label="no match"];
+    t_retry -> p_pending;
+
+    {rank=min; p_tasks; p_roles};
+}

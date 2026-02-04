@@ -1,0 +1,30 @@
+digraph "WCP-2: Parallel Split" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start", xlabel="Start"];
+
+    // Transitions
+    t_split [shape=box, label="AND-Split"];
+    t_a [shape=box, label="A"];
+    t_b [shape=box, label="B"];
+    t_c [shape=box, label="C"];
+
+    // Places after split
+    p_a [label="p_a"];
+    p_b [label="p_b"];
+    p_c [label="p_c"];
+
+    // Arcs
+    p_start -> t_split;
+    t_split -> p_a;
+    t_split -> p_b;
+    t_split -> p_c;
+    p_a -> t_a;
+    p_b -> t_b;
+    p_c -> t_c;
+
+    {rank=min; p_start};
+}

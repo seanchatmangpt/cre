@@ -1,0 +1,37 @@
+digraph "WHP-1: Error Handler" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_active [label="p_active"];
+    p_exec [label="p_exec"];
+    p_error [label="p_error", xlabel="exception"];
+    p_handling [label="p_handling"];
+    p_resolved [label="p_resolved"];
+    p_failed [label="p_failed"];
+
+    // Transitions
+    t_start [shape=box, label="start"];
+    t_execute [shape=box, label="execute"];
+    t_raise [shape=box, label="raise", style=dashed];
+    t_catch [shape=box, label="catch"];
+    t_handle [shape=box, label="handle"];
+    t_fail [shape=box, label="fail"];
+
+    // Arcs
+    p_active -> t_start;
+    t_start -> p_exec;
+    p_exec -> t_execute;
+    t_execute -> t_raise [label="error"];
+    t_raise -> p_error;
+    p_error -> t_catch [label="caught"];
+    t_catch -> p_handling;
+    p_handling -> t_handle;
+    t_handle -> p_resolved [label="handled"];
+    p_error -> t_fail [label="uncaught"];
+    t_fail -> p_failed;
+
+    {rank=min; p_active};
+    {rank=max; p_resolved; p_failed};
+}

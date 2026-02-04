@@ -1,0 +1,32 @@
+digraph "WCP-6: Multi-Choice" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start", xlabel="Start"];
+
+    // Transition
+    t_choice [shape=box, label="OR-Split"];
+
+    // Condition places
+    p_c1 [label="p_c1", xlabel="cond1"];
+    p_c2 [label="p_c2", xlabel="cond2"];
+    p_c3 [label="p_c3", xlabel="cond3"];
+
+    // Activity transitions
+    t_a [shape=box, label="A"];
+    t_b [shape=box, label="B"];
+    t_c [shape=box, label="C"];
+
+    // Arcs - multiple conditions can be true
+    p_start -> t_choice;
+    t_choice -> p_c1 [label="c1"];
+    t_choice -> p_c2 [label="c2"];
+    t_choice -> p_c3 [label="c3"];
+    p_c1 -> t_a;
+    p_c2 -> t_b;
+    p_c3 -> t_c;
+
+    {rank=min; p_start};
+}

@@ -1,0 +1,40 @@
+digraph "WCP-15: Multiple Instances (Dynamic)" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_data [label="p_data", xlabel="data source"];
+    p_ready [label="p_ready"];
+    p_running [label="p_running"];
+    p_done [label="p_done"];
+    p_final [label="p_final"];
+    p_complete [label="p_complete"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_spawn [shape=box, label="spawn"];
+    t_fetch [shape=box, label="fetch data"];
+    t_exec [shape=box, label="execute"];
+    t_collect [shape=box, label="collect"];
+    t_check [shape=box, label="check done"];
+    t_terminate [shape=box, label="terminate"];
+
+    // Arcs - dynamic spawning until exhausted
+    p_data -> t_spawn;
+    t_spawn -> p_ready;
+    p_ready -> t_exec;
+    t_exec -> p_running;
+    p_running -> t_collect;
+    t_collect -> p_done;
+    p_done -> t_fetch [label="more data"];
+    t_fetch -> t_spawn [label="new instance"];
+    p_done -> t_check [label="no more"];
+    p_running -> t_check;
+    t_check -> t_terminate [label="all done"];
+    t_terminate -> p_end;
+    t_check -> p_final [label="continue"];
+
+    {rank=min; p_data};
+    {rank=max; p_end};
+}

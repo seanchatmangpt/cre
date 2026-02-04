@@ -1,0 +1,13 @@
+%% Script to patch bcrypt for OTP 28+ compatibility
+%% erl_interface was removed in OTP 28, so we can only build the NIF version
+
+%% Apply the patch after dependencies are resolved
+Config = case os:getenv("REBAR_BCRYPT_PATCHED") of
+    "1" ->
+        CONFIG;
+    _ ->
+        %% Patch will be applied manually during build
+        CONFIG
+end,
+
+Config.

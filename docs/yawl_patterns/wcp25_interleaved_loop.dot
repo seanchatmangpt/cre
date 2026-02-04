@@ -1,0 +1,39 @@
+digraph "WCP-25: Arbitrary Interleaved Loop" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_branches [label="p_branches", xlabel="branch list"];
+    p_current [label="p_current"];
+    p_exec [label="p_exec"];
+    p_done [label="p_done"];
+    p_cond [label="p_cond"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_init [shape=box, label="init"];
+    t_next [shape=box, label="next branch"];
+    t_exec [shape=box, label="execute"];
+    t_return [shape=box, label="return"];
+    t_check [shape=box, label="continue?"];
+    t_exit [shape=box, label="exit"];
+
+    // Arcs
+    p_start -> t_init;
+    t_init -> p_branches;
+    p_branches -> t_next [label="has branches"];
+    t_next -> p_current;
+    p_current -> t_exec;
+    t_exec -> p_exec;
+    p_exec -> t_return;
+    t_return -> p_done;
+    p_done -> t_check;
+    t_check -> t_next [label="continue"];
+    t_check -> t_exit [label="done"];
+    t_exit -> p_end;
+
+    {rank=min; p_start};
+    {rank=max; p_end};
+}

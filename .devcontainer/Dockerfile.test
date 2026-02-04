@@ -1,0 +1,31 @@
+# Test Dockerfile for CRE YAWL
+FROM erlang:28
+
+# Install build tools
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    wget \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install rebar3
+RUN git clone --depth 1 https://github.com/erlang/rebar3 /tmp/rebar3 && \
+    cd /tmp/rebar3 && \
+    ./bootstrap && \
+    mv rebar3 /usr/local/bin/
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy project files
+COPY rebar.config ./
+COPY src ./src
+COPY test ./test
+COPY include ./include
+
+# Install dependencies and compile
+RUN rebar3 get-deps && rebar3 compile
+
+# Default command
+CMD ["rebar3", "ct"]

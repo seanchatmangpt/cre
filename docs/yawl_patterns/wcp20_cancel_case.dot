@@ -1,0 +1,45 @@
+digraph "WCP-20: Cancel Case" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_cancel [label="p_cancel", xlabel="cancel signal"];
+    p_act1 [label="p_act1"];
+    p_act2 [label="p_act2"];
+    p_act3 [label="p_act3"];
+    p_active [label="p_active"];
+    p_stopped [label="p_stopped"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_start [shape=box, label="start"];
+    t_exec1 [shape=box, label="act1"];
+    t_exec2 [shape=box, label="act2"];
+    t_exec3 [shape=box, label="act3"];
+    t_cancel [shape=box, label="cancel all", style=dashed];
+    t_check [shape=box, label="check"];
+    t_complete [shape=box, label="complete"];
+
+    // Arcs
+    p_start -> t_start;
+    t_start -> p_act1;
+    t_start -> p_act2;
+    t_start -> p_act3;
+    p_act1 -> t_exec1;
+    p_act2 -> t_exec2;
+    p_act3 -> t_exec3;
+    t_exec1 -> p_active;
+    t_exec2 -> p_active;
+    t_exec3 -> p_active;
+    p_cancel -> t_cancel;
+    p_active -> t_check [label="normal"];
+    p_active -> t_cancel [label="cancel"];
+    t_cancel -> p_stopped;
+    t_check -> t_complete [label="all done"];
+    t_complete -> p_end;
+
+    {rank=min; p_start};
+    {rank=max; p_end};
+}

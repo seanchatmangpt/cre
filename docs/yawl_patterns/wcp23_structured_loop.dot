@@ -1,0 +1,28 @@
+digraph "WCP-23: Structured Loop" {
+    rankdir=TB;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_cond [label="p_cond"];
+    p_body [label="p_body"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_check [shape=box, label="while condition"];
+    t_exec [shape=box, label="loop body"];
+    t_exit [shape=box, label="exit"];
+
+    // Arcs
+    p_start -> t_check;
+    t_check -> p_body [label="true"];
+    p_body -> t_exec;
+    t_exec -> p_cond;
+    p_cond -> t_check [label="loop"];
+    t_check -> t_exit [label="false"];
+    t_exit -> p_end;
+
+    {rank=min; p_start};
+    {rank=max; p_end};
+}

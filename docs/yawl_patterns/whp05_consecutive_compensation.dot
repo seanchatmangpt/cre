@@ -1,0 +1,53 @@
+digraph "WHP-5: Consecutive Compensation" {
+    rankdir=TB;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_a [label="p_a"];
+    p_b [label="p_b"];
+    p_c [label="p_c"];
+    p_stack [label="p_stack", xlabel="C,B,A"];
+    p_undo_c [label="p_undo_c"];
+    p_undo_b [label="p_undo_b"];
+    p_undo_a [label="p_undo_a"];
+    p_compensated [label="p_compensated"];
+
+    // Transitions
+    t_exec_a [shape=box, label="exec A"];
+    t_exec_b [shape=box, label="exec B"];
+    t_exec_c [shape=box, label="exec C"];
+    t_push [shape=box, label="push"];
+    t_pop_c [shape=box, label="pop C"];
+    t_undo_c [shape=box, label="undo C"];
+    t_pop_b [shape=box, label="pop B"];
+    t_undo_b [shape=box, label="undo B"];
+    t_pop_a [shape=box, label="pop A"];
+    t_undo_a [shape=box, label="undo A"];
+    t_complete [shape=box, label="complete"];
+
+    // Arcs
+    p_start -> t_exec_a;
+    t_exec_a -> p_a;
+    p_a -> t_exec_b;
+    t_exec_b -> p_b;
+    p_b -> t_exec_c;
+    t_exec_c -> p_c;
+    p_c -> t_push;
+    t_push -> p_stack [label="C,B,A"];
+    p_stack -> t_pop_c [label="trigger"];
+    t_pop_c -> p_undo_c;
+    p_undo_c -> t_undo_c;
+    t_undo_c -> t_pop_b;
+    t_pop_b -> p_undo_b;
+    p_undo_b -> t_undo_b;
+    t_undo_b -> t_pop_a;
+    t_pop_a -> p_undo_a;
+    p_undo_a -> t_undo_a;
+    t_undo_a -> t_complete;
+    t_complete -> p_compensated;
+
+    {rank=min; p_start};
+    {rank=max; p_compensated};
+}

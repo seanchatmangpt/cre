@@ -1,0 +1,39 @@
+digraph "WCP-9: Discriminator" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_a [label="p_a"];
+    p_b [label="p_b"];
+    p_c [label="p_c"];
+    p_count [label="p_count", xlabel="counter"];
+
+    // Transitions
+    t_incr [shape=box, label="increment"];
+    t_check [shape=box, label="check=N"];
+    t_reset [shape=box, label="reset"];
+    t_wait [shape=box, label="wait"];
+
+    // Places
+    p_waiting [label="p_waiting"];
+    p_end [label="p_end", xlabel="All Done"];
+    p_reset [label="p_reset"];
+
+    // Arcs
+    p_a -> t_incr;
+    p_b -> t_incr;
+    p_c -> t_incr;
+    t_incr -> p_count [label="count++"];
+    p_count -> t_check;
+    t_check -> p_waiting [label="count < N"];
+    t_check -> t_reset [label="count = N"];
+    t_reset -> p_end;
+    t_reset -> p_reset [label="reset count"];
+    p_reset -> p_count [style=dashed, label="clear"];
+    p_waiting -> t_wait [label="next arrives"];
+    t_wait -> t_check;
+
+    {rank=min; p_a; p_b; p_c};
+    {rank=max; p_end};
+}

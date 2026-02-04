@@ -1,0 +1,38 @@
+digraph "WHP-2: Retry" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_attempt [label="p_attempt"];
+    p_success [label="p_success"];
+    p_error [label="p_error"];
+    p_backoff [label="p_backoff", xlabel="wait"];
+    p_retry [label="p_retry"];
+    p_failed [label="p_failed", xlabel="max retries"];
+
+    // Transitions
+    t_execute [shape=box, label="execute"];
+    t_succeed [shape=box, label="succeed"];
+    t_fail [shape=box, label="fail"];
+    t_wait [shape=box, label="wait"];
+    t_retry [shape=box, label="retry"];
+    t_giveup [shape=box, label="give up"];
+
+    // Arcs
+    p_start -> t_execute;
+    t_execute -> p_attempt;
+    p_attempt -> t_succeed [label="ok"];
+    t_succeed -> p_success;
+    p_attempt -> t_fail [label="error"];
+    t_fail -> p_backoff;
+    p_backoff -> t_wait;
+    t_wait -> p_retry [label="ready"];
+    p_retry -> t_execute [label="retry"];
+    p_backoff -> t_giveup [label="max attempts"];
+    t_giveup -> p_failed;
+
+    {rank=min; p_start};
+    {rank=max; p_success; p_failed};
+}

@@ -1,0 +1,32 @@
+digraph "WDP-4: Data Accumulation" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_a [label="p_a"];
+    p_b [label="p_b"];
+    p_c [label="p_c"];
+    p_accumulator [label="p_acc", xlabel="accumulator"];
+    p_result [label="p_result", xlabel="accumulated"];
+
+    // Transitions
+    t_collect_a [shape=box, label="collect A"];
+    t_collect_b [shape=box, label="collect B"];
+    t_collect_c [shape=box, label="collect C"];
+    t_accumulate [shape=box, label="accumulate"];
+    t_finalize [shape=box, label="finalize"];
+
+    // Arcs
+    p_a -> t_collect_a;
+    p_b -> t_collect_b;
+    p_c -> t_collect_c;
+    t_collect_a -> p_accumulator [label="data a"];
+    t_collect_b -> p_accumulator [label="data b"];
+    t_collect_c -> p_accumulator [label="data c"];
+    p_accumulator -> t_accumulate;
+    t_accumulate -> p_result;
+
+    {rank=min; p_a; p_b; p_c};
+    {rank=max; p_result};
+}

@@ -1,0 +1,35 @@
+digraph "WCP-19: Cancel Activity" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_running [label="p_running"];
+    p_cancel [label="p_cancel", xlabel="cancel"];
+    p_active [label="p_active"];
+    p_cancelled [label="p_cancelled"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_start [shape=box, label="start"];
+    t_exec [shape=box, label="execute"];
+    t_cancel [shape=box, label="cancel", style=dashed];
+    t_stop [shape=box, label="stop"];
+    t_complete [shape=box, label="complete"];
+
+    // Arcs
+    p_start -> t_start;
+    t_start -> p_running;
+    p_running -> t_exec;
+    t_exec -> p_active;
+    p_cancel -> t_cancel [label="cancel signal"];
+    p_active -> t_complete [label="normal"];
+    p_active -> t_stop [label="cancelled"];
+    t_cancel -> t_stop [label="force stop"];
+    t_complete -> p_end;
+    t_stop -> p_cancelled;
+
+    {rank=min; p_start};
+    {rank=max; p_end; p_cancelled};
+}

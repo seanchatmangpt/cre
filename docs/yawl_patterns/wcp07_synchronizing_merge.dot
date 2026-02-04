@@ -1,0 +1,32 @@
+digraph "WCP-7: Synchronizing Merge" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_a [label="p_a"];
+    p_b [label="p_b"];
+    p_count [label="p_count", xlabel="N of M"];
+
+    // Transitions
+    t_check [shape=box, label="Check"];
+    t_merge [shape=box, label="N-Join"];
+    t_pass [shape=box, label="Pass"];
+
+    // Places
+    p_waiting [label="p_waiting"];
+    p_end [label="p_end"];
+
+    // Arcs
+    p_a -> t_check;
+    p_b -> t_check;
+    t_check -> p_waiting [label="not all"];
+    t_check -> t_merge [label="all N"];
+    p_count -> t_merge;
+    t_merge -> p_end;
+    p_waiting -> t_pass [label="trigger"];
+    t_pass -> p_end;
+
+    {rank=min; p_a; p_b; p_count};
+    {rank=max; p_end};
+}

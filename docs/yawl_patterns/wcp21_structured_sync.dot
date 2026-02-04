@@ -1,0 +1,26 @@
+digraph "WCP-21: Structured Synchronization" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_block [label="p_block", xlabel="block"];
+    p_sync [label="p_sync"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_enter [shape=box, label="enter block"];
+    t_sync [shape=box, label="synchronize"];
+    t_exit [shape=box, label="exit"];
+
+    // Arcs
+    p_start -> t_enter;
+    t_enter -> p_block;
+    p_block -> t_sync;
+    t_sync -> p_end;
+    t_exit -> p_end;
+
+    {rank=min; p_start};
+    {rank=max; p_end};
+}

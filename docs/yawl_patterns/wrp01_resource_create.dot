@@ -1,0 +1,33 @@
+digraph "WRP-1: Resource Creation" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_request [label="p_request"];
+    p_creating [label="p_creating"];
+    p_available [label="p_available", xlabel="resource pool"];
+    p_allocated [label="p_allocated"];
+    p_released [label="p_released"];
+
+    // Transitions
+    t_create [shape=box, label="create"];
+    t_initialize [shape=box, label="initialize"];
+    t_allocate [shape=box, label="allocate"];
+    t_release [shape=box, label="release"];
+    t_destroy [shape=box, label="destroy"];
+
+    // Arcs
+    p_request -> t_create;
+    t_create -> p_creating;
+    p_creating -> t_initialize;
+    t_initialize -> p_available;
+    p_available -> t_allocate [label="assign"];
+    t_allocate -> p_allocated;
+    p_allocated -> t_release [label="done"];
+    t_release -> p_available [label="return"];
+    p_available -> t_destroy [label="cleanup"];
+    t_destroy -> p_released;
+
+    {rank=min; p_request};
+}

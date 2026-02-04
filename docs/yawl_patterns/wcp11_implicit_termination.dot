@@ -1,0 +1,35 @@
+digraph "WCP-11: Implicit Termination" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_active [label="p_active"];
+    p_work [label="p_work", xlabel="work queue"];
+    p_pending [label="p_pending", xlabel="pending"];
+    p_terminate [label="p_terminate"];
+
+    // Transitions
+    t_activate [shape=box, label="activate"];
+    t_queue [shape=box, label="queue work"];
+    t_dequeue [shape=box, label="dequeue"];
+    t_implicit [shape=box, label="implicit term"];
+
+    // Arcs
+    p_start -> t_activate;
+    t_activate -> p_active;
+    p_active -> t_queue;
+    t_queue -> p_work [label="has work"];
+    p_work -> t_dequeue;
+    t_dequeue -> p_pending [label="processing"];
+    p_pending -> p_active [label="done", style=dashed];
+
+    // Implicit termination fires when work is empty and all done
+    p_active -> t_implicit [label="all done"];
+    p_work -> t_implicit [label="empty"];
+    t_implicit -> p_terminate [label="terminate"];
+
+    {rank=min; p_start};
+    {rank=max; p_terminate};
+}

@@ -1,0 +1,29 @@
+digraph "WDP-2: Data Transformation" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_input [label="p_input", xlabel="raw data"];
+    p_transform [label="p_transform"];
+    p_output [label="p_output", xlabel="transformed"];
+    p_result [label="p_result"];
+
+    // Transitions
+    t_validate [shape=box, label="validate"];
+    t_transform [shape=box, label="transform"];
+    t_format [shape=box, label="format"];
+    t_complete [shape=box, label="complete"];
+
+    // Arcs
+    p_input -> t_validate;
+    t_validate -> p_transform [label="valid"];
+    p_transform -> t_transform;
+    t_transform -> p_output [label="transformed"];
+    p_output -> t_format;
+    t_format -> p_result;
+    t_validate -> p_result [label="invalid", style=dashed];
+
+    {rank=min; p_input};
+    {rank=max; p_result};
+}

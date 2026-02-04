@@ -1,0 +1,42 @@
+digraph "WCP-26: Critical Section" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_lock [label="p_lock", xlabel="resource"];
+    p_waiting [label="p_waiting"];
+    p_acquired [label="p_acquired"];
+    p_critical [label="p_critical"];
+    p_released [label="p_released"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_request [shape=box, label="request"];
+    t_acquire [shape=box, label="acquire"];
+    t_enter [shape=box, label="enter"];
+    t_exec [shape=box, label="critical section"];
+    t_leave [shape=box, label="leave"];
+    t_release [shape=box, label="release"];
+    t_complete [shape=box, label="complete"];
+
+    // Arcs
+    p_start -> t_request;
+    t_request -> p_waiting;
+    p_waiting -> t_acquire;
+    p_lock -> t_acquire [label="available"];
+    t_acquire -> p_acquired;
+    p_acquired -> t_enter;
+    t_enter -> p_critical;
+    p_critical -> t_exec;
+    t_exec -> t_leave;
+    t_leave -> p_released;
+    t_released -> t_release;
+    t_release -> p_lock [label="return lock"];
+    t_release -> t_complete;
+    t_complete -> p_end;
+
+    {rank=min; p_start; p_lock};
+    {rank=max; p_end};
+}

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  cre-test:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile.test
+    container_name: cre-yawl-test
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    ports:
+      - "4142:4142"
+      - "3000:3000"
+    environment:
+      - ERL_AFLAGS=-kernel shell_history enabled
+      - REBAR_COLOR=1
+    command: /bin/sh -c "rebar3 get-deps && rebar3 compile && rebar3 ct --verbose"
+
+  cre-shell:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile.test
+    container_name: cre-yawl-shell
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    ports:
+      - "4142:4142"
+      - "3000:3000"
+    environment:
+      - ERL_AFLAGS=-kernel shell_history enabled
+      - REBAR_COLOR=1
+    stdin_open: true
+    tty: true
+    command: /bin/zsh
+
+  cre-interactive:
+    image: erlang:27
+    container_name: cre-yawl-interactive
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    ports:
+      - "4142:4142"
+      - "3000:3000"
+      - "9100:9100" # Erlang observer
+    environment:
+      - ERL_AFLAGS=-kernel shell_history enabled -sname yawltest
+      - REBAR_COLOR=1
+      - LONGNAME=cre-yawl-dev
+    stdin_open: true
+    tty: true
+    depends_on:
+      - cre-test
+    command: /bin/zsh

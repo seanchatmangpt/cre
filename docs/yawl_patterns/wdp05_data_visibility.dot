@@ -1,0 +1,33 @@
+digraph "WDP-5: Data Visibility" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_global [label="p_global", xlabel="shared data"];
+    p_scope [label="p_scope"];
+    p_visible [label="p_visible"];
+    p_hidden [label="p_hidden"];
+    p_local [label="p_local"];
+
+    // Transitions
+    t_enter [shape=box, label="enter scope"];
+    t_check [shape=box, label="check visibility"];
+    t_access [shape=box, label="access"];
+    t_restricted [shape=box, label="restricted"];
+    t_exit [shape=box, label="exit"];
+
+    // Arcs
+    p_global -> t_enter;
+    t_enter -> p_scope;
+    p_scope -> t_check;
+    t_check -> p_visible [label="in scope"];
+    t_check -> p_hidden [label="out of scope"];
+    p_visible -> t_access;
+    t_access -> p_local;
+    p_hidden -> t_restricted;
+    t_restricted -> p_local [label="error"];
+    p_local -> t_exit;
+
+    {rank=min; p_global};
+}

@@ -1,0 +1,35 @@
+digraph "WCP-13: Multiple Instances (Static)" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_pool [label="p_pool", xlabel="N instances"];
+    p_ready [label="p_ready"];
+    p_running [label="p_running"];
+    p_complete [label="p_complete", xlabel="completed"];
+    p_all_spawned [label="p_all_spawned"];
+    p_end [label="p_end", xlabel="all done"];
+
+    // Transitions
+    t_spawn [shape=box, label="spawn all"];
+    t_exec [shape=box, label="execute"];
+    t_collect [shape=box, label="collect"];
+    t_join [shape=box, label="join all"];
+
+    // Arcs
+    p_start -> t_spawn;
+    t_spawn -> p_ready [label="N instances"];
+    t_spawn -> p_all_spawned;
+    p_ready -> t_exec;
+    t_exec -> p_running;
+    p_running -> t_collect;
+    t_collect -> p_complete [label="one done"];
+    p_complete -> t_join [label="check"];
+    p_all_spawned -> t_join [label="enable join"];
+    t_join -> p_end [label="all complete"];
+
+    {rank=min; p_start};
+    {rank=max; p_end};
+}

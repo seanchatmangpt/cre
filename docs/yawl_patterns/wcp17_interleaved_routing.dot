@@ -1,0 +1,37 @@
+digraph "WCP-17: Interleaved Parallel Routing" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_branch_pool [label="p_pool", xlabel="branches"];
+    p_next [label="p_next", xlabel="next branch"];
+    p_executing [label="p_exec"];
+    p_branch_done [label="p_done"];
+    p_all_done [label="p_all_done"];
+
+    // Transitions
+    t_distribute [shape=box, label="distribute"];
+    t_pick [shape=box, label="pick"];
+    t_execute [shape=box, label="execute"];
+    t_return [shape=box, label="return"];
+    t_complete [shape=box, label="complete"];
+
+    // Arcs
+    p_start -> t_distribute;
+    t_distribute -> p_branch_pool [label="A,B,C"];
+    p_branch_pool -> t_pick [label="has next"];
+    t_pick -> p_next;
+    p_next -> t_execute;
+    t_execute -> p_executing;
+    p_executing -> t_return;
+    t_return -> p_branch_done;
+    p_branch_done -> t_pick [label="more branches"];
+    p_branch_done -> t_complete [label="all done"];
+    p_branch_pool -> t_complete [label="empty"];
+    t_complete -> p_all_done;
+
+    {rank=min; p_start};
+    {rank=max; p_all_done};
+}

@@ -1,0 +1,28 @@
+digraph "WCP-1: Sequence" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p0 [label="p0", xlabel="Start"];
+    p1 [label="p1"];
+    p2 [label="p2"];
+    p3 [label="p3", xlabel="End"];
+
+    // Transitions
+    t1 [shape=box, label="t1"];
+    t2 [shape=box, label="t2"];
+    t3 [shape=box, label="t3"];
+
+    // Arcs
+    p0 -> t1;
+    t1 -> p1;
+    p1 -> t2;
+    t2 -> p2;
+    p2 -> t3;
+    t3 -> p3;
+
+    // Initial marking
+    {rank=min; p0};
+    {rank=max; p3};
+}

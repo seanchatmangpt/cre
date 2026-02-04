@@ -1,0 +1,39 @@
+digraph "WHP-4: Triggered Compensation" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_activities [label="p_activities"];
+    p_done [label="p_done", xlabel="completed"];
+    p_trigger [label="p_trigger", xlabel="compensate"];
+    p_stack [label="p_stack", xlabel="LIFO"];
+    p_compensating [label="p_compensating"];
+    p_compensated [label="p_compensated"];
+
+    // Transitions
+    t_exec_a [shape=box, label="exec A"];
+    t_exec_b [shape=box, label="exec B"];
+    t_record [shape=box, label="record"];
+    t_check [shape=box, label="check trigger"];
+    t_pop [shape=box, label="pop"];
+    t_undo [shape=box, label="undo"];
+    t_complete [shape=box, label="complete"];
+
+    // Arcs
+    p_activities -> t_exec_a;
+    t_exec_a -> t_record;
+    t_record -> t_exec_b;
+    t_exec_b -> p_done;
+    p_done -> t_check;
+    p_trigger -> t_check;
+    t_check -> t_pop [label="compensate"];
+    t_pop -> p_stack;
+    p_stack -> t_undo;
+    t_undo -> p_compensating;
+    p_compensating -> t_complete [label="done"];
+    t_complete -> p_compensated;
+
+    {rank=min; p_activities};
+    {rank=max; p_compensated};
+}

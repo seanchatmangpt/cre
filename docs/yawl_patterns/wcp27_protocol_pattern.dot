@@ -1,0 +1,40 @@
+digraph "WCP-27: Protocol Pattern" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_request [label="p_request"];
+    p_sent [label="p_sent"];
+    p_response [label="p_response"];
+    p_received [label="p_received"];
+    p_validated [label="p_validated"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_create [shape=box, label="create request"];
+    t_send [shape=box, label="send"];
+    t_receive [shape=box, label="receive"];
+    t_validate [shape=box, label="validate"];
+    t_process [shape=box, label="process"];
+    t_complete [shape=box, label="complete"];
+
+    // Arcs
+    p_start -> t_create;
+    t_create -> p_request;
+    p_request -> t_send;
+    t_send -> p_sent;
+    p_sent -> t_receive;
+    t_receive -> p_response;
+    p_response -> t_validate;
+    t_validate -> p_received [label="valid"];
+    p_received -> t_process;
+    t_process -> p_validated;
+    p_validated -> t_complete;
+    t_complete -> p_end;
+    t_validate -> p_end [label="invalid"];
+
+    {rank=min; p_start};
+    {rank=max; p_end};
+}

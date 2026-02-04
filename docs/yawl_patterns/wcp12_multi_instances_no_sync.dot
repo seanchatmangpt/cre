@@ -1,0 +1,27 @@
+digraph "WCP-12: Multiple Instances (No Sync)" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_pool [label="p_pool", xlabel="instance pool"];
+    p_ready [label="p_ready"];
+    p_done [label="p_done"];
+
+    // Transitions
+    t_spawn [shape=box, label="spawn"];
+    t_exec [shape=box, label="execute"];
+    t_complete [shape=box, label="complete"];
+
+    // Arcs - no synchronization after completion
+    p_start -> t_spawn;
+    t_spawn -> p_pool [label="create N"];
+    p_pool -> t_exec [label="for each"];
+    t_exec -> p_ready [label="executing"];
+    p_ready -> t_complete;
+    t_complete -> p_done [label="done - NO JOIN"];
+
+    {rank=min; p_start};
+    {rank=max; p_done};
+}

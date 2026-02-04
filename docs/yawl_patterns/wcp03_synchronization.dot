@@ -1,0 +1,25 @@
+digraph "WCP-3: Synchronization" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places before join
+    p_a [label="p_a"];
+    p_b [label="p_b"];
+    p_c [label="p_c"];
+
+    // Transition
+    t_join [shape=box, label="AND-Join"];
+
+    // Place after join
+    p_end [label="p_end", xlabel="All Done"];
+
+    // Arcs
+    p_a -> t_join;
+    p_b -> t_join;
+    p_c -> t_join;
+    t_join -> p_end;
+
+    {rank=min; p_a; p_b; p_c};
+    {rank=max; p_end};
+}

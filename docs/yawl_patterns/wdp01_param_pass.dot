@@ -1,0 +1,31 @@
+digraph "WDP-1: Parameter Passing" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_data [label="p_data", xlabel="parameters"];
+    p_source [label="p_source"];
+    p_transfer [label="p_transfer"];
+    p_target [label="p_target"];
+    p_result [label="p_result"];
+
+    // Transitions
+    t_extract [shape=box, label="extract"];
+    t_pass [shape=box, label="pass"];
+    t_receive [shape=box, label="receive"];
+    t_use [shape=box, label="use"];
+
+    // Arcs
+    p_data -> t_extract;
+    t_extract -> p_source;
+    p_source -> t_pass;
+    t_pass -> p_transfer [label="with params"];
+    p_transfer -> t_receive;
+    t_receive -> p_target;
+    p_target -> t_use;
+    t_use -> p_result;
+
+    {rank=min; p_data};
+    {rank=max; p_result};
+}

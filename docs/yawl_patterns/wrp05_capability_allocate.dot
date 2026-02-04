@@ -1,0 +1,33 @@
+digraph "WRP-5: Capability Allocation" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_requirement [label="p_req"];
+    p_registry [label="p_registry", xlabel="capabilities"];
+    p_check [label="p_check"];
+    p_qualified [label="p_qualified"];
+    p_allocated [label="p_allocated"];
+    p_failed [label="p_failed"];
+
+    // Transitions
+    t_request [shape=box, label="request"];
+    t_scan [shape=box, label="scan"];
+    t_verify [shape=box, label="verify"];
+    t_grant [shape=box, label="grant"];
+    t_deny [shape=box, label="deny"];
+
+    // Arcs
+    p_requirement -> t_request;
+    t_request -> p_check;
+    p_registry -> t_scan;
+    t_scan -> p_check [label="candidates"];
+    p_check -> t_verify;
+    t_verify -> t_grant [label="has capability"];
+    t_grant -> p_allocated;
+    t_verify -> t_deny [label="lacks capability"];
+    t_deny -> p_failed;
+
+    {rank=min; p_requirement; p_registry};
+}

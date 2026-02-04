@@ -1,0 +1,39 @@
+digraph "WCP-16: Deferred Choice" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_option_a [label="p_a", xlabel="option A"];
+    p_option_b [label="p_b", xlabel="option B"];
+    p_selected [label="p_selected"];
+    p_discarded [label="p_discarded"];
+    p_complete [label="p_complete"];
+
+    // Transitions
+    t_offer [shape=box, label="offer"];
+    t_select_a [shape=box, label="select A"];
+    t_select_b [shape=box, label="select B"];
+    t_discard_a [shape=box, label="discard A"];
+    t_discard_b [shape=box, label="discard B"];
+    t_complete [shape=box, label="complete"];
+
+    // Arcs
+    p_start -> t_offer;
+    t_offer -> p_option_a;
+    t_offer -> p_option_b;
+    p_option_a -> t_select_a [label="available"];
+    p_option_b -> t_select_b [label="available"];
+    t_select_a -> p_selected;
+    t_select_b -> p_selected;
+    p_option_a -> t_discard_a [label="not chosen"];
+    p_option_b -> t_discard_b [label="not chosen"];
+    t_discard_a -> p_discarded;
+    t_discard_b -> p_discarded;
+    p_selected -> t_complete;
+    t_complete -> p_complete;
+
+    {rank=min; p_start};
+    {rank=max; p_complete};
+}

@@ -1,0 +1,39 @@
+digraph "WCP-14: Multiple Instances (Runtime)" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_data [label="p_data", xlabel="input data"];
+    p_count [label="p_count", xlabel="N"];
+    p_pool [label="p_pool", xlabel="instances"];
+    p_running [label="p_running"];
+    p_complete [label="p_complete"];
+    p_all_spawned [label="p_all_spawned"];
+    p_end [label="p_end"];
+
+    // Transitions
+    t_eval [shape=box, label="eval N"];
+    t_spawn [shape=box, label="spawn"];
+    t_exec [shape=box, label="execute"];
+    t_collect [shape=box, label="collect"];
+    t_join [shape=box, label="join"];
+
+    // Arcs
+    p_start -> t_eval;
+    t_eval -> p_count;
+    p_count -> t_spawn [label="N instances"];
+    t_spawn -> p_pool;
+    t_spawn -> p_all_spawned;
+    p_pool -> t_exec;
+    t_exec -> p_running;
+    p_running -> t_collect;
+    t_collect -> p_complete;
+    p_complete -> t_join;
+    p_all_spawned -> t_join;
+    t_join -> p_end;
+
+    {rank=min; p_start};
+    {rank=max; p_end};
+}

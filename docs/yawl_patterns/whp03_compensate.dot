@@ -1,0 +1,37 @@
+digraph "WHP-3: Compensate" {
+    rankdir=LR;
+    node [shape=circle, fixedsize=true, width=0.6];
+    edge [fontsize=10];
+
+    // Places
+    p_start [label="p_start"];
+    p_activity [label="p_activity"];
+    p_compensable [label="p_compensable"];
+    p_failed [label="p_failed"];
+    p_compensating [label="p_compensating"];
+    p_compensated [label="p_compensated"];
+
+    // Transitions
+    t_execute [shape=box, label="execute"];
+    t_complete [shape=box, label="complete"];
+    t_fail [shape=box, label="fail"];
+    t_compensate [shape=box, label="compensate"];
+    t_undo [shape=box, label="undo"];
+    t_done [shape=box, label="done"];
+
+    // Arcs
+    p_start -> t_execute;
+    t_execute -> p_activity;
+    p_activity -> t_complete [label="success"];
+    t_complete -> p_compensable;
+    p_activity -> t_fail [label="error"];
+    t_fail -> p_failed;
+    p_failed -> t_compensate;
+    p_compensable -> t_compensate [label="trigger"];
+    t_compensate -> p_compensating;
+    p_compensating -> t_undo;
+    t_undo -> p_compensated;
+
+    {rank=min; p_start};
+    {rank=max; p_compensated};
+}
