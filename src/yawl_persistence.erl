@@ -122,30 +122,21 @@ init_schema() ->
     %% Create Mnesia schema if it doesn't exist
     _ = case mnesia:create_schema([Node]) of
         ok ->
-            error_logger:info_report([{module, ?MODULE},
-                                     {action, create_schema},
-                                     {node, Node}]);
+            logger:info("Mnesia schema created on node ~p", [Node]);
         {error, {already_exists, Node}} ->
-            error_logger:info_report([{module, ?MODULE},
-                                     {action, schema_exists},
-                                     {node, Node}]);
+            logger:info("Mnesia schema already exists on node ~p", [Node]);
         {error, SchemaReason} ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, create_schema},
-                                      {error, SchemaReason}])
+            logger:error("Failed to create Mnesia schema: ~p", [SchemaReason])
     end,
 
     %% Start Mnesia
     _ = case mnesia:start() of
         ok ->
-            error_logger:info_report([{module, ?MODULE},
-                                     {action, mnesia_started}]);
+            logger:info("Mnesia started successfully");
         {error, {already_started, _}} ->
             ok;
         {error, StartReason} ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, mnesia_start},
-                                      {error, StartReason}])
+            logger:error("Failed to start Mnesia: ~p", [StartReason])
     end,
 
     %% Create persistent_case table
@@ -155,20 +146,13 @@ init_schema() ->
                {type, set}],
     CaseResult = case mnesia:create_table(persistent_case, CaseDef) of
         {atomic, ok} ->
-            error_logger:info_report([{module, ?MODULE},
-                                     {action, create_table},
-                                     {table, persistent_case}]),
+            logger:info("Created persistent_case table"),
             ok;
         {aborted, {already_exists, persistent_case}} ->
-            error_logger:info_report([{module, ?MODULE},
-                                     {action, table_exists},
-                                     {table, persistent_case}]),
+            logger:info("persistent_case table already exists"),
             ok;
         {aborted, CaseReason} ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, create_table},
-                                      {table, persistent_case},
-                                      {error, CaseReason}]),
+            logger:error("Failed to create persistent_case table: ~p", [CaseReason]),
             {error, CaseReason}
     end,
 
@@ -180,20 +164,13 @@ init_schema() ->
                    {index, [case_id]}],
     WorkitemResult = case mnesia:create_table(persistent_workitem, WorkitemDef) of
         {atomic, ok} ->
-            error_logger:info_report([{module, ?MODULE},
-                                     {action, create_table},
-                                     {table, persistent_workitem}]),
+            logger:info("Created persistent_workitem table"),
             ok;
         {aborted, {already_exists, persistent_workitem}} ->
-            error_logger:info_report([{module, ?MODULE},
-                                     {action, table_exists},
-                                     {table, persistent_workitem}]),
+            logger:info("persistent_workitem table already exists"),
             ok;
         {aborted, WorkitemReason} ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, create_table},
-                                      {table, persistent_workitem},
-                                      {error, WorkitemReason}]),
+            logger:error("Failed to create persistent_workitem table: ~p", [WorkitemReason]),
             {error, WorkitemReason}
     end,
 
@@ -202,15 +179,10 @@ init_schema() ->
         ok ->
             ok;
         {timeout, Tables} ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, wait_for_tables},
-                                      {error, timeout},
-                                      {tables, Tables}]),
+            logger:error("Timeout waiting for tables: ~p", [Tables]),
             {error, {timeout, Tables}};
         {error, WaitReason} ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, wait_for_tables},
-                                      {error, WaitReason}]),
+            logger:error("Error waiting for tables: ~p", [WaitReason]),
             {error, WaitReason}
     end,
 
@@ -274,12 +246,8 @@ save_case(CaseRecord) when is_tuple(CaseRecord), tuple_size(CaseRecord) >= 1 ->
                 {error, {unknown_record_type, element(1, CaseRecord)}}
         end
     catch
-        Kind:Reason:Stack ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, save_case},
-                                      {error, Kind},
-                                      {reason, Reason},
-                                      {stacktrace, Stack}]),
+        Kind:Reason:_Stack ->
+            logger:error("Error saving case: ~p: ~p", [Kind, Reason]),
             {error, {Kind, Reason}}
     end.
 
@@ -290,14 +258,10 @@ save_case_record(Case) ->
     end,
     case mnesia:transaction(Transaction) of
         {atomic, ok} ->
-            error_logger:info_report([{module, ?MODULE},
-                                     {action, save_case},
-                                     {case_id, Case#persistent_case.case_id}]),
+            logger:info("Saved case: ~p", [Case#persistent_case.case_id]),
             {ok, Case#persistent_case.case_id};
         {aborted, Reason} ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, save_case},
-                                      {error, Reason}]),
+            logger:error("Transaction failed for save_case: ~p", [Reason]),
             {error, Reason}
     end.
 
@@ -329,10 +293,7 @@ load_case(CaseId) when is_binary(CaseId) ->
         {atomic, {error, not_found}} ->
             {error, not_found};
         {aborted, Reason} ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, load_case},
-                                      {case_id, CaseId},
-                                      {error, Reason}]),
+            logger:error("Error loading case ~p: ~p", [CaseId, Reason]),
             {error, Reason}
     end.
 
@@ -367,17 +328,12 @@ delete_case(CaseId) when is_binary(CaseId) ->
     end,
     case mnesia:transaction(Transaction) of
         {atomic, ok} ->
-            error_logger:info_report([{module, ?MODULE},
-                                     {action, delete_case},
-                                     {case_id, CaseId}]),
+            logger:info("Deleted case: ~p", [CaseId]),
             ok;
         {atomic, {error, not_found}} ->
             {error, not_found};
         {aborted, Reason} ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, delete_case},
-                                      {case_id, CaseId},
-                                      {error, Reason}]),
+            logger:error("Error deleting case ~p: ~p", [CaseId, Reason]),
             {error, Reason}
     end.
 
@@ -436,7 +392,7 @@ save_workitem(WorkitemRecord) when is_tuple(WorkitemRecord), tuple_size(Workitem
         end
     catch
         Kind:Reason:Stack ->
-            error_logger:error_report([{module, ?MODULE},
+            logger:error([{module, ?MODULE},
                                       {action, save_workitem},
                                       {error, Kind},
                                       {reason, Reason},
@@ -451,12 +407,12 @@ save_workitem_record(Workitem) ->
     end,
     case mnesia:transaction(Transaction) of
         {atomic, ok} ->
-            error_logger:info_report([{module, ?MODULE},
+            logger:info([{module, ?MODULE},
                                      {action, save_workitem},
                                      {workitem_id, Workitem#persistent_workitem.workitem_id}]),
             {ok, Workitem#persistent_workitem.workitem_id};
         {aborted, Reason} ->
-            error_logger:error_report([{module, ?MODULE},
+            logger:error([{module, ?MODULE},
                                       {action, save_workitem},
                                       {error, Reason}]),
             {error, Reason}
@@ -484,7 +440,7 @@ load_workitems(CaseId) when is_binary(CaseId) ->
             Maps = [workitem_to_map(W) || W <- Workitems],
             {ok, Maps};
         {aborted, Reason} ->
-            error_logger:error_report([{module, ?MODULE},
+            logger:error([{module, ?MODULE},
                                       {action, load_workitems},
                                       {case_id, CaseId},
                                       {error, Reason}]),
@@ -513,7 +469,7 @@ list_active_cases() ->
             ActiveCases = lists:map(fun case_to_map/1, Running ++ Suspended),
             {ok, ActiveCases};
         {aborted, Reason} ->
-            error_logger:error_report([{module, ?MODULE},
+            logger:error([{module, ?MODULE},
                                       {action, list_active_cases},
                                       {error, Reason}]),
             {ok, []}
@@ -558,13 +514,13 @@ cleanup_expired_cases() ->
     case mnesia:transaction(Transaction) of
         {atomic, {ok, Count, ExpiredCases}} ->
             CaseIds = [C#persistent_case.case_id || C <- ExpiredCases],
-            error_logger:info_report([{module, ?MODULE},
+            logger:info([{module, ?MODULE},
                                      {action, cleanup_expired_cases},
                                      {count, Count},
                                      {case_ids, CaseIds}]),
             {ok, Count};
         {aborted, Reason} ->
-            error_logger:error_report([{module, ?MODULE},
+            logger:error([{module, ?MODULE},
                                       {action, cleanup_expired_cases},
                                       {error, Reason}]),
             {error, Reason}
@@ -588,7 +544,7 @@ get_case_count() ->
         {atomic, Count} when is_integer(Count) ->
             {ok, Count};
         {aborted, Reason} ->
-            error_logger:error_report([{module, ?MODULE},
+            logger:error([{module, ?MODULE},
                                       {action, get_case_count},
                                       {error, Reason}]),
             {error, Reason}

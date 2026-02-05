@@ -769,7 +769,9 @@ emit_telemetry(Metric) ->
                 EventName = [yawl, metric, erlang:binary_to_existing_atom(Metric#metric.name, utf8)],
                 Measurements = #{value => Metric#metric.value},
                 Metadata = maps:put(timestamp, Metric#metric.timestamp, Metric#metric.labels),
-                telemetry:execute(EventName, Measurements, Metadata)
+                % telemetry:execute/2 is the correct signature (EventName, Measurements)
+                % Metadata is passed as part of Measurements map or via telemetry:attach/4 handlers
+                telemetry:execute(EventName, Measurements#{metadata => Metadata})
             catch
                 _:_ -> ok
             end

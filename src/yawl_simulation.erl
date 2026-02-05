@@ -829,12 +829,15 @@ calculate_risk_factors(CycleTimes, Results) ->
         _ -> StdDev / Mean
     end,
 
+    %% lists:count/2 was removed in OTP 26; use length(lists:filter/2) instead
+    OutlierCount = length(lists:filter(fun(T) -> T > Mean * 2 end, CycleTimes)),
+
     #{
         failure_rate => FailureRate,
         variability_risk => min(1.0, CV),
         time_risk => case Mean of
             0 -> 0;
-            _ -> lists:count(fun(T) -> T > Mean * 2 end, CycleTimes) / length(CycleTimes)
+            _ -> OutlierCount / length(CycleTimes)
         end
     }.
 

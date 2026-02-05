@@ -427,9 +427,11 @@ send_smtp_email(From, To, Cc, Subject, Body) ->
 send_via_gen_smtp(From, To, Cc, Subject, Message) ->
     Email = From,
     Recipients = To ++ Cc,
-    case gen_smtp_client:send_blocking(
+    % Use send/2 instead of deprecated send_blocking/2
+    % The modern gen_smtp_client API uses send/2 with async delivery
+    case gen_smtp_client:send(
         {Email, Recipients},
-        [{subject, Subject}, {body, Message}]
+        [{subject, Subject}, {body, Message}, {relayed, false}]
     ) of
         {ok, _} -> ok;
         {error, Reason} -> {error, Reason}

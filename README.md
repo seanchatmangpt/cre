@@ -43,10 +43,10 @@ Although the cfl_re library can be imported also directly from GitHub, we recomm
 
 #### rebar3
 
-To integrate the cfl_re into a rebar3 managed project change the `deps` entry in your application's `rebar.config` file to include the tuple `{cre, "0.1.10"}`.
+To integrate the cfl_re into a rebar3 managed project change the `deps` entry in your application's `rebar.config` file to include the tuple `{cre, "0.2.0"}`.
 
 ```erlang
-{deps, [{cre, "0.1.10"}]}.
+{deps, [{cre, "0.2.0"}]}.
 ```
 
 #### mix
@@ -54,7 +54,7 @@ To integrate the cfl_re into a rebar3 managed project change the `deps` entry in
 In an Elixir context, the cfl_re can be integrated into the project via mix.
 
 ```elixir
-{:cre, "~> 0.1.10"}
+{:cre, "~> 0.2.0"}
 ```
 
 ### Starting the cfl_re Master
@@ -478,7 +478,7 @@ Note that even though the reduction rules we gave here are encoded as determinis
 
 ## System Requirements
 
-- [Erlang](https://www.erlang.org) OTP 19.0 or higher
+- [Erlang](https://www.erlang.org) OTP 25.0 or higher
 - [Rebar3](https://www.rebar3.org) 3.0.0 or higher
 
 ## Resources

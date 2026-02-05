@@ -384,9 +384,10 @@ term_to_map(Value) -> #{value => Value}.
 %%--------------------------------------------------------------------
 -spec xmerl_to_simple(term()) -> xml_element().
 xmerl_to_simple(XmlEl) ->
-    Name = list_to_binary(xmerl_lib:get_tag_name(XmlEl)),
-    Attrs = convert_xmerl_attrs(xmerl_lib:get_attributes(XmlEl)),
-    Content = [xmerl_content_to_simple(C) || C <- xmerl_lib:get_content(XmlEl)],
+    % Access xmlElement record fields directly instead of using deprecated xmerl_lib functions
+    Name = list_to_binary(XmlEl#xmlElement.name),
+    Attrs = convert_xmerl_attrs(XmlEl#xmlElement.attributes),
+    Content = [xmerl_content_to_simple(C) || C <- XmlEl#xmlElement.content],
     {Name, Attrs, Content}.
 
 %%--------------------------------------------------------------------
@@ -480,7 +481,8 @@ parse_attr(Attr) ->
 -spec xml_element_to_map(xml_element()) -> xml_map().
 xml_element_to_map({Name, Attrs, Content}) ->
     ContentMap = content_to_map(Content),
-    maps:merge(#{<<"__name">> => Name}, maps:from_list(Attrs), ContentMap).
+    % maps:merge/3 doesn't exist; use nested maps:merge/2 calls
+    maps:merge(maps:merge(#{<<"__name">> => Name}, maps:from_list(Attrs)), ContentMap).
 
 %%--------------------------------------------------------------------
 %% @private Converts content to map.

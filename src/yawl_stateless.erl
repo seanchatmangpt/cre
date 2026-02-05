@@ -49,10 +49,6 @@
 -module(yawl_stateless).
 -behaviour(gen_server).
 
-%% Suppress deprecation warning for code:lib_dir/2
-%% The function is still safe to use for our purposes
--compile({nowarn_deprecated_function, [{code, lib_dir, 2}]}).
-
 %%====================================================================
 %% Exports
 %%====================================================================
@@ -275,11 +271,13 @@ resume_execution(ExecutionId) when is_binary(ExecutionId) ->
 -spec init([]) -> {ok, #stateless_state{}}.
 
 init([]) ->
-    error_logger:info_report([{yawl_stateless, starting}, {pid, self()}]),
+    logger:info([{yawl_stateless, starting}, {pid, self()}],
+                 "Starting stateless execution service"),
     %% Create checkpoint directory if it doesn't exist
-    PrivDir = case code:lib_dir(cre, priv) of
+    %% Use code:lib_dir/1 for OTP 25+ compatibility (code:lib_dir/2 is deprecated)
+    PrivDir = case code:lib_dir(cre) of
         {error, bad_name} -> "priv";
-        Dir -> Dir
+        Dir -> Dir ++ "/priv"
     end,
     CheckpointDir = PrivDir ++ "/checkpoints",
     ok = filelib:ensure_dir(CheckpointDir ++ "/"),
@@ -468,6 +466,22 @@ handle_call({resume, ExecutionId}, _From, State) ->
             {reply, {error, not_paused}, State}
     end;
 
+handle_call({delete_completed_case, ExecutionId}, _From, State) ->
+    case maps:get(ExecutionId, State#stateless_state.executions, undefined) of
+        undefined ->
+            {reply, {error, not_found}, State};
+        #execution_state{status = completed} = ExecState ->
+            %% Check if it's actually completed
+            if ExecState#execution_state.end_time =/= undefined ->
+                NewExecutions = maps:remove(ExecutionId, State#stateless_state.executions),
+                {reply, ok, State#stateless_state{executions = NewExecutions}};
+            true ->
+                {reply, {error, not_completed}, State}
+            end;
+        _ ->
+            {reply, {error, not_completed}, State}
+    end;
+
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_request}, State}.
 
@@ -514,8 +528,12 @@ handle_info({execute_step, ExecutionId}, State) ->
             %% Execute current step
             case execute_workflow_step(CurrentStep, ExecState) of
                 {ok, StepResult} ->
+                    NextStep = case RemainingSteps of
+                        [] -> CurrentStep;
+                        [H | _] -> H
+                    end,
                     NewExecState = ExecState#execution_state{
-                        current_step = hd(RemainingSteps),
+                        current_step = NextStep,
                         steps_completed = [CurrentStep | ExecState#execution_state.steps_completed],
                         steps_remaining = RemainingSteps,
                         data = maps:merge(ExecState#execution_state.data, StepResult)

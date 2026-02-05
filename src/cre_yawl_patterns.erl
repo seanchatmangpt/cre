@@ -995,7 +995,9 @@ trigger_implicit_termination('p_work', Token, NetState) ->
             UpdatedState = PatternState#pattern_state{
               instance_count = PatternState#pattern_state.instance_count + 1
             },
-            gen_pnet:set_usr_info(NetState, UpdatedState),
+            %% Store updated state in process dictionary for next access
+            %% Note: gen_pnet usr_info is immutable during trigger execution
+            put(pattern_state, UpdatedState),
             pass;
         _ ->
             pass
@@ -1020,7 +1022,9 @@ trigger_no_sync('p_done', Token, NetState) ->
     UpdatedState = PatternState#pattern_state{
       completed_instances = UpdatedCompleted
     },
-    gen_pnet:set_usr_info(NetState, UpdatedState),
+    %% Store updated state in process dictionary for next access
+    %% Note: gen_pnet usr_info is immutable during trigger execution
+    put(pattern_state, UpdatedState),
     pass;
 
 trigger_no_sync(_Place, _Token, _NetState) ->

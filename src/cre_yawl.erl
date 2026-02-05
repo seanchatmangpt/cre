@@ -69,7 +69,8 @@
 
 -export([new_workflow/0, new_workflow/1]).
 -export([add_task/3, add_condition/3, set_split_type/3, set_join_type/3, connect/3]).
--export([validate/1, get_errors/1, get_workflow_id/1, get_workflow_name/1, get_tasks/1, get_connections/1, get_conditions/1]).
+-export([validate/1, get_errors/1, get_workflow_id/1, get_workflow_name/1,
+         get_tasks/1, get_connections/1, get_conditions/1, set_workflow_boundaries/3]).
 -export([sequence/0, parallel_split/0, synchronization/0, exclusive_choice/0,
          simple_merge/0, multi_choice/0, synchronizing_merge/0, multi_merge/0,
          discriminator/0, arbitration/0]).
@@ -263,6 +264,42 @@ get_connections(#workflow{connections = Conns}) -> {ok, Conns}.
 %%--------------------------------------------------------------------
 -spec get_conditions(#workflow{}) -> {ok, #{element_id() => #yawl_condition{}}}.
 get_conditions(#workflow{conditions = Conds}) -> {ok, Conds}.
+
+%%--------------------------------------------------------------------
+%% @doc Sets the start and end task boundaries for a workflow.
+%%
+%% Validates that the specified start and end tasks exist in the workflow
+%% before setting them. Returns an error if any task is not found.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec set_workflow_boundaries(Workflow :: #workflow{},
+                              StartTaskId :: element_id(),
+                              EndTaskIds :: [element_id()]) ->
+          #workflow{} | {error, term()}.
+
+set_workflow_boundaries(#workflow{tasks = Tasks} = Workflow, StartTaskId, EndTaskIds)
+  when is_binary(StartTaskId), is_list(EndTaskIds) ->
+    %% Validate start task exists
+    case maps:is_key(StartTaskId, Tasks) of
+        false ->
+            {error, {start_task_not_found, StartTaskId}};
+        true ->
+            %% Validate all end tasks exist
+            case lists:foldl(fun(EndTaskId, Acc) ->
+                case maps:is_key(EndTaskId, Tasks) of
+                    false -> {error, {end_task_not_found, EndTaskId}};
+                    true -> Acc
+                end
+            end, ok, EndTaskIds) of
+                {error, _} = Error -> Error;
+                ok ->
+                    Workflow#workflow{
+                        start_task_id = StartTaskId,
+                        end_task_ids = EndTaskIds
+                    }
+            end
+    end.
 
 %% Pattern constructors
 -spec sequence() -> #sequence{}.

@@ -496,11 +496,10 @@ prepare_case(Task, UsrInfo) ->
     TaskRegistry = UsrInfo#worker_state.task_registry,
     case maps:is_key(TaskName, TaskRegistry) of
         false ->
-            error_logger:warning_report([
-                {module, ?MODULE},
-                {task_not_found, TaskName},
-                {task_id, TaskId}
-            ]);
+            logger:warning([{module, ?MODULE},
+                           {task_not_found, TaskName},
+                           {task_id, TaskId}],
+                          "Task not found in registry");
         true ->
             ok
     end,
@@ -515,13 +514,12 @@ prepare_case(Task, UsrInfo) ->
     },
 
     %% Log task start
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, prepare_case},
-        {task_id, TaskId},
-        {task_name, TaskName},
-        {task_type, Task#yawl_task.type}
-    ]),
+    logger:info([{module, ?MODULE},
+                 {action, prepare_case},
+                 {task_id, TaskId},
+                 {task_name, TaskName},
+                 {task_type, Task#yawl_task.type}],
+                "Task prepared"),
 
     ok.
 
@@ -636,13 +634,12 @@ error_to_expr(Task, Reason, UsrInfo) ->
     TaskName = Task#yawl_task.name,
 
     %% Log the error
-    error_logger:error_report([
-        {module, ?MODULE},
-        {action, task_failed},
-        {task_id, TaskId},
-        {task_name, TaskName},
-        {reason, Reason}
-    ]),
+    logger:error([{module, ?MODULE},
+                  {action, task_failed},
+                  {task_id, TaskId},
+                  {task_name, TaskName},
+                  {reason, Reason}],
+                 "Task execution failed"),
 
     %% Check for exception handlers
     ExceptionHandlers = UsrInfo#worker_state.exception_handlers,
@@ -693,12 +690,11 @@ cleanup_case(Task, Result, UsrInfo) ->
     TaskId = Task#yawl_task.id,
 
     %% Log completion
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, cleanup_case},
-        {task_id, TaskId},
-        {result_status, element(1, Result)}
-    ]),
+    logger:info([{module, ?MODULE},
+                 {action, cleanup_case},
+                 {task_id, TaskId},
+                 {result_status, element(1, Result)}],
+                "Task cleanup completed"),
 
     %% Cache the result if configured
     case maps:get(cache_results, UsrInfo#worker_state.config, true) of
@@ -822,12 +818,11 @@ handle_cast({register_task_handler, TaskName, HandlerFun, TaskType}, State) ->
      },
     TaskRegistry = maps:put(TaskName, Entry, State#worker_state.task_registry),
 
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, register_task_handler},
-        {task_name, TaskName},
-        {task_type, TaskType}
-    ]),
+    logger:info([{module, ?MODULE},
+                 {action, register_task_handler},
+                 {task_name, TaskName},
+                 {task_type, TaskType}],
+                "Task handler registered"),
 
     {noreply, State#worker_state{task_registry = TaskRegistry}};
 
@@ -889,11 +884,10 @@ handle_cast(_Request, State) ->
 handle_info({'DOWN', _Ref, process, _Pid, normal}, State) ->
     {noreply, State};
 handle_info({'DOWN', _Ref, process, _Pid, Reason}, State) ->
-    error_logger:warning_report([
-        {module, ?MODULE},
-        {action, process_down},
-        {reason, Reason}
-    ]),
+    logger:warning([{module, ?MODULE},
+                    {action, process_down},
+                    {reason, Reason}],
+                   "Process monitored went down"),
     {noreply, State};
 
 handle_info(_Info, State) ->

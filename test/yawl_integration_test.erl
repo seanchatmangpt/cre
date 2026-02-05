@@ -180,36 +180,53 @@ integration_test_() ->
 %%====================================================================
 
 setup_integration() ->
-    %% Start CRE application
-    {ok, _} = application:ensure_all_started(cre),
+    %% Start CRE application - handle already_started case
+    case application:ensure_all_started(cre) of
+        {ok, _} -> ok;
+        {error, {already_started, _}} -> ok
+    end,
 
-    %% Start YAWL control panel
-    {ok, _ControlPid} = yawl_control:start_control(yawl_control),
+    %% Start YAWL control panel - handle already started case
+    case whereis(yawl_control) of
+        undefined ->
+            {ok, _ControlPid} = yawl_control:start_control(yawl_control);
+        _Pid ->
+            ok
+    end,
 
-    %% Start authentication server
-    {ok, _AuthPid} = yawl_auth:start_auth(),
+    %% Start authentication server - handle already started case
+    case whereis(yawl_auth) of
+        undefined ->
+            {ok, _AuthPid} = yawl_auth:start_auth();
+        _Pid ->
+            ok
+    end,
 
     %% Start resourcing service with proper gen_server registration
-    %% Use gen_server:start instead of start_link to avoid trapping exits
     case whereis(yawl_resourcing) of
         undefined ->
             {ok, _ResourcingPid} = gen_server:start({local, yawl_resourcing}, yawl_resourcing, [], []);
         _Pid ->
-            %% Already running, possibly from a previous test
             ok
     end,
 
     %% Create test user for authentication tests with proper role format
-    {ok, _UserId} = yawl_auth:create_user(
+    %% Handle user already existing case
+    case yawl_auth:create_user(
         <<"test_user">>,
         <<"TestPassword123!">>,
         [<<"admin">>, <<"workflow:execute">>]
-    ),
+    ) of
+        {ok, _UserId} -> ok;
+        {error, _} -> ok  %% User already exists, that's fine
+    end,
 
     %% Get the resourcing pid for the context
     ResourcingPid = whereis(yawl_resourcing),
+    ControlPid = whereis(yawl_control),
+    AuthPid = whereis(yawl_auth),
 
-    #{control_pid => _ControlPid, auth_pid => _AuthPid, resourcing_pid => ResourcingPid}.
+    #{control_pid => ControlPid, auth_pid => AuthPid, resourcing_pid => ResourcingPid}.
 
 cleanup_integration(_Context) ->
     %% Stop resourcing service if running

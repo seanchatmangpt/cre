@@ -99,13 +99,27 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Setup function called before each test.
+%% @doc Setup function called before before each test.
 %% @end
 %%--------------------------------------------------------------------
 setup() ->
-    application:ensure_all_started(cre),
-    {ok, CrePid} = cre:pid(node()),
-    CrePid.
+    %% Start CRE application - handle already_started case
+    case application:ensure_all_started(cre) of
+        {ok, _} -> ok;
+        {error, {already_started, _}} -> ok
+    end,
+    %% Wait for cre_master to be registered (fix for race condition)
+    timer:sleep(100),
+    %% For local node, use erlang:whereis directly instead of rpc:call
+    case erlang:whereis(cre_master) of
+        undefined ->
+            %% Retry once more if process not yet registered
+            timer:sleep(200),
+            CrePid = erlang:whereis(cre_master),
+            {ok, CrePid};
+        CrePid ->
+            {ok, CrePid}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Cleanup function called after each test.

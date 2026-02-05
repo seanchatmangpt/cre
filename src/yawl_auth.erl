@@ -25,7 +25,7 @@
 %%
 %% <h3>Features</h3>
 %% <ul>
-%%   <li>Password hashing using bcrypt (work factor 12)</li>
+%%   <li>Password hashing using PBKDF2-HMAC-SHA256 (100,000 iterations)</li>
 %%   <li>Secure password strength validation</li>
 %%   <li>Session management with expiration</li>
 %%   <li>Role-based access control (RBAC)</li>
@@ -33,9 +33,10 @@
 %% </ul>
 %%
 %% <h3>Password Security</h3>
-%% Passwords are hashed using bcrypt with a work factor of 12, which
-%% provides approximately 2^12 iterations. The bcrypt library automatically
-%% handles salt generation and inclusion in the hash output.
+%% Passwords are hashed using PBKDF2-HMAC-SHA256 with 100,000 iterations
+%% and a 16-byte random salt. This uses the built-in Erlang crypto module
+%% for OTP 25+ compatibility without external dependencies. The salt is
+%% embedded in the stored hash for verification.
 %%
 %% @end
 %% -------------------------------------------------------------------
@@ -362,15 +363,8 @@ get_expires_at(#session{expires_at = ExpiresAt}) -> ExpiresAt.
 
 %% @private
 init(Options) ->
-    %% Initialize bcrypt library (handle if already started)
-    case bcrypt:start() of
-        ok ->
-            continue_init(Options);
-        {error, {already_started, bcrypt}} ->
-            continue_init(Options);
-        Error ->
-            {stop, {bcrypt_init_failed, Error}}
-    end.
+    %% No external password library needed - using built-in crypto module
+    continue_init(Options).
 
 %% @private
 continue_init(Options) ->
@@ -443,39 +437,49 @@ terminate(_Reason, _State) ->
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @private Hashes a password using bcrypt with work factor 12.
-%% The bcrypt library automatically generates a salt and embeds it
+%% @private Hashes a password using PBKDF2-HMAC-SHA256.
+%% Generates a 16-byte random salt and embeds it with the derived key
 %% in the resulting hash, which can later be used for verification.
 %%
-%% Work factor 12 provides approximately 2^12 = 4096 iterations,
-%% which is considered secure as of 2024. This can be increased
-%% over time as hardware improves.
+%% 100,000 iterations provides strong security while maintaining
+%% reasonable performance. This can be increased over time as
+%% hardware improves.
+%%
+%% The stored hash format is: <<Salt:16/binary, DerivedKey:32/binary>>
 %% @end
 %%--------------------------------------------------------------------
 -spec hash_password(binary()) -> password_hash().
 hash_password(Password) ->
-    {ok, Salt} = bcrypt:gen_salt(12),
-    case bcrypt:hashpw(Password, Salt) of
-        {ok, Hash} -> Hash;
-        {error, Reason} -> error({bcrypt_hash_failed, Reason})
-    end.
+    Salt = crypto:strong_rand_bytes(16),
+    Iterations = 100000,
+    %% Handle both OTP versions - some return binary, some return {ok, binary}
+    DerivedKey = case crypto:pbkdf2_hmac(sha256, Password, Salt, Iterations, 32) of
+        {ok, Key} -> Key;
+        Key when is_binary(Key) -> Key
+    end,
+    <<Salt/binary, DerivedKey/binary>>.
 
 %%--------------------------------------------------------------------
-%% @private Verifies a password against a bcrypt hash.
-%% Uses bcrypt:hashpw/2 which safely re-hashes the password with
-%% the salt embedded in the stored hash.
+%% @private Verifies a password against a PBKDF2 hash.
+%% Extracts the salt from the stored hash and re-computes the derived key
+%% for comparison.
 %% @end
 %%--------------------------------------------------------------------
 -spec verify_password(binary(), password_hash()) -> boolean().
-verify_password(Password, StoredHash) ->
+verify_password(Password, StoredHash) when byte_size(StoredHash) =:= 48 ->
     try
-        case bcrypt:hashpw(Password, StoredHash) of
-            {ok, ComputedHash} -> ComputedHash =:= StoredHash;
-            {error, _Reason} -> false
-        end
+        <<Salt:16/binary, StoredDerivedKey:32/binary>> = StoredHash,
+        Iterations = 100000,
+        ComputedKey = case crypto:pbkdf2_hmac(sha256, Password, Salt, Iterations, 32) of
+            {ok, Key} -> Key;
+            Key when is_binary(Key) -> Key
+        end,
+        ComputedKey =:= StoredDerivedKey
     catch
         _:_ -> false
-    end.
+    end;
+verify_password(_, _) ->
+    false.
 
 %%--------------------------------------------------------------------
 %% @private Generates a unique ID.
