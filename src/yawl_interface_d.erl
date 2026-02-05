@@ -434,7 +434,7 @@ abort_worklet(ExecutionId) ->
 %% @private
 init(_Arg) ->
     process_flag(trap_exit, true),
-    error_logger:info_report([{module, ?MODULE}, {action, init}]),
+    logger:info("Interface D initialized", [{module, ?MODULE}]),
     {ok, #interface_d_state{compensation_log = []}}.
 
 %% @private
@@ -465,13 +465,9 @@ handle_call({launch_worklet, CaseId, WorkletSpecId, ExceptionData}, _From, State
             %% Notify yawl_worklet about the launch
             notify_worklet_launched(Execution),
 
-            error_logger:info_report([
-                {module, ?MODULE},
-                {action, worklet_launched},
-                {execution_id, ExecutionId},
-                {case_id, CaseId},
-                {worklet_spec_id, WorkletSpecId}
-            ]),
+            logger:info("Worklet launched: id=~p case=~p spec=~p",
+                        [ExecutionId, CaseId, WorkletSpecId],
+                        [{module, ?MODULE}, {action, worklet_launched}]),
 
             {reply, {ok, ExecutionId}, State#interface_d_state{
                 active_worklets = [Execution | ActiveWorklets]
@@ -524,13 +520,10 @@ handle_call({complete_worklet, ExecutionId, Result}, _From, State) ->
             %% Notify completion
             notify_worklet_completed(CompletedExec),
 
-            error_logger:info_report([
-                {module, ?MODULE},
-                {action, worklet_completed},
-                {execution_id, ExecutionId},
-                {case_id, CaseId},
-                {status, CompletedExec#worklet_execution.status}
-            ]),
+            logger:info("Worklet completed: id=~p status=~p",
+                          [ExecutionId, CompletedExec#worklet_execution.status],
+                          [{module, ?MODULE}, {action, worklet_completed},
+                           {case_id, CaseId}]),
 
             {reply, ok, State#interface_d_state{active_worklets = UpdatedWorklets}};
         #worklet_execution{status = Status} ->
@@ -584,13 +577,9 @@ handle_call({register_exception_service, ServiceName, Config}, _From, State) ->
                 priority = Priority
             },
 
-            error_logger:info_report([
-                {module, ?MODULE},
-                {action, service_registered},
-                {service_id, ServiceId},
-                {service_name, ServiceName},
-                {service_type, ServiceType}
-            ]),
+            logger:info("Exception service registered: id=~p name=~p type=~p",
+                          [ServiceId, ServiceName, ServiceType],
+                          [{module, ?MODULE}, {action, service_registered}]),
 
             {reply, {ok, ServiceId}, State#interface_d_state{
                 exception_services = Services#{ServiceId => ExceptionService},
@@ -639,11 +628,8 @@ handle_call({abort_worklet, ExecutionId}, _From, #interface_d_state{active_workl
             %% Notify yawl_worklet about the abortion
             notify_worklet_aborted(AbortedExec),
 
-            error_logger:info_report([
-                {module, ?MODULE},
-                {action, worklet_aborted},
-                {execution_id, ExecutionId}
-            ]),
+            logger:info("Worklet aborted: id=~p", [ExecutionId],
+                        [{module, ?MODULE}, {action, worklet_aborted}]),
 
             {reply, ok, State#interface_d_state{active_worklets = UpdatedWorklets}};
         #worklet_execution{status = Status} ->
@@ -996,13 +982,10 @@ notify_worklet_aborted(#worklet_execution{execution_id = ExecId,
 do_propagate_exception(CaseId, ExceptionData, PropagationLevel, State) ->
     try
         %% Log the propagation
-        error_logger:warning_report([
-            {module, ?MODULE},
-            {action, exception_propagation},
-            {case_id, CaseId},
-            {propagation_level, PropagationLevel},
-            {exception_data, ExceptionData}
-        ]),
+        logger:warning("Exception propagation: case=~p level=~p",
+                      [CaseId, PropagationLevel],
+                      [{module, ?MODULE}, {action, exception_propagation},
+                       {exception_data, ExceptionData}]),
 
         %% Try to notify via IPC if available
         case whereis(yawl_ipc) of
@@ -1059,12 +1042,9 @@ do_coordinate_compensation(#worklet_execution{execution_id = ExecId,
                                               case_id = CaseId,
                                               exception_data = ExceptionData}, Log) ->
     try
-        error_logger:info_report([
-            {module, ?MODULE},
-            {action, coordinate_compensation},
-            {execution_id, ExecId},
-            {case_id, CaseId}
-        ]),
+        logger:info("Coordinate compensation: id=~p case=~p",
+                    [ExecId, CaseId],
+                    [{module, ?MODULE}, {action, coordinate_compensation}]),
 
         %% Check if compensation actions are defined
         CompensationActions = maps:get(compensation_actions, ExceptionData, []),
@@ -1132,21 +1112,16 @@ execute_compensation_actions([Action | Rest], ExecId, CaseId, Log) ->
             Fun when is_function(Fun, 1) ->
                 Fun(ExecId);
             _ ->
-                error_logger:warning_report([
-                    {module, ?MODULE},
-                    {action, invalid_compensation_action}
-                ])
+                logger:warning("Invalid compensation action",
+                              [{module, ?MODULE}, {action, invalid_compensation_action}])
         end,
         {ok, [{ExecId, action_completed, Timestamp} | Log]}
     catch
         Kind:Reason:Stack ->
-            error_logger:error_report([
-                {module, ?MODULE},
-                {action, compensation_failed},
-                {kind, Kind},
-                {reason, Reason},
-                {stacktrace, Stack}
-            ]),
+            logger:error("Compensation failed: kind=~p reason=~p",
+                       [Kind, Reason],
+                       [{module, ?MODULE}, {action, compensation_failed},
+                        {stacktrace, Stack}]),
             {error, [{ExecId, {action_failed, Kind, Reason}, Timestamp} | Log]}
     end,
 

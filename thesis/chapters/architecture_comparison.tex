@@ -1,0 +1,223 @@
+% -*- latex -*-
+%%
+% Chapter 4: Architecture Comparison
+%%
+%%====================================================================
+
+\chapter{Architecture Comparison}
+
+\section{Introduction}
+
+This chapter presents a detailed architectural comparison of the CRE
+and A2A YAWL implementations. Both systems implement the Order
+Fulfillment workflow but employ fundamentally different design
+philosophies.
+
+\section{CRE Architecture}
+
+\subsection{Design Philosophy}
+
+The CRE implementation follows a \textbf{direct Petri net modeling} approach:
+
+\begin{itemize}
+  \item Each workflow subprocess is implemented as a standalone
+        gen\_pnet behavior
+  \item Places and transitions are explicitly defined for each workflow
+  \item Token flow is managed by the gen\_pnet engine
+  \item State is maintained through callback functions
+\end{itemize}
+
+\subsection{Module Structure}
+
+Figure~\ref{fig:cre_architecture} shows the CRE module structure.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=1.5cm,
+  module/.style={rectangle, draw, minimum width=3cm, minimum height=1cm,
+                 align=center, fill=blue!10},
+  core/.style={rectangle, draw, minimum width=3cm, minimum height=1cm,
+                align=center, fill=green!10}
+]
+
+% Core modules
+\node[core] (cre_yawl) {cre\_yawl.erl\\(1,740 lines)};
+\node[module, below of=cre_yawl] (patterns) {cre\_yawl\_patterns.erl\\(pattern execution)};
+\node[module, below of=patterns] (xes) {yawl\_xes.erl\\(501 lines)};
+
+% Workflow modules
+\node[module, right=3cm of cre_yawl] (ordering) {ordering.erl\\(570 lines)};
+\node[module, below of=ordering] (payment) {payment.erl\\(730 lines)};
+\node[module, below of=payment] (carrier) {carrier\_appointment.erl\\(670 lines)};
+\node[module, below of=carrier] (transit) {freight\_in\_transit.erl\\(590 lines)};
+\node[module, below of=transit] (delivery) {freight\_delivered.erl\\(560 lines)};
+\node[module, right=3cm of ordering] (orchestrator) {order\_fulfillment.erl\\(702 lines)};
+
+% Types
+\node[module, left=3cm of cre_yawl] (types) {order\_fulfillment\_types.hrl\\(153 lines)};
+
+% Connections
+\draw[<->, dashed] (cre_yawl) -- (patterns);
+\draw[<->, dashed] (cre_yawl) -- (xes);
+\draw[<->, dashed] (cre_yawl) -- (ordering);
+\draw[<->, dashed] (cre_yawl) -- (payment);
+\draw[<->, dashed] (cre_yawl) -- (carrier);
+\draw[<->, dashed] (cre_yawl) -- (transit);
+\draw[<->, dashed] (cre_yawl) -- (delivery);
+\draw[<->, dashed] (orchestrator) -- (ordering);
+\draw[<->, dashed] (orchestrator) -- (payment);
+\draw[<->, dashed] (orchestrator) -- (carrier);
+\draw[<->, dashed] (orchestrator) -- (transit);
+\draw[<->, dashed] (orchestrator) -- (delivery);
+\draw[<->, dashed] (types) -- (ordering);
+\draw[<->, dashed] (types) -- (payment);
+\draw[<->, dashed] (types) -- (carrier);
+\draw[<->, dashed] (types) -- (transit);
+\draw[<->, dashed] (types) -- (delivery);
+
+\end{tikzpicture}
+\caption{CRE Implementation Module Structure}
+\label{fig:cre_architecture}
+\end{figure}
+
+\subsection{Implementation Characteristics}
+
+\begin{table}[htbp]
+\centering
+\caption{CRE Implementation Characteristics}
+\label{tab:cre_characteristics}
+\begin{tabular}{lr}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Total source lines & $\approx$43,387 \\
+Workflow source lines & $\approx$3,822 \\
+Core YAWL module (cre\_yawl.erl) & 1,740 lines \\
+Pattern execution (cre\_yawl\_patterns.erl) & Execution API \\
+XES logging (yawl\_xes.erl) & 501 lines \\
+Shared types (order\_fulfillment\_types.hrl) & 153 lines \\
+Number of workflow modules & 6 (5 subprocesses + orchestrator) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{A2A Architecture}
+
+\subsection{Design Philosophy}
+
+The A2A implementation follows a \textbf{pattern library} approach:
+
+\begin{itemize}
+  \item 43 predefined YAWL patterns in yawl\_patterns.erl (1,890 lines)
+  \item gen\_statem-based workflow instance manager
+  \item Comprehensive workflow infrastructure (REST API, persistence,
+        simulation)
+  \item Pattern composition approach for workflow construction
+\end{itemize}
+
+\subsection{Module Structure}
+
+The A2A system includes numerous specialized modules:
+
+\begin{itemize}
+  \item \textbf{Core patterns}: yawl\_patterns.erl (1,890 lines)
+  \item \textbf{Workflow instance}: yawl\_workflow\_instance.erl (1,125 lines)
+  \item \textbf{Simulation}: yawl\_simulation.erl (502 lines)
+  \item \textbf{REST API}: Multiple handler modules
+  \item \textbf{Persistence}: yawl\_persistence.erl (455 lines)
+  \item \textbf{Testing}: 68+ test files (84,474 lines)
+\end{itemize}
+
+\section{Design Philosophy Comparison}
+
+Table~\ref{tab:design_comparison} summarizes the key design differences.
+
+\begin{table}[htbp]
+\centering
+\caption{Design Philosophy Comparison}
+\label{tab:design_comparison}
+\begin{tabular}{p{5cm}p{5cm}p{5cm}}
+\toprule
+\textbf{Aspect} & \textbf{CRE Implementation} & \textbf{A2A Implementation} \\
+\midrule
+Workflow modeling & Direct Petri net definition & Pattern composition \\
+State management & gen\_pnet callbacks & gen\_statem state machine \\
+Pattern support & Implemented per workflow & Centralized pattern library \\
+XES logging & Integrated gen\_pnet module & Separate logging module \\
+Inter-process comm & Direct Erlang message passing & Coordinated via instance \\
+Extensibility & Add new gen\_pnet modules & Define new patterns \\
+Testing approach & Basic unit tests & Comprehensive test suite \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Component Analysis}
+
+\subsection{Petri Net Engine}
+
+Both implementations use gen\_pnet as the Petri net engine, but with
+different approaches:
+
+\textbf{CRE}: Each workflow module implements gen\_pnet directly:
+\begin{lstlisting}[language=Erlang]
+-module(ordering).
+-behaviour(gen_pnet).
+
+place_lst() -> ['p_input', 'p_order_received', ...].
+trsn_lst() -> ['t_receive_order', 't_check_inventory', ...].
+\end{lstlisting}
+
+\textbf{A2A}: Patterns are defined centrally and workflows compose them:
+\begin{lstlisting}[language=Erlang]
+%% Define pattern
+Pattern = yawl_patterns:create_pattern(sequence, Config),
+
+%% Compose into workflow
+Workflow = yawl_patterns:compose_patterns([Pattern1, Pattern2]).
+\end{lstlisting}
+
+\subsection{Workflow Orchestration}
+
+\textbf{CRE}: The order\_fulfillment.erl module orchestrates subprocesses
+through direct process spawning:
+
+\begin{lstlisting}[language=Erlang, basicstyle=\tiny\ttfamily]
+fire('t_start_ordering', ..., State) ->
+    {ok, OrderingPid} = ordering:start(Order),
+    Result = wait_for_subprocess(OrderingPid),
+    ...
+\end{lstlisting}
+
+\textbf{A2A}: The yawl\_workflow\_instance.erl manages workflow lifecycle
+as a state machine:
+
+\begin{lstlisting}[language=Erlang, basicstyle=\tiny\ttfamily]
+idle(cast, start_workflow, Data) ->
+    {next_state, running, Data, [{next_event, internal, process_tokens}]}.
+\end{lstlisting}
+
+\section{Trade-offs and Design Decisions}
+
+\subsection{Simplicity vs. Comprehensiveness}
+
+\begin{itemize}
+  \item \textbf{CRE advantage}: Simple, direct mapping from YAWL diagram
+        to code
+  \item \textbf{A2A advantage}: Comprehensive infrastructure for
+        production use
+\end{itemize}
+
+\subsection{Pattern Reusability}
+
+\begin{itemize}
+  \item \textbf{CRE}: Patterns are embedded in each workflow module
+  \item \textbf{A2A}: Patterns are reusable components
+\end{itemize}
+
+\subsection{Observability}
+
+\begin{itemize}
+  \item \textbf{CRE}: XES logging integrated into gen\_pnet callbacks
+  \item \textbf{A2A}: Comprehensive metrics and telemetry system
+\end{itemize}

@@ -1,0 +1,211 @@
+% -*- latex -*-
+%%
+% Chapter 2: Background and Related Work
+%%
+%%====================================================================
+
+\chapter{Background and Related Work}
+
+\section{YAWL: Yet Another Workflow Language}
+
+YAWL (Yet Another Workflow Language) was developed by van der Aalst and
+ter Hofstede \cite{vandalAalst2005yawl} to address limitations in
+existing workflow languages. YAWL's design is based on several key
+principles:
+
+\begin{enumerate}
+  \item \textbf{Direct Petri net mapping}: YAWL workflows can be
+        directly translated to Petri nets, enabling formal analysis
+  \item \textbf{Pattern completeness}: YAWL supports all 20 control-flow
+        patterns from the workflow patterns catalog
+  \item \textbf{Orthogonal aspects}: Control flow, data flow, and resource
+        perspectives are handled separately
+  \item \textbf{XML-based notation}: YAWL specifications use XML for
+        interoperability
+\end{enumerate}
+
+\subsection{YAWL Workflow Control Patterns}
+
+The workflow patterns catalog \cite{vandalAalst2003workflow} identifies
+20 control-flow patterns organized into several categories:
+
+\textbf{Basic Control Flow Patterns} (WCP-01 to WCP-06):
+\begin{itemize}
+  \item WCP-01: Sequence
+  \item WCP-02: Parallel Split
+  \item WCP-03: Synchronization
+  \item WCP-04: Exclusive Choice
+  \item WCP-05: Simple Merge
+  \item WCP-06: Multi-Choice
+\end{itemize}
+
+\textbf{Advanced Branching and Synchronization} (WCP-07 to WCP-10):
+\begin{itemize}
+  \item WCP-07: Synchronizing Merge
+  \item WCP-08: Multi-Merge
+  \item WCP-09: Discriminator
+  \item WCP-10: Arbitrary Cycles
+\end{itemize}
+
+\textbf{Structural Patterns} (WCP-11 to WCP-13):
+\begin{itemize}
+  \item WCP-11: Implicit Termination
+  \item WCP-12: Multiple Instances (without synchronization)
+  \item WCP-13: Multiple Instances (with a priori design time knowledge)
+\end{itemize}
+
+\textbf{State-Based Patterns} (WCP-14 to WCP-17):
+\begin{itemize}
+  \item WCP-14: Multiple Instances (with a posteriori runtime knowledge)
+  \item WCP-15: Deferred Choice
+  \item WCP-16: Interleaved Parallel Routing
+  \item WCP-17: Milestone
+\end{itemize}
+
+\textbf{Cancellation Patterns} (WCP-18 to WCP-20):
+\begin{itemize}
+  \item WCP-18: Cancel Task
+  \item WCP-19: Cancel Case
+  \item WCP-20: Cancel Region
+\end{itemize}
+
+\section{Petri Net Formalism}
+
+Petri nets, introduced by Carl Adam Petri in 1962, provide a mathematical
+formalism for modeling distributed systems \cite{peterson1981petri}.
+
+\subsection{Definitions}
+
+\begin{definition}[Petri Net]
+A Petri net is a triple $N = (P, T, F)$ where:
+\begin{itemize}
+  \item $P$ is a finite set of \textbf{places}
+  \item $T$ is a finite set of \textbf{transitions}
+  \item $F \subseteq (P \times T) \cup (T \times P)$ is a set of arcs
+\end{itemize}
+\end{definition}
+
+\begin{definition}[Marking]
+A \textbf{marking} $M: P \to \mathbb{N}$ assigns a non-negative integer
+number of tokens to each place. The initial marking is denoted $M_0$.
+\end{definition}
+
+\begin{definition}[Transition Firing]
+A transition $t \in T$ is \textbf{enabled} in marking $M$ if
+$\forall p \in \bullet t: M(p) \geq 1$, where $\bullet t$ denotes the
+input places of $t$. An enabled transition may \textbf{fire}, producing
+a new marking $M'$ defined by:
+\begin{equation}
+M'(p) = M(p) - |F(p,t)| + |F(t,p)|
+\end{equation}
+\end{definition}
+
+\subsection{Soundness Properties}
+
+For workflow nets, van der Aalst defines several soundness properties
+\cite{vandalAalst1997verification}:
+
+\begin{definition}[Soundness]
+A workflow net is \textbf{sound} if:
+\begin{enumerate}
+  \item For every marking reachable from $M_0$, the final marking
+        $M_{end}$ is reachable
+  \item $M_{end}$ is the unique marking reachable from $M_0$ with at
+        least one token in the output place
+  \item There are no dead transitions in $M_0$ (no transition that can
+        never fire)
+\end{enumerate}
+\end{definition}
+
+\section{gen\_pnet Library}
+
+The gen\_pnet library \cite{genpnet2015} provides a generic OTP behavior
+for implementing Petri nets in Erlang. Key characteristics include:
+
+\begin{itemize}
+  \item Direct implementation of Petri net semantics
+  \item Callback-based transition firing
+  \item Token-based state representation
+  \item Support for place and transition enumeration
+\end{itemize}
+
+\subsection{gen\_pnet Callbacks}
+
+\begin{lstlisting}[language=Erlang, caption=gen\_pnet Callback Functions]
+-module(my_workflow).
+-behaviour(gen_pnet).
+
+-export([place_lst/0, trsn_lst/0, init_marking/2, preset/1,
+         is_enabled/3, fire/3, trigger/3]).
+
+place_lst() -> [p1, p2, p3].
+trsn_lst() -> [t1, t2].
+
+init_marking(p1, _UsrInfo) -> [start];
+init_marking(_, _) -> [].
+
+preset(t1) -> [p1];
+preset(t2) -> [p2].
+
+is_enabled(t1, _Mode, _UsrInfo) -> true;
+is_enabled(t2, _Mode, _UsrInfo) -> true.
+
+fire(t1, #{p1 := [start]}, UsrInfo) ->
+    {produce, #{p2 => [start]}, UsrInfo};
+fire(t2, #{p2 := [start]}, UsrInfo) ->
+    {produce, #{p3 => [done]}, UsrInfo}.
+
+trigger(_Place, _Token, _UsrInfo) -> pass.
+\end{lstlisting}
+
+\section{XES Standard}
+
+The IEEE 1849-2016 XES (eXtensible Event Stream) standard
+\cite{xes2016standard} defines an XML-based format for event logs that
+supports process mining. XES logs capture:
+
+\begin{itemize}
+  \item \textbf{Traces}: Sequences of events for a single case
+  \item \textbf{Events}: Individual occurrences with timestamps
+  \item \textbf{Attributes}: Key-value pairs attached to logs, traces,
+        and events
+\end{itemize}
+
+\begin{lstlisting}[language=XML, caption=XES Log Example]
+<log xes.version="1.0" xes.features="nested-attributes">
+  <trace>
+    <event>
+      <string key="concept:name" value="Ordering"/>
+      <date key="time:timestamp" value="2025-02-05T10:00:00"/>
+      <string key="lifecycle:transition" value="start"/>
+    </event>
+    <event>
+      <string key="concept:name" value="Ordering"/>
+      <date key="time:timestamp" value="2025-02-05T10:00:05"/>
+      <string key="lifecycle:transition" value="complete"/>
+    </event>
+  </trace>
+</log>
+\end{lstlisting}
+
+\section{Related Work}
+
+\subsection{Workflow Pattern Analysis}
+
+Russell et al. \cite{russell2006patterns} revised the workflow
+patterns catalog, adding new patterns for data flow and resource
+perspectives. This thesis focuses on control-flow patterns but
+acknowledges the importance of these other perspectives.
+
+\subsection{Formal Verification of Workflows}
+
+van der Aalst \cite{vandalAalst1997verification} established the
+theoretical foundation for workflow net verification. Our analysis
+applies these soundness properties to both CRE and A2A implementations.
+
+\subsection{Process Mining}
+
+Process mining techniques \cite{vandalAalst2011process} rely on XES
+logs to discover, analyze, and improve business processes. Both CRE
+and A2A implementations produce XES logs, enabling process mining
+analysis of Order Fulfillment executions.

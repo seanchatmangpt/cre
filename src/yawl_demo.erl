@@ -128,7 +128,7 @@ start_demo_services() ->
     %% Start the monitor if not already running
     try
         yawl_monitor:start_monitor(),
-        error_logger:info_report([{module, ?MODULE}, {action, monitor_started}])
+        logger:info("Demo service started: monitor", [{module, ?MODULE}])
     catch
         _:{already_started, _} ->
             ok
@@ -137,7 +137,7 @@ start_demo_services() ->
     %% Start the cost tracker
     try
         yawl_cost:start_link(),
-        error_logger:info_report([{module, ?MODULE}, {action, cost_tracker_started}])
+        logger:info("Demo service started: cost tracker", [{module, ?MODULE}])
     catch
         _:{already_started, _} ->
             ok
@@ -146,7 +146,7 @@ start_demo_services() ->
     %% Start the IPC server
     try
         yawl_ipc:start_link(),
-        error_logger:info_report([{module, ?MODULE}, {action, ipc_started}])
+        logger:info("Demo service started: IPC", [{module, ?MODULE}])
     catch
         _:{already_started, _} ->
             ok
@@ -185,7 +185,7 @@ stop_demo_services() ->
         _:_ -> ok
     end,
 
-    error_logger:info_report([{module, ?MODULE}, {action, demo_services_stopped}]),
+    logger:info("Demo services stopped", [{module, ?MODULE}]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -212,7 +212,7 @@ reset_demo_state() ->
 -spec run_order_fulfillment_workflow() -> {ok, map()}.
 
 run_order_fulfillment_workflow() ->
-    error_logger:info_report([{module, ?MODULE}, {action, run_order_workflow}]),
+    logger:info("Running order fulfillment workflow", [{module, ?MODULE}]),
 
     %% Generate order data
     OrderData = generate_order_data(),
@@ -308,7 +308,7 @@ run_order_fulfillment_workflow() ->
 -spec run_loan_approval_workflow() -> {ok, map()}.
 
 run_loan_approval_workflow() ->
-    error_logger:info_report([{module, ?MODULE}, {action, run_loan_workflow}]),
+    logger:info("Running loan approval workflow", [{module, ?MODULE}]),
 
     CaseId = generate_case_id(<<"loan">>),
     StartTime = erlang:system_time(millisecond),
@@ -354,7 +354,7 @@ run_loan_approval_workflow() ->
 -spec run_customer_onboarding_workflow() -> {ok, map()}.
 
 run_customer_onboarding_workflow() ->
-    error_logger:info_report([{module, ?MODULE}, {action, run_onboarding_workflow}]),
+    logger:info("Running customer onboarding workflow", [{module, ?MODULE}]),
 
     CaseId = generate_case_id(<<"onboarding">>),
     CustomerData = generate_customer_data(),
@@ -404,7 +404,7 @@ run_customer_onboarding_workflow() ->
 -spec run_claim_processing_workflow() -> {ok, map()}.
 
 run_claim_processing_workflow() ->
-    error_logger:info_report([{module, ?MODULE}, {action, run_claim_workflow}]),
+    logger:info("Running claim processing workflow", [{module, ?MODULE}]),
 
     CaseId = generate_case_id(<<"claim">>),
     ClaimData = generate_claim_data(),
@@ -713,10 +713,10 @@ register_demo_handlers() ->
             fun send_confirmation/1,
             atomic
         ),
-        error_logger:info_report([{module, ?MODULE}, {action, handlers_registered}])
+        logger:info("Demo task handlers registered", [{module, ?MODULE}])
     catch
         _:_ ->
-            error_logger:warning_report([{module, ?MODULE}, {warning, worker_not_available}])
+            logger:warning("Worker not available for demo handlers", [{module, ?MODULE}])
     end,
     ok.
 

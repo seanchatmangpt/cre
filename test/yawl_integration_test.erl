@@ -113,6 +113,21 @@
     timestamp :: integer(),
     stacktrace :: list()
 }).
+
+-record(compensator, {
+    activity_id :: binary(),
+    compensation_handler :: function(),
+    state :: pending | executing | completed | failed,
+    result :: undefined | {ok, term()} | {error, term()},
+    created_at :: integer(),
+    completed_at :: undefined | integer()
+}).
+
+-record(session, {
+    session_id :: binary(),
+    user_id :: binary(),
+    expires_at :: integer()
+}).
 %%====================================================================
 %% Test Suite Definition
 %%====================================================================
@@ -190,7 +205,7 @@ setup_integration() ->
     case whereis(yawl_control) of
         undefined ->
             {ok, _ControlPid} = yawl_control:start_control(yawl_control);
-        _Pid ->
+        _ ->
             ok
     end,
 
@@ -198,7 +213,7 @@ setup_integration() ->
     case whereis(yawl_auth) of
         undefined ->
             {ok, _AuthPid} = yawl_auth:start_auth();
-        _Pid ->
+        _ ->
             ok
     end,
 
@@ -206,7 +221,7 @@ setup_integration() ->
     case whereis(yawl_resourcing) of
         undefined ->
             {ok, _ResourcingPid} = gen_server:start({local, yawl_resourcing}, yawl_resourcing, [], []);
-        _Pid ->
+        _ ->
             ok
     end,
 
@@ -232,7 +247,7 @@ cleanup_integration(_Context) ->
     %% Stop resourcing service if running
     case whereis(yawl_resourcing) of
         undefined -> ok;
-        _Pid -> gen_server:stop(yawl_resourcing)
+        _ -> gen_server:stop(yawl_resourcing)
     end,
 
     %% Stop authentication server
@@ -368,7 +383,7 @@ worklet_exception_test() ->
         undefined
     ),
 
-    ?assertMatch(#{activity_id := <<"activity_1">>}, Comp),
+    ?assertMatch(#compensator{activity_id = <<"activity_1">>}, Comp),
     ?assertNot(cre_yawl_exception:has_compensated(Comp)),
 
     {ok, Compensated} = cre_yawl_exception:compensate(Comp, test_input),
@@ -1329,8 +1344,14 @@ set_workflow_boundaries(Workflow, _StartTaskId, _EndTaskIds) ->
 %%--------------------------------------------------------------------
 get_user_id_from_session(Session) when is_map(Session) ->
     maps:get(user_id, Session, undefined);
+get_user_id_from_session(#session{user_id = UserId}) ->
+    UserId;
 get_user_id_from_session(Session) when is_tuple(Session) ->
-    element(2, Session).
+    %% Fallback for tuple case - session record has 3 elements
+    case tuple_size(Session) of
+        3 -> element(2, Session);
+        _ -> undefined
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Helper to get participant name.

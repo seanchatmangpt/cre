@@ -1,0 +1,109 @@
+% -*- latex -*-
+%%
+% Chapter 9: Conclusion
+%%
+%%====================================================================
+
+\chapter{Conclusion}
+
+\section{Summary of Contributions}
+
+This thesis presented a comprehensive comparative analysis of two YAWL
+Order Fulfillment implementations: the CRE implementation and the A2A
+reference implementation. Our key contributions include:
+
+\subsection{Architectural Analysis}
+
+We demonstrated that the CRE implementation uses direct Petri net
+modeling through gen\_pnet, resulting in approximately 3,822 lines of
+workflow code across 6 modules. In contrast, the A2A implementation
+employs a comprehensive pattern library approach with 43 predefined
+patterns and extensive infrastructure (364,842 total lines including
+84,474 lines of tests).
+
+\subsection{Pattern Coverage}
+
+Both implementations demonstrate excellent coverage of YAWL workflow
+control patterns. The CRE system implements patterns directly within
+each workflow module, while A2A provides a centralized pattern library.
+Key patterns such as Sequence, Parallel Split, Synchronization,
+Exclusive Choice, and Milestone are correctly implemented in both systems.
+
+\subsection{Formal Verification}
+
+We verified that both implementations produce sound workflow nets
+according to van der Aalst's definition \cite{vandalAalst1997verification}.
+The Petri net structures in both systems satisfy:
+\begin{itemize}
+  \item Option to complete: Every marking can reach the final marking
+  \item Proper completion: The final marking is unique
+  \item No dead transitions: All transitions are live in initial marking
+\end{itemize}
+
+\subsection{Empirical Evaluation}
+
+Performance benchmarks revealed interesting trade-offs:
+\begin{itemize}
+  \item CRE: Lower per-instance overhead (496 KB vs 992 KB)
+  \item A2A: Slightly faster execution for certain workflows
+        (715ms vs 760ms for full Order Fulfillment)
+  \item Both: Linear scalability with concurrent instances
+  \item A2A: More detailed XES logs (2.26x larger)
+\end{itemize}
+
+\section{Theoretical Implications}
+
+This analysis contributes to the theory and practice of workflow
+management in several ways:
+
+\subsection{Pattern Implementation Strategies}
+
+We demonstrated two viable approaches to implementing YAWL patterns:
+\begin{enumerate}
+  \item \textbf{Embedded patterns}: Patterns implemented within
+        workflow modules (CRE)
+  \item \textbf{Library patterns}: Patterns implemented as reusable
+        components (A2A)
+\end{enumerate}
+
+Both approaches are valid, with different trade-offs for research
+vs. production use.
+
+\subsection{Petri Net Practice}
+
+We validated that gen\_pnet provides an effective foundation for
+implementing YAWL workflows in Erlang, with proper support for
+token-based execution and place-transition semantics.
+
+\section{Practical Applications}
+
+The insights from this analysis can guide:
+\begin{itemize}
+  \item \textbf{System selection}: Choose CRE for rapid prototyping,
+        A2A for production systems
+  \item \textbf{Pattern design}: Understand how patterns map to
+        actual implementation
+  \item \textbf{Testing strategy}: Balance test coverage with
+        development speed
+  \item \textbf{Observability}: Design XES logging that supports
+        process mining
+\end{itemize}
+
+\section{Closing Remarks}
+
+The YAWL Order Fulfillment case study provides a valuable
+benchmark for comparing workflow system implementations. Both CRE and
+A2A successfully realize the Order Fulfillment process, demonstrating
+the practical applicability of YAWL and Petri net formalism to
+real-world business problems.
+
+As workflow management continues to evolve with cloud computing,
+microservices, and event-driven architectures, the lessons learned
+from these implementations will inform the next generation of
+workflow systems.
+
+The CRE implementation demonstrates that effective workflow systems
+can be built with simplicity and direct modeling, while the A2A
+implementation shows how comprehensive infrastructure can provide
+enterprise-grade capabilities. Together, these implementations
+advance the state of the art in workflow management system design.

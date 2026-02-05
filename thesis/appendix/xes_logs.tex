@@ -1,0 +1,94 @@
+% -*- latex -*-
+%%
+% Appendix C: XES Log Examples
+%%
+%%====================================================================
+
+\appendix
+\chapter{XES Log Examples}
+
+\section{CRE XES Log Example}
+
+\begin{lstlisting}[language=XML, basicstyle=\tiny\ttfamily, caption=CRE XES Log Output]
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1.0" xes.features="nested-attributes"
+     xes.xmlns="http://www.xes-standard.org/">
+  <trace xes:id="trace_1738774400000" xes:type="">
+    <event xes:id="event_1">
+      <string key="concept:name" value="Ordering"/>
+      <date key="time:timestamp" value="2025-02-05T10:00:00.001Z"/>
+      <string key="lifecycle:transition" value="start"/>
+      <string key="order_id" value="ORDER-001"/>
+    </event>
+    <event xes:id="event_2">
+      <string key="concept:name" value="Ordering"/>
+      <date key="time:timestamp" value="2025-02-05T10:00:00.045Z"/>
+      <string key="lifecycle:transition" value="complete"/>
+      <string key="order_id" value="ORDER-001"/>
+    </event>
+    <event xes:id="event_3">
+      <string key="concept:name" value="Payment"/>
+      <date key="time:timestamp" value="2025-02-05T10:00:00.050Z"/>
+      <string key="lifecycle:transition" value="start"/>
+      <string key="payment_id" value="PAY-001"/>
+    </event>
+    <!-- Additional events for Payment, Carrier, Transit, Delivery -->
+  </trace>
+</log>
+\end{lstlisting}
+
+\section{A2A XES Log Example}
+
+\begin{lstlisting}[language=XML, basicstyle=\tiny\ttfamily, caption=A2A XES Log Output]
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1.0" xes.features="nested-attributes"
+     xes.xmlns="http://www.xes-standard.org/">
+  <extension name="concept">
+    <string name="name" scope="global"/>
+    <string name="instance" scope="global"/>
+  </extension>
+  <extension name="lifecycle">
+    <string name="transition" scope="global"/>
+  </extension>
+  <extension name="time">
+    <date name="timestamp" scope="global"/>
+  </extension>
+
+  <trace xes:id="trace_1738774401000" xes:type="">
+    <event xes:id="event_1">
+      <string key="concept:name" value="Ordering"/>
+      <string key="concept:instance" value="order-001"/>
+      <date key="time:timestamp" value="2025-02-05T10:00:00.001Z"/>
+      <string key="lifecycle:transition" value="start"/>
+      <string key="lifecycle:model" value="gen_pnet"/>
+      <map key="data">
+        <string key="order_id" value="ORDER-001"/>
+        <string key="customer_id" value="CUST-001"/>
+        <string key="items" value="2"/>
+      </map>
+    </event>
+    <!-- Additional detailed events with full telemetry -->
+  </trace>
+</log>
+\end{lstlisting}
+
+\section{XES Log Comparison}
+
+\begin{table}[htbp]
+\centering
+\caption{XES Log Field Comparison}
+\label{tab:xes_field_comparison}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Field} & \textbf{CRE} & \textbf{A2A} \\
+\midrule
+concept:name & \checkmark & \checkmark \\
+concept:instance & Partial & \checkmark \\
+lifecycle:transition & \checkmark & \checkmark \\
+lifecycle:model & & \checkmark \\
+time:timestamp & \checkmark & \checkmark \\
+data attributes & Basic & Comprehensive \\
+trace metadata & Minimal & Full \\
+\bottomrule
+\end{tabular}
+\end{table}

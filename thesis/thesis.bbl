@@ -1,0 +1,374 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.2 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated by
+% biber as required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+
+\refsection{0}
+  \datalist[entry]{nyt/global//global/global}
+    \entry{vandalAalst1997verification}{inproceedings}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=45fed513d4bd5fb28cebd7bb58a35c4a}{%
+           family={Aalst},
+           familyi={A\bibinitperiod},
+           given={Wil\bibnamedelima MP},
+           giveni={W\bibinitperiod\bibinitdelim M\bibinitperiod},
+           givenun=0,
+           prefix={van\bibnamedelima der},
+           prefixi={v\bibinitperiod\bibinitdelim d\bibinitperiod},
+           prefixun=0}}%
+      }
+      \list{organization}{1}{%
+        {Springer}%
+      }
+      \strng{namehash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \strng{fullhash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \strng{bibnamehash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \strng{authorbibnamehash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \strng{authornamehash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \strng{authorfullhash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \field{extraname}{1}
+      \field{sortinit}{A}
+      \field{sortinithash}{2f401846e2029bad6b3ecc16d50031e2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{booktitle}{Application and Theory of Petri Nets}
+      \field{title}{Verification of workflow nets}
+      \field{year}{1997}
+      \field{pages}{407\bibrangedash 426}
+      \range{pages}{20}
+    \endentry
+    \entry{vandalAalst2011process}{article}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=45fed513d4bd5fb28cebd7bb58a35c4a}{%
+           family={Aalst},
+           familyi={A\bibinitperiod},
+           given={Wil\bibnamedelima MP},
+           giveni={W\bibinitperiod\bibinitdelim M\bibinitperiod},
+           givenun=0,
+           prefix={van\bibnamedelima der},
+           prefixi={v\bibinitperiod\bibinitdelim d\bibinitperiod},
+           prefixun=0}}%
+      }
+      \strng{namehash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \strng{fullhash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \strng{bibnamehash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \strng{authorbibnamehash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \strng{authornamehash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \strng{authorfullhash}{45fed513d4bd5fb28cebd7bb58a35c4a}
+      \field{extraname}{2}
+      \field{sortinit}{A}
+      \field{sortinithash}{2f401846e2029bad6b3ecc16d50031e2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Springer}
+      \field{title}{Process mining: discovery, conformance and enhancement of business processes}
+      \field{year}{2011}
+    \endentry
+    \entry{vandalAalst2005yawl}{inproceedings}{}
+      \name{author}{2}{}{%
+        {{un=0,uniquepart=base,hash=45fed513d4bd5fb28cebd7bb58a35c4a}{%
+           family={Aalst},
+           familyi={A\bibinitperiod},
+           given={Wil\bibnamedelima MP},
+           giveni={W\bibinitperiod\bibinitdelim M\bibinitperiod},
+           givenun=0,
+           prefix={van\bibnamedelima der},
+           prefixi={v\bibinitperiod\bibinitdelim d\bibinitperiod},
+           prefixun=0}}%
+        {{un=0,uniquepart=base,hash=97b0f039214b123f96f6af03d24be98a}{%
+           family={Hofstede},
+           familyi={H\bibinitperiod},
+           given={Arthur\bibnamedelima HM},
+           giveni={A\bibinitperiod\bibinitdelim H\bibinitperiod},
+           givenun=0,
+           prefix={ter},
+           prefixi={t\bibinitperiod},
+           prefixun=0}}%
+      }
+      \list{organization}{1}{%
+        {Elsevier}%
+      }
+      \strng{namehash}{81f8b83c195ec8e127c2d6ce839789d4}
+      \strng{fullhash}{81f8b83c195ec8e127c2d6ce839789d4}
+      \strng{bibnamehash}{81f8b83c195ec8e127c2d6ce839789d4}
+      \strng{authorbibnamehash}{81f8b83c195ec8e127c2d6ce839789d4}
+      \strng{authornamehash}{81f8b83c195ec8e127c2d6ce839789d4}
+      \strng{authorfullhash}{81f8b83c195ec8e127c2d6ce839789d4}
+      \field{sortinit}{A}
+      \field{sortinithash}{2f401846e2029bad6b3ecc16d50031e2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{booktitle}{Information Systems}
+      \field{title}{YAWL: yet another workflow language}
+      \field{year}{2005}
+      \field{pages}{200\bibrangedash 212}
+      \range{pages}{13}
+    \endentry
+    \entry{vandalAalst2003workflow}{article}{}
+      \name{author}{4}{ul=2}{%
+        {{un=0,uniquepart=base,hash=45fed513d4bd5fb28cebd7bb58a35c4a}{%
+           family={Aalst},
+           familyi={A\bibinitperiod},
+           given={Wil\bibnamedelima MP},
+           giveni={W\bibinitperiod\bibinitdelim M\bibinitperiod},
+           givenun=0,
+           prefix={van\bibnamedelima der},
+           prefixi={v\bibinitperiod\bibinitdelim d\bibinitperiod},
+           prefixun=0}}%
+        {{un=0,uniquepart=base,hash=97b0f039214b123f96f6af03d24be98a}{%
+           family={Hofstede},
+           familyi={H\bibinitperiod},
+           given={Arthur\bibnamedelima HM},
+           giveni={A\bibinitperiod\bibinitdelim H\bibinitperiod},
+           givenun=0,
+           prefix={ter},
+           prefixi={t\bibinitperiod},
+           prefixun=0}}%
+        {{un=0,uniquepart=base,hash=3bbd6f0484baca2e0a0428496eaa2c2b}{%
+           family={Kiepuszewski},
+           familyi={K\bibinitperiod},
+           given={Bartek},
+           giveni={B\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=41c0f1cbf170ef92f1a3b7293176d7a2}{%
+           family={Barros},
+           familyi={B\bibinitperiod},
+           given={Alistair\bibnamedelima P},
+           giveni={A\bibinitperiod\bibinitdelim P\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{publisher}{1}{%
+        {Springer}%
+      }
+      \strng{namehash}{411d42b7bceece737e3cf0b4beb838a2}
+      \strng{fullhash}{7697753e13b205a4dcebbcf0283fe1c4}
+      \strng{bibnamehash}{411d42b7bceece737e3cf0b4beb838a2}
+      \strng{authorbibnamehash}{411d42b7bceece737e3cf0b4beb838a2}
+      \strng{authornamehash}{411d42b7bceece737e3cf0b4beb838a2}
+      \strng{authorfullhash}{7697753e13b205a4dcebbcf0283fe1c4}
+      \field{sortinit}{A}
+      \field{sortinithash}{2f401846e2029bad6b3ecc16d50031e2}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Business process management}
+      \field{title}{Workflow patterns: The {Control-Flow} perspective}
+      \field{year}{2003}
+      \field{pages}{3\bibrangedash 26}
+      \range{pages}{24}
+    \endentry
+    \entry{genpnet2015}{software}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=c5f0ba2c0e36cd5133cc57a7a7f7dca3}{%
+           family={Brandt},
+           familyi={B\bibinitperiod},
+           given={Jörgen},
+           giveni={J\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{c5f0ba2c0e36cd5133cc57a7a7f7dca3}
+      \strng{fullhash}{c5f0ba2c0e36cd5133cc57a7a7f7dca3}
+      \strng{bibnamehash}{c5f0ba2c0e36cd5133cc57a7a7f7dca3}
+      \strng{authorbibnamehash}{c5f0ba2c0e36cd5133cc57a7a7f7dca3}
+      \strng{authornamehash}{c5f0ba2c0e36cd5133cc57a7a7f7dca3}
+      \strng{authorfullhash}{c5f0ba2c0e36cd5133cc57a7a7f7dca3}
+      \field{sortinit}{B}
+      \field{sortinithash}{d7095fff47cda75ca2589920aae98399}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{gen\_pnet: a generic Petri net behavior for {Erlang}/{OTP}}
+      \field{year}{2015}
+      \verb{urlraw}
+      \verb https://github.com/jorgenbg/gen_pnet
+      \endverb
+      \verb{url}
+      \verb https://github.com/jorgenbg/gen_pnet
+      \endverb
+    \endentry
+    \entry{conforti2013supporting}{inproceedings}{}
+      \name{author}{4}{}{%
+        {{un=0,uniquepart=base,hash=84bcdc87a0d8398feb31f2cc7708f05c}{%
+           family={Conforti},
+           familyi={C\bibinitperiod},
+           given={Rita},
+           giveni={R\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=1f9d5b527bdfd38ab2b01b5978eb8a0d}{%
+           family={Leoni},
+           familyi={L\bibinitperiod},
+           given={Massimiliano},
+           giveni={M\bibinitperiod},
+           givenun=0,
+           prefix={de},
+           prefixi={d\bibinitperiod},
+           prefixun=0}}%
+        {{un=0,uniquepart=base,hash=6c93b851668ff9e0023eaf8c20dde5d3}{%
+           family={La\bibnamedelima Rosa},
+           familyi={L\bibinitperiod\bibinitdelim R\bibinitperiod},
+           given={Marcello},
+           giveni={M\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=45fed513d4bd5fb28cebd7bb58a35c4a}{%
+           family={Aalst},
+           familyi={A\bibinitperiod},
+           given={Wil\bibnamedelima MP},
+           giveni={W\bibinitperiod\bibinitdelim M\bibinitperiod},
+           givenun=0,
+           prefix={van\bibnamedelima der},
+           prefixi={v\bibinitperiod\bibinitdelim d\bibinitperiod},
+           prefixun=0}}%
+      }
+      \list{organization}{1}{%
+        {Springer}%
+      }
+      \strng{namehash}{6fa29c07de50e118fb49ebb4ce0d7af2}
+      \strng{fullhash}{9b921dcbe7dc0c6361e4cc40c6880672}
+      \strng{bibnamehash}{6fa29c07de50e118fb49ebb4ce0d7af2}
+      \strng{authorbibnamehash}{6fa29c07de50e118fb49ebb4ce0d7af2}
+      \strng{authornamehash}{6fa29c07de50e118fb49ebb4ce0d7af2}
+      \strng{authorfullhash}{9b921dcbe7dc0c6361e4cc40c6880672}
+      \field{sortinit}{C}
+      \field{sortinithash}{4d103a86280481745c9c897c925753c0}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{booktitle}{Advanced Information Systems Engineering}
+      \field{title}{Supporting risk-informed decisions during business process execution}
+      \field{year}{2013}
+      \field{pages}{116\bibrangedash 132}
+      \range{pages}{17}
+    \endentry
+    \entry{xes2016standard}{report}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=472abfae8142fdb6f39d081303e8af85}{%
+           family={{IEEE}},
+           familyi={I\bibinitperiod}}}%
+      }
+      \list{organization}{1}{%
+        {IEEE Standards Association}%
+      }
+      \strng{namehash}{472abfae8142fdb6f39d081303e8af85}
+      \strng{fullhash}{472abfae8142fdb6f39d081303e8af85}
+      \strng{bibnamehash}{472abfae8142fdb6f39d081303e8af85}
+      \strng{authorbibnamehash}{472abfae8142fdb6f39d081303e8af85}
+      \strng{authornamehash}{472abfae8142fdb6f39d081303e8af85}
+      \strng{authorfullhash}{472abfae8142fdb6f39d081303e8af85}
+      \field{sortinit}{I}
+      \field{sortinithash}{8d291c51ee89b6cd86bf5379f0b151d8}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{IEEE 1849-2016: {IEEE} Standard for eXtensible Event Stream ({XES}) for Achieving Interoperability in Event Logs and Event Streams}
+      \field{type}{techreport}
+      \field{year}{2016}
+    \endentry
+    \entry{peterson1981petri}{book}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=f044efc3a42c9f56267c579c3c27655a}{%
+           family={Peterson},
+           familyi={P\bibinitperiod},
+           given={James\bibnamedelima L},
+           giveni={J\bibinitperiod\bibinitdelim L\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{publisher}{1}{%
+        {Prentice-Hall}%
+      }
+      \strng{namehash}{f044efc3a42c9f56267c579c3c27655a}
+      \strng{fullhash}{f044efc3a42c9f56267c579c3c27655a}
+      \strng{bibnamehash}{f044efc3a42c9f56267c579c3c27655a}
+      \strng{authorbibnamehash}{f044efc3a42c9f56267c579c3c27655a}
+      \strng{authornamehash}{f044efc3a42c9f56267c579c3c27655a}
+      \strng{authorfullhash}{f044efc3a42c9f56267c579c3c27655a}
+      \field{sortinit}{P}
+      \field{sortinithash}{ff3bcf24f47321b42cb156c2cc8a8422}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{Petri net theory and the modeling of systems}
+      \field{year}{1981}
+    \endentry
+    \entry{russell2006patterns}{article}{}
+      \name{author}{4}{}{%
+        {{un=0,uniquepart=base,hash=f1645e1e99fb959634edc46a4402c490}{%
+           family={Russell},
+           familyi={R\bibinitperiod},
+           given={Nick},
+           giveni={N\bibinitperiod},
+           givenun=0}}%
+        {{un=0,uniquepart=base,hash=45fed513d4bd5fb28cebd7bb58a35c4a}{%
+           family={Aalst},
+           familyi={A\bibinitperiod},
+           given={Wil\bibnamedelima MP},
+           giveni={W\bibinitperiod\bibinitdelim M\bibinitperiod},
+           givenun=0,
+           prefix={van\bibnamedelima der},
+           prefixi={v\bibinitperiod\bibinitdelim d\bibinitperiod},
+           prefixun=0}}%
+        {{un=0,uniquepart=base,hash=97b0f039214b123f96f6af03d24be98a}{%
+           family={Hofstede},
+           familyi={H\bibinitperiod},
+           given={Arthur\bibnamedelima HM},
+           giveni={A\bibinitperiod\bibinitdelim H\bibinitperiod},
+           givenun=0,
+           prefix={ter},
+           prefixi={t\bibinitperiod},
+           prefixun=0}}%
+        {{un=0,uniquepart=base,hash=692002a5576fd21d75c442128f99ac50}{%
+           family={Edmond},
+           familyi={E\bibinitperiod},
+           given={D},
+           giveni={D\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{publisher}{1}{%
+        {BPMcenter.org}%
+      }
+      \strng{namehash}{78150c62ca09fe68c56a1d7d9bd85ee7}
+      \strng{fullhash}{5c3b4fe073aa7a5dce95d60b0301aa75}
+      \strng{bibnamehash}{78150c62ca09fe68c56a1d7d9bd85ee7}
+      \strng{authorbibnamehash}{78150c62ca09fe68c56a1d7d9bd85ee7}
+      \strng{authornamehash}{78150c62ca09fe68c56a1d7d9bd85ee7}
+      \strng{authorfullhash}{5c3b4fe073aa7a5dce95d60b0301aa75}
+      \field{sortinit}{R}
+      \field{sortinithash}{5e1c39a9d46ffb6bebd8f801023a9486}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{BPM Center Report BPM-06-03}
+      \field{title}{Workflow control-flow patterns: A revised view}
+      \field{year}{2006}
+      \field{pages}{1\bibrangedash 26}
+      \range{pages}{26}
+    \endentry
+  \enddatalist
+\endrefsection
+\endinput
+

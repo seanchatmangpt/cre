@@ -438,19 +438,20 @@ init(_Arg) ->
         true ->
             case yawl_persistence:init_schema() of
                 ok ->
-                    error_logger:info_report([{module, ?MODULE},
-                                             {persistence, enabled},
-                                             {action, schema_initialized}]);
+                    logger:info("Persistence schema initialized",
+                                 [{module, ?MODULE}, {persistence, enabled},
+                                  {action, schema_initialized}]),
+                    {ok, #engine_state{persistence_enabled = true}};
                 {error, Reason} ->
-                    error_logger:error_report([{module, ?MODULE},
-                                              {persistence, failed},
-                                              {error, Reason}])
+                    logger:error("Persistence schema initialization failed: error=~p",
+                                  [Reason],
+                                  [{module, ?MODULE}, {persistence, failed},
+                                   {action, schema_initialized}]),
+                    {ok, #engine_state{persistence_enabled = false}}
             end;
         false ->
-            ok
-    end,
-
-    {ok, #engine_state{persistence_enabled = PersistenceEnabled}}.
+            {ok, #engine_state{persistence_enabled = PersistenceEnabled}}
+    end.
 
 %% @private
 handle_call({start_workflow, Spec, Options}, _From, State) ->
@@ -499,10 +500,9 @@ handle_call({start_workflow, Spec, Options}, _From, State) ->
 
             %% Notify observers
             notify_observers(Observers, {case_started, CaseId}),
-            error_logger:info_report([{info, workflow_started},
-                                     {module, ?MODULE},
-                                     {case_id, CaseId},
-                                     {workflow_id, CaseWithNet#workflow_case.workflow_id}]),
+            logger:info("Workflow started: id=~p workflow=~p",
+                        [CaseId, CaseWithNet#workflow_case.workflow_id],
+                        [{info, workflow_started}, {module, ?MODULE}]),
 
             %% Start workflow execution
             case start_execution(CaseWithNet) of
@@ -761,15 +761,15 @@ handle_call(recover_active_cases, _From, #engine_state{cases = Cases} = State) -
                         %% Restore case from persisted data
                         case restore_case_from_map(CaseMap) of
                             {ok, RestoredCase} ->
-                                error_logger:info_report([{module, ?MODULE},
-                                                         {action, case_recovered},
-                                                         {case_id, CaseId}]),
+                                logger:info("Case recovered: id=~p", [CaseId],
+                                             [{module, ?MODULE},
+                                              {action, case_recovered}]),
                                 {Count + 1, CasesAcc#{CaseId => RestoredCase}};
                             {error, Reason} ->
-                                error_logger:error_report([{module, ?MODULE},
-                                                          {action, case_recovery_failed},
-                                                          {case_id, CaseId},
-                                                          {error, Reason}]),
+                                logger:error("Case recovery failed: id=~p error=~p",
+                                              [CaseId, Reason],
+                                              [{module, ?MODULE},
+                                               {action, case_recovery_failed}]),
                                 {Count, CasesAcc}
                         end;
                     true ->
@@ -780,22 +780,20 @@ handle_call(recover_active_cases, _From, #engine_state{cases = Cases} = State) -
             State1 = State#engine_state{cases = Cases1},
             {reply, {ok, RecoveredCount}, State1};
         {error, Reason} ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, recover_active_cases},
-                                      {error, Reason}]),
+            logger:error("Recover active cases failed: reason=~p",
+                        [Reason],
+                        [{module, ?MODULE}, {action, recover_active_cases}]),
             {reply, {error, Reason}, State}
     end;
 
 handle_call(enable_persistence, _From, State) ->
     State1 = State#engine_state{persistence_enabled = true},
-    error_logger:info_report([{module, ?MODULE},
-                             {action, persistence_enabled}]),
+    logger:info("Persistence enabled", [{module, ?MODULE}, {action, persistence_enabled}]),
     {reply, ok, State1};
 
 handle_call(disable_persistence, _From, State) ->
     State1 = State#engine_state{persistence_enabled = false},
-    error_logger:info_report([{module, ?MODULE},
-                             {action, persistence_disabled}]),
+    logger:info("Persistence disabled", [{module, ?MODULE}, {action, persistence_disabled}]),
     {reply, ok, State1};
 
 handle_call(is_persistence_enabled, _From, #engine_state{persistence_enabled = Enabled}) ->
@@ -1179,20 +1177,17 @@ safe_persist_case(Case) ->
                 ok;
             {error, Reason} ->
                 %% Log but don't fail the workflow
-                error_logger:error_report([{module, ?MODULE},
-                                          {action, persist_case_failed},
-                                          {case_id, Case#workflow_case.case_id},
-                                          {error, Reason}]),
+                logger:error("Persist case failed: id=~p error=~p",
+                                  [Case#workflow_case.case_id, Reason],
+                                  [{module, ?MODULE}, {action, persist_case_failed}]),
                 ok
         end
     catch
         Kind:ErrorReason:Stack ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, persist_case_crashed},
-                                      {case_id, Case#workflow_case.case_id},
-                                      {error, Kind},
-                                      {reason, ErrorReason},
-                                      {stacktrace, Stack}]),
+            logger:error("Persist case crashed: id=~p kind=~p reason=~p",
+                          [Case#workflow_case.case_id, Kind, ErrorReason],
+                          [{module, ?MODULE}, {action, persist_case_crashed},
+                           {stacktrace, Stack}]),
             ok
     end.
 
@@ -1207,20 +1202,17 @@ safe_persist_workitem(Workitem) ->
                 ok;
             {error, Reason} ->
                 %% Log but don't fail the workflow
-                error_logger:error_report([{module, ?MODULE},
-                                          {action, persist_workitem_failed},
-                                          {workitem_id, Workitem#workitem.id},
-                                          {error, Reason}]),
+                logger:error("Persist workitem failed: id=~p error=~p",
+                                  [Workitem#workitem.id, Reason],
+                                  [{module, ?MODULE}, {action, persist_workitem_failed}]),
                 ok
         end
     catch
         Kind:ErrorReason:Stack ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, persist_workitem_crashed},
-                                      {workitem_id, Workitem#workitem.id},
-                                      {error, Kind},
-                                      {reason, ErrorReason},
-                                      {stacktrace, Stack}]),
+            logger:error("Persist workitem crashed: id=~p kind=~p reason=~p",
+                          [Workitem#workitem.id, Kind, ErrorReason],
+                          [{module, ?MODULE}, {action, persist_workitem_crashed},
+                           {stacktrace, Stack}]),
             ok
     end.
 
@@ -1269,11 +1261,10 @@ restore_case_from_map(CaseMap) ->
         {ok, RestoredCase}
     catch
         Kind:Reason:Stack ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, restore_case_failed},
-                                      {error, Kind},
-                                      {reason, Reason},
-                                      {stacktrace, Stack}]),
+            logger:error("Case restore failed: kind=~p reason=~p",
+                          [Kind, Reason],
+                          [{module, ?MODULE}, {action, restore_case_failed},
+                           {reason, Reason}, {stacktrace, Stack}]),
             {error, {Kind, Reason}}
     end.
 
@@ -1288,24 +1279,20 @@ delete_completed_case(CaseId) ->
     try
         case yawl_persistence:delete_case(CaseId) of
             ok ->
-                error_logger:info_report([{module, ?MODULE},
-                                        {action, deleted_completed_case},
-                                        {case_id, CaseId}]),
+                logger:info("Completed case deleted: id=~p", [CaseId],
+                             [{module, ?MODULE}, {action, deleted_completed_case}]),
                 ok;
             {error, Reason} ->
-                error_logger:error_report([{module, ?MODULE},
-                                          {action, delete_case_failed},
-                                          {case_id, CaseId},
-                                          {error, Reason}]),
+                logger:error("Delete case failed: id=~p error=~p",
+                                  [CaseId, Reason],
+                                  [{module, ?MODULE}, {action, delete_case_failed}]),
                 {error, Reason}
         end
     catch
         Kind:ErrorReason:Stack ->
-            error_logger:error_report([{module, ?MODULE},
-                                      {action, delete_case_crashed},
-                                      {case_id, CaseId},
-                                      {error, Kind},
-                                      {reason, ErrorReason},
-                                      {stacktrace, Stack}]),
+            logger:error("Delete case crashed: id=~p kind=~p reason=~p",
+                          [CaseId, Kind, ErrorReason],
+                          [{module, ?MODULE}, {action, delete_case_crashed},
+                           {reason, ErrorReason}, {stacktrace, Stack}]),
             {error, {Kind, ErrorReason}}
     end.

@@ -329,14 +329,10 @@ schedule_report(Interval, Config, Recipient) when is_pid(Recipient); is_binary(R
     %% Register the schedule
     gen_server:cast(yawl_reporter_scheduler, {register_schedule, Schedule}),
 
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, schedule_report},
-        {schedule_id, ScheduleId},
-        {interval, Interval},
-        {recipient, Recipient},
-        {next_run, NextRun}
-    ]),
+    logger:info("Report scheduled: id=~p interval=~p",
+                [ScheduleId, Interval],
+                [{module, ?MODULE}, {action, schedule_report},
+                 {recipient, Recipient}, {next_run, NextRun}]),
 
     {ok, ScheduleId}.
 
@@ -352,11 +348,8 @@ schedule_report(Interval, Config, Recipient) when is_pid(Recipient); is_binary(R
 
 cancel_schedule(ScheduleId) ->
     gen_server:cast(yawl_reporter_scheduler, {cancel_schedule, ScheduleId}),
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, cancel_schedule},
-        {schedule_id, ScheduleId}
-    ]),
+    logger:info("Report schedule cancelled: id=~p", [ScheduleId],
+                 [{module, ?MODULE}, {action, cancel_schedule}]),
     ok.
 
 %%--------------------------------------------------------------------

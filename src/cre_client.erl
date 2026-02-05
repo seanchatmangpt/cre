@@ -47,7 +47,9 @@
 %% Constant definitions
 %%====================================================================
 
--define(INTERVAL, 250).
+%% Poll interval is now managed via persistent_term (OTP 21+ optimization)
+%% for O(1) access. Default 250ms.
+-define(get_interval(), cre_config:get(cre_client_poll_interval, 250)).
 
 %%====================================================================
 %% Callback definitions
@@ -266,7 +268,9 @@ start_timer(From) ->
 
     F =
         fun() ->
-                timer:sleep(?INTERVAL),
+                %% Use persistent_term for O(1) access to poll interval
+                %% (OTP 21+ optimization)
+                timer:sleep(?get_interval()),
                 gen_server:cast(Self, {continue, From})
         end,
 

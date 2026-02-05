@@ -84,4 +84,31 @@ init(_Args) ->
                   modules => [cre_master]
                  },
 
-    {ok, {SupFlags, [ChildSpec]}}.
+    TimeoutSpec = #{
+                    id => yawl_timeout,
+                    start => {yawl_timeout, start_link, []},
+                    restart => permanent,
+                    shutdown => 5000,
+                    type => worker,
+                    modules => [yawl_timeout]
+                   },
+
+    XesSpec = #{
+               id => yawl_xes,
+               start => {yawl_xes, start_link, []},
+               restart => permanent,
+               shutdown => 5000,
+               type => worker,
+               modules => [yawl_xes]
+              },
+
+    ApprovalSpec = #{
+                    id => yawl_approval,
+                    start => {yawl_approval, start_link, []},
+                    restart => permanent,
+                    shutdown => 5000,
+                    type => worker,
+                    modules => [yawl_approval]
+                   },
+
+    {ok, {SupFlags, [ChildSpec, TimeoutSpec, XesSpec, ApprovalSpec]}}.

@@ -1,0 +1,120 @@
+% -*- latex -*-
+%%
+% Chapter 8: Discussion
+%%
+%%====================================================================
+
+\chapter{Discussion}
+
+\section{Lessons Learned}
+
+\subsection{Architectural Insights}
+
+The comparison between CRE and A2A implementations reveals several
+important lessons for YAWL system designers:
+
+\begin{enumerate}
+  \item \textbf{Direct modeling vs. Pattern libraries}: Direct Petri net
+        modeling (CRE) provides clearer intent and easier debugging,
+        while pattern libraries (A2A) offer better reusability.
+
+  \item \textbf{State machine vs. Callback-based}: gen\_statem (A2A) provides
+        more explicit state management than gen\_pnet callbacks (CRE).
+
+  \item \textbf{Testing investment}: A2A's comprehensive test suite
+        (84,474 lines) demonstrates the value of thorough testing
+        for complex workflow systems.
+\end{enumerate}
+
+\section{Best Practices}
+
+Based on our analysis, we recommend the following best practices
+for YAWL implementations:
+
+\subsection{For Research Prototypes}
+
+\begin{itemize}
+  \item Use direct Petri net modeling (gen\_pnet) for simplicity
+  \item Implement basic XES logging for process mining
+  \item Focus on pattern correctness over completeness
+  \item Include unit tests for each subprocess
+\end{itemize}
+
+\subsection{For Production Systems}
+
+\begin{itemize}
+  \item Use pattern library approach for reusability
+  \item Implement comprehensive monitoring and telemetry
+  \item Include state space exploration for verification
+  \item Provide REST API for external integration
+  \item Implement comprehensive error handling and recovery
+\end{itemize}
+
+\section{Limitations}
+
+\subsection{CRE Limitations}
+
+\begin{itemize}
+  \item Limited pattern library (patterns embedded in workflows)
+  \item Basic test coverage
+  \item No state space exploration or formal verification
+  \item Limited REST API support
+  \item Smaller developer community
+\end{itemize}
+
+\subsection{A2A Limitations}
+
+\begin{itemize}
+  \item Higher complexity and learning curve
+  \item More dependencies and infrastructure
+  \item Higher memory footprint per instance
+  \item Overkill for simple use cases
+\end{itemize}
+
+\section{Future Work}
+
+\subsection{For CRE Implementation}
+
+\begin{itemize}
+  \item Extract patterns into reusable library
+  \item Add comprehensive test suite
+  \item Implement state space exploration
+  \item Add REST API layer
+  \item Improve XES logging with extensions
+\end{itemize}
+
+\subsection{For A2A Implementation}
+
+\begin{itemize}
+  \item Simplify API for basic use cases
+  \item Reduce memory footprint
+  \item Improve documentation
+  \item Add direct Petri net modeling option
+  \item Optimize for single-instance scenarios
+\end{itemize}
+
+\subsection{Research Directions}
+
+\begin{itemize}
+  \item Hybrid approach: Combine direct modeling with pattern library
+  \item Automatic workflow verification using model checking
+  \item Machine learning for workflow optimization
+  \item Cross-language workflow interoperability
+  \item Real-time workflow monitoring and adaptation
+\end{itemize}
+
+\section{Applicability to Other Domains}
+
+The Order Fulfillment case study demonstrates patterns applicable to
+many domains:
+
+\begin{itemize}
+  \item \textbf{Supply chain management}: Similar multi-stage processes
+  \item \textbf{Financial services}: Multi-step approval workflows
+  \item \textbf{Healthcare}: Patient journey through care pathways
+  \item \textbf{Manufacturing}: Production process orchestration
+\end{itemize}
+
+The architectural insights and pattern implementations from both
+CRE and A2A can be applied to these domains with appropriate
+adaptation.

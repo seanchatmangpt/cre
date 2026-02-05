@@ -282,7 +282,7 @@ reset_worker_load(WorkerPid) when is_pid(WorkerPid) ->
 -spec init([]) -> {ok, #balancer_state{}}.
 
 init([]) ->
-    error_logger:info_report([{yawl_balancer, starting}, {pid, self()}]),
+    logger:info("Load balancer starting", [{yawl_balancer, starting}]),
     %% Monitor CRE master for worker updates
     case whereis(cre_master) of
         undefined -> ok;
@@ -386,13 +386,9 @@ handle_cast({register_worker, WorkerPid, Options}, State) ->
         AffinityTags
     ),
 
-    error_logger:info_report([
-        {yawl_balancer, worker_registered},
-        {worker_pid, WorkerPid},
-        {node, node(WorkerPid)},
-        {capacity, Capacity},
-        {weight, Weight}
-    ]),
+    logger:info("Worker registered: pid=~p node=~p cap=~p weight=~p",
+                [WorkerPid, node(WorkerPid), Capacity, Weight],
+                [{yawl_balancer, worker_registered}]),
 
     {noreply, State#balancer_state{workers = NewWorkers, affinity_map = NewAffinityMap}};
 
@@ -405,19 +401,15 @@ handle_cast({unregister_worker, WorkerPid}, State) ->
         State#balancer_state.affinity_map
     ),
 
-    error_logger:info_report([
-        {yawl_balancer, worker_unregistered},
-        {worker_pid, WorkerPid}
-    ]),
+    logger:info("Worker unregistered: pid=~p", [WorkerPid],
+                 [{yawl_balancer, worker_unregistered}]),
 
     {noreply, State#balancer_state{workers = NewWorkers, affinity_map = NewAffinityMap}};
 
 handle_cast({set_strategy, Strategy}, State) ->
-    error_logger:info_report([
-        {yawl_balancer, strategy_changed},
-        {from, State#balancer_state.strategy},
-        {to, Strategy}
-    ]),
+    logger:info("Load balancer strategy changed: from=~p to=~p",
+                  [State#balancer_state.strategy, Strategy],
+                  [{yawl_balancer, strategy_changed}]),
     {noreply, State#balancer_state{strategy = Strategy}};
 
 handle_cast({update_worker_capacity, WorkerPid, Capacity}, State) ->
@@ -460,10 +452,8 @@ handle_cast(_Request, State) ->
 -spec handle_info(term(), #balancer_state{}) -> {noreply, #balancer_state{}}.
 
 handle_info({'DOWN', _Ref, process, WorkerPid, _Reason}, State) ->
-    error_logger:info_report([
-        {yawl_balancer, worker_down},
-        {worker_pid, WorkerPid}
-    ]),
+    logger:info("Worker down: pid=~p", [WorkerPid],
+                [{yawl_balancer, worker_down}]),
     NewWorkers = maps:remove(WorkerPid, State#balancer_state.workers),
     NewAffinityMap = maps:filter(
         fun(_Tag, Pid) -> Pid =/= WorkerPid end,
@@ -492,7 +482,7 @@ code_change(_OldVsn, State, _Extra) ->
 -spec terminate(term(), #balancer_state{}) -> ok.
 
 terminate(_Reason, _State) ->
-    error_logger:info_report([{yawl_balancer, stopping}, {pid, self()}]),
+    logger:info("Load balancer stopping", [{yawl_balancer, stopping}]),
     ok.
 
 %%====================================================================

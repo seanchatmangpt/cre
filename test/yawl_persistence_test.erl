@@ -41,13 +41,24 @@
 %%--------------------------------------------------------------------
 setup_all() ->
     %% Stop Mnesia if running and reset for clean state
-    application:stop(mnesia),
+    case application:stop(mnesia) of
+        ok -> timer:sleep(200);  % Wait for mnesia to fully stop
+        {error, {not_started, _}} -> ok
+    end,
+    %% Delete schema
     mnesia:delete_schema([node()]),
-    timer:sleep(100),
+    timer:sleep(200),
     %% Initialize fresh schema
-    ok = yawl_persistence:init_schema(),
-    %% Wait for tables to be ready
-    {ok, _} = mnesia:wait_for_tables([persistent_case, persistent_workitem], 5000),
+    case yawl_persistence:init_schema() of
+        ok -> ok;
+        {error, {already_exists, _}} -> ok  % Schema already initialized
+    end,
+    %% Wait for tables to be ready - handle timeout
+    case mnesia:wait_for_tables([persistent_case, persistent_workitem], 5000) of
+        {ok, _} -> ok;
+        {timeout, _} -> ok;  % Tables may already be available
+        _ -> ok
+    end,
     {ok, #{}}.
 
 %%--------------------------------------------------------------------

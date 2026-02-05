@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<log xes.version="1.0" xes.features="nested-attributes" xes.xmlns="http://www.xes-standard.org/">
+  <trace xes:id="trace_2" xes:type="">
+    <event xes:id="0">
+      <string key="org:xes-standard:concept:name" value="CRE YAWL Workflow"/>
+      <date key="org:xes-standard:time:timestamp" value="2026-02-05T21:10:11.187Z"/>
+      <string key="log:id" value="log_1"/>
+    </event>
+    
+    <event id="event_3" string key="case:id" value="CASE-001"/>>
+      <date key="time:timestamp" value="2026-02-05T21:10:11.187Z"/>
+      <string key="concept:concept:name" value="CaseStart"/>
+      <string key="lifecycle:lifecycle:transition" value="start"/>
+      
+    </event>
+    <event id="event_4">
+      <date key="time:timestamp" value="2026-02-05T21:10:11.187Z"/>
+      <string key="concept:concept:name" value="WCP-01"/><string key="concept:concept:instance" value="Sequence"/>
+      <string key="lifecycle:lifecycle:transition" value="start"/>
+      
+    </event>
+    <event id="event_5">
+      <date key="time:timestamp" value="2026-02-05T21:10:11.289Z"/>
+      <string key="concept:concept:name" value="WCP-01"/><string key="concept:concept:instance" value="Sequence"/>
+      <string key="lifecycle:lifecycle:transition" value="complete"/>
+      <string key="data:result" value="{status=>ok, }"/>
+    </event>
+    <event id="event_6">
+      <date key="time:timestamp" value="2026-02-05T21:10:11.289Z"/>
+      <string key="concept:concept:name" value="WCP-02"/><string key="concept:concept:instance" value="ParallelSplit"/>
+      <string key="lifecycle:lifecycle:transition" value="start"/>
+      
+    </event>
+    <event id="event_7">
+      <date key="time:timestamp" value="2026-02-05T21:10:11.390Z"/>
+      <string key="concept:concept:name" value="WCP-02"/><string key="concept:concept:instance" value="ParallelSplit"/>
+      <string key="lifecycle:lifecycle:transition" value="complete"/>
+      <string key="data:result" value="{branches=>2, }"/>
+    </event>
+    <event id="event_8">
+      <date key="time:timestamp" value="2026-02-05T21:10:11.390Z"/>
+      <string key="concept:concept:name" value="Workitem"/><string key="concept:concept:instance" value="WI-001"/>
+      <string key="lifecycle:lifecycle:transition" value="start"/>
+      <string key="data:task" value="OrderVerification"/>
+    </event>
+    <event id="event_9">
+      <date key="time:timestamp" value="2026-02-05T21:10:11.441Z"/>
+      <string key="concept:concept:name" value="Workitem"/><string key="concept:concept:instance" value="WI-001"/>
+      <string key="lifecycle:lifecycle:transition" value="complete"/>
+      <string key="data:task" value="OrderVerification"/><string key="data:result" value="{valid=>true, }"/>
+    </event>
+    <event id="event_10">
+      <date key="time:timestamp" value="2026-02-05T21:10:11.441Z"/>
+      <string key="concept:concept:name" value="TokenMove"/>
+      <string key="lifecycle:lifecycle:transition" value="move"/>
+      <string key="data:to" value="p_processing"/><string key="data:place" value="p_start"/><string key="data:from" value="p_input"/>
+    </event>
+    <event id="event_11">
+      <date key="time:timestamp" value="2026-02-05T21:10:11.441Z"/>
+      <string key="concept:concept:name" value="TokenMove"/>
+      <string key="lifecycle:lifecycle:transition" value="move"/>
+      <string key="data:to" value="p_complete"/><string key="data:place" value="p_processing"/><string key="data:from" value="p_processing"/>
+    </event>
+    <event id="event_12" string key="case:id" value="CASE-001"/>>
+      <date key="time:timestamp" value="2026-02-05T21:10:11.441Z"/>
+      <string key="concept:concept:name" value="CaseComplete"/>
+      <string key="lifecycle:lifecycle:transition" value="complete"/>
+      <string key="data:status" value="completed"/><string key="data:duration" value="350"/>
+    </event>
+  </trace>
+</log>

@@ -511,11 +511,8 @@ init(Config) ->
         pending_messages = []
     },
 
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, init},
-        {max_queue_size, MaxQueueSize}
-    ]),
+    logger:info("IPC server initialized: max_queue=~p", [MaxQueueSize],
+                 [{module, ?MODULE}, {action, init}]),
 
     {ok, State}.
 

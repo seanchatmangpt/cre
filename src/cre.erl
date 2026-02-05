@@ -83,15 +83,21 @@ pid(CreNode) when is_atom(CreNode) ->
 
 start(_Type, _Args) ->
 
-    {ok, Port} = start_cre_webservice(?PORT),
+    %% Initialize persistent_term configuration (OTP 21+ optimization)
+    ok = cre_config:init(),
 
-    error_logger:info_report([{info, "starting cre"},
-                              {application, cre},
-                              {vsn, ?VSN},
-                              {node, node()},
-                              {port, Port}]),
-
-    cre_sup:start_link().
+    %% Use persistent_term for O(1) access to default port
+    DefaultPort = cre_config:get(cre_default_port, 4142),
+    case start_cre_webservice(DefaultPort) of
+        {ok, Port} ->
+            logger:info("Starting CRE: vsn=~p node=~p port=~p",
+                        [?VSN, node(), Port],
+                        [{info, "starting cre"}, {application, cre}]),
+            cre_sup:start_link();
+        {error, {already_started, Port}} ->
+            logger:info("CRE web service already running on port ~p", [Port]),
+            cre_sup:start_link()
+    end.
 
 
 -spec stop(State :: _) -> ok.

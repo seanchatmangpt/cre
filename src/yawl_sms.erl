@@ -171,14 +171,10 @@ send_sms(To, Body, Provider) ->
                     end,
 
                     %% Log the send
-                    error_logger:info_report([
-                        {module, ?MODULE},
-                        {action, send_sms},
-                        {message_id, MessageId},
-                        {to, mask_phone_number(To)},
-                        {provider, Provider},
-                        {body_length, byte_size(Body)}
-                    ]),
+                    logger:info("SMS sent: id=~p to=~p provider=~p len=~p",
+                                [MessageId, mask_phone_number(To), Provider,
+                                 byte_size(Body)],
+                                [{module, ?MODULE}, {action, send_sms}]),
 
                     {ok, MessageId}
             end
@@ -247,12 +243,9 @@ send_template(To, TemplateName, Vars, Provider) ->
 -spec set_provider(Provider :: provider(), Config :: map()) -> ok.
 
 set_provider(Provider, Config) ->
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, set_provider},
-        {provider, Provider},
-        {config_keys, maps:keys(Config)}
-    ]),
+    logger:info("SMS provider set: ~p keys=~p",
+                [Provider, maps:keys(Config)],
+                [{module, ?MODULE}, {action, set_provider}]),
     %% In production, would store provider config
     ok.
 

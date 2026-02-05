@@ -271,20 +271,17 @@ resume_execution(ExecutionId) when is_binary(ExecutionId) ->
 -spec init([]) -> {ok, #stateless_state{}}.
 
 init([]) ->
-    logger:info([{yawl_stateless, starting}, {pid, self()}],
-                 "Starting stateless execution service"),
-    %% Create checkpoint directory if it doesn't exist
-    %% Use code:lib_dir/1 for OTP 25+ compatibility (code:lib_dir/2 is deprecated)
-    PrivDir = case code:lib_dir(cre) of
-        {error, bad_name} -> "priv";
-        Dir -> Dir ++ "/priv"
-    end,
-    CheckpointDir = PrivDir ++ "/checkpoints",
+    logger:info("Starting stateless execution service",
+                [{yawl_stateless, starting}, {pid, self()}]),
+    %% Use persistent_term for O(1) access to checkpoint directory
+    %% (OTP 21+ optimization)
+    CheckpointDir = cre_config:get(yawl_stateless_checkpoint_dir,
+                                   "priv/checkpoints"),
     ok = filelib:ensure_dir(CheckpointDir ++ "/"),
     %% Start TTL cleanup timer
     schedule_ttl_cleanup(),
     {ok, #stateless_state{
-        checkpoint_dir = list_to_binary(CheckpointDir)
+        checkpoint_dir = CheckpointDir
     }}.
 
 %%--------------------------------------------------------------------
@@ -324,10 +321,8 @@ handle_call({execute, WorkflowSpec, InputData}, _From, State) ->
 
                     NewExecutions = maps:put(ExecutionId, ExecState, State#stateless_state.executions),
 
-                    error_logger:info_report([
-                        {yawl_stateless, execution_started},
-                        {execution_id, ExecutionId}
-                    ]),
+                    logger:info("Stateless execution started: ~p", [ExecutionId],
+                                 [{yawl_stateless, execution_started}]),
 
                     %% Start execution in background
                     self() ! {execute_step, ExecutionId},
@@ -365,11 +360,9 @@ handle_call({checkpoint, ExecutionId, CheckpointName}, _From, State) ->
                                      ExecState#execution_state.checkpoints],
                     NewExecState = ExecState#execution_state{checkpoints = NewCheckpoints},
                     NewExecutions = maps:put(ExecutionId, NewExecState, State#stateless_state.executions),
-                    error_logger:info_report([
-                        {yawl_stateless, checkpoint_created},
-                        {execution_id, ExecutionId},
-                        {checkpoint, CheckpointName}
-                    ]),
+                    logger:info("Checkpoint created: ~p checkpoint=~p",
+                                [ExecutionId, CheckpointName],
+                                [{yawl_stateless, checkpoint_created}]),
                     {reply, ok, State#stateless_state{executions = NewExecutions}};
                 {error, Reason} ->
                     {reply, {error, Reason}, State}
@@ -387,11 +380,9 @@ handle_call({restore, ExecutionId, CheckpointName}, _From, State) ->
                 {_Name, CheckpointData, _Timestamp} ->
                     RestoredState = deserialize_execution_state(CheckpointData),
                     NewExecutions = maps:put(ExecutionId, RestoredState, State#stateless_state.executions),
-                    error_logger:info_report([
-                        {yawl_stateless, execution_restored},
-                        {execution_id, ExecutionId},
-                        {checkpoint, CheckpointName}
-                    ]),
+                    logger:info("Stateless execution restored: ~p checkpoint=~p",
+                                [ExecutionId, CheckpointName],
+                                [{yawl_stateless, execution_restored}]),
                     {reply, ok, State#stateless_state{executions = NewExecutions}}
             end
     end;
@@ -434,10 +425,8 @@ handle_call({cancel, ExecutionId}, _From, State) ->
                 end_time = erlang:timestamp()
             },
             NewExecutions = maps:put(ExecutionId, NewExecState, State#stateless_state.executions),
-            error_logger:info_report([
-                {yawl_stateless, execution_cancelled},
-                {execution_id, ExecutionId}
-            ]),
+            logger:info("Execution cancelled: id=~p", [ExecutionId],
+                        [{yawl_stateless, execution_cancelled}]),
             {reply, ok, State#stateless_state{executions = NewExecutions}}
     end;
 
@@ -519,10 +508,8 @@ handle_info({execute_step, ExecutionId}, State) ->
                 end_time = erlang:timestamp()
             },
             NewExecutions = maps:put(ExecutionId, NewExecState, State#stateless_state.executions),
-            error_logger:info_report([
-                {yawl_stateless, execution_completed},
-                {execution_id, ExecutionId}
-            ]),
+            logger:info("Stateless execution completed: ~p", [ExecutionId],
+                         [{yawl_stateless, execution_completed}]),
             {noreply, State#stateless_state{executions = NewExecutions}};
         #execution_state{steps_remaining = [CurrentStep | RemainingSteps]} = ExecState ->
             %% Execute current step
@@ -549,11 +536,9 @@ handle_info({execute_step, ExecutionId}, State) ->
                         error_reason = Reason
                     },
                     NewExecutions = maps:put(ExecutionId, NewExecState, State#stateless_state.executions),
-                    error_logger:error_report([
-                        {yawl_stateless, execution_failed},
-                        {execution_id, ExecutionId},
-                        {reason, Reason}
-                    ]),
+                    logger:error("Stateless execution failed: ~p reason=~p",
+                               [ExecutionId, Reason],
+                               [{yawl_stateless, execution_failed}]),
                     {noreply, State#stateless_state{executions = NewExecutions}}
             end
     end;
@@ -597,7 +582,7 @@ code_change(_OldVsn, State, _Extra) ->
 -spec terminate(term(), #stateless_state{}) -> ok.
 
 terminate(_Reason, _State) ->
-    error_logger:info_report([{yawl_stateless, stopping}, {pid, self()}]),
+    logger:info("Stateless execution stopping", [{yawl_stateless, stopping}]),
     ok.
 
 %%====================================================================
@@ -723,4 +708,7 @@ timestamp_to_binary({MegaSecs, Secs, MicroSecs}) ->
 -spec schedule_ttl_cleanup() -> reference().
 
 schedule_ttl_cleanup() ->
-    erlang:send_after(60000, self(), ttl_cleanup).  %% Check every minute
+    %% Use persistent_term for O(1) access to TTL cleanup interval
+    %% (OTP 21+ optimization)
+    Interval = cre_config:get(yawl_stateless_ttl_cleanup_interval, 60000),
+    erlang:send_after(Interval, self(), ttl_cleanup).

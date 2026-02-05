@@ -1,0 +1,58 @@
+# YAWL Workflow Patterns Reference
+
+> Auto-generated from: `ontology/yawl_patterns.ttl`
+> Generated: {{ generation_time | default(value="") }}
+
+This document describes all YAWL (Yet Another Workflow Language) workflow patterns implemented in CRE.
+
+## Pattern Categories
+
+{%- set grouped = {} %}
+{%- for row in sparql_results %}
+{%- set category = row["?category"] | default(value="uncategorized") %}
+{%- set _ = grouped.update({category: grouped.get(category, []) + [row]}) %}
+{%- endfor %}
+
+{%- for category in grouped | sort(attribute="0") %}
+
+### {{ category[0] | replace(from="_", to=" ") | title }}
+
+| Pattern ID | Pattern Name | Description |
+|------------|--------------|-------------|
+{%- for row in category[1] %}
+| {{ row["?patternId"] | default(value="") }} | {{ row["?patternName"] | default(value="") }} | {{ row["?comment"] | default(value="") }} |
+{%- endfor %}
+
+{%- endfor %}
+
+## Pattern Details
+
+{%- for row in sparql_results %}
+{%- set patternName = row["?patternName"] | default(value="") %}
+{%- set patternId = row["?patternId"] | default(value="") %}
+{%- set comment = row["?comment"] | default(value="") %}
+{%- set category = row["?category"] | default(value="") %}
+{%- set arity = row["?arity"] | default(value="") %}
+{%- set petriNetType = row["?petriNetType"] | default(value="") %}
+
+### {{ patternId }}: {{ patternName }}
+
+**Description:** {{ comment }}
+
+**Category:** {{ category }}
+{%- if arity != "" %}
+
+**Arity:** {{ arity }}
+{%- endif -%}
+{%- if petriNetType != "" %}
+
+**Petri Net Type:** {{ petriNetType }}
+{%- endif %}
+
+#### Erlang Function
+
+```erlang
+{{ patternName | snake_case }}() -> pnet:pnet()
+```
+
+{%- endfor %}

@@ -1,0 +1,123 @@
+% -*- latex -*-
+%%
+% Chapter 1: Introduction
+%%
+%%====================================================================
+
+\chapter{Introduction}
+
+\section{Research Motivation}
+
+Business Process Management (BPM) has emerged as a critical discipline for
+organizational efficiency and process optimization. At the heart of BPM
+lies the workflow management system, which coordinates the execution of
+business processes according to specified control flow patterns.
+
+The YAWL (Yet Another Workflow Language) system, developed by van der
+Aalst et al., represents a comprehensive approach to workflow management
+that directly maps to Petri net formalism. YAWL was designed to support
+all 20 control-flow patterns identified in the workflow patterns catalog,
+making it one of the most expressive workflow languages available.
+
+This thesis focuses on the Order Fulfillment process, a well-known
+business case study from CAISE 2013 \cite{conforti2013supporting}, which
+involves five subprocesses: Ordering, Payment, Carrier Appointment,
+Freight In Transit, and Freight Delivered. This case study is particularly
+interesting because it involves risk-informed decisions and complex
+inter-subprocess coordination.
+
+\section{Problem Statement}
+
+While YAWL provides a comprehensive theoretical foundation for workflow
+management, there remains a significant gap between theory and practice:
+different implementations of YAWL workflows can exhibit dramatically
+different characteristics in terms of:
+
+\begin{itemize}
+  \item \textbf{Architectural approach}: Direct Petri net modeling vs.
+        pattern library composition
+  \item \textbf{Execution semantics}: How tokens flow through the system
+  \item \textbf{Pattern coverage}: Which workflow patterns are natively
+        supported
+  \item \textbf{Observability}: How execution traces are captured and
+        analyzed
+  \item \textbf{Performance}: Execution time and memory characteristics
+\end{itemize}
+
+This thesis compares two independent implementations of the YAWL Order
+Fulfillment workflow:
+
+\begin{enumerate}
+  \item \textbf{CRE Implementation}: A direct Petri net modeling approach
+        using the gen\_pnet behavior
+  \item \textbf{A2A Implementation}: A pattern library approach with
+        comprehensive workflow management infrastructure
+\end{enumerate}
+
+Both implementations target the same business process but employ
+fundamentally different design philosophies, providing a unique
+opportunity for comparative analysis.
+
+\section{Contributions}
+
+The main contributions of this thesis are:
+
+\begin{enumerate}
+  \item \textbf{Architectural Analysis}: A detailed comparison of the
+        architectural approaches used in the CRE and A2A implementations,
+        highlighting their trade-offs and design decisions.
+
+  \item \textbf{Pattern Coverage Analysis}: Systematic analysis of
+        workflow pattern support in both implementations, mapping YAWL
+        patterns to actual code implementations.
+
+  \item \textbf{Formal Verification}: Analysis of Petri net soundness
+        properties (soundness, liveness, boundedness) for both
+        implementations.
+
+  \item \textbf{Empirical Evaluation}: Performance benchmarks comparing
+        execution times and memory usage patterns for both systems.
+
+  \item \textbf{XES Logging Analysis}: Comparison of event logging
+        capabilities and process mining compatibility.
+
+  \item \textbf{Case Study Execution}: End-to-end execution and
+        documentation of the Order Fulfillment workflow in both
+        systems.
+\end{enumerate}
+
+\section{Thesis Structure}
+
+The remainder of this thesis is organized as follows:
+
+\textbf{Chapter 2} provides background on YAWL, Petri net formalism, and
+workflow patterns. It introduces the gen\_pnet library used in both
+implementations and the XES standard for event logging.
+
+\textbf{Chapter 3} describes the Order Fulfillment domain, based on the
+CAISE 2013 paper. It presents the business requirements, process
+specification, and risk-informed decision aspects.
+
+\textbf{Chapter 4} presents the architectural comparison of the CRE and
+A2A implementations, analyzing their design philosophies and component
+structures.
+
+\textbf{Chapter 5} analyzes the pattern implementation coverage in
+both systems, mapping YAWL workflow control patterns to actual code.
+
+\textbf{Chapter 6} presents the empirical evaluation, including
+performance benchmarks, memory usage analysis, and scalability
+characteristics.
+
+\textbf{Chapter 7} provides a detailed case study of Order Fulfillment
+execution, including inter-subprocess communication and data flow
+analysis.
+
+\textbf{Chapter 8} discusses lessons learned, best practices for YAWL
+implementation, and limitations of both approaches.
+
+\textbf{Chapter 9} concludes the thesis with a summary of contributions
+and directions for future research.
+
+The appendices contain complete code listings, test results, and
+sample XES logs.

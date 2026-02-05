@@ -1,0 +1,228 @@
+% -*- latex -*-
+%%
+% PhD Thesis: YAWL Order Fulfillment Implementation Comparison
+%
+% A comparative analysis of two YAWL (Yet Another Workflow Language)
+% implementations for Order Fulfillment workflows using Petri net
+% formalism and workflow patterns.
+%
+% Reference: Supporting Risk-Informed Decisions during Business
+%             Process Execution (CAISE 2013)
+%
+% @author CRE Research Team
+% @date 2025
+%
+%%====================================================================
+
+\documentclass[12pt,a4paper]{report}
+
+%%====================================================================
+%% Packages
+%%====================================================================
+
+% Standard LaTeX packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{etoolbox}
+
+% Mathematics
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{stmaryrd}
+
+% Graphics and figures
+\usepackage{tikz}
+\usetikzlibrary{arrows,automata,positioning,shapes,fit,calc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+
+% Tables
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{tabularx}
+
+% Code listings
+\usepackage{listings}
+\usepackage{xcolor}
+
+% Hyperlinks
+\usepackage{hyperref}
+\usepackage[all]{hypcap}
+
+% Algorithms
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Bibliography
+\usepackage[style=authoryear,backend=biber]{biblatex}
+\addbibresource{bibliography/thesis.bib}
+
+% Page layout
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+
+%%====================================================================
+%% Configuration
+%%====================================================================
+
+% Colors for code listings
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+% Erlang code listing style
+\lstdefinelanguage{Erlang}{
+  keywords={module, export, import, include, include_lib, compile, define,
+          record, case, of, end, if, else, receive, after, try, catch,
+          throw, begin, true, false, not, and, or,andalso, orelse,
+          fun, when},
+  sensitive=true,
+  morecomment=[l]{\%},
+  morestring=[b]",
+  morestring=[b]'
+}
+
+\lstset{
+  language=Erlang,
+  backgroundcolor=\color{backcolour},
+  commentstyle=\color{codegreen},
+  keywordstyle=\color{magenta},
+  numberstyle=\tiny\color{codegray},
+  stringstyle=\color{codepurple},
+  basicstyle=\ttfamily\footnotesize,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  numbers=left,
+  numbersep=5pt,
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=2,
+  frame=single
+}
+
+% TikZ styles for Petri nets
+\tikzset{
+  place/.style={circle, draw, minimum size=8mm, inner sep=0pt},
+  transition/.style={rectangle, draw, minimum size=8mm, inner sep=0pt},
+  token/.style={fill, circle, inner sep=1.5pt},
+  inhibitor/.style={circle, draw, fill=white, minimum size=4mm}
+}
+
+% Theorem environments
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{example}{Example}[section]
+
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}[section]
+
+%%====================================================================
+%% Title Page
+%%====================================================================
+
+\title{\textbf{A Comparative Analysis of YAWL Order Fulfillment Implementations}\\
+\large Using Petri Net Formalism and Workflow Patterns}
+
+\author{\textbf{CRE Research Team}\\
+\small Department of Distributed Systems\\
+\small Common Runtime Environment (CRE)}
+
+\date{\small February 2025}
+
+%%====================================================================
+%% Document Start
+%%====================================================================
+
+\begin{document}
+
+% Title page
+\maketitle
+
+% Abstract
+\begin{abstract}
+This thesis presents a comprehensive comparative analysis of two implementations
+of the YAWL (Yet Another Workflow Language) Order Fulfillment workflow:
+the CRE implementation and the A2A reference implementation. Both systems
+implement the Order Fulfillment process originally presented at CAISE 2013
+by Conforti et al., but employ fundamentally different architectural approaches.
+
+The CRE implementation uses direct Petri net modeling through the gen\_pnet
+behavior, with each workflow subprocess implemented as a standalone Petri net
+module. The A2A implementation employs a comprehensive pattern library approach
+with 43 predefined YAWL patterns and a gen\_statem-based workflow instance
+manager.
+
+We analyze both implementations across multiple dimensions: pattern coverage,
+architectural design, execution semantics, XES logging capabilities, and
+performance characteristics. The analysis includes formal verification of
+Petri net soundness properties, empirical evaluation of execution times,
+and detailed comparison of workflow pattern implementations.
+
+Our findings demonstrate that while both implementations correctly realize
+the Order Fulfillment process, they embody different design philosophies:
+the CRE implementation emphasizes simplicity and direct modeling, while the
+A2A implementation prioritizes pattern reusability and comprehensive
+workflow management capabilities.
+\end{abstract}
+
+% Acknowledgments (optional)
+\chapter*{Acknowledgments}
+This research was conducted using the CRE (Common Runtime Environment)
+for distributed programming languages. We acknowledge the foundational work
+by van der Aalst et al. on workflow patterns and YAWL, and the CAISE 2013
+paper by Conforti et al. that provided the Order Fulfillment case study.
+
+%%====================================================================
+%% Table of Contents
+%%====================================================================
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+%%====================================================================
+%% Chapters
+%%====================================================================
+
+\include{chapters/introduction}
+\include{chapters/background}
+\include{chapters/order_fulfillment_domain}
+\include{chapters/architecture_comparison}
+\include{chapters/pattern_analysis}
+\include{chapters/empirical_evaluation}
+\include{chapters/case_study}
+\include{chapters/discussion}
+\include{chapters/conclusion}
+
+%%====================================================================
+%% Bibliography
+%%====================================================================
+
+\printbibliography
+
+%%====================================================================
+%% Appendices
+%%====================================================================
+
+\appendix
+\include{appendix/code_listings}
+\include{appendix/test_results}
+\include{appendix/xes_logs}
+
+\end{document}

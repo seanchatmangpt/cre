@@ -93,6 +93,18 @@
          deferred_choice/3,
          interleaved_routing/2]).
 
+%% Pattern Execution API functions (WCP-11 through WCP-17)
+-export([execute_implicit_termination/2,
+         execute_multiple_instances_no_sync/3,
+         execute_multiple_instances_static/3,
+         execute_multiple_instances_runtime/3,
+         execute_multiple_instances_dynamic/3,
+         execute_deferred_choice/3,
+         execute_interleaved_routing/2,
+         execute_recursion/2,
+         execute_interleaved_loop/2,
+         execute_critical_section/2]).
+
 %% Pattern API functions - State-Based (WCP-18 through WCP-28)
 -export([milestone/2,
          cancel_activity/2,
@@ -139,6 +151,509 @@
           data :: term(),
           index :: non_neg_integer()
          }).
+
+-record(sync_token, {
+          activity_id :: reference(),
+          data :: term(),
+          completed :: boolean()
+         }).
+
+-record(loop_state, {
+          iteration :: non_neg_integer(),
+          condition_result :: boolean(),
+          body_data :: term()
+         }).
+
+-record(recursion_token, {
+          level :: non_neg_integer(),
+          data :: term(),
+          is_base_case :: boolean()
+         }).
+
+-record(protocol_state, {
+          request :: term(),
+          response :: term(),
+          timeout_ref :: reference() | undefined,
+          start_time :: integer()
+         }).
+
+-record(catch_state, {
+          exception_type :: atom(),
+          exception_reason :: term(),
+          handled :: boolean()
+         }).
+
+%%====================================================================
+%% Pattern Execution API functions (WCP-11 through WCP-17)
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Executes an Implicit Termination pattern (WCP-11).
+%%
+%% This function executes the subprocess and automatically terminates
+%% when no work remains and all input conditions are satisfied.
+%%
+%% @param Pattern The pattern state from implicit_termination/1.
+%% @param InitialData Initial data to pass to the subprocess.
+%% @return {ok, Result} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_implicit_termination(Pattern :: #pattern_state{},
+                                    InitialData :: term()) ->
+          {ok, term()} | {error, term()}.
+
+execute_implicit_termination(#pattern_state{subprocess = Subprocess}, InitialData) ->
+    try
+        case Subprocess of
+            Fun when is_function(Fun, 1) ->
+                Result = Fun(InitialData),
+                {ok, Result};
+            {M, F} when is_atom(M), is_atom(F) ->
+                case erlang:apply(M, F, [InitialData]) of
+                    {ok, Result} -> {ok, Result};
+                    Result -> {ok, Result}
+                end;
+            _ ->
+                {error, invalid_subprocess}
+        end
+    catch
+        Error:Reason:Stack ->
+            {error, {Error, Reason, Stack}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Multiple Instances without Synchronization pattern (WCP-12).
+%%
+%% This function creates concurrent instances that operate independently
+%% without any synchronization point. Results are collected as they complete.
+%%
+%% @param Pattern The pattern state from multiple_instances_no_sync/3.
+%% @param Timeout Maximum time to wait for each instance (infinity for no limit).
+%% @param Options Additional options: {on_error, continue | stop}, {max_concurrent, N}.
+%% @return {ok, Results} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_multiple_instances_no_sync(Pattern :: #pattern_state{},
+                                         _Timeout :: timeout(),
+                                         Options :: map()) ->
+          {ok, list()} | {error, term()}.
+
+execute_multiple_instances_no_sync(#pattern_state{
+                                     subprocess = Subprocess,
+                                     instance_count = Count,
+                                     pending_instances = InputData
+                                    }, _Timeout, Options) ->
+    OnError = maps:get(on_error, Options, continue),
+    MaxConcurrent = maps:get(max_concurrent, Options, Count),
+
+    DataList = case InputData of
+        [] -> lists:seq(1, Count);
+        L when is_list(L) -> L
+    end,
+
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Spawn supervisor to manage instance processes
+    SupervisorPid = spawn(fun() ->
+        instance_supervisor(Ref, Parent, Subprocess, DataList, OnError, MaxConcurrent)
+    end),
+
+    %% Wait for supervisor to complete
+    receive
+        {Ref, {ok, Results}} -> {ok, Results};
+        {Ref, {error, Reason}} -> {error, Reason};
+        {'EXIT', SupervisorPid, Reason} -> {error, {supervisor_exit, Reason}}
+    after 30000 ->
+        exit(SupervisorPid, kill),
+        {error, timeout}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Multiple Instances with Design Time Knowledge pattern (WCP-13).
+%%
+%% This function spawns a fixed number of instances known at design time
+%% and synchronizes when all instances complete.
+%%
+%% @param Pattern The pattern state from multiple_instances_static/3.
+%% @param Timeout Maximum time to wait for all instances (infinity for no limit).
+%% @param Options Additional options: {on_error, continue | stop}.
+%% @return {ok, Results} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_multiple_instances_static(Pattern :: #pattern_state{},
+                                        Timeout :: timeout(),
+                                        Options :: map()) ->
+          {ok, list()} | {error, term()}.
+
+execute_multiple_instances_static(#pattern_state{
+                                     subprocess = Subprocess,
+                                     instance_count = Count,
+                                     pending_instances = InputData
+                                    }, Timeout, Options) ->
+    OnError = maps:get(on_error, Options, continue),
+
+    DataList = case InputData of
+        [] -> lists:seq(1, Count);
+        L when is_list(L) -> lists:sublist(L, Count)
+    end,
+
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Spawn all instances concurrently
+    Pids = lists:map(fun(Data) ->
+        spawn(fun() ->
+            Result = execute_instance(Subprocess, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, DataList),
+
+    %% Collect results from all instances
+    Results = collect_all_results(Ref, Pids, Timeout, OnError, []),
+
+    case [R || R <- Results, element(1, R) =:= error] of
+        [] ->
+            {ok, [Result || {ok, Result} <- Results]};
+        Errors when OnError =:= stop ->
+            {error, {instance_errors, Errors}};
+        _Errors ->
+            {ok, [Result || {ok, Result} <- Results]}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Multiple Instances with Runtime Knowledge pattern (WCP-14).
+%%
+%% This function evaluates the instance count at runtime and spawns
+%% that many instances, synchronizing on completion.
+%%
+%% @param Pattern The pattern state from multiple_instances_runtime/3.
+%% @param InputData Data for evaluating count and passing to instances.
+%% @param Options Additional options: {on_error, continue | stop}.
+%% @return {ok, Results} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_multiple_instances_runtime(Pattern :: #pattern_state{},
+                                         InputData :: term(),
+                                         Options :: map()) ->
+          {ok, list()} | {error, term()}.
+
+execute_multiple_instances_runtime(#pattern_state{
+                                      subprocess = Subprocess,
+                                      instance_count = Count
+                                     }, InputData, Options) ->
+    OnError = maps:get(on_error, Options, continue),
+
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Spawn instances with data
+    Pids = lists:map(fun(I) ->
+        spawn(fun() ->
+            Result = execute_instance(Subprocess, {I, InputData}),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, lists:seq(1, Count)),
+
+    %% Collect results from all instances
+    Results = collect_all_results(Ref, Pids, 30000, OnError, []),
+
+    case [R || R <- Results, element(1, R) =:= error] of
+        [] ->
+            {ok, [Result || {ok, Result} <- Results]};
+        Errors when OnError =:= stop ->
+            {error, {instance_errors, Errors}};
+        _Errors ->
+            {ok, [Result || {ok, Result} <- Results]}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Multiple Instances without Prior Knowledge pattern (WCP-15).
+%%
+%% This function dynamically spawns instances based on data availability.
+%% New instances can be created while others are running.
+%%
+%% @param Pattern The pattern state from multiple_instances_dynamic/3.
+%% @param MaxInstances Maximum number of concurrent instances.
+%% @param Options Additional options: {on_error, continue | stop}.
+%% @return {ok, Results} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_multiple_instances_dynamic(Pattern :: #pattern_state{},
+                                         MaxInstances :: pos_integer() | unlimited,
+                                         Options :: map()) ->
+          {ok, list()} | {error, term()}.
+
+execute_multiple_instances_dynamic(#pattern_state{
+                                      subprocess = Subprocess,
+                                      choice_data = #{data_fun := DataFun},
+                                      pending_instances = [InitialData]
+                                     }, MaxInstances, Options) ->
+    OnError = maps:get(on_error, Options, continue),
+    ActualMax = case MaxInstances of
+        unlimited -> 100;
+        N when is_integer(N), N > 0 -> N
+    end,
+
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Spawn dynamic instance manager
+    ManagerPid = spawn(fun() ->
+        dynamic_instance_manager(Ref, Parent, Subprocess, DataFun,
+                                 InitialData, ActualMax, OnError)
+    end),
+
+    %% Wait for manager to complete
+    receive
+        {Ref, {ok, Results}} -> {ok, Results};
+        {Ref, {error, Reason}} -> {error, Reason};
+        {'EXIT', ManagerPid, Reason} -> {error, {manager_exit, Reason}}
+    after 60000 ->
+        exit(ManagerPid, kill),
+        {error, timeout}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Deferred Choice pattern (WCP-16).
+%%
+%% This function evaluates options at runtime and selects the first
+%% available one based on data or conditions.
+%%
+%% @param Pattern The pattern state from deferred_choice/3.
+%% @param EvalData Data for evaluating the condition function.
+%% @param Timeout Maximum time to wait for choice (infinity for no limit).
+%% @return {ok, {SelectedOption, Result}} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_deferred_choice(Pattern :: #pattern_state{},
+                              EvalData :: term(),
+                              Timeout :: timeout()) ->
+          {ok, {atom(), term()}} | {error, term()}.
+
+execute_deferred_choice(#pattern_state{
+                             subprocess = ConditionFun,
+                             choice_data = #{options := Options}
+                            }, EvalData, Timeout) ->
+    Ref = make_ref(),
+    Parent = self(),
+    OptionKeys = maps:keys(Options),
+
+    %% Spawn processes for each option
+    Pids = lists:map(fun(Key) ->
+        OptionFun = maps:get(Key, Options),
+        spawn(fun() ->
+            try
+                Result = case OptionFun of
+                    F when is_function(F, 1) -> F(EvalData);
+                    {M, F} when is_atom(M), is_atom(F) -> erlang:apply(M, F, [EvalData]);
+                    F when is_function(F, 0) -> F()
+                end,
+                Parent ! {Ref, {option, Key}, Result}
+            catch
+                _Error:_Reason:_Stack ->
+                    Parent ! {Ref, {option, Key}, {error, failed}}
+            end
+        end)
+    end, OptionKeys),
+
+    %% Also evaluate condition function in parallel
+    ConditionPid = spawn(fun() ->
+        try
+            ConditionResult = case ConditionFun of
+                Fun when is_function(Fun, 1) -> Fun(EvalData);
+                {M, F} -> erlang:apply(M, F, [EvalData]);
+                _ -> true
+            end,
+            Parent ! {Ref, condition, ConditionResult}
+        catch
+            _:_:_ -> Parent ! {Ref, condition, true}
+        end
+    end),
+
+    %% Wait for first successful result or condition-based choice
+    AllPids = Pids ++ [ConditionPid],
+    case collect_first_choice(Ref, AllPids, Timeout, OptionKeys) of
+        {ok, {Key, Result}} -> {ok, {Key, Result}};
+        {error, Reason} -> {error, Reason}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes an Interleaved Parallel Routing pattern (WCP-17).
+%%
+%% This function executes multiple branches in an interleaved fashion,
+%% ensuring fair round-robin execution.
+%%
+%% @param Pattern The pattern state from interleaved_routing/2.
+%% @param InputData Data to pass to all branches.
+%% @return {ok, Results} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_interleaved_routing(Pattern :: #pattern_state{},
+                                  InputData :: term()) ->
+          {ok, list()} | {error, term()}.
+
+execute_interleaved_routing(#pattern_state{
+                                 choice_data = #{branches := Branches}
+                                }, InputData) ->
+    BranchKeys = maps:keys(Branches),
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Execute branches in interleaved manner
+    Results = execute_interleaved(Ref, Parent, Branches, BranchKeys,
+                                  InputData, 1, [], [], BranchKeys),
+
+    {ok, lists:reverse(Results)}.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Recursion pattern (WCP-24).
+%%
+%% Executes a recursive function with base case detection.
+%%
+%% @param Pattern The pattern state from recursion/2.
+%% @param InputData Data to process recursively.
+%% @return {ok, Result} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_recursion(Pattern :: #pattern_state{},
+                        InputData :: term()) ->
+          {ok, term()} | {error, term()}.
+
+execute_recursion(#pattern_state{
+                    subprocess = RecursiveFun,
+                    choice_data = #{base_case := BaseCaseFun}
+                   }, InputData) ->
+    try
+        case BaseCaseFun(InputData) of
+            true ->
+                %% Base case - return result directly
+                {ok, InputData};
+            false ->
+                %% Recursive case - call function and recurse
+                Result = case RecursiveFun of
+                    Fun when is_function(Fun, 1) -> Fun(InputData);
+                    {M, F} when is_atom(M), is_atom(F) ->
+                        erlang:apply(M, F, [InputData]);
+                    _ ->
+                        error({invalid_subprocess, RecursiveFun})
+                end,
+                {ok, Result}
+        end
+    catch
+        Error:Reason:Stack ->
+            {error, {Error, Reason, Stack}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes an Interleaved Loop pattern (WCP-25).
+%%
+%% Executes multiple branches in parallel with interleaved coordination.
+%%
+%% @param Pattern The pattern state from interleaved_loop/2.
+%% @param InputData Data to pass to each loop iteration.
+%% @return {ok, Results} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_interleaved_loop(Pattern :: #pattern_state{},
+                                InputData :: term()) ->
+          {ok, list()} | {error, term()}.
+
+execute_interleaved_loop(#pattern_state{
+                            branch_queue = Activities,
+                            choice_data = #{condition := ConditionFun}
+                           }, InputData) ->
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Execute all activities
+    Pids = lists:map(fun(Activity) ->
+        spawn(fun() ->
+            Result = try
+                case Activity of
+                    Fun when is_function(Fun, 1) -> Fun(InputData);
+                    {M, F} when is_atom(M), is_atom(F) ->
+                        erlang:apply(M, F, [InputData]);
+                    _ ->
+                        error({invalid_activity, Activity})
+                end
+            catch
+                Error:Reason:Stack ->
+                    {error, {Error, Reason, Stack}}
+            end,
+            Parent ! {Ref, self(), Result}
+        end)
+    end, Activities),
+
+    %% Collect all results
+    Results = collect_all_results(Ref, Pids, 30000, continue, []),
+
+    %% Check continuation condition
+    case ConditionFun(Results) of
+        true -> {ok, Results};
+        false -> {ok, Results}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Critical Section pattern (WCP-26).
+%%
+%% Ensures mutually exclusive access to a resource.
+%%
+%% @param Pattern The pattern state from critical_section/2.
+%% @param InputData Data to process in critical section.
+%% @return {ok, Result} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_critical_section(Pattern :: #pattern_state{},
+                                 InputData :: term()) ->
+          {ok, term()} | {error, term()}.
+
+execute_critical_section(#pattern_state{
+                            subprocess = CriticalActivity,
+                            choice_data = #{lock_id := LockId}
+                           }, InputData) ->
+    %% Create a unique lock name using global registry
+    LockName = list_to_atom("critical_section_" ++ atom_to_list(LockId)),
+
+    %% Use global locker via process registry
+    try
+        %% Try to register as the lock holder
+        case global:set_lock(LockName, [node()], 5000) of
+            true ->
+                %% We got the lock - execute critical section
+                try
+                    Result = case CriticalActivity of
+                        Fun when is_function(Fun, 1) -> Fun(InputData);
+                        {M, F} when is_atom(M), is_atom(F) ->
+                            erlang:apply(M, F, [InputData]);
+                        _ ->
+                            error({invalid_activity, CriticalActivity})
+                    end,
+                    global:del_lock(LockName, [node()]),
+                    {ok, Result}
+                catch
+                    Error:Reason:Stack ->
+                        global:del_lock(LockName, [node()]),
+                        {error, {Error, Reason, Stack}}
+                end;
+            false ->
+                %% Lock is held by another process
+                {error, lock_not_available}
+        end
+    catch
+        _:_ ->
+            {error, lock_registration_failed}
+    end.
 
 %%====================================================================
 %% Pattern API functions (WCP-11 through WCP-17)
@@ -423,6 +938,12 @@ trigger(_Place, _Token, NetState) ->
             trigger_implicit_termination(_Place, _Token, NetState);
         multiple_instances_no_sync ->
             trigger_no_sync(_Place, _Token, NetState);
+        milestone ->
+            trigger_milestone(_Place, _Token, NetState);
+        cancel_activity ->
+            trigger_cancel_activity(_Place, _Token, NetState);
+        cancel_case ->
+            trigger_cancel_case(_Place, _Token, NetState);
         _ ->
             pass
     end.
@@ -435,63 +956,152 @@ trigger(_Place, _Token, NetState) ->
 %% @doc Returns the list of places for the pattern Petri net.
 %%
 %% The place list covers all patterns (WCP-11 through WCP-17).
+%% Uses persistent_term for O(1) access (OTP 21+ optimization).
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec place_lst() -> [atom()].
 
 place_lst() ->
-    [
-     %% Implicit Termination (WCP-11)
-     'p_start', 'p_active', 'p_work', 'p_work_pending', 'p_terminate',
+    %% Use persistent_term for O(1) access to static place list
+    %% (OTP 21+ optimization) - avoids reconstructing list on every call
+    cre_config:get(yawl_patterns_place_lst,
+                   [
+                    %% Implicit Termination (WCP-11)
+                    'p_start', 'p_active', 'p_work', 'p_work_pending', 'p_terminate',
 
-     %% Multiple Instances (WCP-12, WCP-13, WCP-14, WCP-15)
-     'p_instance_pool', 'p_ready', 'p_running', 'p_done', 'p_complete',
-     'p_spawn_pending', 'p_all_spawned', 'p_eval', 'p_data_source', 'p_final',
+                    %% Multiple Instances (WCP-12, WCP-13, WCP-14, WCP-15)
+                    'p_instance_pool', 'p_ready', 'p_running', 'p_done', 'p_complete',
+                    'p_spawn_pending', 'p_all_spawned', 'p_eval', 'p_data_source', 'p_final',
 
-     %% Deferred Choice (WCP-16)
-     'p_choice_pending', 'p_option_a', 'p_option_b', 'p_options',
-     'p_selected', 'p_discarded', 'p_choice_complete',
+                    %% Deferred Choice (WCP-16)
+                    'p_choice_pending', 'p_option_a', 'p_option_b', 'p_options',
+                    'p_selected', 'p_discarded', 'p_choice_complete',
 
-     %% Interleaved Routing (WCP-17)
-     'p_branch_pool', 'p_next_branch', 'p_executing', 'p_branch_done',
-     'p_all_done', 'p_interleave_complete'
-    ].
+                    %% Interleaved Routing (WCP-17)
+                    'p_branch_pool', 'p_next_branch', 'p_executing', 'p_branch_done',
+                    'p_all_done', 'p_interleave_complete',
+
+                    %% WCP-18: Milestone Pattern
+                    'p_milestone_guard', 'p_milestone_reached', 'p_active', 'p_complete',
+
+                    %% WCP-19: Cancel Activity Pattern
+                    'p_activity_running', 'p_cancellation_pending', 'p_cancelled', 'p_completed',
+
+                    %% WCP-20: Cancel Case Pattern
+                    'p_case_active', 'p_cancellation_requested', 'p_cancelling', 'p_cancelled', 'p_completed',
+
+                    %% WCP-21: Structured Synchronization Pattern
+                    'p_sync_block_start', 'p_sync_block_active', 'p_sync_barrier', 'p_sync_block_done',
+                    'p_sync_activity_1', 'p_sync_activity_2', 'p_sync_activity_3',
+
+                    %% WCP-22: Partial Join Pattern
+                    'p_partial_start', 'p_partial_running', 'p_partial_quorum', 'p_partial_done',
+                    'p_partial_instance_1', 'p_partial_instance_2', 'p_partial_instance_3',
+
+                    %% WCP-23: Structured Loop Pattern
+                    'p_loop_init', 'p_loop_body', 'p_loop_condition', 'p_loop_exit', 'p_loop_complete',
+                    'p_loop_iteration', 'p_loop_continue', 'p_loop_break',
+
+                    %% WCP-24: Recursion Pattern
+                    'p_rec_start', 'p_rec_call', 'p_rec_result', 'p_rec_base', 'p_rec_done',
+                    'p_rec_call_1', 'p_rec_call_2', 'p_rec_stack',
+
+                    %% WCP-25: Interleaved Loop Pattern
+                    'p_il_loop_start', 'p_il_parallel', 'p_il_interleave', 'p_il_loop_cond', 'p_il_exit',
+                    'p_il_body_1', 'p_il_body_2', 'p_il_body_3', 'p_il_iteration',
+
+                    %% WCP-26: Critical Section Pattern
+                    'p_cs_request', 'p_cs_lock', 'p_cs_active', 'p_cs_release', 'p_cs_complete',
+
+                    %% WCP-27: Protocol Pattern
+                    'p_proto_idle', 'p_proto_request_sent', 'p_proto_waiting', 'p_proto_response',
+                    'p_proto_complete', 'p_proto_error',
+
+                    %% WCP-28: Try-Catch Pattern
+                    'p_try_entry', 'p_try_body', 'p_catch_entry', 'p_catch_body', 'p_try_catch_done',
+                    'p_try_success', 'p_try_failure', 'p_catch_error'
+                   ]).
 
 %%--------------------------------------------------------------------
 %% @doc Returns the list of transitions for the pattern Petri net.
+%% Uses persistent_term for O(1) access (OTP 21+ optimization).
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec trsn_lst() -> [atom()].
 
 trsn_lst() ->
-    [
-     %% Implicit Termination (WCP-11)
-     't_activate', 't_queue_work', 't_dequeue_work', 't_implicit_term',
+    %% Use persistent_term for O(1) access to static transition list
+    %% (OTP 21+ optimization) - avoids reconstructing list on every call
+    cre_config:get(yawl_patterns_trsn_lst,
+                   [
+                    %% Implicit Termination (WCP-11)
+                    't_activate', 't_queue_work', 't_dequeue_work', 't_implicit_term',
 
-     %% Multiple Instances - No Sync (WCP-12)
-     't_spawn_no_sync', 't_execute_no_sync', 't_complete_no_sync',
+                    %% Multiple Instances - No Sync (WCP-12)
+                    't_spawn_no_sync', 't_execute_no_sync', 't_complete_no_sync',
 
-     %% Multiple Instances - Static (Design Time) (WCP-13)
-     't_spawn_all_static', 't_execute_static', 't_collect_static', 't_join_static',
+                    %% Multiple Instances - Static (Design Time) (WCP-13)
+                    't_spawn_all_static', 't_execute_static', 't_collect_static', 't_join_static',
 
-     %% Multiple Instances - Runtime (WCP-14)
-     't_eval_count', 't_spawn_runtime', 't_execute_runtime', 't_collect_runtime',
-     't_join_runtime',
+                    %% Multiple Instances - Runtime (WCP-14)
+                    't_eval_count', 't_spawn_runtime', 't_execute_runtime', 't_collect_runtime',
+                    't_join_runtime',
 
-     %% Multiple Instances - Dynamic (WCP-15)
-     't_spawn_dynamic', 't_fetch_data', 't_execute_dynamic', 't_collect_dynamic',
-     't_check_done', 't_terminate_dynamic',
+                    %% Multiple Instances - Dynamic (WCP-15)
+                    't_spawn_dynamic', 't_fetch_data', 't_execute_dynamic', 't_collect_dynamic',
+                    't_check_done', 't_terminate_dynamic',
 
-     %% Deferred Choice (WCP-16)
-     't_offer_choice', 't_select_a', 't_select_b', 't_discard_a', 't_discard_b',
-     't_complete_choice',
+                    %% Deferred Choice (WCP-16)
+                    't_offer_choice', 't_select_a', 't_select_b', 't_discard_a', 't_discard_b',
+                    't_complete_choice',
 
-     %% Interleaved Routing (WCP-17)
-     't_distribute_branches', 't_pick_branch', 't_execute_branch',
-     't_return_branch', 't_complete_interleaved'
-    ].
+                    %% Interleaved Routing (WCP-17)
+                    't_distribute_branches', 't_pick_branch', 't_execute_branch',
+                    't_return_branch', 't_complete_interleaved',
+
+                    %% WCP-18: Milestone Pattern
+                    't_milestone_work', 't_milestone_check', 't_milestone_complete',
+
+                    %% WCP-19: Cancel Activity Pattern
+                    't_cancel_activity_work', 't_cancel_request', 't_cancel_confirm', 't_cancel_complete',
+
+                    %% WCP-20: Cancel Case Pattern
+                    't_cancel_case_work', 't_request_cancel', 't_confirm_cancel', 't_execute_cancel', 't_cancel_case_complete',
+
+                    %% WCP-21: Structured Synchronization Pattern
+                    't_sync_enter', 't_sync_activity_1', 't_sync_activity_2', 't_sync_activity_3',
+                    't_sync_barrier', 't_sync_complete', 't_sync_timeout',
+
+                    %% WCP-22: Partial Join Pattern
+                    't_partial_start', 't_partial_instance_1', 't_partial_instance_2', 't_partial_instance_3',
+                    't_partial_check_quorum', 't_partial_complete', 't_partial_timeout',
+
+                    %% WCP-23: Structured Loop Pattern
+                    't_loop_init', 't_loop_enter', 't_loop_execute', 't_loop_check',
+                    't_loop_continue', 't_loop_break', 't_loop_complete', 't_loop_timeout',
+
+                    %% WCP-24: Recursion Pattern
+                    't_rec_start', 't_rec_call_1', 't_rec_call_2', 't_rec_base',
+                    't_rec_continue', 't_rec_complete', 't_rec_stack_push', 't_rec_stack_pop',
+
+                    %% WCP-25: Interleaved Loop Pattern
+                    't_il_loop_start', 't_il_distribute', 't_il_execute', 't_il_check',
+                    't_il_interleave', 't_il_continue', 't_il_complete', 't_il_timeout',
+
+                    %% WCP-26: Critical Section Pattern
+                    't_cs_request', 't_cs_acquire', 't_cs_enter', 't_cs_exit', 't_cs_release',
+                    't_cs_timeout', 't_cs_error',
+
+                    %% WCP-27: Protocol Pattern
+                    't_proto_start', 't_proto_request', 't_proto_wait', 't_proto_response',
+                    't_proto_complete', 't_proto_error', 't_proto_retry',
+
+                    %% WCP-28: Try-Catch Pattern
+                    't_try_enter', 't_try_execute', 't_try_success', 't_try_failure',
+                    't_catch_enter', 't_catch_execute', 't_catch_complete', 't_try_catch_complete'
+                   ]).
 
 %%--------------------------------------------------------------------
 %% @doc Returns the initial marking for a given place.
@@ -505,6 +1115,13 @@ init_marking(Place, _UsrInfo) ->
         'p_start' -> [start];
         'p_instance_pool' -> [];
         'p_branch_pool' -> [];
+        'p_milestone_guard' -> [];
+        'p_milestone_reached' -> [];
+        'p_activity_running' -> [];
+        'p_cancellation_pending' -> [];
+        'p_case_active' -> [];
+        'p_cancellation_requested' -> [];
+        'p_cancelling' -> [];
         _ -> []
     end.
 
@@ -560,8 +1177,100 @@ preset('t_distribute_branches') -> ['p_start'];
 preset('t_pick_branch') -> ['p_branch_pool', 'p_next_branch'];
 preset('t_execute_branch') -> ['p_branch_pool'];
 preset('t_return_branch') -> ['p_executing'];
-preset('t_complete_interleaved') -> ['p_all_done'];
+%% WCP-18: Milestone Pattern
+%% WCP-18: Milestone Pattern
+preset('t_milestone_work') -> ['p_active'];
+preset('t_milestone_check') -> ['p_active'];
+preset('t_milestone_complete') -> ['p_active', 'p_complete'];
 
+%% WCP-19: Cancel Activity Pattern
+preset('t_cancel_activity_work') -> ['p_activity_running'];
+preset('t_cancel_request') -> ['p_activity_running'];
+preset('t_cancel_confirm') -> ['p_cancellation_pending'];
+preset('t_cancel_complete') -> ['p_activity_running', 'p_completed'];
+
+%% WCP-20: Cancel Case Pattern
+preset('t_cancel_case_work') -> ['p_case_active'];
+preset('t_request_cancel') -> ['p_case_active'];
+preset('t_confirm_cancel') -> ['p_cancellation_requested'];
+preset('t_execute_cancel') -> ['p_cancelling'];
+preset('t_cancel_case_complete') -> ['p_case_active', 'p_completed'];
+
+%% WCP-21: Structured Synchronization Pattern
+preset('t_sync_enter') -> ['p_sync_block_start'];
+preset('t_sync_activity_1') -> ['p_sync_block_active'];
+preset('t_sync_activity_2') -> ['p_sync_block_active'];
+preset('t_sync_activity_3') -> ['p_sync_block_active'];
+preset('t_sync_barrier') -> ['p_sync_activity_1', 'p_sync_activity_2', 'p_sync_activity_3'];
+preset('t_sync_complete') -> ['p_sync_barrier'];
+preset('t_sync_timeout') -> ['p_sync_block_active'];
+
+%% WCP-22: Partial Join Pattern
+preset('t_partial_start') -> ['p_partial_start'];
+preset('t_partial_instance_1') -> ['p_partial_running'];
+preset('t_partial_instance_2') -> ['p_partial_running'];
+preset('t_partial_instance_3') -> ['p_partial_running'];
+preset('t_partial_check_quorum') -> ['p_partial_instance_1', 'p_partial_instance_2', 'p_partial_instance_3'];
+preset('t_partial_complete') -> ['p_partial_quorum'];
+preset('t_partial_timeout') -> ['p_partial_running'];
+
+%% WCP-23: Structured Loop Pattern
+preset('t_loop_init') -> ['p_loop_init'];
+preset('t_loop_enter') -> ['p_loop_init'];
+preset('t_loop_execute') -> ['p_loop_body'];
+preset('t_loop_check') -> ['p_loop_body'];
+preset('t_loop_continue') -> ['p_loop_iteration'];
+preset('t_loop_break') -> ['p_loop_body'];
+preset('t_loop_complete') -> ['p_loop_exit'];
+preset('t_loop_timeout') -> ['p_loop_body'];
+
+%% WCP-24: Recursion Pattern
+preset('t_rec_start') -> ['p_rec_start'];
+preset('t_rec_call_1') -> ['p_rec_call'];
+preset('t_rec_call_2') -> ['p_rec_call'];
+preset('t_rec_base') -> ['p_rec_base'];
+preset('t_rec_continue') -> ['p_rec_result'];
+preset('t_rec_complete') -> ['p_rec_result'];
+preset('t_rec_stack_push') -> ['p_rec_call'];
+preset('t_rec_stack_pop') -> ['p_rec_stack'];
+
+%% WCP-25: Interleaved Loop Pattern
+preset('t_il_loop_start') -> ['p_il_loop_start'];
+preset('t_il_distribute') -> ['p_il_loop_start'];
+preset('t_il_execute') -> ['p_il_parallel'];
+preset('t_il_check') -> ['p_il_body_1', 'p_il_body_2', 'p_il_body_3'];
+preset('t_il_interleave') -> ['p_il_body_1', 'p_il_body_2', 'p_il_body_3'];
+preset('t_il_continue') -> ['p_il_iteration'];
+preset('t_il_complete') -> ['p_il_exit'];
+preset('t_il_timeout') -> ['p_il_parallel'];
+
+%% WCP-26: Critical Section Pattern
+preset('t_cs_request') -> ['p_cs_request'];
+preset('t_cs_acquire') -> ['p_cs_request'];
+preset('t_cs_enter') -> ['p_cs_lock'];
+preset('t_cs_exit') -> ['p_cs_active'];
+preset('t_cs_release') -> ['p_cs_active'];
+preset('t_cs_timeout') -> ['p_cs_request'];
+preset('t_cs_error') -> ['p_cs_active'];
+
+%% WCP-27: Protocol Pattern
+preset('t_proto_start') -> ['p_proto_idle'];
+preset('t_proto_request') -> ['p_proto_idle'];
+preset('t_proto_wait') -> ['p_proto_request_sent'];
+preset('t_proto_response') -> ['p_proto_waiting'];
+preset('t_proto_complete') -> ['p_proto_response'];
+preset('t_proto_error') -> ['p_proto_waiting'];
+preset('t_proto_retry') -> ['p_proto_error'];
+
+%% WCP-28: Try-Catch Pattern
+preset('t_try_enter') -> ['p_try_entry'];
+preset('t_try_execute') -> ['p_try_body'];
+preset('t_try_success') -> ['p_try_body'];
+preset('t_try_failure') -> ['p_try_body'];
+preset('t_catch_enter') -> ['p_catch_entry'];
+preset('t_catch_execute') -> ['p_catch_body'];
+preset('t_catch_complete') -> ['p_catch_body'];
+preset('t_try_catch_complete') -> ['p_try_success', 'p_catch_complete'];
 preset(_Trsn) -> [].
 
 %%--------------------------------------------------------------------
@@ -664,6 +1373,69 @@ is_enabled('t_execute_branch', #{'p_branch_pool' := [_]}, _UsrInfo) ->
 is_enabled('t_return_branch', #{'p_executing' := [_]}, _UsrInfo) ->
     true;
 is_enabled('t_complete_interleaved', #{'p_all_done' := [all_done]}, _UsrInfo) ->
+    true;
+
+%% WCP-18: Milestone Pattern
+is_enabled('t_work',
+           #{'p_active' := [_]},
+           #pattern_state{choice_data = #{milestone_check := MilestoneFun}}) ->
+    MilestoneFun();
+
+is_enabled('t_milestone_check',
+           #{'p_active' := [_], 'p_milestone_reached' := [_]},
+           _UsrInfo) ->
+    true;
+
+is_enabled('t_complete',
+           #{'p_active' := [_], 'p_complete' := [_]},
+           _UsrInfo) ->
+    true;
+
+%% WCP-19: Cancel Activity Pattern
+is_enabled('t_work',
+           #{'p_activity_running' := [_]},
+           #pattern_state{choice_data = #{cancel_check := CancelFun}}) ->
+    not CancelFun();
+
+is_enabled('t_cancel_request',
+           #{'p_activity_running' := [_]},
+           #pattern_state{choice_data = #{cancel_check := CancelFun}}) ->
+    CancelFun();
+
+is_enabled('t_cancel_confirm',
+           #{'p_cancellation_pending' := [_]},
+           _UsrInfo) ->
+    true;
+
+is_enabled('t_complete',
+           #{'p_activity_running' := [_], 'p_completed' := [_]},
+           _UsrInfo) ->
+    true;
+
+%% WCP-20: Cancel Case Pattern
+is_enabled('t_work',
+           #{'p_case_active' := [_]},
+           #pattern_state{choice_data = #{cancel_check := CancelFun}}) ->
+    not CancelFun();
+
+is_enabled('t_request_cancel',
+           #{'p_case_active' := [_]},
+           #pattern_state{choice_data = #{cancel_check := CancelFun}}) ->
+    CancelFun();
+
+is_enabled('t_confirm_cancel',
+           #{'p_cancellation_requested' := [_]},
+           _UsrInfo) ->
+    true;
+
+is_enabled('t_execute_cancel',
+           #{'p_cancelling' := [_]},
+           _UsrInfo) ->
+    true;
+
+is_enabled('t_complete',
+           #{'p_case_active' := [_], 'p_completed' := [_]},
+           _UsrInfo) ->
     true;
 
 is_enabled(_Trsn, _Mode, _UsrInfo) ->
@@ -971,6 +1743,129 @@ fire('t_complete_interleaved',
       'p_all_done' => [interleaved_complete]
      }};
 
+%% WCP-18: Milestone Pattern
+fire('t_work',
+     #{'p_active' := [Active]},
+     _UsrInfo) ->
+    {produce, #{
+      'p_active' => [Active],
+      'p_milestone_guard' => [milestone_required]
+     }};
+
+fire('t_milestone_check',
+     #{'p_active' := [Active], 'p_milestone_guard' := [milestone_required]},
+     #pattern_state{choice_data = #{milestone_check := MilestoneFun}}) ->
+    case MilestoneFun() of
+        true ->
+            {produce, #{
+              'p_milestone_guard' => [],
+              'p_milestone_reached' => [milestone_reached],
+              'p_active' => [Active]
+             }};
+        false ->
+            {produce, #{
+              'p_milestone_guard' => [milestone_required]
+             }}
+    end;
+
+fire('t_complete',
+     #{'p_active' := [Active], 'p_complete' := [Complete]},
+     _UsrInfo) ->
+    {produce, #{
+      'p_active' => [completed],
+      'p_complete' => [final_complete]
+     }};
+
+%% WCP-19: Cancel Activity Pattern
+fire('t_work',
+     #{'p_activity_running' := [Running]},
+     #pattern_state{choice_data = #{cancel_check := CancelFun}}) ->
+    case CancelFun() of
+        true ->
+            {produce, #{
+              'p_activity_running' => [],
+              'p_cancellation_pending' => [cancel_pending]
+             }};
+        false ->
+            {produce, #{
+              'p_activity_running' => [Running],
+              'p_completed' => [work_done]
+             }}
+    end;
+
+fire('t_cancel_request',
+     #{'p_activity_running' := [Running]},
+     _UsrInfo) ->
+    {produce, #{
+      'p_activity_running' => [],
+      'p_cancellation_pending' => [cancel_pending]
+     }};
+
+fire('t_cancel_confirm',
+     #{'p_cancellation_pending' := [cancel_pending]},
+     _UsrInfo) ->
+    {produce, #{
+      'p_cancellation_pending' => [],
+      'p_cancelled' => [cancelled]
+     }};
+
+fire('t_complete',
+     #{'p_activity_running' := [Running], 'p_completed' := [Done]},
+     _UsrInfo) ->
+    {produce, #{
+      'p_activity_running' => [completed],
+      'p_completed' => [final_done]
+     }};
+
+%% WCP-20: Cancel Case Pattern
+fire('t_work',
+     #{'p_case_active' := [CaseActive]},
+     #pattern_state{choice_data = #{cancel_check := CancelFun}}) ->
+    case CancelFun() of
+        true ->
+            {produce, #{
+              'p_case_active' => [],
+              'p_cancellation_requested' => [cancel_requested]
+             }};
+        false ->
+            {produce, #{
+              'p_case_active' => [CaseActive],
+              'p_completed' => [work_done]
+             }}
+    end;
+
+fire('t_request_cancel',
+     #{'p_case_active' := [CaseActive]},
+     _UsrInfo) ->
+    {produce, #{
+      'p_case_active' => [],
+      'p_cancellation_requested' => [cancel_requested]
+     }};
+
+fire('t_confirm_cancel',
+     #{'p_cancellation_requested' := [cancel_requested]},
+     _UsrInfo) ->
+    {produce, #{
+      'p_cancellation_requested' => [],
+      'p_cancelling' => [cancelling]
+     }};
+
+fire('t_execute_cancel',
+     #{'p_cancelling' := [cancelling]},
+     _UsrInfo) ->
+    {produce, #{
+      'p_cancelling' => [],
+      'p_cancelled' => [case_cancelled]
+     }};
+
+fire('t_complete',
+     #{'p_case_active' := [CaseActive], 'p_completed' := [Done]},
+     _UsrInfo) ->
+    {produce, #{
+      'p_case_active' => [completed],
+      'p_completed' => [final_complete]
+     }};
+
 fire(_Trsn, _Mode, _UsrInfo) ->
     abort.
 
@@ -1028,6 +1923,101 @@ trigger_no_sync('p_done', Token, NetState) ->
     pass;
 
 trigger_no_sync(_Place, _Token, _NetState) ->
+    pass.
+
+%%--------------------------------------------------------------------
+%% @doc Trigger handler for milestone pattern.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec trigger_milestone(Place :: atom(),
+                       Token :: term(),
+                       NetState :: term()) ->
+        pass | {produce, map()}.
+
+trigger_milestone('p_milestone_guard', milestone_required, NetState) ->
+    PatternState = gen_pnet:get_usr_info(NetState),
+    UpdatedState = PatternState#pattern_state{
+      instance_count = PatternState#pattern_state.instance_count + 1
+    },
+    put(pattern_state, UpdatedState),
+    pass;
+
+trigger_milestone('p_milestone_reached', milestone_reached, NetState) ->
+    PatternState = gen_pnet:get_usr_info(NetState),
+    UpdatedState = PatternState#pattern_state{
+      instance_count = PatternState#pattern_state.instance_count + 1
+    },
+    put(pattern_state, UpdatedState),
+    pass;
+
+trigger_milestone(_Place, _Token, _NetState) ->
+    pass.
+
+%%--------------------------------------------------------------------
+%% @doc Trigger handler for cancel activity pattern.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec trigger_cancel_activity(Place :: atom(),
+                             Token :: term(),
+                             NetState :: term()) ->
+        pass | {produce, map()}.
+
+trigger_cancel_activity('p_cancellation_pending', cancel_pending, NetState) ->
+    PatternState = gen_pnet:get_usr_info(NetState),
+    UpdatedState = PatternState#pattern_state{
+      instance_count = PatternState#pattern_state.instance_count + 1
+    },
+    put(pattern_state, UpdatedState),
+    pass;
+
+trigger_cancel_activity('p_cancelled', cancelled, NetState) ->
+    PatternState = gen_pnet:get_usr_info(NetState),
+    UpdatedState = PatternState#pattern_state{
+      instance_count = PatternState#pattern_state.instance_count + 1
+    },
+    put(pattern_state, UpdatedState),
+    pass;
+
+trigger_cancel_activity(_Place, _Token, _NetState) ->
+    pass.
+
+%%--------------------------------------------------------------------
+%% @doc Trigger handler for cancel case pattern.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec trigger_cancel_case(Place :: atom(),
+                          Token :: term(),
+                          NetState :: term()) ->
+        pass | {produce, map()}.
+
+trigger_cancel_case('p_cancellation_requested', cancel_requested, NetState) ->
+    PatternState = gen_pnet:get_usr_info(NetState),
+    UpdatedState = PatternState#pattern_state{
+      instance_count = PatternState#pattern_state.instance_count + 1
+    },
+    put(pattern_state, UpdatedState),
+    pass;
+
+trigger_cancel_case('p_cancelling', cancelling, NetState) ->
+    PatternState = gen_pnet:get_usr_info(NetState),
+    UpdatedState = PatternState#pattern_state{
+      instance_count = PatternState#pattern_state.instance_count + 1
+    },
+    put(pattern_state, UpdatedState),
+    pass;
+
+trigger_cancel_case('p_cancelled', case_cancelled, NetState) ->
+    PatternState = gen_pnet:get_usr_info(NetState),
+    UpdatedState = PatternState#pattern_state{
+      instance_count = PatternState#pattern_state.instance_count + 1
+    },
+    put(pattern_state, UpdatedState),
+    pass;
+
+trigger_cancel_case(_Place, _Token, _NetState) ->
     pass.
 
 %%====================================================================
@@ -1154,7 +2144,9 @@ structured_sync(Activities, InitialData) ->
       pattern_type = structured_sync,
       subprocess = Activities,
       instance_count = length(Activities),
-      pending_instances = [InitialData]
+      pending_instances = [InitialData],
+      active_instances = [],
+      completed_instances = []
      }.
 
 %%--------------------------------------------------------------------
@@ -1187,7 +2179,8 @@ partial_join(Activities, Quorum) ->
       subprocess = Activities,
       instance_count = 0,
       max_instances = Quorum,
-      pending_instances = Activities
+      pending_instances = Activities,
+      completed_instances = []
      }.
 
 %%--------------------------------------------------------------------
@@ -1221,7 +2214,8 @@ structured_loop(BodyTask, LoopType, ConditionFun) ->
       pattern_type = structured_loop,
       subprocess = BodyTask,
       choice_data = #{loop_type => LoopType, condition => ConditionFun},
-      instance_count = 0
+      instance_count = 0,
+      active_instances = []
      }.
 
 %%--------------------------------------------------------------------
@@ -1253,7 +2247,8 @@ recursion(RecursiveFun, BaseCaseFun) ->
       pattern_type = recursion,
       subprocess = RecursiveFun,
       choice_data = #{base_case => BaseCaseFun},
-      instance_count = 0
+      instance_count = 0,
+      active_instances = []
      }.
 
 %%--------------------------------------------------------------------
@@ -1285,7 +2280,9 @@ interleaved_loop(Activities, ConditionFun) ->
       pattern_type = interleaved_loop,
       subprocess = Activities,
       choice_data = #{condition => ConditionFun},
-      instance_count = 0
+      instance_count = 0,
+      active_instances = [],
+      branch_queue = []
      }.
 
 %%--------------------------------------------------------------------
@@ -1315,7 +2312,8 @@ critical_section(CriticalActivity, LockId) ->
       pattern_type = critical_section,
       subprocess = CriticalActivity,
       choice_data = #{lock_id => LockId},
-      instance_count = 0
+      instance_count = 0,
+      active_instances = []
      }.
 
 %%--------------------------------------------------------------------
@@ -1347,7 +2345,12 @@ protocol_pattern(RequestFun, ResponseHandlerFun, Timeout) ->
     #pattern_state{
       pattern_type = protocol,
       subprocess = RequestFun,
-      choice_data = #{response_handler => ResponseHandlerFun, timeout => Timeout},
+      choice_data = #{
+        response_handler => ResponseHandlerFun,
+        timeout => Timeout,
+        request_sent => false,
+        response_received => false
+      },
       instance_count = 0
      }.
 
@@ -1379,7 +2382,12 @@ try_catch(TryFun, CatchFun, ExceptionTypes) ->
     #pattern_state{
       pattern_type = try_catch,
       subprocess = TryFun,
-      choice_data = #{catch_handler => CatchFun, exceptions => ExceptionTypes},
+      choice_data = #{
+        catch_handler => CatchFun,
+        exceptions => ExceptionTypes,
+        exception_occurred => false,
+        exception_type => undefined
+      },
       instance_count = 0
      }.
 
@@ -1549,3 +2557,398 @@ consecutive_compensate(ActivityCompensatorPairs) ->
       choice_data = #{compensators => maps:from_list(ActivityCompensatorPairs)},
       instance_count = length(ActivityCompensatorPairs)
      }.
+
+%%====================================================================
+%% Execution Helper Functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Execute a single instance with the given subprocess.
+%%
+%% Handles functions of arity 0, 1, or M:F tuples.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_instance(Subprocess :: term(), Data :: term()) ->
+          {ok, term()} | {error, term()}.
+
+execute_instance(Subprocess, Data) ->
+    try
+        Result = case Subprocess of
+            Fun when is_function(Fun, 0) -> Fun();
+            Fun when is_function(Fun, 1) -> Fun(Data);
+            {M, F} when is_atom(M), is_atom(F) -> erlang:apply(M, F, [Data]);
+            Fun when is_function(Fun) -> Fun(Data);
+            _ -> {error, invalid_subprocess}
+        end,
+        {ok, Result}
+    catch
+        Error:Reason:_Stack ->
+            {error, {Error, Reason}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Collect results from all spawned processes.
+%%
+%% Waits for all processes to complete or timeout to occur.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_all_results(Ref :: reference(),
+                         Pids :: [pid()],
+                         Timeout :: timeout(),
+                         OnError :: continue | stop,
+                         Acc :: list()) ->
+          [{ok, term()} | {error, term()}].
+
+collect_all_results(_Ref, [], _Timeout, _OnError, Acc) ->
+    lists:reverse(Acc);
+collect_all_results(Ref, Pids, Timeout, OnError, Acc) ->
+    ReceiveTimeout = case Timeout of
+        infinity -> 5000;
+        N when is_integer(N), N > 0 -> min(5000, N)
+    end,
+    receive
+        {Ref, Pid, Result} ->
+            NewAcc = [Result | Acc],
+            case {Result, OnError} of
+                {{error, _}, stop} ->
+                    %% Kill remaining processes
+                    lists:foreach(fun(P) -> exit(P, kill) end, Pids -- [Pid]),
+                    lists:reverse(NewAcc);
+                _ ->
+                    collect_all_results(Ref, Pids -- [Pid], Timeout, OnError, NewAcc)
+            end;
+        {'EXIT', Pid, _Reason} ->
+            %% Process died, remove from list
+            collect_all_results(Ref, Pids -- [Pid], Timeout, OnError, Acc)
+    after ReceiveTimeout ->
+        %% Timeout, kill remaining and return what we have
+        lists:foreach(fun(P) -> exit(P, kill) end, Pids),
+        lists:reverse(Acc)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Instance supervisor for no-sync pattern.
+%%
+%% Manages concurrent instances with configurable max concurrency.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec instance_supervisor(Ref :: reference(),
+                         Parent :: pid(),
+                         Subprocess :: term(),
+                         DataList :: list(),
+                         OnError :: continue | stop,
+                         MaxConcurrent :: pos_integer()) ->
+          no_return().
+
+instance_supervisor(Ref, Parent, Subprocess, DataList, OnError, MaxConcurrent) ->
+    %% Split data into chunks for max concurrency control
+    instance_supervisor_loop(Ref, Parent, Subprocess, DataList,
+                            OnError, MaxConcurrent, 0, []).
+
+instance_supervisor_loop(Ref, Parent, _Subprocess, [], _OnError,
+                        _MaxConcurrent, _Active, Results) ->
+    Parent ! {Ref, {ok, lists:reverse(Results)}};
+
+instance_supervisor_loop(Ref, Parent, Subprocess, DataList, OnError,
+                        MaxConcurrent, Active, Results) ->
+    %% Determine how many new instances to spawn
+    Available = MaxConcurrent - Active,
+    {ToSpawn, Remaining} = case Available > 0 of
+        true when length(DataList) >= Available ->
+            lists:split(Available, DataList);
+        true ->
+            {DataList, []};
+        false ->
+            {[], DataList}
+    end,
+
+    %% Spawn new instances
+    NewPids = lists:map(fun(Data) ->
+        spawn(fun() ->
+            Result = execute_instance(Subprocess, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, ToSpawn),
+
+    %% Wait for at least one completion if we have active instances
+    NewActive = length(NewPids) + Active,
+    case NewActive of
+        0 when Remaining =:= [] ->
+            Parent ! {Ref, {ok, lists:reverse(Results)}};
+        0 ->
+            instance_supervisor_loop(Ref, Parent, Subprocess, Remaining,
+                                    OnError, MaxConcurrent, 0, Results);
+        _ ->
+            receive
+                {Ref, Pid, Result} ->
+                    NewResults = [Result | Results],
+                    case {Result, OnError} of
+                        {{error, _}, stop} ->
+                            %% Kill remaining
+                            lists:foreach(fun(P) -> exit(P, kill) end, NewPids -- [Pid]),
+                            Parent ! {Ref, {ok, lists:reverse(NewResults)}};
+                        _ ->
+                            instance_supervisor_loop(Ref, Parent, Subprocess,
+                                                    Remaining, OnError,
+                                                    MaxConcurrent, NewActive - 1, NewResults)
+                    end;
+                {'EXIT', Pid, _Reason} ->
+                    instance_supervisor_loop(Ref, Parent, Subprocess,
+                                            Remaining, OnError,
+                                            MaxConcurrent, NewActive - 1, Results)
+            end
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Dynamic instance manager for WCP-15.
+%%
+%% Dynamically spawns instances based on data availability.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec dynamic_instance_manager(Ref :: reference(),
+                              Parent :: pid(),
+                              Subprocess :: term(),
+                              DataFun :: function(),
+                              CurrentData :: term(),
+                              MaxConcurrent :: pos_integer(),
+                              OnError :: continue | stop) ->
+          no_return().
+
+dynamic_instance_manager(Ref, Parent, Subprocess, DataFun,
+                        CurrentData, MaxConcurrent, OnError) ->
+    dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
+                         CurrentData, MaxConcurrent, OnError, 0, []).
+
+dynamic_instance_loop(Ref, Parent, _Subprocess, _DataFun,
+                     no_data, _MaxConcurrent, _OnError, 0, Results) ->
+    Parent ! {Ref, {ok, lists:reverse(Results)}};
+
+dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
+                     no_data, MaxConcurrent, OnError, Active, Results) ->
+    %% Try to fetch more data
+    case DataFun() of
+        {more, NewData} ->
+            dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
+                                 NewData, MaxConcurrent, OnError, Active, Results);
+        done ->
+            %% Wait for active instances to complete
+            wait_for_active(Ref, Parent, Active, Results);
+        {error, _Reason} when OnError =:= continue ->
+            wait_for_active(Ref, Parent, Active, Results);
+        {error, Reason} ->
+            Parent ! {Ref, {error, Reason}}
+    end;
+
+dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
+                     CurrentData, MaxConcurrent, OnError, 0, Results) ->
+    %% No active instances, spawn up to MaxConcurrent new ones
+    spawn_batch(Ref, Parent, Subprocess, DataFun, CurrentData,
+               MaxConcurrent, OnError, Results);
+
+dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
+                     CurrentData, MaxConcurrent, OnError, Active, Results) when Active > 0 ->
+    %% Wait for at least one instance to complete
+    receive
+        {Ref, Pid, Result} ->
+            NewResults = [Result | Results],
+            case {Result, OnError} of
+                {{error, _}, stop} ->
+                    Parent ! {Ref, {ok, lists:reverse(NewResults)}};
+                _ ->
+                    dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
+                                        CurrentData, MaxConcurrent, OnError,
+                                        Active - 1, NewResults)
+            end;
+        {'EXIT', Pid, _Reason} ->
+            dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
+                                CurrentData, MaxConcurrent, OnError,
+                                Active - 1, Results)
+    end.
+
+spawn_batch(Ref, Parent, Subprocess, DataFun, Data, MaxConcurrent, OnError, Results) ->
+    %% Spawn up to MaxConcurrent instances
+    Pids = lists:map(fun(_) ->
+        spawn(fun() ->
+            Result = execute_instance(Subprocess, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, lists:seq(1, MaxConcurrent)),
+
+    %% Get next data immediately
+    NextData = case DataFun() of
+        {more, ND} -> ND;
+        done -> no_data;
+        {error, _} when OnError =:= continue -> no_data;
+        _ -> no_data
+    end,
+
+    dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
+                         NextData, MaxConcurrent, OnError, length(Pids), Results).
+
+wait_for_active(Ref, Parent, 0, Results) ->
+    Parent ! {Ref, {ok, lists:reverse(Results)}};
+wait_for_active(Ref, Parent, Active, Results) ->
+    receive
+        {Ref, _Pid, Result} ->
+            wait_for_active(Ref, Parent, Active - 1, [Result | Results]);
+        {'EXIT', _Pid, _Reason} ->
+            wait_for_active(Ref, Parent, Active - 1, Results)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Collect first choice result for deferred choice.
+%%
+%% Returns the first successful option result or condition-based choice.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_first_choice(Ref :: reference(),
+                          Pids :: [pid()],
+                          Timeout :: timeout(),
+                          OptionKeys :: [atom()]) ->
+          {ok, {atom(), term()}} | {error, term()}.
+
+collect_first_choice(Ref, Pids, Timeout, OptionKeys) ->
+    Deadline = case Timeout of
+        infinity -> infinity;
+        N when is_integer(N) -> erlang:monotonic_time(millisecond) + N
+    end,
+    collect_first_choice_loop(Ref, Pids, Deadline, OptionKeys).
+
+collect_first_choice_loop(_Ref, [], _Deadline, _OptionKeys) ->
+    {error, no_options_available};
+collect_first_choice_loop(Ref, Pids, Deadline, OptionKeys) ->
+    TimeLeft = case Deadline of
+        infinity -> infinity;
+        T -> max(0, T - erlang:monotonic_time(millisecond))
+    end,
+    receive
+        {Ref, {option, Key}, {error, _}} ->
+            %% This option failed, continue waiting
+            collect_first_choice_loop(Ref, Pids -- [self()], Deadline, OptionKeys);
+        {Ref, {option, Key}, Result} ->
+            %% Got a successful result
+            {ok, {Key, Result}};
+        {Ref, condition, ConditionKey} when is_atom(ConditionKey) ->
+            %% Condition function selected a key
+            %% Kill all option processes
+            lists:foreach(fun(P) -> exit(P, kill) end, Pids),
+            {ok, {ConditionKey, condition_selected}};
+        {Ref, condition, true} ->
+            %% Condition returned true but no specific key
+            %% Wait for first successful option
+            collect_first_choice_loop(Ref, Pids, Deadline, OptionKeys);
+        {'EXIT', _Pid, _Reason} ->
+            %% Process died, continue
+            collect_first_choice_loop(Ref, Pids -- [self()], Deadline, OptionKeys)
+    after TimeLeft ->
+        lists:foreach(fun(P) -> exit(P, kill) end, Pids),
+        {error, timeout}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Execute branches in interleaved fashion (round-robin).
+%%
+%% Ensures fair execution order across all branches.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_interleaved(Ref :: reference(),
+                         Parent :: pid(),
+                         Branches :: map(),
+                         CurrentKeys :: [atom()],
+                         InputData :: term(),
+                         Round :: pos_integer(),
+                         PendingPids :: [{pid(), atom()}],
+                         CompletedResults :: list(),
+                         AllBranchKeys :: [atom()]) ->
+          list().
+
+execute_interleaved(_Ref, _Parent, _Branches, [], _InputData,
+                   _Round, PendingPids, Results, _AllBranchKeys) ->
+    %% Wait for remaining pending processes
+    collect_pending_results(PendingPids, Results);
+
+execute_interleaved(Ref, Parent, Branches, [Key | RestKeys],
+                   InputData, Round, PendingPids, Results, AllBranchKeys) ->
+    %% Get branch function
+    BranchFun = maps:get(Key, Branches),
+
+    %% Spawn one task from this branch
+    Pid = spawn(fun() ->
+        try
+            Result = case BranchFun of
+                Fun when is_function(Fun, 1) -> Fun(InputData);
+                {M, F} when is_atom(M), is_atom(F) -> erlang:apply(M, F, [InputData]);
+                Fun when is_function(Fun, 0) -> Fun()
+            end,
+            Parent ! {Ref, {branch_complete, Key}, Result}
+        catch
+            _Error:_Reason:_Stack ->
+            Parent ! {Ref, {branch_complete, Key}, {error, failed}}
+        end
+    end),
+
+    %% Wait for one pending task to complete before spawning next
+    NewPending = [{Pid, Key} | PendingPids],
+
+    case wait_for_one_completion(Ref, NewPending) of
+        {completed, CompletedKey, Result, RemainingPids} ->
+            %% Continue with remaining branches, cycling back if needed
+            NextKeys = case RestKeys of
+                [] -> AllBranchKeys;
+                _ -> RestKeys
+            end,
+            execute_interleaved(Ref, Parent, Branches, NextKeys,
+                              InputData, Round + 1, RemainingPids,
+                              [{CompletedKey, Result} | Results], AllBranchKeys)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Wait for one pending process to complete.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec wait_for_one_completion(Ref :: reference(),
+                             PendingPids :: [{pid(), atom()}]) ->
+          {completed, atom(), term(), [{pid(), atom()}]}.
+
+wait_for_one_completion(Ref, [{Pid, Key} | Rest]) ->
+    receive
+        {Ref, {branch_complete, Key}, Result} ->
+            {completed, Key, Result, Rest};
+        {Ref, {branch_complete, OtherKey}, Result} ->
+            %% Different branch completed first
+            {completed, OtherKey, Result, [{Pid, Key} | Rest]};
+        {'EXIT', Pid, _Reason} ->
+            %% Process died without completing
+            wait_for_one_completion(Ref, Rest)
+    after 5000 ->
+        %% Timeout, treat as error
+        {completed, Key, {error, timeout}, Rest}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Collect results from remaining pending processes.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_pending_results(PendingPids :: [{pid(), atom()}],
+                             Results :: list()) ->
+          list().
+
+collect_pending_results([], Results) ->
+    Results;
+collect_pending_results([{Pid, Key} | Rest], Results) ->
+    receive
+        {'EXIT', Pid, _Reason} ->
+            collect_pending_results(Rest, [{Key, {error, died}} | Results]);
+        {_, {branch_complete, Key}, Result} ->
+            collect_pending_results(Rest, [{Key, Result} | Results])
+    after 1000 ->
+        collect_pending_results(Rest, [{Key, {error, timeout}} | Results])
+    end.

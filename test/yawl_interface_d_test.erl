@@ -1228,3 +1228,643 @@ test_compensation_action_error_test_() ->
                     ?assertEqual({error, {invalid_status, aborted}}, Result)
                 end)]
      end}.
+
+%%====================================================================
+%% 14. Performance Tests
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Test worklet launch performance under normal conditions.
+%% @end
+%%--------------------------------------------------------------------
+test_worklet_launch_performance_test_() ->
+    {setup,
+     fun setup/0,
+     fun cleanup/1,
+     fun(_Pid) ->
+         [?_test(begin
+                    % Prepare test data
+                    CaseId = <<"case_performance">>,
+                    WorkletSpecId = <<"worklet_performance">>,
+                    ExceptionData = #{
+                        <<"task_id">> => <<"task_performance">>,
+                        <<"large_data">> => lists:duplicate(1000, <<"performance_test_data">>)
+                    },
+
+                    % Measure launch time for multiple worklets
+                    N = 100,
+                    {Time, Results} = timer:tc(
+                        fun() ->
+                            [yawl_interface_d:launch_worklet(CaseId, WorkletSpecId, ExceptionData)
+                             || _ <- lists:seq(1, N)]
+                        end
+                    ),
+
+                    % Calculate performance metrics
+                    SuccessCount = length([R || R <- Results, element(1, R) =:= ok]),
+                    SuccessRate = SuccessCount / N,
+                    AvgTimePerOp = Time / N,
+                    Throughput = (N * 1000) / Time,
+
+                    % Log performance metrics
+                    logger:info("Worklet launch performance: ~pms total, ~p ops/sec, ~p% success rate",
+                                [Time, Throughput, SuccessRate * 100],
+
+                    % Performance assertions
+                    ?assert(SuccessRate >= 0.95, "Success rate should be at least 95%"),
+                    ?assert(AvgTimePerOp < 100, "Average launch time should be < 100ms"),
+                    ?assert(Throughput > 10, "Throughput should be > 10 ops/sec")
+                end)]
+     end}.
+
+%%--------------------------------------------------------------------
+%% @doc Test worklet completion performance.
+%% @end
+%%--------------------------------------------------------------------
+test_worklet_completion_performance_test_() ->
+    {setup,
+     fun setup/0,
+     fun cleanup/1,
+     fun(_Pid) ->
+         [?_test(begin
+                    % Launch test worklets
+                    CaseId = <<"case_completion_perf">>,
+                    WorkletSpecId = <<"worklet_completion_perf">>,
+                    ExceptionData = #{<<"task_id">> => <<"task_completion_perf">>},
+
+                    {ok, ExecutionIds} = lists:unzip([
+                        yawl_interface_d:launch_worklet(CaseId, WorkletSpecId, ExceptionData)
+                        || _ <- lists:seq(1, 50)
+                    ]),
+
+                    % Measure completion time with large result data
+                    LargeResult = #{<<"status">> => <<"completed">>,
+                                 <<"large_data">> => lists:duplicate(5000, <<"completion_data">>)},
+
+                    {Time, Results} = timer:tc(
+                        fun() ->
+                            [yawl_interface_d:complete_worklet(ExecId, LargeResult)
+                             || ExecId <- ExecutionIds]
+                        end
+                    ),
+
+                    % Calculate metrics
+                    SuccessCount = length([R || R <- Results, R =:= ok]),
+                    SuccessRate = SuccessCount / length(ExecutionIds),
+                    AvgTimePerCompletion = Time / length(ExecutionIds),
+
+                    % Log performance metrics
+                    logger:info("Worklet completion performance: ~pms total, ~pms avg, ~p% success rate",
+                                [Time, AvgTimePerCompletion, SuccessRate * 100],
+
+                    % Performance assertions
+                    ?assert(SuccessRate >= 0.95, "Completion success rate should be at least 95%"),
+                    ?assert(AvgTimePerCompletion < 200, "Average completion time should be < 200ms")
+                end)]
+     end}.
+
+%%--------------------------------------------------------------------
+%% @doc Test memory usage patterns.
+%% @end
+%%--------------------------------------------------------------------
+test_memory_usage_test_() ->
+    {setup,
+     fun setup/0,
+     fun cleanup/1,
+     fun(_Pid) ->
+         [?_test(begin
+                    % Get initial memory
+                    InitialMemory = process_info(self(), memory),
+
+                    % Perform operations to track memory growth
+                    CaseId = <<"case_memory">>,
+                    WorkletSpecId = <<"worklet_memory">>,
+                    LargeExceptionData = #{
+                        <<"task_id">> => <<"task_memory">>,
+                        <<"large_metadata">> => generate_large_metadata(5000)
+                    },
+
+                    % Launch and complete many worklets
+                    N = 100,
+                    Operations = [],
+                    for I <- lists:seq(1, N) do
+                        {ok, ExecId} = yawl_interface_d:launch_worklet(
+                            CaseId, WorkletSpecId, LargeExceptionData
+                        ),
+                        Result = #{<<"status">> => <<"handled">>,
+                                 <<"result_data">> => generate_large_metadata(2000)},
+                        ok = yawl_interface_d:complete_worklet(ExecId, Result),
+                        Operations := [I | Operations]
+                    end,
+
+                    % Get final memory
+                    FinalMemory = process_info(self(), memory),
+
+                    % Calculate memory increase
+                    MemoryIncrease = case {InitialMemory, FinalMemory} of
+                                        {undefined, _} -> 0;
+                                        {_, undefined} -> 0;
+                                        {I, F} -> element(2, F) - element(2, I)
+                                    end,
+
+                    % Memory assertions (should not grow excessively)
+                    ?assert(MemoryIncrease < 10 * 1024 * 1024, "Memory increase should be < 10MB"),
+                    ?assert(MemoryIncrease / N < 100000, "Average memory per operation should be < 100KB")
+
+                    % Clean up
+                    lists:foreach(fun(ExecId) ->
+                        % Clean up any remaining active worklets
+                        case yawl_interface_d:get_worklet_status(ExecId) of
+                            {ok, _Status} -> yawl_interface_d:abort_worklet(ExecId);
+                            {error, not_found} -> ok
+                        end
+                    end, Operations)
+                end)]
+     end}.
+
+%%====================================================================
+%% 15. Concurrency Tests
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Test concurrent worklet launches.
+%% @end
+%%--------------------------------------------------------------------
+test_concurrent_worklet_launches_test_() ->
+    {setup,
+     fun setup/0,
+     fun cleanup/1,
+     fun(_Pid) ->
+         [?_test(begin
+                    N = 20,
+                    CaseId = <<"case_concurrent">>,
+                    WorkletSpecId = <<"worklet_concurrent">>,
+                    ExceptionData = #{<<"task_id">> => <<"task_concurrent">>},
+
+                    % Launch worklets concurrently using spawn
+                    LaunchFun = fun(I) ->
+                        spawn_link(fun() ->
+                            case yawl_interface_d:launch_worklet(
+                                CaseId, WorkletSpecId, ExceptionData) of
+                                {ok, ExecId} ->
+                                    % Also complete immediately
+                                    Result = #{<<"status">> => <<"completed">>, <<"iteration">> => I},
+                                    yawl_interface_d:complete_worklet(ExecId, Result);
+                                {error, Reason} ->
+                                    logger:error("Launch failed for ~p: ~p", [I, Reason])
+                            end
+                        end)
+                    end,
+
+                    % Spawn all launches
+                    Pids = [LaunchFun(I) || I <- lists:seq(1, N)],
+
+                    % Wait for all to complete
+                    lists:foreach(fun(Pid) ->
+                        receive
+                            {'EXIT', Pid, _} -> ok
+                        after 5000 ->
+                            logger:error("Process ~p did not complete", [Pid])
+                        end
+                    end, Pids),
+
+                    % Verify all worklets were handled
+                    ActiveWorklets = yawl_interface_d:get_active_worklets(),
+                    CompletedCount = length([W || W <- ActiveWorklets,
+                                                 W#worklet_execution.status =:= completed]),
+                    ?assert(CompletedCount >= N - 2, "Should have most worklets completed")
+                end)]
+     end}.
+
+%%--------------------------------------------------------------------
+%% @doc Test concurrent exception handling.
+%% @end
+%%--------------------------------------------------------------------
+test_concurrent_exception_handling_test_() ->
+    {setup,
+     fun setup/0,
+     fun cleanup/1,
+     fun(_Pid) ->
+         [?_test(begin
+                    % Register service for concurrent testing
+                    ServiceConfig = [{endpoint, <<"http://concurrent_service">>}],
+                    {ok, _ServiceId} = yawl_interface_d:register_exception_service(
+                        <<"concurrent_service">>, ServiceConfig
+                    ),
+
+                    N = 15,
+                    ExceptionType = system_exception,
+                    BaseExceptionData = #{
+                        <<"task_id">> => <<"task_concurrent_exception">>,
+                        <<"worklet_spec_id">> => <<"concurrent_handler">>
+                    },
+
+                    % Handle exceptions concurrently
+                    HandleFun = fun(I) ->
+                        ExceptionData = BaseExceptionData#{
+                            <<"case_id">> => list_to_binary(integer_to_list(I)),
+                            <<"iteration">> => I
+                        },
+                        spawn_link(fun() ->
+                            case yawl_interface_d:handle_exception(ExceptionType, ExceptionData) of
+                                {ok, ExecId} ->
+                                    % Complete the worklet
+                                    Result = #{<<"status">> => <<"resolved">>, <<"iteration">> => I},
+                                    yawl_interface_d:complete_worklet(ExecId, Result);
+                                {error, Reason} ->
+                                    logger:error("Exception handling failed for ~p: ~p", [I, Reason])
+                            end
+                        end)
+                    end,
+
+                    % Spawn all exception handlers
+                    Pids = [HandleFun(I) || I <- lists:seq(1, N)],
+
+                    % Wait for all to complete
+                    lists:foreach(fun(Pid) ->
+                        receive
+                            {'EXIT', Pid, _} -> ok
+                        after 5000 ->
+                            logger:error("Process ~p did not complete", [Pid])
+                        end
+                    end, Pids),
+
+                    % Verify all worklets completed
+                    ActiveWorklets = yawl_interface_d:get_active_worklets(),
+                    CompletedCount = length([W || W <- ActiveWorklets,
+                                                 W#worklet_execution.status =:= completed]),
+                    ?assert(CompletedCount >= N - 2, "Should have most exceptions handled")
+                end)]
+     end}.
+
+%%====================================================================
+%% 16. Load Tests
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Test high-volume worklet processing.
+%% @end
+%%--------------------------------------------------------------------
+test_high_volume_worklet_processing_test_() ->
+    {setup,
+     fun setup/0,
+     fun cleanup/1,
+     fun(_Pid) ->
+         [?_test(begin
+                    N = 1000,  %% 1000 worklets
+                    CaseId = <<"case_high_volume">>,
+                    WorkletSpecId = <<"worklet_high_volume">>,
+                    ExceptionData = #{<<"task_id">> => <<"task_high_volume">>,
+                                    <<"batch_id">> => <<"batch_001">>},
+
+                    % Measure total processing time
+                    {StartTime, Results} = timer:tc(
+                        fun() ->
+                            [yawl_interface_d:launch_worklet(CaseId, WorkletSpecId, ExceptionData)
+                             || _ <- lists:seq(1, N)]
+                        end
+                    ),
+
+                    EndTime = erlang:monotonic_time(millisecond),
+                    TotalTime = EndTime - StartTime,
+
+                    % Calculate metrics
+                    SuccessCount = length([R || R <- Results, element(1, R) =:= ok]),
+                    SuccessRate = SuccessCount / N,
+                    Throughput = (N * 1000) / TotalTime,
+
+                    % Performance requirements
+                    ?assert(SuccessRate >= 0.95,
+                            io_lib:format("Success rate ~p% below threshold", [SuccessRate * 100])),
+                    ?assert(TotalTime < 30000,
+                            io_lib:format("Total time ~pms exceeds 30s limit", [TotalTime])),
+                    ?assert(Throughput > 33,
+                            io_lib:format("Throughput ~p ops/sec below 33 ops/sec threshold", [Throughput])),
+
+                    % Complete successfully launched worklets
+                    SuccessfulLaunches = [element(2, R) || R <- Results, element(1, R) =:= ok],
+
+                    {CompleteStartTime, CompleteResults} = timer:tc(
+                        fun() ->
+                            [yawl_interface_d:complete_worklet(
+                                ExecId, #{<<"status">> => <<"completed">>})
+                             || ExecId <- SuccessfulLaunches]
+                        end
+                    ),
+
+                    CompleteRate = length([R || R <- CompleteResults, R =:= ok]) / length(SuccessfulLaunches),
+                    CompleteThroughput = (length(SuccessfulLaunches) * 1000) / CompleteStartTime,
+
+                    logger:info("High-volume metrics: ~p ops launched (~p%), ~p ops completed (~p%), "
+                                "Launch throughput: ~p ops/sec, Complete throughput: ~p ops/sec",
+                                [N, SuccessRate * 100, length(SuccessfulLaunches), CompleteRate * 100,
+                                 Throughput, CompleteThroughput])
+                end)]
+     end}.
+
+%%--------------------------------------------------------------------
+%% @doc Test sustained load over time.
+%% @end
+%%--------------------------------------------------------------------
+test_sustained_load_test_() ->
+    {setup,
+     fun setup/0,
+     fun cleanup/1,
+     fun(_Pid) ->
+         [?_test(begin
+                    Duration = 10000,  %% 10 seconds
+                    Interval = 100,    %% 100ms between operations
+                    BatchSize = 5,    %% 5 worklets per interval
+
+                    % Register service
+                    ServiceConfig = [{endpoint, <<"http://sustained_service">>}],
+                    {ok, _ServiceId} = yawl_interface_d:register_exception_service(
+                        <<"sustained_service">>, ServiceConfig
+                    ),
+
+                    ExceptionType = timeout_exception,
+                    BaseExceptionData = #{
+                        <<"task_id">> => <<"task_sustained">>,
+                        <<"worklet_spec_id">> => <<"sustained_handler">>
+                    },
+
+                    % Perform sustained operations
+                    StartTime = erlang:monotonic_time(millisecond),
+                    CurrentTime = StartTime,
+                    Operations = [],
+
+                    while(CurrentTime < StartTime + Duration, fun() ->
+                        BatchResults = [yawl_interface_d:handle_exception(
+                            ExceptionType,
+                            BaseExceptionData#{
+                                <<"case_id">> => list_to_binary(integer_to_list(CurrentTime, I)),
+                                <<"iteration">> => I
+                            })
+                            || I <- lists:seq(1, BatchSize)],
+
+                        Operations := [BatchResults | Operations],
+                        CurrentTime := erlang:monotonic_time(millisecond),
+                        timer:sleep(Interval)
+                    end),
+
+                    % Complete all launched worklets
+                    AllExecutionIds = lists:flatten([
+                        [element(2, R) || R <- Batch, element(1, R) =:= ok]
+                        || Batch <- Operations
+                    ]),
+
+                    CompleteFun = fun(ExecId) ->
+                        yawl_interface_d:complete_worklet(
+                            ExecId, #{<<"status">> => <<"resolved">>})
+                    end,
+                    lists:foreach(CompleteFun, AllExecutionIds),
+
+                    % Calculate final metrics
+                    TotalOperations = length(lists:flatten(Operations)),
+                    DurationMs = erlang:monotonic_time(millisecond) - StartTime,
+                    OpsPerSecond = (TotalOperations * 1000) / DurationMs,
+
+                    logger:info("Sustained load: ~p operations in ~pms = ~p ops/sec",
+                                [TotalOperations, DurationMs, OpsPerSecond]),
+
+                    % Requirements
+                    ?assert(TotalOperations >= Duration / Interval * BatchSize * 0.8,
+                            io_lib:format("Operations ~p below expected threshold", [TotalOperations])),
+                    ?assert(OpsPerSecond > BatchSize * 5,
+                            io_lib:format("Throughput ~p ops/sec below expected threshold", [OpsPerSecond]))
+                end)]
+     end}.
+
+%%--------------------------------------------------------------------
+%% @doc Test stress conditions with limited resources.
+%% @end
+%%--------------------------------------------------------------------
+test_stress_conditions_test_() ->
+    {setup,
+     fun setup/0,
+     fun cleanup/1,
+     fun(_Pid) ->
+         [?_test(begin
+                    % Simulate stress conditions with multiple operations
+                    StressDuration = 5000,  %% 5 seconds stress
+                    HighFrequency = 20,    %% 20ms between operations
+                    ConcurrentBatches = 10, %% 10 concurrent processes
+
+                    % Register service
+                    ServiceConfig = [{endpoint, <<"http://stress_service">>}],
+                    {ok, _ServiceId} = yawl_interface_d:register_exception_service(
+                        <<"stress_service">>, ServiceConfig
+                    ),
+
+                    ExceptionType = business_rule_exception,
+                    BaseExceptionData = #{
+                        <<"task_id">> => <<"task_stress">>,
+                        <<"worklet_spec_id">> => <<"stress_handler">>,
+                        <<"stress_data">> => lists:duplicate(1000, <<"stress_data">>)
+                    },
+
+                    % Start concurrent stress processes
+                    StressProcesses = [],
+                    for I <- lists:seq(1, ConcurrentBatches) do
+                        ProcessPid = spawn_link(fun() ->
+                            ProcessStartTime = erlang:monotonic_time(millisecond),
+                            ProcessOps = [],
+
+                            while(erlang:monotonic_time(millisecond) < ProcessStartTime + StressDuration, fun() ->
+                                CaseId = list_to_binary(integer_to_list(I, erlang:unique_integer())),
+                                ExceptionData = BaseExceptionData#{
+                                    <<"case_id">> => CaseId,
+                                    <<"process_id">> => I,
+                                    <<"timestamp">> => erlang:system_time(millisecond)
+                                },
+
+                                case yawl_interface_d:handle_exception(ExceptionType, ExceptionData) of
+                                    {ok, ExecId} ->
+                                        % Complete immediately
+                                        Result = #{<<"status">> => <<"handled">>,
+                                                 <<"process_id">> => I,
+                                                 <<"timestamp">> => erlang:system_time(millisecond)},
+                                        yawl_interface_d:complete_worklet(ExecId, Result),
+                                        ProcessOps := [ok | ProcessOps];
+                                    {error, Reason} ->
+                                        ProcessOps := [{error, Reason} | ProcessOps]
+                                end,
+
+                                timer:sleep(HighFrequency)
+                            end),
+
+                            % Log process results
+                            ProcessCount = length(ProcessOps),
+                            SuccessCount = length([R || R <- ProcessOps, R =:= ok]),
+                            logger:info("Stress process ~p: ~p ops, ~p% success",
+                                        [I, ProcessCount, (SuccessCount / ProcessCount) * 100]),
+
+                            exit(normal)
+                        end),
+                        StressProcesses := [ProcessPid | StressProcesses]
+                    end,
+
+                    % Wait for all stress processes to complete
+                    lists:foreach(fun(Pid) ->
+                        receive
+                            {'EXIT', Pid, _} -> ok
+                        after 10000 ->
+                            logger:error("Stress process ~p did not complete", [Pid])
+                        end
+                    end, StressProcesses),
+
+                    % Final validation
+                    logger:info("Stress test completed for ~p concurrent processes", [ConcurrentBatches]),
+                    logger:info("System should have handled high frequency operations gracefully")
+                end)]
+     end}.
+
+%%====================================================================
+%% 17. Interface D Integration Tests
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Test Interface D with YAWL workflow patterns integration.
+%% @end
+%%--------------------------------------------------------------------
+test_interface_d_workflow_pattern_integration_test_() ->
+    {setup,
+     fun setup/0,
+     fun cleanup/1,
+     fun(_Pid) ->
+         [?_test(begin
+                    % Register multiple exception services for different patterns
+                    ServiceConfigs = [
+                        {<<"pattern_service_1">>,
+                            [{endpoint, <<"http://pattern1">>}, {priority, 10}]},
+                        {<<"pattern_service_2">>,
+                            [{endpoint, <<"http://pattern2">>}, {priority, 5}]},
+                        {<<"pattern_service_3">>,
+                            [{endpoint, <<"http://pattern3">>}, {priority, 8}]}
+                    ],
+
+                    lists:foreach(fun({Name, Config}) ->
+                        {ok, _Id} = yawl_interface_d:register_exception_service(Name, Config)
+                    end, ServiceConfigs),
+
+                    % Test different workflow patterns
+                    Patterns = [
+                        {sequential_flow, sequential_exception, <<"sequential_handler">>},
+                        {parallel_flow, parallel_exception, <<"parallel_handler">>},
+                        {conditional_flow, business_rule_exception, <<"conditional_handler">>},
+                        {loop_flow, timeout_exception, <<"loop_handler">>},
+                        {merge_flow, runtime_exception, <<"merge_handler">>}
+                    ],
+
+                    PatternResults = [],
+                    for {PatternName, ExceptionType, WorkletSpecId} <- Patterns do
+                        ExceptionData = #{
+                            <<"pattern_name">> => PatternName,
+                            <<"case_id">> => list_to_binary(atom_to_list(PatternName)),
+                            <<"task_id">> => list_to_binary(atom_to_list(PatternName)),
+                            <<"worklet_spec_id">> => WorkletSpecId,
+                            <<"metadata">> => #{
+                                pattern => PatternName,
+                                timestamp => erlang:system_time(millisecond)
+                            }
+                        },
+
+                        {ok, ExecId} = yawl_interface_d:handle_exception(ExceptionType, ExceptionData),
+                        ok = yawl_interface_d:complete_worklet(
+                            ExecId, #{
+                                <<"pattern_completed">> => PatternName,
+                                <<"status">> => <<"handled">>,
+                                <<"timestamp">> => erlang:system_time(millisecond)
+                            }),
+
+                        PatternResults := [{PatternName, ExecId} | PatternResults]
+                    end,
+
+                    % Verify all patterns were handled
+                    ?assert(length(PatternResults) =:= 5, "All 5 patterns should be handled"),
+
+                    logger:info("Workflow pattern integration test: ~p patterns completed",
+                                [length(PatternResults)])
+                end)]
+     end}.
+
+%%--------------------------------------------------------------------
+%% @doc Test Interface D with distributed workflow execution.
+%% @end
+%%--------------------------------------------------------------------
+test_interface_d_distributed_integration_test_() ->
+    {setup,
+     fun setup/0,
+     fun cleanup/1,
+     fun(_Pid) ->
+         [?_test(begin
+                    % Register both local and remote services
+                    LocalService = [{endpoint, <<"http://localhost:8080/local">>},
+                                   {service_type, local}, {priority, 5}],
+                    RemoteService = [{endpoint, <<"http://remote.example.com:8080/distributed">>},
+                                     {service_type, remote}, {priority, 10}],
+
+                    {ok, LocalId} = yawl_interface_d:register_exception_service(
+                        <<"local_distributed_service">>, LocalService),
+                    {ok, RemoteId} = yawl_interface_d:register_exception_service(
+                        <<"remote_distributed_service">>, RemoteService),
+
+                    % Test with different exception types to trigger routing
+                    ExceptionTypes = [
+                        {local_distributed_exception, LocalId},
+                        {remote_distributed_exception, RemoteId},
+                        {mixed_exception, LocalId}  % Should pick local due to higher priority
+                    ],
+
+                    Results = [],
+                    for {ExceptionType, ExpectedServiceId} <- ExceptionTypes do
+                        ExceptionData = #{
+                            <<"exception_type">> => ExceptionType,
+                            <<"case_id">> => list_to_binary(atom_to_list(ExceptionType)),
+                            <<"task_id">> => <<"distributed_task">>,
+                            <<"service_id">> => ExceptionType,
+                            <<"distributed_context">> => #{
+                                nodes => [node()],
+                                timestamp => erlang:system_time(millisecond)
+                            }
+                        },
+
+                        case yawl_interface_d:handle_exception(ExceptionType, ExceptionData) of
+                            {ok, ExecId} ->
+                                % Complete the worklet
+                                Result = #{<<"handled_by">> => ExceptionType,
+                                         <<"service_id">> => ExpectedServiceId,
+                                         <<"status">> => <<"distributed_handled">>},
+                                ok = yawl_interface_d:complete_worklet(ExecId, Result),
+                                Results := [{ExceptionType, ExecId, success} | Results];
+                            {error, Reason} ->
+                                Results := [{ExceptionType, undefined, Reason} | Results]
+                        end
+                    end,
+
+                    % Verify results
+                    SuccessCount = length([R || R <- Results, element(3, R) =:= success]),
+                    ?assert(SuccessCount >= 2, "Should handle at least 2/3 exceptions"),
+
+                    logger:info("Distributed integration: ~p/~p exceptions handled",
+                                [SuccessCount, length(Results)])
+                end)]
+     end}.
+
+%%====================================================================
+%% Helper Functions
+%%====================================================================
+
+%% @private
+generate_large_metadata(Size) ->
+    lists:duplicate(Size, <<"metadata_test">>).
+
+%% @private
+while(Condition, Fun) when is_function(Fun, 0) ->
+    case Condition() of
+        true ->
+            Fun(),
+            while(Condition, Fun);
+        false ->
+            ok
+    end.

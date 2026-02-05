@@ -1,0 +1,202 @@
+% -*- latex -*-
+%%
+% Chapter 3: YAWL Order Fulfillment Domain
+%%
+%%====================================================================
+
+\chapter{The YAWL Order Fulfillment Domain}
+
+\section{Introduction to the Case Study}
+
+The Order Fulfillment process was introduced by Conforti et al. at
+CAISE 2013 \cite{conforti2013supporting} as a case study for
+risk-informed decision making during business process execution.
+This chapter describes the business domain, process specification,
+and the key aspects that make it an interesting case for YAWL
+implementation comparison.
+
+\section{Business Requirements}
+
+The Order Fulfillment process handles customer orders from initial
+order placement through final delivery. The process involves five
+major subprocesses, each with specific business requirements:
+
+\begin{enumerate}
+  \item \textbf{Ordering}: Receive and validate customer orders,
+        check inventory availability, and reserve items
+
+  \item \textbf{Payment}: Process payment using various methods
+        (credit card, PayPal, bank transfer)
+
+  \item \textbf{Carrier Appointment}: Arrange shipping with carriers
+        based on order characteristics (FTL, LTL, single package)
+
+  \item \textbf{Freight In Transit}: Track shipment during transit,
+        monitor for delays, and notify customers of issues
+
+  \item \textbf{Freight Delivered}: Confirm delivery, verify items,
+        obtain signatures, and send receipts
+\end{enumerate}
+
+\section{Process Specification}
+
+Figure~\ref{fig:order_fulfillment_process} shows the high-level structure
+of the Order Fulfillment process.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=2cm, auto,
+  place/.style={circle, draw, minimum size=10mm},
+  transition/.style={rectangle, draw, minimum size=10mm}]
+
+% Places
+\node[place] (p_start) {$p_{start}$};
+\node[place, below of=p_start] (p_ordering) {$p_{ordering}$};
+\node[place, below of=p_ordering] (p_carrier) {$p_{carrier}$};
+\node[place, below of=p_carrier] (p_payment) {$p_{payment}$};
+\node[place, right=3cm of p_carrier] (p_transit) {$p_{transit}$};
+\node[place, below of=p_payment] (p_delivery) {$p_{delivery}$};
+\node[place, below of=p_delivery] (p_end) {$p_{end}$};
+
+% Transitions
+\node[transition, right of=p_ordering] (t_ordering) {$t_{ordering}$};
+\node[transition, right of=p_carrier] (t_carrier) {$t_{carrier}$};
+\node[transition, left of=p_transit] (t_transit) {$t_{transit}$};
+\node[transition, right of=p_payment] (t_payment) {$t_{payment}$};
+\node[transition, right of=p_delivery] (t_delivery) {$t_{delivery}$};
+
+% Arcs
+\draw[->] (p_start) -- (t_ordering);
+\draw[->] (t_ordering) -- (p_ordering);
+\draw[->] (p_ordering) -- (t_carrier);
+\draw[->] (t_carrier) -- (p_carrier);
+\draw[->] (p_carrier) -- (t_payment);
+\draw[->] (p_carrier) -- (t_transit);
+\draw[->] (t_payment) -- (p_payment);
+\draw[->] (t_transit) -- (p_transit);
+\draw[->] (p_payment) -- (t_delivery);
+\draw[->] (t_transit) -- (t_delivery);
+\draw[->] (p_delivery) -- (t_delivery);
+\draw[->] (t_delivery) -- (p_end);
+
+\end{tikzpicture}
+\caption{Order Fulfillment Process Petri Net Structure}
+\label{fig:order_fulfillment_process}
+\end{figure}
+
+\subsection{Ordering Subprocess}
+
+The Ordering subprocess implements WCP-01 (Sequence) and WCP-26 (Critical
+Section) patterns:
+
+\begin{itemize}
+  \item Receive order from customer
+  \item Check inventory for all items
+  \item Reserve items (critical section - prevents double-booking)
+  \item Calculate total (including tax and shipping)
+  \item Confirm order
+\end{itemize}
+
+\subsection{Payment Subprocess}
+
+The Payment subprocess implements WCP-04 (Exclusive Choice) and
+WCP-23 (Structured Loop) patterns:
+
+\begin{itemize}
+  \item Receive payment information
+  \item Validate payment details
+  \item \textbf{Exclusive Choice}: Process based on payment method
+    \begin{itemize}
+      \item Credit card processing
+      \item PayPal processing
+      \item Bank transfer
+    \end{itemize}
+  \item Send confirmation (if successful)
+  \item Handle failure (retry if under max attempts)
+\end{itemize}
+
+\subsection{Carrier Appointment Subprocess}
+
+The Carrier Appointment subprocess implements WCP-04 (Exclusive Choice)
+and WCP-18 (Milestone) patterns:
+
+\begin{itemize}
+  \item Receive confirmation of purchase order
+  \item Estimate trailer usage
+  \item Prepare route guide
+  \item Prepare transportation quote
+  \item \textbf{Exclusive Choice}: Determine shipping type
+    \begin{itemize}
+      \item FTL (Full Truck Load) - for large volumes
+      \item LTL (Less Than Truckload) - for multiple packages
+      \item Single package - for individual items
+    \end{itemize}
+  \item Create shipment documentation
+  \item Arrange pickup and delivery appointments
+  \item Produce shipping notice
+\end{itemize}
+
+\subsection{Freight In Transit Subprocess}
+
+The Freight In Transit subprocess implements WCP-25 (Interleaved Loop)
+and WCP-16 (Deferred Choice) patterns:
+
+\begin{itemize}
+  \item Start tracking
+  \item Monitor shipment during transit
+  \item Update location (interleaved loop)
+  \item Check for delays
+  \item Notify customer if delayed (deferred choice)
+  \item Complete transit phase
+\end{itemize}
+
+\subsection{Freight Delivered Subprocess}
+
+The Freight Delivered subprocess implements WCP-18 (Milestone) pattern:
+
+\begin{itemize}
+  \item Receive delivery confirmation
+  \item Verify all items (milestone - must complete before signature)
+  \item Obtain customer signature
+  \item Send delivery receipt
+  \item Complete delivery
+\end{itemize}
+
+\section{Risk-Informed Decisions}
+
+A key aspect of the Order Fulfillment process is the handling of
+risk-informed decisions, as highlighted in the CAISE 2013 paper:
+
+\begin{enumerate}
+  \item \textbf{Payment risk}: Credit card fraud detection and retry
+        strategies
+  \item \textbf{Inventory risk}: Critical section prevents double-booking
+        of items
+  \item \textbf{Transit risk}: Delay detection and customer notification
+  \item \textbf{Delivery risk}: Item verification before completion
+\end{enumerate}
+
+Both CRE and A2A implementations must handle these risk scenarios,
+though their approaches may differ significantly.
+
+\section{Data Flow Between Subprocesses}
+
+Table~\ref{tab:subprocess_data_flow} summarizes the data flow
+between subprocesses.
+
+\begin{table}[htbp]
+\centering
+\caption{Data Flow Between Order Fulfillment Subprocesses}
+\label{tab:subprocess_data_flow}
+\begin{tabular}{lll}
+\toprule
+\textbf{From Subprocess} & \textbf{To Subprocess} & \textbf{Data Passed} \\
+\midrule
+Ordering & Payment & Order ID, total amount, customer info \\
+Ordering & Carrier & Order ID, items list, shipping address \\
+Carrier & Transit & Shipment ID, tracking number, carrier info \\
+Payment & Transit & Payment confirmation (via orchestrator) \\
+Transit & Delivery & Shipment status, delivery details \\
+\bottomrule
+\end{tabular}
+\end{table}

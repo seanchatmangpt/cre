@@ -185,6 +185,15 @@ terminate(_Reason, _CreState) -> ok.
 
 init(_Arg) ->
     process_flag(trap_exit, true),
+
+    %% Initialize persistent terms for configuration if not already done
+    %% This ensures tests that call cre_master:start_link() directly
+    %% still have access to configuration values
+    case catch persistent_term:get(cre_client_poll_interval) of
+        {'EXIT', _} -> cre_config:init();
+        _ -> ok
+    end,
+
     {ok, #cre_state{}}.
 
 
@@ -199,13 +208,9 @@ handle_cast({add_worker, P}, CreState) ->
             true -> whereis(P)
         end,
 
-    error_logger:info_report(
-      [{info, "new worker"},
-       {application, cre},
-       {cre_master_pid, self()},
-       {worker_pid, Pid},
-       {worker_node, node(Pid)},
-       {nworker, length(IdleLst) + maps:size(BusyMap) + 1}]),
+    logger:info("New worker: pid=~p node=~p count=~p",
+                [Pid, node(Pid), length(IdleLst) + maps:size(BusyMap) + 1],
+                [{info, "new worker"}, {application, cre}]),
 
     true = link(Pid),
 
@@ -310,13 +315,13 @@ handle_info({'EXIT', P, _Reason}, CreState) ->
         % an idle worker died
         true ->
 
-            error_logger:info_report(
-              [{info, "idle worker down"},
-               {application, cre},
-               {cre_master_pid, self()},
-               {worker_pid, Pid},
-               {worker_node, node(Pid)},
-               {nworker, length(IdleLst) + maps:size(BusyMap) - 1}]),
+            logger:info("Idle worker down: pid=~p node=~p",
+                          [Pid, node(Pid)],
+                          [{info, "idle worker down"},
+                           {application, cre},
+                           {cre_master_pid, self()},
+                           {worker_pid, Pid},
+                           {nworker, length(IdleLst) + maps:size(BusyMap) - 1}]),
 
             CreState1 = CreState#cre_state{idle_lst = IdleLst -- [Pid]},
 
@@ -328,13 +333,13 @@ handle_info({'EXIT', P, _Reason}, CreState) ->
                 % a busy worker died
                 {A, Pid} ->
 
-                    error_logger:info_report(
-                      [{info, "busy worker down"},
-                       {application, cre},
-                       {cre_master_pid, self()},
-                       {worker_pid, Pid},
-                       {worker_node, node(Pid)},
-                       {nworker, length(IdleLst) + maps:size(BusyMap) - 1}]),
+                    logger:info("Busy worker down: pid=~p node=~p",
+                                  [Pid, node(Pid)],
+                                  [{info, "busy worker down"},
+                                   {application, cre},
+                                   {cre_master_pid, self()},
+                                   {worker_pid, Pid},
+                                   {nworker, length(IdleLst) + maps:size(BusyMap) - 1}]),
 
                     CreState1 = CreState#cre_state{
                                   queue = [A | Queue],
@@ -346,11 +351,11 @@ handle_info({'EXIT', P, _Reason}, CreState) ->
                 % some other linked process died
                 false ->
 
-                    error_logger:info_report(
-                      [{info, "exit signal received"},
-                       {application, cre},
-                       {cre_master_pid, self()},
-                       {from_pid, Pid}]),
+                    logger:info("Exit signal received: from=~p", [Pid],
+                                  [{info, "exit signal received"},
+                                   {application, cre},
+                                   {cre_master_pid, self()},
+                                   {from_pid, Pid}]),
 
                     {stop, exit, CreState}
             end

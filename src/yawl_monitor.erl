@@ -408,12 +408,9 @@ init(Config) ->
     %% Set up retention timer
     schedule_retention_cleanup(RetentionMs),
 
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, init},
-        {max_metrics, MaxMetrics},
-        {retention_ms, RetentionMs}
-    ]),
+    logger:info("Monitor initialized: max_metrics=~p retention=~p ms",
+                [MaxMetrics, RetentionMs],
+                [{module, ?MODULE}, {action, init}]),
 
     {ok, #monitor_state{
         metrics = [],
@@ -576,7 +573,7 @@ handle_cast({delete_dashboard, DashboardId}, State) ->
     {noreply, State#monitor_state{dashboards = Dashboards}};
 
 handle_cast(reset_metrics, State) ->
-    error_logger:info_report([{module, ?MODULE}, {action, reset_metrics}]),
+    logger:info("Metrics reset", [{module, ?MODULE}, {action, reset_metrics}]),
     {noreply, State#monitor_state{
         metrics = [],
         metric_index = #{},
@@ -769,9 +766,9 @@ emit_telemetry(Metric) ->
                 EventName = [yawl, metric, erlang:binary_to_existing_atom(Metric#metric.name, utf8)],
                 Measurements = #{value => Metric#metric.value},
                 Metadata = maps:put(timestamp, Metric#metric.timestamp, Metric#metric.labels),
-                % telemetry:execute/2 is the correct signature (EventName, Measurements)
-                % Metadata is passed as part of Measurements map or via telemetry:attach/4 handlers
-                telemetry:execute(EventName, Measurements#{metadata => Metadata})
+                % Use apply/3 to avoid xref warnings for optional dependencies
+                % telemetry:execute(EventName, Measurements) is the correct signature
+                apply(telemetry, execute, [EventName, Measurements#{metadata => Metadata}])
             catch
                 _:_ -> ok
             end
@@ -946,12 +943,9 @@ cleanup_old_metrics(State) ->
     MetricIndex = rebuild_metric_index(KeptMetrics),
     CaseIndex = rebuild_case_index(KeptMetrics),
 
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, cleanup_old_metrics},
-        {removed, length(RemovedMetrics)},
-        {kept, length(KeptMetrics)}
-    ]),
+    logger:info("Old metrics cleaned: removed=~p kept=~p",
+                [length(RemovedMetrics), length(KeptMetrics)],
+                [{module, ?MODULE}, {action, cleanup_old_metrics}]),
 
     State#monitor_state{
         metrics = KeptMetrics,

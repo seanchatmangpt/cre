@@ -303,7 +303,7 @@ update_case_status(CaseId, Status) ->
 -spec init([]) -> {ok, #control_state{}}.
 
 init([]) ->
-    error_logger:info_report([{yawl_control, starting}, {pid, self()}]),
+    logger:info("YAWL control starting", [{yawl_control, starting}]),
     {ok, #control_state{
         status = #engine_status{
             start_time = erlang:timestamp(),
@@ -361,11 +361,8 @@ handle_call({cancel_case, CaseId, Reason}, _From, State) ->
             NewStatus = State#control_state.status#engine_status{
                 cases_cancelled = State#control_state.status#engine_status.cases_cancelled + 1
             },
-            error_logger:info_report([
-                {yawl_control, case_cancelled},
-                {case_id, CaseId},
-                {reason, Reason}
-            ]),
+            logger:info("Case cancelled: id=~p reason=~p", [CaseId, Reason],
+                        [{yawl_control, case_cancelled}]),
             notify_subscribers(case_cancelled, CaseId, State#control_state.subscribers),
             {reply, ok, State#control_state{cases = NewCases, status = NewStatus}}
     end;
@@ -381,11 +378,8 @@ handle_call({suspend_case, CaseId, Reason}, _From, State) ->
         CaseInfo ->
             UpdatedCase = CaseInfo#case_info{status = suspended},
             NewCases = maps:put(CaseId, UpdatedCase, State#control_state.cases),
-            error_logger:info_report([
-                {yawl_control, case_suspended},
-                {case_id, CaseId},
-                {reason, Reason}
-            ]),
+            logger:info("Case suspended: id=~p reason=~p", [CaseId, Reason],
+                         [{yawl_control, case_suspended}]),
             notify_subscribers(case_suspended, CaseId, State#control_state.subscribers),
             {reply, ok, State#control_state{cases = NewCases}}
     end;
@@ -401,11 +395,8 @@ handle_call({resume_case, CaseId, Reason}, _From, State) ->
         CaseInfo ->
             UpdatedCase = CaseInfo#case_info{status = running},
             NewCases = maps:put(CaseId, UpdatedCase, State#control_state.cases),
-            error_logger:info_report([
-                {yawl_control, case_resumed},
-                {case_id, CaseId},
-                {reason, Reason}
-            ]),
+            logger:info("Case resumed: id=~p reason=~p", [CaseId, Reason],
+                         [{yawl_control, case_resumed}]),
             notify_subscribers(case_resumed, CaseId, State#control_state.subscribers),
             {reply, ok, State#control_state{cases = NewCases}}
     end;
@@ -421,11 +412,8 @@ handle_call(get_engine_status, _From, State) ->
 handle_call({set_parameter, Parameter, Value}, _From, State) ->
     NewParams = maps:put(Parameter, Value, State#control_state.status#engine_status.parameters),
     NewStatus = State#control_state.status#engine_status{parameters = NewParams},
-    error_logger:info_report([
-        {yawl_control, parameter_set},
-        {parameter, Parameter},
-        {value, Value}
-    ]),
+    logger:info("Parameter set: ~p=~p", [Parameter, Value],
+                 [{yawl_control, parameter_set}]),
     {reply, ok, State#control_state{status = NewStatus}};
 
 handle_call(list_all_cases, _From, State) ->
@@ -466,11 +454,8 @@ handle_cast({register_case, CaseId, SpecId}, State) ->
         end_time = undefined
     },
     NewCases = maps:put(CaseId, CaseInfo, State#control_state.cases),
-    error_logger:info_report([
-        {yawl_control, case_registered},
-        {case_id, CaseId},
-        {spec_id, SpecId}
-    ]),
+    logger:info("Case registered: id=~p spec=~p", [CaseId, SpecId],
+                 [{yawl_control, case_registered}]),
     notify_subscribers(case_started, CaseId, State#control_state.subscribers),
     {noreply, State#control_state{cases = NewCases}};
 
@@ -542,7 +527,7 @@ code_change(_OldVsn, State, _Extra) ->
 -spec terminate(term(), #control_state{}) -> ok.
 
 terminate(_Reason, _State) ->
-    error_logger:info_report([{yawl_control, stopping}, {pid, self()}]),
+    logger:info("YAWL control stopping", [{yawl_control, stopping}]),
     ok.
 
 %%====================================================================

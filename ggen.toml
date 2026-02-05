@@ -1,0 +1,79 @@
+# CRE YAWL Pattern Generation Configuration for ggen v5
+# This file drives the ggen sync pipeline to generate Erlang code
+# from the RDF ontology: ontology/yawl_patterns.ttl
+
+[project]
+name = "cre"
+version = "0.3.0"
+description = "Concurrent Runtime Environment with YAWL workflow patterns"
+
+# Ontology configuration for YAWL patterns
+[ontology]
+source = "ontology/yawl_patterns.ttl"
+base_iri = "https://yawl.dev/"
+
+[ontology.prefixes]
+yawl = "https://yawl.dev/"
+cre = "https://cre.dev/"
+rdfs = "http://www.w3.org/2000/01/rdf-schema#"
+owl = "http://www.w3.org/2002/07/owl#"
+xsd = "http://www.w3.org/2001/XMLSchema#"
+rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+
+# =============================================================================
+# GENERATION RULES
+# =============================================================================
+
+# Generate basic pattern functions from ontology
+[[generation.rules]]
+name = "generate-basic-patterns"
+description = "Generate Erlang pattern functions for basic YAWL patterns"
+query = { inline = """
+PREFIX yawl: <https://yawl.dev/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?patternName ?patternId ?comment ?category ?arity ?petriNetType
+WHERE {
+  ?pattern a yawl:Pattern ;
+    rdfs:label ?patternName ;
+    yawl:patternId ?patternId ;
+    rdfs:comment ?comment ;
+    yawl:category ?category .
+  OPTIONAL { ?pattern yawl:arity ?arity }
+  OPTIONAL { ?pattern yawl:petriNetType ?petriNetType }
+}
+ORDER BY ?patternId
+""" }
+template = { file = "templates/erl/pattern_functions.tera" }
+output_file = "src/generated/yawl_pattern_functions.erl"
+mode = "Overwrite"
+
+# Generate pattern module documentation
+[[generation.rules]]
+name = "generate-pattern-docs"
+description = "Generate YAWL pattern documentation from ontology"
+query = { inline = """
+PREFIX yawl: <https://yawl.dev/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?patternName ?patternId ?comment ?category
+WHERE {
+  ?pattern a yawl:Pattern ;
+    rdfs:label ?patternName ;
+    yawl:patternId ?patternId ;
+    rdfs:comment ?comment ;
+    yawl:category ?category .
+}
+ORDER BY ?category ?patternId
+""" }
+template = { file = "templates/erl/pattern_docs.tera" }
+output_file = "docs/generated/YAWL_PATTERNS.md"
+mode = "Overwrite"
+
+# =============================================================================
+# OUTPUT CONFIGURATION
+# =============================================================================
+
+[output]
+directory = "generated"
+format = "structured"
+preserve_timestamps = true
+create_manifest = true

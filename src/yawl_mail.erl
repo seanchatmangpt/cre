@@ -409,8 +409,9 @@ send_smtp_email(From, To, Cc, Subject, Body) ->
                 send_via_gen_smtp(From, To, Cc, Subject, Message);
             _ ->
                 % Fallback to simple HTTP or log
-                error_logger:info_msg("Email would be sent:~nFrom: ~s~nTo: ~p~nSubject: ~s~n",
-                                     [From, To, Subject]),
+                logger:info("Email would be sent: from=~p to=~p subject=~p",
+                           [From, To, Subject],
+                           [{module, ?MODULE}, {action, email_fallback}]),
                 ok
         end
     catch
@@ -420,21 +421,28 @@ send_smtp_email(From, To, Cc, Subject, Body) ->
 
 %%--------------------------------------------------------------------
 %% @private Sends email using gen_smtp_client.
+%% Note: gen_smtp_client is an optional runtime dependency.
 %% @end
 %%--------------------------------------------------------------------
+%% -compile({nowarn_xref, [{send_via_gen_smtp, 5, gen_smtp_client, send, 2}]}).
+%% The above directive is not supported directly. Instead, we use a safe
+%% wrapper that only calls the function when the module is confirmed loaded.
 -spec send_via_gen_smtp(binary(), [binary()], [binary()], binary(), iolist()) ->
           ok | {error, term()}.
 send_via_gen_smtp(From, To, Cc, Subject, Message) ->
     Email = From,
     Recipients = To ++ Cc,
     % Use send/2 instead of deprecated send_blocking/2
-    % The modern gen_smtp_client API uses send/2 with async delivery
-    case gen_smtp_client:send(
-        {Email, Recipients},
-        [{subject, Subject}, {body, Message}, {relayed, false}]
-    ) of
-        {ok, _} -> ok;
-        {error, Reason} -> {error, Reason}
+    Options = [{subject, Subject}, {body, Message}, {relayed, false}],
+    case code:ensure_loaded(gen_smtp_client) of
+        {module, gen_smtp_client} ->
+            % gen_smtp_client:send/2 takes {From, To} and Options proplist
+            case gen_smtp_client:send({Email, Recipients}, Options) of
+                {ok, _} -> ok;
+                {error, Reason} -> {error, Reason}
+            end;
+        _ ->
+            {error, gen_smtp_not_available}
     end.
 
 %%--------------------------------------------------------------------

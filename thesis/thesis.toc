@@ -1,0 +1,136 @@
+\contentsline {chapter}{\numberline {1}Introduction}{8}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Research Motivation}{8}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Problem Statement}{8}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Contributions}{9}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Thesis Structure}{9}{section.1.4}%
+\contentsline {chapter}{\numberline {2}Background and Related Work}{11}{chapter.2}%
+\contentsline {section}{\numberline {2.1}YAWL: Yet Another Workflow Language}{11}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}YAWL Workflow Control Patterns}{11}{subsection.2.1.1}%
+\contentsline {section}{\numberline {2.2}Petri Net Formalism}{12}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Definitions}{12}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}Soundness Properties}{13}{subsection.2.2.2}%
+\contentsline {section}{\numberline {2.3}gen\_pnet Library}{13}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}gen\_pnet Callbacks}{13}{subsection.2.3.1}%
+\contentsline {section}{\numberline {2.4}XES Standard}{14}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Related Work}{14}{section.2.5}%
+\contentsline {subsection}{\numberline {2.5.1}Workflow Pattern Analysis}{14}{subsection.2.5.1}%
+\contentsline {subsection}{\numberline {2.5.2}Formal Verification of Workflows}{14}{subsection.2.5.2}%
+\contentsline {subsection}{\numberline {2.5.3}Process Mining}{14}{subsection.2.5.3}%
+\contentsline {chapter}{\numberline {3}The YAWL Order Fulfillment Domain}{15}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Introduction to the Case Study}{15}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Business Requirements}{15}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Process Specification}{15}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Ordering Subprocess}{15}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}Payment Subprocess}{16}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}Carrier Appointment Subprocess}{17}{subsection.3.3.3}%
+\contentsline {subsection}{\numberline {3.3.4}Freight In Transit Subprocess}{17}{subsection.3.3.4}%
+\contentsline {subsection}{\numberline {3.3.5}Freight Delivered Subprocess}{18}{subsection.3.3.5}%
+\contentsline {section}{\numberline {3.4}Risk-Informed Decisions}{18}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Data Flow Between Subprocesses}{18}{section.3.5}%
+\contentsline {chapter}{\numberline {4}Architecture Comparison}{19}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Introduction}{19}{section.4.1}%
+\contentsline {section}{\numberline {4.2}CRE Architecture}{19}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}Design Philosophy}{19}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}Module Structure}{19}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.2.3}Implementation Characteristics}{19}{subsection.4.2.3}%
+\contentsline {section}{\numberline {4.3}A2A Architecture}{19}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}Design Philosophy}{19}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {4.3.2}Module Structure}{21}{subsection.4.3.2}%
+\contentsline {section}{\numberline {4.4}Design Philosophy Comparison}{21}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Component Analysis}{21}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Petri Net Engine}{21}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}Workflow Orchestration}{22}{subsection.4.5.2}%
+\contentsline {section}{\numberline {4.6}Trade-offs and Design Decisions}{22}{section.4.6}%
+\contentsline {subsection}{\numberline {4.6.1}Simplicity vs. Comprehensiveness}{22}{subsection.4.6.1}%
+\contentsline {subsection}{\numberline {4.6.2}Pattern Reusability}{22}{subsection.4.6.2}%
+\contentsline {subsection}{\numberline {4.6.3}Observability}{22}{subsection.4.6.3}%
+\contentsline {chapter}{\numberline {5}Pattern Implementation Analysis}{23}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Introduction}{23}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Basic Control Flow Patterns}{23}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}WCP-01: Sequence}{23}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}WCP-02: Parallel Split}{23}{subsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.2.3}WCP-03: Synchronization}{23}{subsection.5.2.3}%
+\contentsline {subsection}{\numberline {5.2.4}WCP-04: Exclusive Choice}{24}{subsection.5.2.4}%
+\contentsline {section}{\numberline {5.3}Advanced Branching Patterns}{24}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}WCP-07: Synchronizing Merge}{24}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5.3.2}WCP-09: Discriminator}{24}{subsection.5.3.2}%
+\contentsline {subsection}{\numberline {5.3.3}WCP-10: Arbitrary Cycles}{24}{subsection.5.3.3}%
+\contentsline {section}{\numberline {5.4}Structural Patterns}{24}{section.5.4}%
+\contentsline {subsection}{\numberline {5.4.1}WCP-11: Implicit Termination}{24}{subsection.5.4.1}%
+\contentsline {subsection}{\numberline {5.4.2}WCP-13: Multiple Instances (Design Time)}{24}{subsection.5.4.2}%
+\contentsline {section}{\numberline {5.5}Pattern Coverage Matrix}{24}{section.5.5}%
+\contentsline {section}{\numberline {5.6}Formal Verification}{26}{section.5.6}%
+\contentsline {subsection}{\numberline {5.6.1}Soundness Analysis}{26}{subsection.5.6.1}%
+\contentsline {chapter}{\numberline {6}Empirical Evaluation}{27}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Introduction}{27}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Test Methodology}{27}{section.6.2}%
+\contentsline {subsection}{\numberline {6.2.1}Test Environment}{27}{subsection.6.2.1}%
+\contentsline {subsection}{\numberline {6.2.2}Test Cases}{27}{subsection.6.2.2}%
+\contentsline {section}{\numberline {6.3}Performance Benchmarks}{27}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}Single Subprocess Execution}{27}{subsection.6.3.1}%
+\contentsline {subsection}{\numberline {6.3.2}Full Workflow Execution}{28}{subsection.6.3.2}%
+\contentsline {section}{\numberline {6.4}Memory Usage Analysis}{28}{section.6.4}%
+\contentsline {subsection}{\numberline {6.4.1}Per-Instance Memory}{28}{subsection.6.4.1}%
+\contentsline {subsection}{\numberline {6.4.2}Scalability Characteristics}{28}{subsection.6.4.2}%
+\contentsline {section}{\numberline {6.5}Test Coverage}{28}{section.6.5}%
+\contentsline {subsection}{\numberline {6.5.1}CRE Test Coverage}{28}{subsection.6.5.1}%
+\contentsline {subsection}{\numberline {6.5.2}A2A Test Coverage}{28}{subsection.6.5.2}%
+\contentsline {section}{\numberline {6.6}Observations}{28}{section.6.6}%
+\contentsline {chapter}{\numberline {7}Case Study: End-to-End Order Fulfillment}{31}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Introduction}{31}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Test Scenario}{31}{section.7.2}%
+\contentsline {section}{\numberline {7.3}CRE Execution Trace}{31}{section.7.3}%
+\contentsline {subsection}{\numberline {7.3.1}Ordering Phase}{31}{subsection.7.3.1}%
+\contentsline {subsection}{\numberline {7.3.2}Payment Phase}{32}{subsection.7.3.2}%
+\contentsline {subsection}{\numberline {7.3.3}Carrier Appointment Phase}{32}{subsection.7.3.3}%
+\contentsline {subsection}{\numberline {7.3.4}Transit Phase}{32}{subsection.7.3.4}%
+\contentsline {subsection}{\numberline {7.3.5}Delivery Phase}{32}{subsection.7.3.5}%
+\contentsline {section}{\numberline {7.4}A2A Execution Trace}{32}{section.7.4}%
+\contentsline {section}{\numberline {7.5}Inter-Workflow Communication}{32}{section.7.5}%
+\contentsline {subsection}{\numberline {7.5.1}Data Passing Between Subprocesses}{32}{subsection.7.5.1}%
+\contentsline {section}{\numberline {7.6}XES Log Analysis}{32}{section.7.6}%
+\contentsline {subsection}{\numberline {7.6.1}CRE XES Log Structure}{32}{subsection.7.6.1}%
+\contentsline {subsection}{\numberline {7.6.2}XES Log Comparison}{33}{subsection.7.6.2}%
+\contentsline {chapter}{\numberline {8}Discussion}{34}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Lessons Learned}{34}{section.8.1}%
+\contentsline {subsection}{\numberline {8.1.1}Architectural Insights}{34}{subsection.8.1.1}%
+\contentsline {section}{\numberline {8.2}Best Practices}{34}{section.8.2}%
+\contentsline {subsection}{\numberline {8.2.1}For Research Prototypes}{34}{subsection.8.2.1}%
+\contentsline {subsection}{\numberline {8.2.2}For Production Systems}{34}{subsection.8.2.2}%
+\contentsline {section}{\numberline {8.3}Limitations}{35}{section.8.3}%
+\contentsline {subsection}{\numberline {8.3.1}CRE Limitations}{35}{subsection.8.3.1}%
+\contentsline {subsection}{\numberline {8.3.2}A2A Limitations}{35}{subsection.8.3.2}%
+\contentsline {section}{\numberline {8.4}Future Work}{35}{section.8.4}%
+\contentsline {subsection}{\numberline {8.4.1}For CRE Implementation}{35}{subsection.8.4.1}%
+\contentsline {subsection}{\numberline {8.4.2}For A2A Implementation}{35}{subsection.8.4.2}%
+\contentsline {subsection}{\numberline {8.4.3}Research Directions}{36}{subsection.8.4.3}%
+\contentsline {section}{\numberline {8.5}Applicability to Other Domains}{36}{section.8.5}%
+\contentsline {chapter}{\numberline {9}Conclusion}{37}{chapter.9}%
+\contentsline {section}{\numberline {9.1}Summary of Contributions}{37}{section.9.1}%
+\contentsline {subsection}{\numberline {9.1.1}Architectural Analysis}{37}{subsection.9.1.1}%
+\contentsline {subsection}{\numberline {9.1.2}Pattern Coverage}{37}{subsection.9.1.2}%
+\contentsline {subsection}{\numberline {9.1.3}Formal Verification}{37}{subsection.9.1.3}%
+\contentsline {subsection}{\numberline {9.1.4}Empirical Evaluation}{37}{subsection.9.1.4}%
+\contentsline {section}{\numberline {9.2}Theoretical Implications}{38}{section.9.2}%
+\contentsline {subsection}{\numberline {9.2.1}Pattern Implementation Strategies}{38}{subsection.9.2.1}%
+\contentsline {subsection}{\numberline {9.2.2}Petri Net Practice}{38}{subsection.9.2.2}%
+\contentsline {section}{\numberline {9.3}Practical Applications}{38}{section.9.3}%
+\contentsline {section}{\numberline {9.4}Closing Remarks}{38}{section.9.4}%
+\contentsline {chapter}{\numberline {A}Code Listings}{41}{appendix.A}%
+\contentsline {section}{\numberline {A.1}CRE Ordering Module (Excerpt)}{41}{section.A.1}%
+\contentsline {section}{\numberline {A.2}CRE Payment Module (Excerpt)}{42}{section.A.2}%
+\contentsline {section}{\numberline {A.3}A2A Patterns Module (Excerpt)}{42}{section.A.3}%
+\contentsline {section}{\numberline {A.4}Shared Type Definitions}{42}{section.A.4}%
+\contentsline {chapter}{\numberline {A}Test Results}{44}{appendix.A}%
+\contentsline {section}{\numberline {A.1}CRE Test Execution Results}{44}{section.A.1}%
+\contentsline {subsection}{\numberline {A.1.1}Compilation}{44}{subsection.A.1.1}%
+\contentsline {subsection}{\numberline {A.1.2}Ordering Subprocess Test}{44}{subsection.A.1.2}%
+\contentsline {subsection}{\numberline {A.1.3}Payment Subprocess Test}{45}{subsection.A.1.3}%
+\contentsline {subsection}{\numberline {A.1.4}Full Order Fulfillment Test}{45}{subsection.A.1.4}%
+\contentsline {section}{\numberline {A.2}A2A Test Execution Results}{45}{section.A.2}%
+\contentsline {subsection}{\numberline {A.2.1}Pattern Tests}{45}{subsection.A.2.1}%
+\contentsline {subsection}{\numberline {A.2.2}Workflow Instance Tests}{45}{subsection.A.2.2}%
+\contentsline {chapter}{\numberline {A}XES Log Examples}{46}{appendix.A}%
+\contentsline {section}{\numberline {A.1}CRE XES Log Example}{46}{section.A.1}%
+\contentsline {section}{\numberline {A.2}A2A XES Log Example}{46}{section.A.2}%
+\contentsline {section}{\numberline {A.3}XES Log Comparison}{47}{section.A.3}%

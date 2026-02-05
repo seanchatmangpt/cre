@@ -95,7 +95,7 @@
     users = #{} :: #{user_id() => #user{}},
     username_index = #{} :: #{username() => user_id()},
     sessions = #{} :: #{session_id() => #session{}},
-    session_timeout = 3600 :: pos_integer()  % 1 hour default
+    session_timeout :: pos_integer()  % 1 hour default (from persistent_term)
 }).
 
 -type auth_result() :: {ok, user_id() | session_id()} | {error, term()}.
@@ -368,7 +368,10 @@ init(Options) ->
 
 %% @private
 continue_init(Options) ->
-    SessionTimeout = proplists:get_value(session_timeout, Options, 3600),
+    %% Use persistent_term for O(1) access to default session timeout
+    %% (OTP 21+ optimization)
+    DefaultTimeout = cre_config:get(cre_auth_default_session_timeout, 3600),
+    SessionTimeout = proplists:get_value(session_timeout, Options, DefaultTimeout),
     State = #auth_state{session_timeout = SessionTimeout},
     {ok, State}.
 
@@ -451,7 +454,9 @@ terminate(_Reason, _State) ->
 -spec hash_password(binary()) -> password_hash().
 hash_password(Password) ->
     Salt = crypto:strong_rand_bytes(16),
-    Iterations = 100000,
+    %% Use persistent_term for O(1) access to iterations constant
+    %% (OTP 21+ optimization)
+    Iterations = cre_config:get(cre_auth_pbkdf2_iterations, 100000),
     %% Handle both OTP versions - some return binary, some return {ok, binary}
     DerivedKey = case crypto:pbkdf2_hmac(sha256, Password, Salt, Iterations, 32) of
         {ok, Key} -> Key;
@@ -469,7 +474,9 @@ hash_password(Password) ->
 verify_password(Password, StoredHash) when byte_size(StoredHash) =:= 48 ->
     try
         <<Salt:16/binary, StoredDerivedKey:32/binary>> = StoredHash,
-        Iterations = 100000,
+        %% Use persistent_term for O(1) access to iterations constant
+        %% (OTP 21+ optimization)
+        Iterations = cre_config:get(cre_auth_pbkdf2_iterations, 100000),
         ComputedKey = case crypto:pbkdf2_hmac(sha256, Password, Salt, Iterations, 32) of
             {ok, Key} -> Key;
             Key when is_binary(Key) -> Key

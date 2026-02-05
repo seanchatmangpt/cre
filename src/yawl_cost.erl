@@ -557,11 +557,8 @@ init(Config) ->
         cost_index = #{}
     },
 
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, init},
-        {default_currency, DefaultCurrency}
-    ]),
+    logger:info("Cost tracker initialized",
+                [{module, ?MODULE}, {default_currency, DefaultCurrency}]),
 
     {ok, State}.
 
@@ -708,13 +705,9 @@ handle_call({archive_costs, CaseId}, _From, State) ->
     CostIndex1 = maps:remove(CaseId, State#cost_state.cost_index),
 
     %% In production, would persist to disk/database
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, archive_costs},
-        {case_id, CaseId},
-        {archive_id, ArchiveId},
-        {entries_count, length(Costs)}
-    ]),
+    logger:info("Costs archived",
+                [{module, ?MODULE}, {case_id, CaseId},
+                 {archive_id, ArchiveId}, {entries_count, length(Costs)}]),
 
     {reply, {ok, ArchiveId}, State#cost_state{costs = Costs1, cost_index = CostIndex1}};
 
@@ -764,12 +757,8 @@ handle_cast({assign_cost, CaseId, TaskId, CostType, Amount, Currency}, State) ->
 handle_cast({assign_resource_cost, CaseId, ResourceId, Duration}, State) ->
     case maps:get(ResourceId, State#cost_state.resource_rates, undefined) of
         undefined ->
-            error_logger:warning_report([
-                {module, ?MODULE},
-                {action, assign_resource_cost},
-                {warning, no_resource_rate},
-                {resource_id, ResourceId}
-            ]),
+            logger:warning("No resource rate for ~p", [ResourceId],
+                         [{module, ?MODULE}]),
             {noreply, State};
         #resource_rate{rate = Rate, currency = Currency, unit = Unit} ->
             Amount = calculate_resource_cost(Duration, Rate, Unit),
@@ -846,13 +835,9 @@ handle_cast({set_resource_rate, ResourceId, Rate, Currency}, State) ->
     },
     ResourceRates = maps:put(ResourceId, ResourceRate, State#cost_state.resource_rates),
 
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, set_resource_rate},
-        {resource_id, ResourceId},
-        {rate, Rate},
-        {currency, Currency}
-    ]),
+    logger:info("Resource rate set: ~p rate=~p currency=~s",
+                [ResourceId, Rate, Currency],
+                [{module, ?MODULE}]),
 
     {noreply, State#cost_state{resource_rates = ResourceRates}};
 
@@ -872,7 +857,7 @@ handle_cast({set_exchange_rate, From, To, Rate}, State) ->
     {noreply, State#cost_state{exchange_rates = ExchangeRates1}};
 
 handle_cast(reset_costs, State) ->
-    error_logger:info_report([{module, ?MODULE}, {action, reset_costs}]),
+    logger:info("Costs reset", [{module, ?MODULE}]),
     {noreply, State#cost_state{costs = [], cost_index = #{}}};
 
 handle_cast({reset_case_costs, CaseId}, State) ->
@@ -945,13 +930,10 @@ convert_amount(Amount, From, To, State) ->
             Default = State#cost_state.default_currency,
             case maps:get({From, Default}, State#cost_state.exchange_rates, undefined) of
                 undefined ->
-                    error_logger:warning_report([
-                        {module, ?MODULE},
-                        {action, convert_amount},
-                        {warning, no_exchange_rate},
-                        {from, From},
-                        {to, To}
-                    ]),
+                    logger:warning("No exchange rate: from=~p to=~p",
+                                  [From, To],
+                                  [{module, ?MODULE}, {action, convert_amount},
+                                   {warning, no_exchange_rate}]),
                     Amount;
                 Rate1 ->
                     case maps:get({Default, To}, State#cost_state.exchange_rates, undefined) of

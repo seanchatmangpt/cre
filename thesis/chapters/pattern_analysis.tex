@@ -1,0 +1,180 @@
+% -*- latex -*-
+%%
+% Chapter 5: Pattern Implementation Analysis
+%%
+%%====================================================================
+
+\chapter{Pattern Implementation Analysis}
+
+\section{Introduction}
+
+This chapter analyzes how the CRE and A2A implementations realize
+the YAWL workflow control patterns. We map each pattern to its
+implementation in both systems and compare approaches.
+
+\section{Basic Control Flow Patterns}
+
+\subsection{WCP-01: Sequence}
+
+\textbf{Definition}: Tasks are executed sequentially, one after another.
+
+\textbf{CRE Implementation}: Direct place-transition chain:
+\begin{lstlisting}[language=Erlang, basicstyle=\tiny\ttfamily]
+place_lst() -> ['p_input', 'p_step1', 'p_step2', 'p_output'].
+trsn_lst() -> ['t_step1', 't_step2'].
+
+preset('t_step1') -> ['p_input'];
+preset('t_step2') -> ['p_step1'].
+\end{lstlisting}
+
+\textbf{A2A Implementation}: Predefined sequence pattern:
+\begin{lstlisting}[language=Erlang, basicstyle=\tiny\ttfamily]
+create_sequence([Task1, Task2], Config).
+\end{lstlisting}
+
+\subsection{WCP-02: Parallel Split}
+
+\textbf{Definition}: A single thread of control splits into multiple
+parallel threads, which execute concurrently.
+
+\textbf{CRE Implementation}: Multiple output places from one transition:
+\begin{lstlisting}[language=Erlang, basicstyle=\tiny\ttfamily]
+fire('t_parallel_split', #{'p_input' := [start]}, State) ->
+    {produce, #{'p_branch1' => [start], 'p_branch2' => [start]}}.
+\end{lstlisting}
+
+\textbf{A2A Implementation}: parallel\_split pattern with join coordination.
+
+\subsection{WCP-03: Synchronization}
+
+\textbf{Definition}: Multiple parallel threads converge into a single
+thread. Synchronization waits for all incoming branches to complete.
+
+\textbf{CRE Implementation}: Transition with multiple input places:
+\begin{lstlisting}[language=Erlang, basicstyle=\tiny\ttfamily]
+preset('t_synchronize') -> ['p_branch1', 'p_branch2'].
+\end{lstlisting}
+
+\subsection{WCP-04: Exclusive Choice}
+
+\textbf{Definition}: One branch is selected from a set of alternatives
+based on data-dependent conditions.
+
+\textbf{CRE Implementation}: Enabled transitions based on state:
+\begin{lstlisting}[language=Erlang, basicstyle=\tiny\ttfamily]
+is_enabled('t_process_cc', _Mode, #payment_state{payment_details = Details}) ->
+    maps:get(method, Details) =:= credit_card.
+\end{lstlisting}
+
+\textbf{A2A Implementation}: exclusive\_choice pattern with condition functions.
+
+\section{Advanced Branching Patterns}
+
+\subsection{WCP-07: Synchronizing Merge}
+
+\textbf{Definition}: Multiple threads converge, but only one may proceed.
+All branches must be ``in progress'' before the merge completes.
+
+\textbf{CRE Implementation}: cre\_yawl.erl provides execute\_synchronizing\_merge/3.
+
+\subsection{WCP-09: Discriminator}
+
+\textbf{Definition}: Multiple threads converge, triggering on the
+\textbf{first} completion. Subsequent completions are ignored.
+
+\textbf{CRE Implementation}: cre\_yawl.erl provides execute\_discriminator/3.
+
+\subsection{WCP-10: Arbitrary Cycles}
+
+\textbf{Definition}: A process can loop back to any previous state.
+
+\textbf{CRE Implementation}: Direct arcs from later places to earlier places.
+
+\section{Structural Patterns}
+
+\subsection{WCP-11: Implicit Termination}
+
+\textbf{Definition}: A subprocess should terminate when no work remains
+and all input conditions are satisfied.
+
+\textbf{CRE Implementation}: Handled by gen\_pnet termination semantics.
+
+\subsection{WCP-13: Multiple Instances (Design Time)}
+
+\textbf{Definition}: Multiple instances are created based on design-time
+knowledge of the required number.
+
+\textbf{CRE Implementation}: Multiple process spawns in orchestrator.
+
+\section{Pattern Coverage Matrix}
+
+Table~\ref{tab:pattern_coverage} shows the pattern coverage in both
+implementations.
+
+\begin{table}[htbp]
+\centering
+\caption{Workflow Pattern Coverage Comparison}
+\label{tab:pattern_coverage}
+\small
+\begin{tabular}{clcc}
+\toprule
+\textbf{Pattern} & \textbf{CRE} & \textbf{A2A} \\
+\midrule
+\textbf{Basic Patterns} & & & \\
+\quad WCP-01: Sequence & \checkmark & \checkmark \\
+\quad WCP-02: Parallel Split & \checkmark & \checkmark \\
+\quad WCP-03: Synchronization & \checkmark & \checkmark \\
+\quad WCP-04: Exclusive Choice & \checkmark & \checkmark \\
+\quad WCP-05: Simple Merge & \checkmark & \checkmark \\
+\quad WCP-06: Multi-Choice & \checkmark & \checkmark \\
+\midrule
+\textbf{Advanced Branching} & & & \\
+\quad WCP-07: Synchronizing Merge & \checkmark & \checkmark \\
+\quad WCP-08: Multi-Merge & \checkmark & \checkmark \\
+\quad WCP-09: Discriminator & \checkmark & \checkmark \\
+\quad WCP-10: Arbitrary Cycles & \checkmark & \checkmark \\
+\midrule
+\textbf{Structural} & & & \\
+\quad WCP-11: Implicit Termination & \checkmark & \checkmark \\
+\quad WCP-12: Multiple Instances (no sync) & Partial & \checkmark \\
+\quad WCP-13: Multiple Instances (design time) & \checkmark & \checkmark \\
+\midrule
+\textbf{State-Based} & & & \\
+\quad WCP-14: Multiple Instances (runtime) & Partial & \checkmark \\
+\quad WCP-15: Deferred Choice & \checkmark & \checkmark \\
+\quad WCP-16: Interleaved Parallel Routing & \checkmark & \checkmark \\
+\quad WCP-17: Milestone & \checkmark & \checkmark \\
+\midrule
+\textbf{Cancellation} & & & \\
+\quad WCP-18: Cancel Task & \checkmark & \checkmark \\
+\quad WCP-19: Cancel Case & Partial & \checkmark \\
+\quad WCP-20: Cancel Region & Partial & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Formal Verification}
+
+\subsection{Soundness Analysis}
+
+Both implementations produce sound workflow nets according to the
+definition by van der Aalst \cite{vandalAalst1997verification}:
+
+\begin{theorem}[Soundness of CRE Order Fulfillment]
+The CRE Order Fulfillment workflow net is sound because:
+\begin{enumerate}
+  \item Every marking reachable from the initial marking can reach the
+        final marking (p\_output with token)
+  \item The final marking is unique when tokens reach p\_output
+  \item All transitions are live in the initial marking
+\end{enumerate}
+\end{theorem}
+
+\begin{theorem}[Soundness of A2A Order Fulfillment]
+The A2A Order Fulfillment workflow net is sound due to:
+\begin{enumerate}
+  \item Pattern-based construction guarantees sound structure
+  \item Validation in yawl\_workflow\_instance ensures soundness
+  \item Runtime deadlock detection prevents unsound states
+\end{enumerate}
+\end{theorem}

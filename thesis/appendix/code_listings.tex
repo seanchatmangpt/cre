@@ -1,0 +1,101 @@
+% -*- latex -*-
+%%
+% Appendix A: Code Listings
+%%
+%%====================================================================
+
+\appendix
+\chapter{Code Listings}
+
+\section{CRE Ordering Module (Excerpt)}
+
+\begin{lstlisting}[language=Erlang, caption=ordering.erl Petri Net Definition]
+-module(ordering).
+-behaviour(gen_pnet).
+
+place_lst() ->
+    ['p_input', 'p_order_received', 'p_inventory_checked',
+     'p_items_reserved', 'p_total_calculated', 'p_order_confirmed',
+     'p_output'].
+
+trsn_lst() ->
+    ['t_receive_order', 't_check_inventory', 't_reserve_items',
+     't_calculate_total', 't_confirm_order', 't_complete'].
+
+init_marking('p_input', _UsrInfo) -> [start];
+init_marking(_, _) -> [].
+
+preset('t_receive_order') -> ['p_input'];
+preset('t_check_inventory') -> ['p_order_received'];
+preset('t_reserve_items') -> ['p_inventory_checked'];
+preset('t_calculate_total') -> ['p_items_reserved'];
+preset('t_confirm_order') -> ['p_total_calculated'];
+preset('t_complete') -> ['p_order_confirmed'];
+preset(_) -> [].
+
+is_enabled('t_reserve_items', _Mode, State) ->
+    %% WCP-26: Critical Section - Check if inventory is available
+    State#ordering_state.inventory_checked.
+
+fire('t_receive_order', #{'p_input' := [start]}, State) ->
+    Order = State#ordering_state.order,
+    log_event(State, <<"Ordering">>, <<"OrderReceived">>, #{
+        <<"order_id">> => Order#order.order_id
+    }),
+    {produce, #{'p_order_received' => [start]}};
+...
+\end{lstlisting}
+
+\section{CRE Payment Module (Excerpt)}
+
+\begin{lstlisting}[language=Erlang, caption=payment.erl Exclusive Choice (WCP-04)]
+is_enabled('t_process_cc', _Mode, #payment_state{payment_details = Details}) ->
+    %% WCP-04: Exclusive Choice - Route based on payment method
+    maps:get(method, Details, credit_card) =:= credit_card;
+
+is_enabled('t_process_pp', _Mode, #payment_state{payment_details = Details}) ->
+    maps:get(method, Details, credit_card) =:= paypal;
+
+is_enabled('t_process_bt', _Mode, #payment_state{payment_details = Details}) ->
+    maps:get(method, Details, credit_card) =:= bank_transfer.
+\end{lstlisting}
+
+\section{A2A Patterns Module (Excerpt)}
+
+\begin{lstlisting}[language=Erlang, caption=yawl_patterns.erl Structure]
+create_workflow(PatternType, Config) ->
+    PatternConfig = maps:get(pattern_config, Config, #{}),
+    case validate_pattern(PatternType, PatternConfig) of
+        {ok, ValidatedConfig} ->
+            Workflow = #workflow{
+                id = generate_id(<<"workflow">>),
+                pattern_type = PatternType,
+                config = ValidatedConfig,
+                created_at = erlang:timestamp()
+            },
+            {ok, Workflow};
+        {error, Reason} ->
+            {error, {invalid_pattern, Reason}}
+    end.
+\end{lstlisting}
+
+\section{Shared Type Definitions}
+
+\begin{lstlisting}[language=Erlang, caption=order\_fulfillment\_types.hrl]
+-record(order, {
+    order_id :: binary(),
+    customer_id :: binary(),
+    customer_name :: binary(),
+    customer_email :: binary(),
+    items :: list(#item{}),
+    shipping_address :: map(),
+    billing_address :: map(),
+    subtotal :: float(),
+    tax :: float(),
+    shipping_cost :: float(),
+    total :: float(),
+    status :: pending | confirmed | processing | shipped | delivered | cancelled,
+    created_at :: integer(),
+    notes :: binary() | undefined
+}).
+\end{lstlisting}

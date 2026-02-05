@@ -151,13 +151,9 @@ post_tweet(Text, Options) ->
                     )
             end,
 
-            error_logger:info_report([
-                {module, ?MODULE},
-                {action, post_tweet},
-                {tweet_id, TweetId},
-                {text, Text},
-                {length, byte_size(Text)}
-            ]),
+            logger:info("Tweet posted: id=~p length=~p",
+                        [TweetId, byte_size(Text)],
+                        [{module, ?MODULE}, {action, post_tweet}]),
 
             {ok, TweetId}
     end.
@@ -177,13 +173,8 @@ post_tweet_with_media(Text, MediaUrl) ->
         _ ->
             TweetId = generate_tweet_id(),
 
-            error_logger:info_report([
-                {module, ?MODULE},
-                {action, post_tweet_with_media},
-                {tweet_id, TweetId},
-                {text, Text},
-                {media_url, MediaUrl}
-            ]),
+            logger:info("Tweet with media posted: id=~p", [TweetId],
+                        [{module, ?MODULE}, {action, post_tweet_with_media}]),
 
             {ok, TweetId}
     end.
@@ -223,12 +214,8 @@ send_direct_message(UserHandle, _Message, Options) ->
             )
     end,
 
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, send_direct_message},
-        {dm_id, DMId},
-        {recipient, UserHandle}
-    ]),
+    logger:info("DM sent: id=~p to=~p", [DMId, UserHandle],
+                 [{module, ?MODULE}, {action, send_direct_message}]),
 
     {ok, DMId}.
 
@@ -272,12 +259,9 @@ monitor_hashtag(Hashtag, CallbackPid) ->
         last_id = undefined
     },
 
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, monitor_hashtag},
-        {hashtag, Hashtag},
-        {monitor_id, MonitorId}
-    ]),
+    logger:info("Hashtag monitoring: ~p monitor=~p",
+                [Hashtag, MonitorId],
+                [{module, ?MODULE}, {action, monitor_hashtag}]),
 
     %% In production, would start actual monitoring
     {ok, MonitorId}.
@@ -300,12 +284,9 @@ monitor_mentions(UserHandle, CallbackPid) ->
         last_id = undefined
     },
 
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, monitor_mentions},
-        {handle, UserHandle},
-        {monitor_id, MonitorId}
-    ]),
+    logger:info("Mentions monitoring: ~p monitor=~p",
+                [UserHandle, MonitorId],
+                [{module, ?MODULE}, {action, monitor_mentions}]),
 
     {ok, MonitorId}.
 
@@ -317,11 +298,8 @@ monitor_mentions(UserHandle, CallbackPid) ->
 -spec stop_monitoring(MonitorId :: reference()) -> ok.
 
 stop_monitoring(MonitorId) ->
-    error_logger:info_report([
-        {module, ?MODULE},
-        {action, stop_monitoring},
-        {monitor_id, MonitorId}
-    ]),
+    logger:info("Twitter monitoring stopped: ~p", [MonitorId],
+                 [{module, ?MODULE}, {action, stop_monitoring}]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -332,7 +310,7 @@ stop_monitoring(MonitorId) ->
 -spec set_credentials(AppKey :: binary(), BearerToken :: binary()) -> ok.
 
 set_credentials(_AppKey, _BearerToken) ->
-    error_logger:info_report([{module, ?MODULE}, {action, set_credentials_bearer}]),
+    logger:info("Twitter credentials set: bearer token", [{module, ?MODULE}]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -346,7 +324,7 @@ set_credentials(_AppKey, _BearerToken) ->
                      AccessSecret :: binary()) -> ok.
 
 set_credentials(_ConsumerKey, _ConsumerSecret, _AccessToken, _AccessSecret) ->
-    error_logger:info_report([{module, ?MODULE}, {action, set_credentials_oauth}]),
+    logger:info("Twitter credentials set: OAuth", [{module, ?MODULE}]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -357,7 +335,7 @@ set_credentials(_ConsumerKey, _ConsumerSecret, _AccessToken, _AccessSecret) ->
 -spec clear_credentials() -> ok.
 
 clear_credentials() ->
-    error_logger:info_report([{module, ?MODULE}, {action, clear_credentials}]),
+    logger:info("Twitter credentials cleared", [{module, ?MODULE}]),
     ok.
 
 %%--------------------------------------------------------------------
