@@ -17,58 +17,32 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Petri Net Receipts Module
-%%
-%% This module provides receipt creation and effects extraction for the
-%% gen_pnet Petri net framework in CRE. Receipts are immutable records
-%% of state transitions that provide an audit trail for all Petri net
-%% executions.
-%%
-%% <h3>Purpose</h3>
-%%
-%% Receipts provide:
-%% <ul>
-%%   <li><b>Audit Trail:</b> Complete record of all state transitions</li>
-%%   <li><b>Observability:</b> Debugging and inspection capabilities</li>
-%%   <li><b>Replay Capability:</b> State reconstruction for testing</li>
-%%   <li><b>Proofs of Execution:</b> Verifiable execution records</li>
-%% </ul>
-%%
-%% <h3>Receipt Structure</h3>
-%%
-%% A receipt contains:
-%% <ul>
-%%   <li><code>before_hash</code> - Hash of the marking before execution</li>
-%%   <li><code>after_hash</code> - Hash of the marking after execution</li>
-%%   <li><code>move</code> - The transition firing that was executed</li>
-%%   <li><code>ts</code> - Timestamp in milliseconds since epoch</li>
-%% </ul>
-%%
-%% <h3>Effects</h3>
-%%
-%% Effects represent side effects produced by transition execution.
-%% By default, receipts have no effects (empty list). Callback modules
-%% can extend this behavior by implementing custom effects extraction.
-%%
-%% <h3>Usage Example</h3>
-%%
-%% <pre>
-%% %% Create a receipt from state transition
-%% BeforeHash = crypto:hash(sha256, term_to_binary(BeforeMarking)),
-%% AfterHash = crypto:hash(sha256, term_to_binary(AfterMarking)),
-%% Move = #{trsn => my_transition,
-%%          mode => #{input => [token]},
-%%          produce => #{output => [new_token]}},
-%% Receipt = pnet_receipt:make(BeforeHash, AfterHash, Move),
-%%
-%% %% Extract effects (empty by default)
-%% Effects = pnet_receipt:effects(Receipt).
-%% </pre>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(pnet_receipt).
+
+-moduledoc """
+Receipts are immutable audit records for state transitions.
+
+Time choice: timestamp/0 returns monotonic milliseconds (integer).
+
+```erlang
+> T1 = pnet_receipt:timestamp(), T2 = pnet_receipt:timestamp(), T2 >= T1.
+true
+
+> Move = #{trsn => t1, mode => #{}, produce => #{p => [a]}}.
+_
+> R = pnet_receipt:make(<<1>>, <<2>>, Move).
+_
+> maps:get(before_hash, R).
+<<1>>
+> maps:get(after_hash, R).
+<<2>>
+> maps:get(move, R) =:= Move.
+true
+> is_integer(maps:get(ts, R)).
+true
+```
+""".
 
 %%====================================================================
 %% Exports
@@ -163,18 +137,17 @@ make(BeforeHash, AfterHash, Move)
 %%--------------------------------------------------------------------
 %% @doc Gets the current timestamp in milliseconds.
 %%
-%% Uses erlang:system_time(millisecond) for consistency across the
-%% codebase and to provide monotonically increasing timestamps suitable
-%% for ordering receipts in a sequence.
+%% Uses erlang:monotonic_time(millisecond) for monotonic timestamps
+%% suitable for ordering receipts in a sequence.
 %%
-%% @return Current time in milliseconds since Unix epoch.
+%% @return Current monotonic time in milliseconds.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec timestamp() -> integer().
 
 timestamp() ->
-    erlang:system_time(millisecond).
+    erlang:monotonic_time(millisecond).
 
 %%--------------------------------------------------------------------
 %% @doc Extracts effects from a receipt.
@@ -199,4 +172,15 @@ effects(#{}) ->
     %% Callback modules can override by pattern matching on specific
     %% receipt structures and extracting their own effect metadata
     [].
+
+%%====================================================================
+%% Internal Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.
 

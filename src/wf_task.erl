@@ -17,57 +17,33 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc External Work Task Token Injection Constructors
-%%
-%% This module provides pure-functional token constructors for external
-%% work integration with gen_pnet Petri net execution. It creates properly
-%% shaped {produce, ProduceMap} tuples that inject task lifecycle tokens
-%% into specified places.
-%%
-%% <h3>Key Features</h3>
-%% <ul>
-%%   <li><b>Pure Functional:</b> No processes, all operations return data structures</li>
-%%   <li><b>Task Lifecycle:</b> Covers enabled, running, done, failed, cancelled states</li>
-%%   <li><b>Token Events:</b> Returns {produce, ProduceMap} events for gen_pnet</li>
-%%   <li><b>Flexible Payloads:</b> Any Erlang term can be carried as task payload</li>
-%% </ul>
-%%
-%% <h3>Usage Example</h3>
-%% <pre><code>
-%% % External work becomes enabled
-%% ProduceMap1 = wf_task:enabled(TaskId, InputData, 'p_task_ready'),
-%% gen_pnet:produce(NetPid, ProduceMap1).
-%%
-%% % Task starts execution
-%% ProduceMap2 = wf_task:running(TaskId, InputData, 'p_task_running'),
-%% gen_pnet:produce(NetPid, ProduceMap2).
-%%
-%% % Task completes successfully
-%% ProduceMap3 = wf_task:done(TaskId, Result, 'p_task_complete'),
-%% gen_pnet:produce(NetPid, ProduceMap3).
-%%
-%% % Task fails
-%% ProduceMap4 = wf_task:failed(TaskId, {error, timeout}, 'p_task_failed'),
-%% gen_pnet:produce(NetPid, ProduceMap4).
-%%
-%% % Task is cancelled
-%% ProduceMap5 = wf_task:cancelled(TaskId, user_cancel, 'p_task_cancelled'),
-%% gen_pnet:produce(NetPid, ProduceMap5).
-%% </code></pre>
-%%
-%% <h3>Token Format</h3>
-%%
-%% All tokens are tuples of the form:
-%% <pre><code>
-%% {task, TaskId, Status, Payload}
-%% </code></pre>
-%%
-%% Where Status is one of: enabled, running, done, failed, cancelled
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(wf_task).
+-moduledoc """
+External task token constructors.
+
+Token form is stable:
+  {task, TaskId, State, Payload}
+
+All functions return {produce, #{Place => [Token]}}.
+
+```erlang
+> wf_task:enabled(task42, #{kind => approval}, inbox).
+{produce, #{inbox => [{task,task42,enabled,#{kind => approval}}]}}
+
+> wf_task:running(task42, #{pct => 50}, inbox).
+{produce, #{inbox => [{task,task42,running,#{pct => 50}}]}}
+
+> wf_task:done(task42, #{ok => true}, inbox).
+{produce, #{inbox => [{task,task42,done,#{ok => true}}]}}
+
+> wf_task:failed(task42, timeout, inbox).
+{produce, #{inbox => [{task,task42,failed,timeout}]}}
+
+> wf_task:cancelled(task42, user_abort, inbox).
+{produce, #{inbox => [{task,task42,cancelled,user_abort}]}}
+```
+""".
 
 %%====================================================================
 %% Exports
@@ -252,3 +228,14 @@ failed(TaskId, Reason, Place) ->
 cancelled(TaskId, Reason, Place) ->
     Token = {task, TaskId, cancelled, Reason},
     {produce, #{Place => [Token]}}.
+
+%%====================================================================
+%% Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

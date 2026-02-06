@@ -17,48 +17,32 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Workflow Scope Boundary Mapping Module
-%%
-%% This module provides boundary mapping helpers for hierarchical
-%% workflows in the gen_pnet Petri net framework. Scopes represent
-%% nested subflows or subprocess boundaries where place names may
-%% differ between parent and child contexts.
-%%
-%% <h3>Key Concepts</h3>
-%%
-%% A <em>scope</em> represents a boundary in a hierarchical workflow, such
-%% as a subflow or subprocess. Tokens entering or leaving a scope must be
-%% translated between the parent's place namespace and the child's
-%% place namespace.
-%%
-%% The <em>binding table</em> maps scope IDs to place mappings, defining
-%% how tokens should be translated when crossing scope boundaries.
-%%
-%% <h3>Usage Example</h3>
-%% <pre><code>
-%% %% Define a binding table for a subflow
-%% BindingTable => #{
-%%   my_subflow => #{
-%%     parent_input => child_input,
-%%     parent_output => child_output
-%%   }
-%% },
-%%
-%% %% Enter scope: translate parent tokens to child places
-%% ParentTokens = #{parent_input => [data1, data2]},
-%% ChildProduceMap = wf_scope:enter(BindingTable, my_subflow, ParentTokens),
-%% %% => #{child_input => [data1, data2]}
-%%
-%% %% Leave scope: translate child results back to parent places
-%% ChildTokens = #{child_output => [result]},
-%% ParentProduceMap = wf_scope:leave(BindingTable, my_subflow, ChildTokens),
-%% %% => #{parent_output => [result]}
-%% </code></pre>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(wf_scope).
+
+-moduledoc """
+Scope boundary mapping (parent places <-> child places).
+
+enter/3 renames parent keys to child keys using BindingTable[ScopeId].
+leave/3 renames child keys back to parent keys.
+bindings/2 returns mapping or {error, unknown_scope}.
+
+```erlang
+> BT = #{scope1 => #{parent_in => child_in, parent_out => child_out}}.
+_
+
+> wf_scope:bindings(BT, scope1).
+#{parent_in => child_in, parent_out => child_out}
+> wf_scope:bindings(BT, missing).
+{error, unknown_scope}
+
+> wf_scope:enter(BT, scope1, #{parent_in => [a]}).
+#{child_in => [a]}
+
+> wf_scope:leave(BT, scope1, #{child_out => [r]}).
+#{parent_out => [r]}
+```
+""".
 
 %%====================================================================
 %% Exports
@@ -262,7 +246,17 @@ translate_places(Input, Mapping) when is_map(Input), is_map(Mapping) ->
         (Place, Tokens, Acc) when is_atom(Place) ->
             NewPlace = maps:get(Place, Mapping, Place),
             Acc#{NewPlace => Tokens};
-        (_Place, _Tokens, _Acc) ->
-            %% Skip non-atom places
-            error
+        (Place, Tokens, Acc) ->
+            %% Preserve non-atom places unchanged
+            Acc#{Place => Tokens}
     end, #{}, Input).
+
+%%--------------------------------------------------------------------
+%% EUnit Tests
+%%--------------------------------------------------------------------
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

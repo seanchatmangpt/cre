@@ -17,29 +17,47 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Petri Net Types and Validation Helpers
-%%
-%% This module provides shared type definitions and validation helpers
-%% for the gen_pnet Petri net framework in CRE. It defines the core
-%% data structures used in Petri net execution including places,
-%% transitions, tokens, markings, modes, and colored net extensions.
-%%
-%% <h3>Type Categories</h3>
-%% <ul>
-%%   <li><strong>Basic Types:</strong> place, trsn, token</li>
-%%   <li><strong>State Types:</strong> marking, mode, consume_map, produce_map</li>
-%%   <li><strong>Colored Types:</strong> var, binding, cmode</li>
-%%   <li><strong>Execution Types:</strong> move, receipt</li>
-%% </ul>
-%%
-%% <h3>Usage</h3>
-%% All validation functions are total - they return boolean() and
-%% never crash, making them safe to use in guards and assertions.
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(pnet_types).
+-moduledoc """
+Type validators for Petri net data structures.
+
+All validators are total: they return true/false and never crash.
+
+```erlang
+> pnet_types:is_marking(#{p1 => [a,b], p2 => []}).
+true
+> pnet_types:is_marking(#{p1 => a}).
+false
+
+> pnet_types:is_mode(#{p1 => [a], p2 => [b]}).
+true
+> pnet_types:is_mode(#{p1 => a}).
+false
+
+> pnet_types:is_binding(#{x => 1, y => <<"ok">>}).
+true
+> pnet_types:is_binding(#{1 => x}).
+false
+
+> pnet_types:is_cmode({#{x => 1}, #{p1 => [a]}}).
+true
+> pnet_types:is_cmode({#{}, #{p1 => a}}).
+false
+```
+
+<h3>Type Categories</h3>
+<ul>
+  <li><strong>Basic Types:</strong> place, trsn, token</li>
+  <li><strong>State Types:</strong> marking, mode, consume_map, produce_map</li>
+  <li><strong>Colored Types:</strong> var, binding, cmode</li>
+  <li><strong>Execution Types:</strong> move, receipt</li>
+</ul>
+
+<h3>Usage</h3>
+All validation functions are total - they return boolean() and
+never crash, making them safe to use in guards and assertions.
+""".
 
 %%====================================================================
 %% Exports
@@ -333,3 +351,14 @@ is_cmode({Binding, Mode}) ->
     is_binding(Binding) andalso is_mode(Mode);
 is_cmode(_) ->
     false.
+
+%%====================================================================
+%% EUnit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

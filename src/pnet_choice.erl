@@ -16,37 +16,47 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %%
-%% -------------------------------------------------------------------
-%% @doc Deterministic Nondeterminism Module
-%%
-%% This module provides deterministic nondeterminism for the gen_pnet
-%% Petri net framework. All randomness in the runner should go through
-%% this module to ensure reproducible behavior when seeded.
-%%
-%% <h3>Key Features</h3>
-%% <ul>
-%%   <li><b>Deterministic RNG:</b> Seedable for reproducible execution</li>
-%%   <li><b>Pure Functional:</b> No process state, all operations return updated state</li>
-%%   <li><b>Weighted Selection:</b> Support for weighted random choice</li>
-%% </ul>
-%%
-%% <h3>Usage Example</h3>
-%% <pre><code>
-%% %% Seed the RNG with a fixed value for reproducibility
-%% Rng0 = pnet_choice:seed(12345),
-%%
-%% %% Pick a random element from a list
-%% {Choice, Rng1} = pnet_choice:pick([a, b, c], Rng0),
-%%
-%% %% Pick from weighted options
-%% Options = [{a, 1}, {b, 3}, {c, 1}],  % b has 3x weight
-%% {WeightedChoice, Rng2} = pnet_choice:pick_weighted(Options, Rng1).
-%% </code></pre>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(pnet_choice).
+
+-moduledoc """
+Deterministic choice (all nondeterminism goes here).
+
+The only required property is repeatability for the same seed and inputs.
+The actual picked element is not specified by the doctests.
+
+```erlang
+> R0 = pnet_choice:seed(123).
+_
+> {X1, R1} = pnet_choice:pick([a,b,c], R0).
+_
+> R0b = pnet_choice:seed(123).
+_
+> {X1b, _} = pnet_choice:pick([a,b,c], R0b).
+_
+> X1 =:= X1b.
+true
+
+> pnet_choice:pick([], pnet_choice:seed(1)).
+{error, empty}
+
+> pnet_choice:pick_weighted([], pnet_choice:seed(1)).
+{error, empty}
+> pnet_choice:pick_weighted([{a,0}], pnet_choice:seed(1)).
+{error, bad_weights}
+
+> R2 = pnet_choice:seed(999).
+_
+> {Y1, _R3} = pnet_choice:pick_weighted([{a,1},{b,3},{c,1}], R2).
+_
+> R2b = pnet_choice:seed(999).
+_
+> {Y1b, _} = pnet_choice:pick_weighted([{a,1},{b,3},{c,1}], R2b).
+_
+> Y1 =:= Y1b.
+true
+```
+""".
 
 %%====================================================================
 %% Exports
@@ -150,7 +160,8 @@ pick_weighted(Items, RngState) when is_list(Items) ->
         true ->
             TotalWeight = lists:sum([W || {_, W} <- Items]),
             {RandValue, NewRngState} = rand_uniform(TotalWeight, RngState),
-            select_weighted(Items, RandValue, 0)
+            Item = select_weighted(Items, RandValue, 0),
+            {Item, NewRngState}
     end.
 
 %%====================================================================
@@ -176,19 +187,20 @@ validate_weights(_) ->
 %% @private
 %% @doc Selects an element from a weighted list using cumulative weights.
 %%
+%% Returns just the selected item. The RNG state is managed by the caller.
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec select_weighted([{term(), pos_integer()}], non_neg_integer(),
-                     non_neg_integer()) ->
-          {term(), rng_state()}.
+                     non_neg_integer()) -> term().
 
-select_weighted([{Item, _Weight} | _Rest], RandValue, _Acc) when RandValue < 0 ->
-    {Item, undefined};  %% RNG state unchanged in this path
+select_weighted([{Item, _Weight} | _Rest], _RandValue, _Acc) ->
+    Item;
 select_weighted([{Item, Weight} | Rest], RandValue, Acc) ->
     NewAcc = Acc + Weight,
     if
         RandValue < NewAcc ->
-            {Item, undefined};
+            Item;
         true ->
             select_weighted(Rest, RandValue, NewAcc)
     end.
@@ -256,3 +268,19 @@ mix(X) ->
     X3 = X2 bxor (X2 bsr 27),
     X4 = X3 * 16#94d049bb133111eb band 16#ffffffffffffffff,
     X4 bxor (X4 bsr 31).
+
+%%====================================================================
+%% EUnit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests from the moduledoc and function documentation.
+%%
+%% @end
+%%--------------------------------------------------------------------
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

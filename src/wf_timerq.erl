@@ -27,37 +27,16 @@
 %% <ul>
 %%   <li><b>Pure Functional:</b> No processes, all operations return updated state</li>
 %%   <li><b>Priority Queue:</b> Efficient O(n) operations using sorted list</li>
-%%   <li><b>Deadline-Based:</b> Timers fire based on Unix timestamps (milliseconds)</li>
+%%   <li><b>Deadline-Based:</b> Timers fire based on monotonic milliseconds</li>
 %%   <li><b>Token Events:</b> Returns {produce, ProduceMap} events for gen_pnet</li>
 %% </ul>
-%%
-%% <h3>Usage Example</h3>
-%% <pre><code>
-%% % Create empty queue
-%% Q0 = wf_timerq:new(),
-%%
-%% % Arm a timer for transition 't_timeout' at deadline
-%% Deadline = erlang:system_time(millisecond) + 5000,
-%% Event = {produce, #{'p_timed_out' => [done]}},
-%% Q1 = wf_timerq:arm(Q0, my_timeout, Deadline, Event),
-%%
-%% % Poll for expired timers
-%% Now = erlang:system_time(millisecond),
-%% case wf_timerq:poll(Q1, Now) of
-%%     {[], Q2} -> no_expired_timers;
-%%     {[ExpiredEvent | _], Q2} -> handle_expired(ExpiredEvent)
-%% end,
-%%
-%% % Disarm a timer before it expires
-%% Q2 = wf_timerq:disarm(Q1, my_timeout).
-%% </code></pre>
 %%
 %% <h3>Data Structure</h3>
 %%
 %% The timer queue uses an orddict-like structure with deadlines as keys
 %% for efficient retrieval of expired timers. Each timer entry contains:
 %% <ul>
-%%   <li><b>Deadline:</b> Unix timestamp in milliseconds when timer fires</li>
+%%   <li><b>Deadline:</b> Monotonic milliseconds when timer fires</li>
 %%   <li><b>Key:</b> Unique identifier for the timer</li>
 %%   <li><b>Event:</b> {produce, ProduceMap} token injection event</li>
 %% </ul>
@@ -66,6 +45,31 @@
 %% -------------------------------------------------------------------
 
 -module(wf_timerq).
+
+-moduledoc """
+Deadline queue for time-based token injection.
+
+Time choice: deadlines are monotonic milliseconds (integers).
+wf_timerq is pure: it returns ready {produce, ProduceMap} events via poll/2.
+
+```erlang
+> Q0 = wf_timerq:new().
+_
+> Now = erlang:monotonic_time(millisecond).
+_
+> Q1 = wf_timerq:arm(Q0, k1, Now + 10, {produce, #{p => [t]}}).
+_
+> {E0, _Qx} = wf_timerq:poll(Q1, Now + 5), E0.
+[]
+> {E1, _Qy} = wf_timerq:poll(Q1, Now + 10), E1.
+[{produce, #{p => [t]}}]
+
+> Q2 = wf_timerq:disarm(Q1, k1).
+_
+> {E2, _} = wf_timerq:poll(Q2, Now + 10), E2.
+[]
+```
+""".
 
 %%====================================================================
 %% Exports
@@ -253,3 +257,14 @@ poll([{Deadline, _Key, Event} | Rest], Now, Acc) when Deadline =< Now ->
 poll([{Deadline, _Key, _Event} | _] = TimerQ, Now, Acc) when Deadline > Now ->
     %% Remaining timers are in the future (sorted list)
     {lists:reverse(Acc), TimerQ}.
+
+%%====================================================================
+%% Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

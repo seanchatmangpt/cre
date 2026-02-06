@@ -328,38 +328,48 @@ consume_tokens([Token | RestAvailable], TokensToTake) ->
 
 ```erlang
 %% @doc Returns the count of tokens needed from each preset place (from actual implementation)
-%% For basic Petri nets, each place needs at least 1 token.
-%% This function returns a map indicating the minimum requirement.
+%% Handles multiplicity: repeated places in preset list increment the count.
+%% This function returns a map indicating the requirement for each place.
 -spec preset_counts(PresetPlaces :: [place()]) ->
          #{place() => non_neg_integer()}.
 preset_counts(PresetPlaces) when is_list(PresetPlaces) ->
-    maps:from_list([{P, 1} || P <- PresetPlaces]).
+    lists:foldl(
+        fun(P, Acc) ->
+            maps:update_with(P, fun(V) -> V + 1 end, 1, Acc)
+        end,
+        #{},
+        PresetPlaces
+    ).
+
+%% Example: preset_counts([p, p, q]) => #{p => 2, q => 1}
 
 %% @doc Enumerates all possible modes given the current marking (from actual implementation)
 %% A mode represents one valid way to fire a transition by selecting
-%% tokens from each preset place. This function generates the Cartesian
-%% product of available tokens across all preset places.
+%% tokens from each preset place. Handles repeated places via preset_counts.
 -spec enum_modes(PresetPlaces :: [place()], Marking :: marking()) ->
          [mode()].
-enum_modes([], _Marking) ->
+enum_modes(PresetPlaces, Marking) when is_list(PresetPlaces), is_map(Marking) ->
+    Counts = preset_counts(PresetPlaces),
+    UniquePlaces = lists:usort(PresetPlaces),
+    enum_modes_for_places(UniquePlaces, Counts, Marking).
+
+%% Internal helper
+enum_modes_for_places([], _Counts, _Marking) ->
     [#{ }];
-enum_modes([Place | Rest], Marking) when is_atom(Place), is_map(Marking) ->
+enum_modes_for_places([Place | Rest], Counts, Marking) ->
     case maps:get(Place, Marking, []) of
         [] ->
             [];  %% No tokens available, no modes possible
         Tokens ->
-            %% Generate modes for the rest of the places
-            RestModes = enum_modes(Rest, Marking),
-            %% Combine each token with each rest mode
+            Count = maps:get(Place, Counts, 1),
+            TokenCombos = combinations(Count, Tokens),
+            RestModes = enum_modes_for_places(Rest, Counts, Marking),
             lists:flatmap(
-                fun(Token) ->
-                    [M#{Place => [Token]} || M <- RestModes]
+                fun(Combo) ->
+                    [M#{Place => Combo} || M <- RestModes]
                 end,
-                Tokens
-            )
-    end;
-enum_modes(PresetPlaces, Marking) ->
-    enum_modes(lists:usort(PresetPlaces), Marking).
+                TokenCombos
+            ).
 
 %% @doc Enumerates colored modes with variable bindings (from actual implementation)
 %% For colored Petri nets, this function calls the net module's
@@ -392,53 +402,57 @@ enum_cmodes(Trsn, Marking, Ctx, NetMod) when is_atom(Trsn), is_map(Marking),
 
 ### Types
 ```erlang
--type rng_state() :: term().
+-type rng_state() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}.
+%% 3-tuple XOR-shift PRNG state for deterministic choice
 ```
 
 ### Functions
 
 ```erlang
-%% @doc Seed the random number generator for deterministic behavior
+%% @doc Creates a deterministic RNG state from a seed term (from actual implementation)
 -spec seed(term()) -> rng_state().
 seed(SeedTerm) ->
-    {random:seed_s({erlang:monotonic_time(), erlang:unique_integer()}), SeedTerm}.
+    IntSeed = erlang:phash2(SeedTerm),
+    {A, B, C} = {IntSeed bxor 16#5deece66d, IntSeed bxor 16#babe, IntSeed bxor 16#deadbeef},
+    seed_splitmix(A, B, C).
 
-%% @doc Pick one item from a list deterministically
+%% @doc Picks a random element from a list (from actual implementation)
 -spec pick([T], rng_state()) -> {T, rng_state()} | {error, empty}.
 pick([], _RngState) -> {error, empty};
-pick([Item], RngState) -> {Item, RngState};
-pick(List, RngState) ->
-    {Value, NewRngState} = random:uniform_s(length(List), RngState),
-    Selected = lists:nth(Value, List),
-    {Selected, NewRngState}.
+pick(List, RngState) when is_list(List), length(List) > 0 ->
+    Len = length(List),
+    {Index, NewRngState} = rand_uniform(Len, RngState),
+    Element = lists:nth(Index + 1, List),
+    {Element, NewRngState}.
 
-%% @doc Pick one item from weighted choices deterministically
--spec pick_weighted([{T, pos_integer()}], rng_state()) -> {T, rng_state()} | {error, empty | bad_weights}.
-pick_weighted(Items, RngState) ->
+%% @doc Picks a random element from a weighted list (from actual implementation)
+-spec pick_weighted([{T, pos_integer()}], rng_state()) ->
+          {T, rng_state()} | {error, empty | bad_weights}.
+pick_weighted([], _RngState) -> {error, empty};
+pick_weighted(Items, RngState) when is_list(Items) ->
     case validate_weights(Items) of
-        {ok, Total} when Total > 0 ->
-            pick_weighted_internal(Items, Total, RngState);
-        {error, _} = Error -> Error
+        false -> {error, bad_weights};
+        true ->
+            TotalWeight = lists:sum([W || {_, W} <- Items]),
+            {RandValue, NewRngState} = rand_uniform(TotalWeight, RngState),
+            Item = select_weighted(Items, RandValue, 0),
+            {Item, NewRngState}
     end.
 
-%% Helper functions
-validate_weights(Items) ->
-    case lists:map(fun({_, Weight}) when is_integer(Weight), Weight > 0 -> Weight;
-                      ({_, _}) -> bad_weight
-                   end, Items) of
-        Weights when lists:member(bad_weight, Weights) -> {error, bad_weights};
-        Weights -> {ok, lists:sum(Weights)}
+%% @private
+validate_weights([]) -> true;
+validate_weights([{_Item, Weight} | Rest]) when is_integer(Weight), Weight > 0 ->
+    validate_weights(Rest);
+validate_weights(_) -> false.
+
+%% @private
+select_weighted([{Item, _Weight} | _Rest], _RandValue, _Acc) ->
+    Item;
+select_weighted([{Item, Weight} | Rest], RandValue, Acc) ->
+    NewAcc = Acc + Weight,
+    if RandValue < NewAcc -> Item;
+       true -> select_weighted(Rest, RandValue, NewAcc)
     end.
-
-pick_weighted_internal(Items, Total, RngState) ->
-    {Value, NewRngState} = random:uniform_s(Total, RngState),
-    pick_weighted_iter(Items, Value, NewRngState).
-
-pick_weighted_iter([], _, RngState) -> {error, empty};
-pick_weighted_iter([{Item, Weight}|_], Value, RngState) when Value =< Weight ->
-    {Item, RngState};
-pick_weighted_iter([{_, Weight}|Rest], Value, RngState) ->
-    pick_weighted_iter(Rest, Value - Weight, RngState).
 ```
 
 ---

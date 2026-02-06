@@ -17,48 +17,54 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Petri Net Marking Algebra Module
-%%
-%% This module implements multiset marking algebra for the gen_pnet
-%% Petri net framework in CRE. Markings represent the state of a Petri
-%% net by mapping places to their token multisets.
-%%
-%% <h3>Key Features</h3>
-%% <ul>
-%%   <li><b>Multiset Semantics:</b> Token multiplicity matters in operations</li>
-%%   <li><b>Total Functions:</b> All operations return {error, ...} instead of crashing</li>
-%%   <li><b>Immutable Updates:</b> All operations return new markings</li>
-%%   <li><b>Hashing Support:</b> Consistent hashing for state comparison</li>
-%% </ul>
-%%
-%% <h3>Usage Example</h3>
-%% <pre><code>
-%% %% Create empty marking with places
-%% M0 = pnet_marking:new([p1, p2, p3]),
-%%
-%% %% Add tokens via produce map
-%% M1 = pnet_marking:add(M0, #{p1 => [a, b], p2 => [c]}),
-%%
-%% %% Get tokens at a place
-%% {ok, Tokens} = pnet_marking:get(M1, p1),
-%%
-%% %% Take tokens via consume map (multiset operation)
-%% case pnet_marking:take(M1, #{p1 => [a]}) of
-%%     {ok, M2} -> have_token;
-%%     {error, insufficient} -> need_more_tokens
-%% end,
-%%
-%% %% Atomic take + add (transition firing)
-%% case pnet_marking:apply(M1, #{p1 => [a]}, #{p2 => [d]}) of
-%%     {ok, M3} -> transition_fired;
-%%     {error, Reason} -> handle_error(Reason)
-%% end.
-%% </code></pre>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(pnet_marking).
+
+-moduledoc """
+Multiset marking algebra (places -> bag of tokens).
+
+Contracts:
+- multiplicity matters
+- unknown place => {error, bad_place}
+- consume is bag subtraction (order-insensitive)
+- hash is canonical for bags (token order does not change hash)
+
+```erlang
+> M0 = pnet_marking:new([p1, p2]).
+_
+> pnet_marking:get(M0, p1).
+{ok, []}
+> pnet_marking:get(M0, missing).
+{error, bad_place}
+
+> {ok, M1} = pnet_marking:add(M0, #{p1 => [a,b], p2 => [c]}).
+_
+> pnet_marking:get(M1, p1).
+{ok, [a,b]}
+
+> {ok, M2} = pnet_marking:take(M1, #{p1 => [b,a]}).
+_
+> pnet_marking:get(M2, p1).
+{ok, []}
+
+> pnet_marking:take(M1, #{p1 => [a,a,a]}).
+{error, insufficient}
+
+> {ok, M3} = pnet_marking:apply(M1, #{p1 => [a]}, #{p2 => [d]}).
+_
+> pnet_marking:get(M3, p1).
+{ok, [b]}
+> pnet_marking:get(M3, p2).
+{ok, [c,d]}
+
+> {ok, Ma} = pnet_marking:set(pnet_marking:new([p]), p, [a,b]).
+_
+> {ok, Mb} = pnet_marking:set(pnet_marking:new([p]), p, [b,a]).
+_
+> pnet_marking:hash(Ma) =:= pnet_marking:hash(Mb).
+true
+```
+""".
 
 %%====================================================================
 %% Exports
@@ -359,3 +365,14 @@ consume_tokens([Token | RestAvailable], TokensToTake) ->
                 {error, _} = Error -> Error
             end
     end.
+
+%%====================================================================
+%% EUnit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.
