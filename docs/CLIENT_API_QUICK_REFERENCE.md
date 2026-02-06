@@ -1,288 +1,269 @@
-# Client API Quick Reference Card
+# CRE Client API Quick Reference
+
+## Overview
+
+This quick reference provides essential information for using the CRE client API modules. It covers the most common functions, patterns, and usage scenarios for both `cre_client` and `cre_yawl_client`.
 
 ## cre_client Module
 
 ### Core Functions
 
+#### Starting Clients
 ```erlang
-%% Start anonymous client
-{ok, Pid} = cre_client:start_link(CreName, ClientMod, ClientArg).
+%% Anonymous client
+{ok, Pid} = cre_client:start_link(CreName, ClientMod, ClientArg)
 
-%% Start named client
-{ok, Pid} = cre_client:start_link(ClientName, CreName, ClientMod, ClientArg).
+%% Named client
+{ok, Pid} = cre_client:start_link(Name, CreName, ClientMod, ClientArg)
+```
 
-%% Evaluate workflow (blocking)
-Result = cre_client:eval(ClientPid, WorkflowExpr).
+#### Workflow Evaluation
+```erlang
+%% Synchronous evaluation (blocking)
+Result = cre_client:eval(ClientPid, WorkflowExpr)
 
-%% Handle worker reply
-ok = cre_client:cre_reply(ClientPid, From, TaskArg, Result).
+%% Handle worker replies
+cre_client:cre_reply(ClientPid, From, TaskArg, ResultValue)
 
 %% Stop client
-ok = cre_client:stop(ClientPid).
+cre_client:stop(ClientPid)
 ```
 
 ### Callback Interface
 
-```erlang
-%% Required callbacks
-init(InitArg) -> UsrInfo.
-is_value(E, UsrInfo) -> boolean().
-step(E, UsrInfo) -> {ok, NewUsrInfo, Tasks}.
-recv(E, ReplyLst, UsrInfo) -> NewUsrInfo.
-load(E, UsrInfo) -> NewUsrInfo.
-unload(E, UsrInfo) -> FinalResult.
-```
-
-### Example Usage
-
-```erlang
-%% Basic client lifecycle
-{ok, ClientPid} = cre_client:start_link(my_cre, my_client, []).
-Result = cre_client:eval(ClientPid, workflow_expr).
-cre_client:stop(ClientPid).
-```
+**Required callbacks:**
+- `init(InitArg) -> UsrInfo`
+- `is_value(E, UsrInfo) -> boolean()`
+- `step(E, UsrInfo) -> {ok, NewE, TaskList}`
+- `recv(E, Replies, UsrInfo) -> NewUsrInfo`
+- `load(E, UsrInfo) -> LoadedState`
+- `unload(E, UsrInfo) -> FinalResult`
 
 ## cre_yawl_client Module
 
 ### Core Functions
 
+#### Starting Clients
 ```erlang
-%% Start YAWL client
-{ok, Pid} = cre_yawl_client:start_link(CreName, WorkflowExpr).
+%% Anonymous YAWL client
+{ok, Pid} = cre_yawl_client:start_link(CreName, WorkflowExpr)
 
-%% Execute workflow
-{ok, Results} = cre_yawl_client:execute_workflow(ClientPid, InitialData).
+%% Named YAWL client
+{ok, Pid} = cre_yawl_client:start_link(Name, CreName, WorkflowExpr)
+```
+
+#### Workflow Execution
+```erlang
+%% Execute complete workflow
+{ok, Result} = cre_yawl_client:execute_workflow(ClientPid, InitialData)
 
 %% Execute single pattern
-{ok, Results} = cre_yawl_client:execute_pattern(ClientPid, Pattern, InputData).
+{ok, Result} = cre_yawl_client:execute_pattern(ClientPid, Pattern, InputData)
+
+%% Compose multiple patterns
+WorkflowExpr = cre_yawl_client:compose_patterns([Pattern1, Pattern2], Options)
 
 %% Get workflow state
-{ok, State} = cre_yawl_client:get_workflow_state(ClientPid).
+{ok, State} = cre_yawl_client:get_workflow_state(ClientPid)
 
-%% Get results
-{ok, Results} = cre_yawl_client:get_workflow_results(ClientPid).
+%% Get workflow results
+{ok, Results} = cre_yawl_client:get_workflow_results(ClientPid)
 
 %% Terminate workflow
-ok = cre_yawl_client:terminate_workflow(ClientPid).
+cre_yawl_client:terminate_workflow(ClientPid)
 ```
 
-### Pattern Functions
+### Workflow Patterns
 
+#### Control Flow
+- `sequence([Tasks])` - Execute tasks sequentially
+- `parallel_split([Tasks])` - Execute tasks in parallel
+- `synchronization()` - Wait for all tasks to complete
+- `exclusive_choice([{Task, Condition}])` - Select one branch
+- `simple_merge()` - Merge from single source
+- `multi_choice([{Task, Condition}])` - Select multiple branches
+- `synchronizing_merge()` - Wait for multiple sources
+- `multi_merge()` - Merge from multiple sources
+- `discriminator()` - Select based on condition
+- `arbitration()` - Select one of multiple options
+
+#### Data Flow
+- `param_pass(Source, Target)` - Pass parameters
+- `data_transform(Source, Target, TransformFun)` - Transform data
+- `data_distribute(Source, Targets)` - Distribute data
+- `data_accumulate(Sources, Target)` - Accumulate data
+- `data_visibility(Source, Scope)` - Control visibility
+
+#### Resource Management
+- `resource_create(ResourceDef)` - Create resource
+- `role_allocate(Task, Role)` - Allocate by role
+- `resource_start(Resource)` - Start resource
+- `role_distribute(Task, Roles)` - Distribute roles
+- `capability_allocate(Task, Capability)` - Allocate capability
+
+### Pattern Composition Options
 ```erlang
-%% Create patterns
-Pattern = cre_yawl:sequence([task1, task2]).
-Pattern = cre_yawl:parallel_split([task1, task2, task3]).
-Pattern = cre_yawl:exclusive_choice([{task1, Condition}, {task2, Condition}]).
-
-%% Compose patterns
-Composed = cre_yawl_client:compose_patterns([P1, P2], #{mode => sequence}).
+Options = #{
+    mode => sequence | parallel | conditional,  % Composition mode
+    error_handling => continue | stop,          % Error handling strategy
+    timeout => integer()                      % Optional timeout
+}
 ```
 
-### Example Usage
-
-```erlang
-%% Simple workflow
-Workflow = cre_yawl:new_workflow().
-Workflow1 = cre_yawl:add_task(Workflow, <<"task1">>, [{name, "Task 1"}]).
-Workflow2 = cre_yawl:connect(Workflow1, <<"task1">>, <<"task2">>).
-
-{ok, ClientPid} = cre_yawl_client:start_link(CrePid, Workflow2).
-{ok, Results} = cre_yawl_client:execute_workflow(ClientPid, #{data => input}).
-```
-
-## Common Patterns
+## Common Usage Patterns
 
 ### Basic Workflow
-
 ```erlang
-%% 1. Start CRE
-cre:start().
-{ok, CrePid} = cre:pid(node()).
+%% 1. Start CRE master
+{ok, MasterPid} = cre_master:start_link(my_cre),
 
-%% 2. Create client
-{ok, ClientPid} = cre_client:start_link(CrePid, my_client, []).
+%% 2. Start client
+{ok, ClientPid} = cre_yawl_client:start_link(my_cre, Workflow),
 
 %% 3. Execute workflow
-Result = cre_client:eval(ClientPid, workflow_expr).
+{ok, Result} = cre_yawl_client:execute_workflow(ClientPid, #{}),
 
-%% 4. Clean up
-cre_client:stop(ClientPid).
+%% 4. Cleanup
+cre_yawl_client:terminate_workflow(ClientPid),
+cre_master:stop(MasterPid).
+```
+
+### Simple Sequence Workflow
+```erlang
+Workflow = cre_yawl:sequence([
+    {task1, "Step 1", []},
+    {task2, "Step 2", []},
+    {task3, "Step 3", []}
+]).
+```
+
+### Parallel Processing
+```erlang
+Workflow = cre_yawl:parallel_split([
+    {process_data, "Process data", []},
+    {validate_data, "Validate data", []}
+]).
+```
+
+### Conditional Execution
+```erlang
+Workflow = cre_yawl:exclusive_choice([
+    {happy_path, fun() -> is_valid_data() end},
+    {error_path, fun() -> true end}
+]).
 ```
 
 ### Error Handling
-
 ```erlang
-%% Handle errors gracefully
-case cre_client:eval(ClientPid, workflow_expr) of
-    {ok, Result} ->
-        handle_success(Result);
-    {error, Reason} ->
-        handle_error(Reason)
+try
+    {ok, Result} = cre_yawl_client:execute_workflow(ClientPid, Data),
+    handle_success(Result)
+catch
+    Error:Reason ->
+        handle_error(Error, Reason)
 end.
-```
-
-### YAWL Patterns
-
-```erlang
-%% Sequence pattern
-Sequence = cre_yawl:sequence([
-    cre_yawl:task(<<"task1">>, module, function, []),
-    cre_yawl:task(<<"task2">>, module, function, [])
-]).
-
-%% Parallel pattern
-Parallel = cre_yawl:parallel_split([
-    cre_yawl:task(<<"task1">>, module, function, []),
-    cre_yawl:task(<<"task2">>, module, function, [])
-]).
-
-%% Choice pattern
-Choice = cre_yawl:exclusive_choice([
-    {cre_yawl:task(<<"task1">>, module, function, []), Condition1},
-    {cre_yawl:task(<<"task2">>, module, function, []), Condition2}
-]).
 ```
 
 ## Configuration
 
-### Client Configuration
-
+### CRE Master Configuration
 ```erlang
-%% Poll interval (persistent_term for O(1) access)
-persistent_term:put(cre_client_poll_interval, 250).
+%% Start with custom name
+{ok, MasterPid} = cre_master:start_link(my_cre_instance).
 
-%% Max concurrent tasks
-persistent_term:put(cre_client_max_concurrent, 100).
-
-%% Timeout
-persistent_term:put(cre_client_timeout, 30000).
+%% Start anonymous
+{ok, MasterPid} = cre_master:start_link().
 ```
 
-## Common Return Values
-
-### Success Responses
-
+### Client Poll Interval
 ```erlang
-%% Generic client success
-{ok, Result}
-
-%% YAWL client success
-{ok, #{status => completed, results => #{...}, duration_ms => 1500}}
+%% Set via persistent_term
+persistent_term:put(cre_client_poll_interval, 500).  % 500ms
 ```
 
-### Error Responses
+## Return Values
 
+### Success Results
 ```erlang
-%% Client errors
-{error, Reason}
-
-%% YAWL client errors
-{error, workflow_validation_failed}
-{error, client_not_found}
-{error, timeout}
+{ok, Result}                          % Success with result
+{ok, State}                           % State query success
 ```
 
-## Doctest Examples
-
-### cre_client Examples
-
+### Error Results
 ```erlang
-%% Start client
-1> {ok, Pid} = cre_client:start_link(my_cre, my_client, []).
-{ok,<0.123.0>}
-
-%% Evaluate workflow
-2> Result = cre_client:eval(Pid, workflow_expr).
-{ok, #{result => "completed"}}
-
-%% Stop client
-3> cre_client:stop(Pid).
-ok
+{error, Reason}                       % General error
+{error, {validation_failed, Errors}}  % Workflow validation error
+{error, client_not_found}             % Client not found
 ```
 
-### cre_yawl_client Examples
-
+### Workflow Result Structure
 ```erlang
-%% Start YAWL client
-1> {ok, Pid} = cre_yawl_client:start_link(my_cre, workflow).
-{ok,<0.456.0>}
-
-%% Execute workflow
-2> {ok, Results} = cre_yawl_client:execute_workflow(Pid, #{data => input}).
-{ok, #{status => completed, duration_ms => 1500}}
-
-%% Get workflow state
-3> {ok, State} = cre_yawl_client:get_workflow_state(Pid).
-{ok, #{execution_state => running, active_tasks => 1}}
+#{
+    status => completed | failed | terminated,
+    results => #{TaskId => TaskResult},
+    errors => [{ErrorType, Reason}],
+    duration_ms => integer(),
+    completed_at => DateTime
+}
 ```
 
-## Integration Patterns
+## Quick Examples
 
-### Human-in-the-Loop
-
+### 1. Simple Task Execution
 ```erlang
-%% Workflow with human task
-Workflow = cre_yawl:add_task(base_workflow, <<"approval">>,
-    [{name, "Human Approval"}, {type, human}, {assignee, "manager"}]).
+{ok, Client} = cre_yawl_client:start_link(my_cre,
+    cre_yawl:sequence([{my_task, "Do work", []}])),
+
+{ok, Result} = cre_yawl_client:execute_workflow(Client, #{}),
 ```
 
-### Error Recovery
-
+### 2. Parallel Data Processing
 ```erlang
-%% Retry on errors
-execute_with_retry(Fun, MaxRetries) ->
-    execute_with_retry(Fun, MaxRetries, 1000).
-
-execute_with_retry(Fun, 0, _) -> Fun();
-execute_with_retry(Fun, Retries, Delay) ->
-    case Fun() of
-        {ok, Result} -> Result;
-        {error, _} ->
-            timer:sleep(Delay),
-            execute_with_retry(Fun, Retries - 1, Delay * 2)
-    end.
+ParallelWorkflow = cre_yawl:parallel_split([
+    {process_file1, "File 1", []},
+    {process_file2, "File 2", []}
+]),
 ```
 
-### Performance Monitoring
-
+### 3. Conditional Branching
 ```erlang
-%% Monitor execution time
-{Time, Result} = timer:tc(fun() ->
-    cre_client:eval(ClientPid, workflow_expr)
-end).
-
-%% Log metrics
-metrics:log(cre_execution_time, Time).
+ConditionalWorkflow = cre_yawl:exclusive_choice([
+    {success_branch, fun() -> check_data_quality() end},
+    {cleanup_branch, fun() -> true end}
+]),
 ```
 
-## Checklist
+### 4. Custom Client
+```erlang
+-module(my_client).
+-behaviour(cre_client).
 
-### Client Setup Checklist
+init(_Arg) -> #{user => "me"}.
+is_value(E, _Info) -> is_workflow_complete(E).
+step(E, Info) -> {ok, E, [task]}.
+recv(_, _, Info) -> Info.
+load(E, _) -> E.
+unload(_, Info) -> Info.
 
-- [ ] Start CRE system
-- [ ] Create client process
-- [ ] Configure client options
-- [ ] Set up callback module
-- [ ] Prepare workflow expressions
-- [ ] Handle errors gracefully
-- [ ] Clean up resources
+%% Usage
+{ok, Pid} = cre_client:start_link(my_cre, my_client, []),
+Result = cre_client:eval(Pid, workflow),
+```
 
-### Workflow Execution Checklist
+## Error Codes
 
-- [ ] Validate workflow specification
-- [ ] Initialize client state
-- [ ] Execute workflow steps
-- [ | Monitor progress
-- [ | Handle worker replies
-- [ | Collect results
-- [ | Clean up state
+### Common Errors
+- `{invalid_workflow_expression, Expr}` - Invalid workflow definition
+- `{workflow_validation_failed, Errors}` - YAWL validation errors
+- `client_not_found` - Client process not found
+- `timeout` - Operation timed out
+- `cre_down` - CRE master connection lost
 
-### Error Handling Checklist
+### Best Practices
+1. Always validate workflows before execution
+2. Use named clients for easier debugging
+3. Implement proper error handling
+4. Clean up client processes when done
+5. Monitor workflow progress for long-running tasks
 
-- [ ] Handle client startup errors
-- [ ] Handle workflow validation errors
-- [ ] Handle task execution errors
-- [ | Handle timeout conditions
-- [ | Handle resource limitations
-- [ | Implement retry logic
-- [ | Provide meaningful error messages
+This quick reference should help you get started with the CRE client API. For detailed documentation, see the complete API reference.

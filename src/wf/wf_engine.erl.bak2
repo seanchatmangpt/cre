@@ -96,8 +96,7 @@
 -export([service_reply/5]).
 -export([publish/4]).
 -export([case_log/2]).
--export([set_worklet/2]).
--export([apply_worklet/4]).
+-export([delegate_task/4, reallocate_task/4]).
 -export([doctest_test/0]).
 
 %% gen_server callbacks
@@ -188,14 +187,41 @@
     timerq :: wf_timerq:timerq(),
     next_seq = 1 :: non_neg_integer(),
     current_time = 0 :: integer(),
-    rng_state :: pnet_choice:rng_state(),
-    worklet :: wf_worklet:worklet() | undefined
+    rng_state :: pnet_choice:rng_state()
 }).
 
 -type engine_state() :: #engine_state{}.
 
 %%--------------------------------------------------------------------
 %% @doc Service request event.
+%%
+%% Emitted when a workflow invokes a service. The caller must handle
+%% this event and call service_reply/5 with the response. If no reply
+%% is received within the timeout period, a service_timeout event will
+%% be emitted automatically.
+%%
+%% == Doctests ==
+%%
+%% Service timeout triggers failure event:
+%% ```erlang
+%% %% After starting a case with a service task that times out:
+%% > Events = wf_engine:drain_events(Eng),
+%% [#service_timeout{req_id = ReqId, service = Service, reason = timeout}].
+%% ```
+%%
+%% Case continues after timeout:
+%% ```erlang
+%% > wf_engine:case_state(Eng, CaseId).
+%% running  %% Case is still running, not blocked
+%% ```
+%%
+%% Timeout value configurable per task:
+%% ```erlang
+%% %% In workflow spec, set timeout per task:
+%% #{service => payment_service, timeout => 10000}  %% 10 second timeout
+%% ```
+%%
+%% @end
 %%--------------------------------------------------------------------
 -record(service_request, {
     req_id :: binary(),
@@ -205,11 +231,32 @@
     timeout :: integer() | undefined
 }).
 
+%%--------------------------------------------------------------------
+%% @doc Service timeout event.
+%%
+%% Emitted when a service call does not receive a reply within the
+%% configured timeout period. The workflow should handle this as an
+%% exception path and continue execution with appropriate error handling.
+%% The timeout injects an {error, timeout} token to the service_error place
+%% which can be used for exception handling flows.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-record(service_timeout, {
+    req_id :: binary(),
+    case_id :: case_id(),
+    service :: atom(),
+    reason :: timeout,
+    timeout_value :: integer()
+}).
+
 -type service_request() :: #service_request{}.
+-type service_timeout() :: #service_timeout{}.
 
 %% Export types
 -export_type([case_id/0, wi_id/0, user/0, case_status/0, wi_status/0,
-             receipt/0, work_item/0, wf_case/0, engine_state/0]).
+             receipt/0, work_item/0, wf_case/0, engine_state/0,
+             service_request/0, service_timeout/0]).
 
 %%====================================================================
 %% API Functions
@@ -494,44 +541,6 @@ case_log(Engine, CaseId) ->
 
 doctest_test() ->
     ok.
-%%--------------------------------------------------------------------
-%% @doc Sets a worklet for dynamic task replacement.
-%%
-%% The worklet rules will be checked before executing tasks. If a rule
-%% matches, the task will be replaced with the specified workflow.
-%%
-%% @param Engine Engine pid or name
-%% @param Worklet Worklet containing rules for task replacement
-%% @return ok
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec set_worklet(Engine :: pid() | atom(), Worklet :: wf_worklet:worklet()) -> ok.
-
-set_worklet(Engine, Worklet) ->
-    gen_server:call(Engine, {set_worklet, Worklet}).
-
-%%--------------------------------------------------------------------
-%% @doc Applies worklet rules to check if a task should be replaced.
-%%
-%% Evaluates worklet rules against case data to determine if a replacement
-%% workflow should be executed instead of the original task.
-%%
-%% @param Worklet The worklet containing rules
-%% @param Task The task name to check for replacement
-%% @param Data The case data to evaluate conditions against
-%% @param Now Current timestamp (for logging purposes)
-%% @return {ok, ReplacementWorkflow} | {error, no_matching_rule}
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec apply_worklet(Worklet :: wf_worklet:worklet(), Task :: atom(),
-                   Data :: map(), Now :: integer()) ->
-          {ok, atom()} | {error, no_matching_rule}.
-
-apply_worklet(Worklet, Task, Data, _Now) ->
-    wf_worklet:select(Worklet, Task, Data).
-
 
 %%====================================================================
 %% gen_server Callbacks
@@ -551,7 +560,6 @@ init(Config) ->
     Seed = maps:get(seed, Config, 1),
     Now = maps:get(now, Config, 0),
     RngState = pnet_choice:seed(Seed),
-    Worklet = maps:get(worklet, Config, undefined),
     {ok, #engine_state{
         spec = Spec,
         org = Org,
@@ -693,7 +701,18 @@ handle_call({resume_case, CaseId, Now}, _From, State) ->
 handle_call({cancel_case, CaseId, Now}, _From, State) ->
     case maps:get(CaseId, State#engine_state.cases, undefined) of
         undefined -> {reply, {error, not_found}, State};
+        #wf_case{status = scheduled} = Case ->
+            %% Remove from timer queue and cancel
+            TimerKey = {scheduled_start, CaseId},
+            NewTimerQ = wf_timerq:disarm(State#engine_state.timerq, TimerKey),
+            Case1 = Case#wf_case{
+                status = cancelled,
+                timestamps = maps:put(cancelled_at, Now, Case#wf_case.timestamps)
+            },
+            Cases = maps:put(CaseId, Case1, State#engine_state.cases),
+            {reply, ok, State#engine_state{cases = Cases, timerq = NewTimerQ}};
         #wf_case{} = Case ->
+            %% Regular case cancel (already running, suspended, etc.)
             Case1 = Case#wf_case{
                 status = cancelled,
                 timestamps = maps:put(cancelled_at, Now, Case#wf_case.timestamps)
@@ -739,8 +758,135 @@ handle_call({case_log, CaseId}, _From, State) ->
         #wf_case{log = Log} -> {reply, lists:reverse(Log), State}
     end;
 
-handle_call({set_worklet, Worklet}, _From, State) ->
-    {reply, ok, State#engine_state{worklet = Worklet}};
+
+%% Multi-instance task operations
+handle_call({start_multi_instance, CaseId, Task, M, Q, Options}, _From, State) ->
+    Mode = maps:get(mode, Options, parallel),
+    Now = maps:get(now, Options, 0),
+    case maps:get(CaseId, State#engine_state.cases, undefined) of
+        undefined -> {reply, {error, not_found}, State};
+        #wf_case{} = Case ->
+            MiTask = create_multi_instance_task(Task, M, Q, Mode, Now),
+            MiId = MiTask#mi_task.mi_id,
+
+            %% Create M instance work items
+            {WiIds, NewWorkItems} = create_instance_workitems(
+                MiId, CaseId, Task, M, Case, Now
+            ),
+
+            %% Update mi_task with instance IDs
+            MiTask1 = MiTask#mi_task{instance_ids = WiIds},
+
+            %% Store multi-instance task in case
+            Case1 = Case#wf_case{
+                multi_instances = maps:put(MiId, MiTask1, Case#wf_case.multi_instances),
+                work_items = maps:merge(Case#wf_case.work_items, NewWorkItems)
+            },
+
+            Cases = maps:put(CaseId, Case1, State#engine_state.cases),
+            {reply, {ok, MiId, WiIds}, State#engine_state{cases = Cases}}
+    end;
+
+handle_call({get_multi_instance_state, CaseId, MiId}, _From, State) ->
+    case maps:get(CaseId, State#engine_state.cases, undefined) of
+        undefined -> {reply, {error, not_found}, State};
+        #wf_case{multi_instances = MiTasks} ->
+            case maps:get(MiId, MiTasks, undefined) of
+                undefined -> {reply, {error, not_found}, State};
+                #mi_task{} = MiTask ->
+                    StateMap = #{
+                        mi_id => MiTask#mi_task.mi_id,
+                        task => MiTask#mi_task.task,
+                        m => MiTask#mi_task.m,
+                        q => MiTask#mi_task.q,
+                        mode => MiTask#mi_task.mode,
+                        instance_ids => MiTask#mi_task.instance_ids,
+                        completed => MiTask#mi_task.completed,
+                        results => MiTask#mi_task.results,
+                        status => MiTask#mi_task.status,
+                        created_at => MiTask#mi_task.created_at
+                    },
+                    {reply, {ok, StateMap}, State}
+            end
+    end;
+
+handle_call({complete_multi_instance, CaseId, MiId, InstanceWiId, Data, Now}, _From, State) ->
+    case maps:get(CaseId, State#engine_state.cases, undefined) of
+        undefined -> {reply, {error, not_found}, State};
+        #wf_case{} = Case ->
+            case maps:get(MiId, Case#wf_case.multi_instances, undefined) of
+                undefined -> {reply, {error, not_found}, State};
+                #mi_task{status = cancelled} ->
+                    {reply, {error, cancelled}, State};
+                #mi_task{status = completed} ->
+                    {reply, {error, already_complete}, State};
+                #mi_task{instance_ids = WiIds} = MiTask ->
+                    case lists:member(InstanceWiId, WiIds) of
+                        false ->
+                            {reply, {error, invalid_instance}, State};
+                        true ->
+                            case lists:member(InstanceWiId, MiTask#mi_task.completed) of
+                                true ->
+                                    {reply, {error, already_completed}, State};
+                                false ->
+                                    %% Update instance work item status
+                                    {NewCase, NewState} = update_workitem_status(
+                                        Case, InstanceWiId, completed, system, Now, State
+                                    ),
+
+                                    %% Update multi-instance task state
+                                    MiTasks = NewCase#wf_case.multi_instances,
+                                    MiTask1 = maps:get(MiId, MiTasks),
+
+                                    %% Add to completed and results
+                                    Completed1 = [InstanceWiId | MiTask1#mi_task.completed],
+                                    Results1 = [Data | MiTask1#mi_task.results],
+
+                                    %% Update status based on quorum
+                                    Status1 = case is_quorum_met(MiTask1#mi_task{completed = Completed1}) of
+                                        true -> quorum_met;
+                                        false -> running
+                                    end,
+
+                                    %% Check if all complete
+                                    Status2 = case is_mi_complete(MiTask1#mi_task{completed = Completed1}) of
+                                        true -> completed;
+                                        false -> Status1
+                                    end,
+
+                                    MiTask2 = MiTask1#mi_task{
+                                        completed = Completed1,
+                                        results = Results1,
+                                        status = Status2
+                                    },
+
+                                    MiTasks1 = maps:put(MiId, MiTask2, MiTasks),
+                                    Case2 = NewCase#wf_case{multi_instances = MiTasks1},
+
+                                    Cases = maps:put(CaseId, Case2, NewState#engine_state.cases),
+                                    {reply, ok, NewState#engine_state{cases = Cases}}
+                            end
+                    end
+            end
+    end;
+
+handle_call({cancel_multi_instance, CaseId, MiId}, _From, State) ->
+    case maps:get(CaseId, State#engine_state.cases, undefined) of
+        undefined -> {reply, {error, not_found}, State};
+        #wf_case{multi_instances = MiTasks} = Case ->
+            case maps:get(MiId, MiTasks, undefined) of
+                undefined -> {reply, {error, not_found}, State};
+                #mi_task{status = completed} ->
+                    {reply, {error, already_complete}, State};
+                #mi_task{} = MiTask ->
+                    MiTask1 = MiTask#mi_task{status = cancelled},
+                    MiTasks1 = maps:put(MiId, MiTask1, MiTasks),
+                    Case1 = Case#wf_case{multi_instances = MiTasks1},
+                    Cases = maps:put(CaseId, Case1, State#engine_state.cases),
+                    {reply, ok, State#engine_state{cases = Cases}}
+            end
+    end;
+
 
 handle_call(_Request, _From, State) ->
     {reply, {error, bad_msg}, State}.
@@ -1260,3 +1406,27 @@ inject_tokens(#wf_case{marking = Marking} = Case, ProduceMap, Now) ->
         marking = Marking1,
         timestamps = maps:put(updated_at, Now, Case#wf_case.timestamps)
     }.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Starts a scheduled case by transitioning it to running status.
+%%
+%% Called when the scheduled start time is reached. The case transitions
+%% from 'scheduled' to 'running' and begins processing enabled transitions.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec start_scheduled_case(wf_case(), map(), integer()) -> wf_case().
+
+start_scheduled_case(#wf_case{marking = Marking, scheduled_at = ScheduledAt} = Case, Spec, Now) ->
+    %% Update case to running status
+    Timestamps = maps:put(started_at, Now, Case#wf_case.timestamps),
+    
+    Case1 = Case#wf_case{
+        status = running,
+        scheduled_at = undefined,
+        timestamps = Timestamps
+    },
+    
+    %% Process initial transitions (case is now active)
+    process_enabled(Case1, Spec, Now).

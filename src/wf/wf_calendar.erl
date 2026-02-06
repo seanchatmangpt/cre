@@ -216,7 +216,27 @@ normalize_tz(TZ) when is_list(TZ) -> list_to_binary(TZ).
 
 normalize_workdays(Workdays) ->
     Norm = [normalize_day(D) || D <- Workdays],
-    lists:usort(Norm).
+    %% Remove duplicates while preserving order
+    deduplicate(Norm).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Removes duplicates from a list while preserving order.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec deduplicate([weekday()]) -> [weekday()].
+
+deduplicate(List) ->
+    deduplicate(List, sets:new(), []).
+
+deduplicate([], _Seen, Acc) ->
+    lists:reverse(Acc);
+deduplicate([H | T], Seen, Acc) ->
+    case sets:is_element(H, Seen) of
+        true -> deduplicate(T, Seen, Acc);
+        false -> deduplicate(T, sets:add_element(H, Seen), [H | Acc])
+    end.
 
 %%--------------------------------------------------------------------
 %% @private

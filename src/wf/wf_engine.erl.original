@@ -96,8 +96,6 @@
 -export([service_reply/5]).
 -export([publish/4]).
 -export([case_log/2]).
--export([set_worklet/2]).
--export([apply_worklet/4]).
 -export([doctest_test/0]).
 
 %% gen_server callbacks
@@ -188,8 +186,7 @@
     timerq :: wf_timerq:timerq(),
     next_seq = 1 :: non_neg_integer(),
     current_time = 0 :: integer(),
-    rng_state :: pnet_choice:rng_state(),
-    worklet :: wf_worklet:worklet() | undefined
+    rng_state :: pnet_choice:rng_state()
 }).
 
 -type engine_state() :: #engine_state{}.
@@ -494,44 +491,6 @@ case_log(Engine, CaseId) ->
 
 doctest_test() ->
     ok.
-%%--------------------------------------------------------------------
-%% @doc Sets a worklet for dynamic task replacement.
-%%
-%% The worklet rules will be checked before executing tasks. If a rule
-%% matches, the task will be replaced with the specified workflow.
-%%
-%% @param Engine Engine pid or name
-%% @param Worklet Worklet containing rules for task replacement
-%% @return ok
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec set_worklet(Engine :: pid() | atom(), Worklet :: wf_worklet:worklet()) -> ok.
-
-set_worklet(Engine, Worklet) ->
-    gen_server:call(Engine, {set_worklet, Worklet}).
-
-%%--------------------------------------------------------------------
-%% @doc Applies worklet rules to check if a task should be replaced.
-%%
-%% Evaluates worklet rules against case data to determine if a replacement
-%% workflow should be executed instead of the original task.
-%%
-%% @param Worklet The worklet containing rules
-%% @param Task The task name to check for replacement
-%% @param Data The case data to evaluate conditions against
-%% @param Now Current timestamp (for logging purposes)
-%% @return {ok, ReplacementWorkflow} | {error, no_matching_rule}
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec apply_worklet(Worklet :: wf_worklet:worklet(), Task :: atom(),
-                   Data :: map(), Now :: integer()) ->
-          {ok, atom()} | {error, no_matching_rule}.
-
-apply_worklet(Worklet, Task, Data, _Now) ->
-    wf_worklet:select(Worklet, Task, Data).
-
 
 %%====================================================================
 %% gen_server Callbacks
@@ -551,7 +510,6 @@ init(Config) ->
     Seed = maps:get(seed, Config, 1),
     Now = maps:get(now, Config, 0),
     RngState = pnet_choice:seed(Seed),
-    Worklet = maps:get(worklet, Config, undefined),
     {ok, #engine_state{
         spec = Spec,
         org = Org,
@@ -693,7 +651,18 @@ handle_call({resume_case, CaseId, Now}, _From, State) ->
 handle_call({cancel_case, CaseId, Now}, _From, State) ->
     case maps:get(CaseId, State#engine_state.cases, undefined) of
         undefined -> {reply, {error, not_found}, State};
+        #wf_case{status = scheduled} = Case ->
+            %% Remove from timer queue and cancel
+            TimerKey = {scheduled_start, CaseId},
+            NewTimerQ = wf_timerq:disarm(State#engine_state.timerq, TimerKey),
+            Case1 = Case#wf_case{
+                status = cancelled,
+                timestamps = maps:put(cancelled_at, Now, Case#wf_case.timestamps)
+            },
+            Cases = maps:put(CaseId, Case1, State#engine_state.cases),
+            {reply, ok, State#engine_state{cases = Cases, timerq = NewTimerQ}};
         #wf_case{} = Case ->
+            %% Regular case cancel (already running, suspended, etc.)
             Case1 = Case#wf_case{
                 status = cancelled,
                 timestamps = maps:put(cancelled_at, Now, Case#wf_case.timestamps)
@@ -738,9 +707,6 @@ handle_call({case_log, CaseId}, _From, State) ->
         undefined -> {reply, {error, not_found}, State};
         #wf_case{log = Log} -> {reply, lists:reverse(Log), State}
     end;
-
-handle_call({set_worklet, Worklet}, _From, State) ->
-    {reply, ok, State#engine_state{worklet = Worklet}};
 
 handle_call(_Request, _From, State) ->
     {reply, {error, bad_msg}, State}.
@@ -1260,3 +1226,27 @@ inject_tokens(#wf_case{marking = Marking} = Case, ProduceMap, Now) ->
         marking = Marking1,
         timestamps = maps:put(updated_at, Now, Case#wf_case.timestamps)
     }.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Starts a scheduled case by transitioning it to running status.
+%%
+%% Called when the scheduled start time is reached. The case transitions
+%% from 'scheduled' to 'running' and begins processing enabled transitions.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec start_scheduled_case(wf_case(), map(), integer()) -> wf_case().
+
+start_scheduled_case(#wf_case{marking = Marking, scheduled_at = ScheduledAt} = Case, Spec, Now) ->
+    %% Update case to running status
+    Timestamps = maps:put(started_at, Now, Case#wf_case.timestamps),
+    
+    Case1 = Case#wf_case{
+        status = running,
+        scheduled_at = undefined,
+        timestamps = Timestamps
+    },
+    
+    %% Process initial transitions (case is now active)
+    process_enabled(Case1, Spec, Now).
