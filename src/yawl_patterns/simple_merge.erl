@@ -77,7 +77,7 @@
 %% -------------------------------------------------------------------
 
 -module(simple_merge).
--behaviour(gen_pnet).
+-behaviour(gen_yawl).
 
 %% gen_pnet callbacks
 -export([
@@ -161,7 +161,7 @@ new(BranchAFun, BranchBFun) when is_function(BranchAFun), is_function(BranchBFun
           {ok, pid()} | {error, term()}.
 
 start(SimpleMergeState) ->
-    gen_pnet:start(?MODULE, SimpleMergeState, []).
+    gen_yawl:start(?MODULE, SimpleMergeState, []).
 
 %%--------------------------------------------------------------------
 %% @doc Starts the Simple Merge workflow as a gen_pnet process (linked).
@@ -175,7 +175,7 @@ start(SimpleMergeState) ->
           {ok, pid()} | {error, term()}.
 
 start_link(SimpleMergeState) ->
-    gen_pnet:start_link(?MODULE, SimpleMergeState, []).
+    gen_yawl:start_link(?MODULE, SimpleMergeState, []).
 
 %%--------------------------------------------------------------------
 %% @doc Runs the Simple Merge workflow synchronously.
@@ -195,10 +195,10 @@ run(BranchAFun, BranchBFun) ->
         {ok, Pid} ->
             case wait_for_completion(Pid, 30000) of
                 {ok, Result} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {ok, Result};
                 {error, Reason} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {error, Reason}
             end;
         {error, Reason} ->
@@ -217,7 +217,7 @@ run(BranchAFun, BranchBFun) ->
           {ok, simple_merge_state()} | {error, term()}.
 
 get_state(Pid) ->
-    gen_pnet:call(Pid, get_state).
+    gen_yawl:call(Pid, get_state).
 
 %%--------------------------------------------------------------------
 %% @doc Executes a specific branch with input data.
@@ -233,7 +233,7 @@ get_state(Pid) ->
           {ok, term()} | {error, term()}.
 
 execute_branch(Pid, Branch, InputData) ->
-    gen_pnet:call(Pid, {execute_branch, Branch, InputData}).
+    gen_yawl:call(Pid, {execute_branch, Branch, InputData}).
 
 %%--------------------------------------------------------------------
 %% @doc Executes the Simple Merge pattern by selecting a branch based on condition.
@@ -253,10 +253,10 @@ execute(SimpleMergeState, {Branch, InputData}) ->
         {ok, Pid} ->
             case execute_branch(Pid, Branch, InputData) of
                 {ok, Result} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {ok, Result};
                 {error, Reason} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {error, Reason}
             end;
         {error, Reason} ->
@@ -451,23 +451,23 @@ init(SimpleMergeState) ->
           {reply, term(), term()}.
 
 handle_call(get_state, _From, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     {reply, {ok, UsrInfo}, NetState};
 
 handle_call({execute_branch, Branch, InputData}, _From, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     Result = case Branch of
         branch_a ->
             Fun = UsrInfo#simple_merge_state.branch_a_fun,
             try
                 Result1 = Fun(InputData),
                 %% Trigger the merge
-                gen_pnet:sync(NetState, 1000),
+                gen_yawl:sync(NetState, 1000),
                 NewState = UsrInfo#simple_merge_state{
                     merged_by = branch_a,
                     result = {ok, Result1}
                 },
-                NewUsrInfo = gen_pnet:set_usr_info(NetState, NewState),
+                NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
                 {reply, {ok, Result1}, NewUsrInfo}
             catch
                 Error:Reason:Stack ->
@@ -478,12 +478,12 @@ handle_call({execute_branch, Branch, InputData}, _From, NetState) ->
             try
                 Result1 = Fun(InputData),
                 %% Trigger the merge
-                gen_pnet:sync(NetState, 1000),
+                gen_yawl:sync(NetState, 1000),
                 NewState = UsrInfo#simple_merge_state{
                     merged_by = branch_b,
                     result = {ok, Result1}
                 },
-                NewUsrInfo = gen_pnet:set_usr_info(NetState, NewState),
+                NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
                 {reply, {ok, Result1}, NewUsrInfo}
             catch
                 Error:Reason:Stack ->
@@ -533,7 +533,7 @@ code_change(_OldVsn, NetState, _Extra) ->
           ok.
 
 terminate(_Reason, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #simple_merge_state{log_id = LogId} when LogId =/= undefined ->
             yawl_xes:log_case_end(LogId),
@@ -560,9 +560,9 @@ wait_for_completion(Pid, Timeout) ->
     Pid ! {trigger, 'p_end', Ref},
     receive
         {trigger, 'p_end', Ref, pass} ->
-            case gen_pnet:sync(Pid, 1000) of
+            case gen_yawl:sync(Pid, 1000) of
                 {ok, _} ->
-                    UsrInfo = gen_pnet:get_usr_info(Pid),
+                    UsrInfo = gen_yawl:get_usr_info(Pid),
                     case UsrInfo of
                         #simple_merge_state{result = Result} when Result =/= undefined ->
                             {ok, Result};

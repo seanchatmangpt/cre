@@ -36,6 +36,17 @@ This document provides the complete API specification for the refactored CRE arc
 }.
 ```
 
+### Exports
+```erlang
+% Validation Functions (all return boolean())
+-export([is_marking/1,
+         is_consume_map/1,
+         is_produce_map/1,
+         is_mode/1,
+         is_binding/1,
+         is_cmode/1]).
+```
+
 ### Functions
 
 ```erlang

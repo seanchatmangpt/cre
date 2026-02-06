@@ -58,7 +58,7 @@
 %% -------------------------------------------------------------------
 
 -module(milestone).
--behaviour(gen_pnet).
+-behaviour(gen_yawl).
 
 %% gen_pnet callbacks
 -export([
@@ -131,7 +131,7 @@ new(ActivityFun, MilestoneFun) when is_function(ActivityFun), is_function(Milest
     }.
 
 %%--------------------------------------------------------------------
-%% @doc Starts the Milestone workflow as a gen_pnet process.
+%% @doc Starts the Milestone workflow as a gen_yawl process.
 %%
 %% @param ActivityFun The function to execute after milestone is reached.
 %% @param MilestoneFun Function that checks if milestone is reached.
@@ -144,7 +144,7 @@ new(ActivityFun, MilestoneFun) when is_function(ActivityFun), is_function(Milest
 
 start(ActivityFun, MilestoneFun) when is_function(ActivityFun), is_function(MilestoneFun) ->
     MilestoneState = new(ActivityFun, MilestoneFun),
-    gen_pnet:start_link(?MODULE, MilestoneState, []).
+    gen_yawl:start_link(?MODULE, MilestoneState, []).
 
 %%--------------------------------------------------------------------
 %% @doc Runs the Milestone workflow synchronously.
@@ -169,13 +169,13 @@ run(ActivityFun, InitialState) when is_function(ActivityFun) ->
     case start(ActivityFun, MilestoneFun) of
         {ok, Pid} ->
             %% Inject initial state
-            gen_pnet:cast(Pid, {initial_state, InitialState}),
+            gen_yawl:cast(Pid, {initial_state, InitialState}),
             case wait_for_completion(Pid, 30000) of
                 {ok, Result} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {ok, Result};
                 {error, Reason} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {error, Reason}
             end;
         {error, Reason} ->
@@ -185,7 +185,7 @@ run(ActivityFun, InitialState) when is_function(ActivityFun) ->
 %%--------------------------------------------------------------------
 %% @doc Gets the current state of the Milestone workflow.
 %%
-%% @param Pid The pid of the gen_pnet process.
+%% @param Pid The pid of the gen_yawl process.
 %% @return {ok, State} | {error, Reason}
 %%
 %% @end
@@ -193,7 +193,7 @@ run(ActivityFun, InitialState) when is_function(ActivityFun) ->
 -spec get_state(Pid :: pid()) -> {ok, milestone_state()} | {error, term()}.
 
 get_state(Pid) ->
-    gen_pnet:call(Pid, get_state).
+    gen_yawl:call(Pid, get_state).
 
 %%--------------------------------------------------------------------
 %% @doc Executes the Milestone pattern with given initial state.
@@ -238,7 +238,7 @@ execute(ActivityFun, MilestoneFun, InitialState) when is_function(ActivityFun), 
 %%--------------------------------------------------------------------
 %% @doc Manually sets the milestone as reached.
 %%
-%% @param Pid The pid of the gen_pnet process.
+%% @param Pid The pid of the gen_yawl process.
 %% @return ok | {error, Reason}
 %%
 %% @end
@@ -246,7 +246,7 @@ execute(ActivityFun, MilestoneFun, InitialState) when is_function(ActivityFun), 
 -spec set_milestone(Pid :: pid()) -> ok | {error, term()}.
 
 set_milestone(Pid) ->
-    gen_pnet:cast(Pid, set_milestone_reached).
+    gen_yawl:cast(Pid, set_milestone_reached).
 
 %%====================================================================
 %% gen_pnet Callbacks
@@ -443,7 +443,7 @@ init(MilestoneState) ->
           {reply, term(), term()}.
 
 handle_call(get_state, _From, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     {reply, {ok, UsrInfo}, NetState};
 handle_call(_Request, _From, NetState) ->
     {reply, {error, bad_msg}, NetState}.
@@ -456,11 +456,11 @@ handle_call(_Request, _From, NetState) ->
           {noreply, term()}.
 
 handle_cast(set_milestone_reached, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #milestone_state{} = State ->
             NewState = State#milestone_state{milestone_reached = true},
-            NewUsrInfo = gen_pnet:set_usr_info(NetState, NewState),
+            NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
             {noreply, NewUsrInfo};
         _ ->
             {noreply, NetState}
@@ -498,7 +498,7 @@ code_change(_OldVsn, NetState, _Extra) ->
           ok.
 
 terminate(_Reason, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #milestone_state{log_id = LogId} when LogId =/= undefined ->
             yawl_xes:log_case_end(LogId),
@@ -525,9 +525,9 @@ wait_for_completion(Pid, Timeout) ->
     Pid ! {trigger, 'p_complete', Ref},
     receive
         {trigger, 'p_complete', Ref, pass} ->
-            case gen_pnet:sync(Pid, 1000) of
+            case gen_yawl:sync(Pid, 1000) of
                 {ok, _} ->
-                    UsrInfo = gen_pnet:get_usr_info(Pid),
+                    UsrInfo = gen_yawl:get_usr_info(Pid),
                     case UsrInfo of
                         #milestone_state{activity_result = Result} ->
                             {ok, Result};

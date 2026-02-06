@@ -62,7 +62,7 @@
 %% -------------------------------------------------------------------
 
 -module(discriminator).
--behaviour(gen_pnet).
+-behaviour(gen_yawl).
 
 %% gen_pnet callbacks
 -export([
@@ -137,7 +137,7 @@ new(BranchFuns, BranchCount) when is_list(BranchFuns),
     }.
 
 %%--------------------------------------------------------------------
-%% @doc Starts the Discriminator workflow as a gen_pnet process.
+%% @doc Starts the Discriminator workflow as a gen_yawl process.
 %%
 %% @param BranchFuns List of functions to execute for each branch.
 %% @return {ok, Pid} | {error, Reason}
@@ -150,7 +150,7 @@ new(BranchFuns, BranchCount) when is_list(BranchFuns),
 start(BranchFuns) when is_list(BranchFuns), length(BranchFuns) >= 2 ->
     BranchCount = length(BranchFuns),
     DiscriminatorState = new(BranchFuns, BranchCount),
-    gen_pnet:start_link(?MODULE, DiscriminatorState, []).
+    gen_yawl:start_link(?MODULE, DiscriminatorState, []).
 
 %%--------------------------------------------------------------------
 %% @doc Runs the Discriminator workflow synchronously.
@@ -168,10 +168,10 @@ run(BranchFuns) when is_list(BranchFuns), length(BranchFuns) >= 2 ->
         {ok, Pid} ->
             case wait_for_completion(Pid, 30000) of
                 {ok, Result} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {ok, Result};
                 {error, Reason} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {error, Reason}
             end;
         {error, Reason} ->
@@ -181,7 +181,7 @@ run(BranchFuns) when is_list(BranchFuns), length(BranchFuns) >= 2 ->
 %%--------------------------------------------------------------------
 %% @doc Gets the current state of the Discriminator workflow.
 %%
-%% @param Pid The pid of the gen_pnet process.
+%% @param Pid The pid of the gen_yawl process.
 %% @return {ok, State} | {error, Reason}
 %%
 %% @end
@@ -189,7 +189,7 @@ run(BranchFuns) when is_list(BranchFuns), length(BranchFuns) >= 2 ->
 -spec get_state(Pid :: pid()) -> {ok, discriminator_state()} | {error, term()}.
 
 get_state(Pid) ->
-    gen_pnet:call(Pid, get_state).
+    gen_yawl:call(Pid, get_state).
 
 %%--------------------------------------------------------------------
 %% @doc Executes the Discriminator pattern with given input data.
@@ -234,7 +234,7 @@ execute(BranchFuns, InputData) when is_list(BranchFuns), length(BranchFuns) >= 2
 %%--------------------------------------------------------------------
 %% @doc Resets the discriminator for another cycle.
 %%
-%% @param Pid The pid of the gen_pnet process.
+%% @param Pid The pid of the gen_yawl process.
 %% @return ok | {error, Reason}
 %%
 %% @end
@@ -242,7 +242,7 @@ execute(BranchFuns, InputData) when is_list(BranchFuns), length(BranchFuns) >= 2
 -spec reset(Pid :: pid()) -> ok | {error, term()}.
 
 reset(Pid) ->
-    gen_pnet:cast(Pid, reset_discriminator).
+    gen_yawl:cast(Pid, reset_discriminator).
 
 %%====================================================================
 %% gen_pnet Callbacks
@@ -452,7 +452,7 @@ init(DiscriminatorState) ->
           {reply, term(), term()}.
 
 handle_call(get_state, _From, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     {reply, {ok, UsrInfo}, NetState};
 handle_call(_Request, _From, NetState) ->
     {reply, {error, bad_msg}, NetState}.
@@ -465,7 +465,7 @@ handle_call(_Request, _From, NetState) ->
           {noreply, term()}.
 
 handle_cast(reset_discriminator, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #discriminator_state{} = State ->
             NewState = State#discriminator_state{
@@ -473,7 +473,7 @@ handle_cast(reset_discriminator, NetState) ->
                 triggered_by = undefined,
                 cycle_count = State#discriminator_state.cycle_count + 1
             },
-            NewUsrInfo = gen_pnet:set_usr_info(NetState, NewState),
+            NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
             {noreply, NewUsrInfo};
         _ ->
             {noreply, NetState}
@@ -509,7 +509,7 @@ code_change(_OldVsn, NetState, _Extra) ->
           ok.
 
 terminate(_Reason, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #discriminator_state{log_id = LogId} when LogId =/= undefined ->
             yawl_xes:log_case_end(LogId),
@@ -536,9 +536,9 @@ wait_for_completion(Pid, Timeout) ->
     Pid ! {trigger, 'p_output', Ref},
     receive
         {trigger, 'p_output', Ref, pass} ->
-            case gen_pnet:sync(Pid, 1000) of
+            case gen_yawl:sync(Pid, 1000) of
                 {ok, _} ->
-                    UsrInfo = gen_pnet:get_usr_info(Pid),
+                    UsrInfo = gen_yawl:get_usr_info(Pid),
                     case UsrInfo of
                         #discriminator_state{triggered_by = TriggeredBy} when TriggeredBy =/= undefined ->
                             {ok, {TriggeredBy, triggered}};

@@ -56,7 +56,7 @@
 %% -------------------------------------------------------------------
 
 -module(interleaved_routing).
--behaviour(gen_pnet).
+-behaviour(gen_yawl).
 
 %% gen_pnet callbacks
 -export([
@@ -138,7 +138,7 @@ new(Branches) when is_map(Branches), map_size(Branches) >= 2 ->
 
 start(Branches) when is_map(Branches), map_size(Branches) >= 2 ->
     InterleavedState = new(Branches),
-    gen_pnet:start_link(?MODULE, InterleavedState, []).
+    gen_yawl:start_link(?MODULE, InterleavedState, []).
 
 %%--------------------------------------------------------------------
 %% @doc Runs the Interleaved Routing workflow synchronously.
@@ -156,13 +156,13 @@ run(Branches, InputData) when is_map(Branches), map_size(Branches) >= 2 ->
     case start(Branches) of
         {ok, Pid} ->
             %% Inject input data
-            gen_pnet:cast(Pid, {input_data, InputData}),
+            gen_yawl:cast(Pid, {input_data, InputData}),
             case wait_for_completion(Pid, 30000) of
                 {ok, Results} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {ok, Results};
                 {error, Reason} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {error, Reason}
             end;
         {error, Reason} ->
@@ -180,7 +180,7 @@ run(Branches, InputData) when is_map(Branches), map_size(Branches) >= 2 ->
 -spec get_state(Pid :: pid()) -> {ok, interleaved_state()} | {error, term()}.
 
 get_state(Pid) ->
-    gen_pnet:call(Pid, get_state).
+    gen_yawl:call(Pid, get_state).
 
 %%--------------------------------------------------------------------
 %% @doc Executes the Interleaved Routing pattern with given input data.
@@ -422,7 +422,7 @@ init(InterleavedState) ->
           {reply, term(), term()}.
 
 handle_call(get_state, _From, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     {reply, {ok, UsrInfo}, NetState};
 handle_call(_Request, _From, NetState) ->
     {reply, {error, bad_msg}, NetState}.
@@ -468,7 +468,7 @@ code_change(_OldVsn, NetState, _Extra) ->
           ok.
 
 terminate(_Reason, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #interleaved_state{log_id = LogId} when LogId =/= undefined ->
             yawl_xes:log_case_end(LogId),
@@ -495,9 +495,9 @@ wait_for_completion(Pid, Timeout) ->
     Pid ! {trigger, 'p_output', Ref},
     receive
         {trigger, 'p_output', Ref, pass} ->
-            case gen_pnet:sync(Pid, 1000) of
+            case gen_yawl:sync(Pid, 1000) of
                 {ok, _} ->
-                    UsrInfo = gen_pnet:get_usr_info(Pid),
+                    UsrInfo = gen_yawl:get_usr_info(Pid),
                     case UsrInfo of
                         #interleaved_state{completed = Completed} ->
                             {ok, [{Key, completed} || Key <- Completed]};

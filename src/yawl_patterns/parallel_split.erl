@@ -56,7 +56,7 @@
 %% -------------------------------------------------------------------
 
 -module(parallel_split).
--behaviour(gen_pnet).
+-behaviour(gen_yawl).
 
 %% gen_pnet callbacks
 -export([
@@ -144,7 +144,7 @@ new(BranchFuns, BranchCount) when is_list(BranchFuns),
 start(BranchFuns) when is_list(BranchFuns), length(BranchFuns) >= 2 ->
     BranchCount = length(BranchFuns),
     SplitState = new(BranchFuns, BranchCount),
-    gen_pnet:start_link(?MODULE, SplitState, []).
+    gen_yawl:start_link(?MODULE, SplitState, []).
 
 %%--------------------------------------------------------------------
 %% @doc Runs the Parallel Split workflow synchronously.
@@ -162,13 +162,13 @@ run(BranchFuns, InputData) when is_list(BranchFuns), length(BranchFuns) >= 2 ->
     case start(BranchFuns) of
         {ok, Pid} ->
             %% Inject input data
-            gen_pnet:cast(Pid, {input_data, InputData}),
+            gen_yawl:cast(Pid, {input_data, InputData}),
             case wait_for_completion(Pid, 30000) of
                 {ok, Results} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {ok, Results};
                 {error, Reason} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {error, Reason}
             end;
         {error, Reason} ->
@@ -187,7 +187,7 @@ run(BranchFuns, InputData) when is_list(BranchFuns), length(BranchFuns) >= 2 ->
           {ok, parallel_split_state()} | {error, term()}.
 
 get_state(Pid) ->
-    gen_pnet:call(Pid, get_state).
+    gen_yawl:call(Pid, get_state).
 
 %%--------------------------------------------------------------------
 %% @doc Executes the Parallel Split pattern with given input data.
@@ -432,7 +432,7 @@ init(ParallelSplitState) ->
           {reply, term(), term()}.
 
 handle_call(get_state, _From, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     {reply, {ok, UsrInfo}, NetState};
 handle_call(_Request, _From, NetState) ->
     {reply, {error, bad_msg}, NetState}.
@@ -478,7 +478,7 @@ code_change(_OldVsn, NetState, _Extra) ->
           ok.
 
 terminate(_Reason, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #parallel_split_state{log_id = LogId} when LogId =/= undefined ->
             yawl_xes:log_case_end(LogId),
@@ -544,9 +544,9 @@ wait_for_completion(Pid, Timeout) ->
     Pid ! {trigger, 'p_end', Ref},
     receive
         {trigger, 'p_end', Ref, pass} ->
-            case gen_pnet:sync(Pid, 1000) of
+            case gen_yawl:sync(Pid, 1000) of
                 {ok, _} ->
-                    UsrInfo = gen_pnet:get_usr_info(Pid),
+                    UsrInfo = gen_yawl:get_usr_info(Pid),
                     case UsrInfo of
                         #parallel_split_state{results = Results} ->
                             {ok, Results};

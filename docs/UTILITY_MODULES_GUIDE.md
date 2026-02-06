@@ -73,21 +73,8 @@ is_consume_map(Term) -> boolean().        % Valid consume map
 is_produce_map(Term) -> boolean().        % Valid produce map
 
 % Colored net validation
-is_var(Term) -> boolean().                % Valid variable name
 is_binding(Term) -> boolean().            % Valid variable binding
-is_cmode(Term) -> boolean().              % Valid colored mode
-
-% Execution validation
-is_move(Term) -> boolean().               % Valid move structure
-is_receipt(Term) -> boolean().           % Valid receipt structure
-```
-
-#### Helper Functions
-```erlang
-% Place and transition validation
-is_place(Term) -> boolean().              % Valid place identifier
-is_trsn(Term) -> boolean().               % Valid transition identifier
-is_token(Term) -> boolean().              % Valid token value
+is_cmode(Term) -> boolean().              % Valid colored mode (tuple of {binding(), mode()})
 ```
 
 ### Usage Examples
@@ -114,52 +101,6 @@ All validation functions are total:
 - Never crash on any input
 - Return false for invalid structures
 - Safe to use in guards and assertions
-
----
-
-## 2. `pnet_marking.erl` - Multiset Marking Algebra
-
-### Overview
-Implements multiset operations for token state management. Markings represent the state of a Petri net by mapping places to their token multisets. All operations are total and return either {ok, NewMarking} or {error, Reason}.
-
-### Key Data Structure
-```erlang
-% A marking is a map where:
-% - Keys are atoms (place identifiers)
-% - Values are lists (token multisets)
--type marking() :: #{place() => [token()]}.
-```
-
-### Core Operations
-
-#### Marking Creation and Inspection
-```erlang
-% Create empty marking with specified places
--spec new([place()]) -> marking().
-new(Places) -> #{P => [] || P <- Places}.
-
-% Get tokens at a place (unknown place returns {error, bad_place})
--spec get(marking(), place()) -> {ok, [token()]} | {error, bad_place}.
-get(Marking, Place) ->
-    case maps:find(Place, Marking) of
-        {ok, Tokens} -> {ok, Tokens};
-        error -> {error, bad_place}
-    end.
-
-% Set tokens at a place (unknown place returns {error, bad_place})
--spec set(marking(), place(), [token()]) -> marking() | {error, bad_place}.
-set(Marking, Place, Tokens) ->
-    case maps:is_key(Place, Marking) of
-        true -> Marking#{Place => Tokens};
-        false -> {error, bad_place}
-    end.
-```
-
-#### Multiset Operations (order-insensitive bag semantics)
-```erlang
-% Add tokens (multiset union)
--spec add(marking(), produce_map()) -> marking() | {error, bad_place}.
-add(Marking, ProduceMap) ->
     maps:fold(fun(Place, NewTokens, Acc) ->
         case maps:find(Place, Acc) of
             {ok, ExistingTokens} ->
@@ -262,8 +203,13 @@ Provides reproducible random selection for workflow execution. All randomness go
 
 ### Key Data Structure
 ```erlang
-% RNG state using simple XOR-shift PRNG
--type rng_state() :: {non_neg_integer(), non_neg_integer(), non_neg_integer()}.
+% RNG state using simple XOR-shift PRNG or exs1024s algorithm
+-type rng_state() :: {non_neg_integer(), non_neg_integer(), non_neg_integer(),
+                      non_neg_integer()} | {exs1024s,
+                                               non_neg_integer(),
+                                               non_neg_integer(),
+                                               non_neg_integer(),
+                                               non_neg_integer()}.
 ```
 
 ### Core Operations
@@ -498,17 +444,11 @@ timestamp() ->
 #### Receipt Analysis
 ```erlang
 % Extract transition effects from receipt
--spec effects(receipt()) -> {Type, Details}.
-effects(Receipt) ->
-    #{move := Move} = Receipt,
-    #{trsn := Trsn, produce := ProduceMap} = Move,
-    Type = case maps:size(ProduceMap) of
-        0 -> silent;
-        1 -> single_production;
-        _ -> multiple_production
-    end,
-    Details = #{transition => Trsn, produced => ProduceMap},
-    {Type, Details}.
+% By default, receipts have no associated effects and return an empty list.
+% This design allows callback modules to extend the receipt system with
+% custom effects extraction logic.
+-spec effects(Receipt :: receipt()) -> [effect()].
+effects(#{}) -> [].
 ```
 
 ### Usage Examples
@@ -520,17 +460,16 @@ Move = #{trsn => t1, mode => #{p1 => [a]}, produce => #{p2 => [b]}},
 AfterHash = crypto:hash(sha256, term_to_binary(Marking2)),
 Receipt = pnet_receipt:make(BeforeHash, AfterHash, Move).
 
-% Analyze receipt
-{Type, Details} = pnet_receipt:effects(Receipt),
-% Type = single_production
-% Details = #{transition => t1, produced => #{p2 => [b]}}
+% Extract effects (returns empty list by default)
+Effects = pnet_receipt:effects(Receipt),
+% Effects = []
 ```
 
 ### Key Features
 - **Immutable Audit Trail**: Complete state transition records
 - **Timestamped**: Precise timing for all operations
 - **State Hashing**: Before/after state verification
-- **Effect Analysis**: Extract meaningful information from transitions
+- **Extensible Effects**: Default empty list, customizable by callbacks
 
 ---
 
@@ -650,8 +589,8 @@ running(TaskId, Payload, Place) ->
 
 % Completed state
 -spec done(task_id(), term(), place()) -> {produce, produce_map()}.
-done(TaskId, Payload, Place) ->
-    Token = {task, TaskId, done, Payload},
+done(TaskId, Output, Place) ->
+    Token = {task, TaskId, done, Output},
     {produce, #{Place => [Token]}}.
 
 % Failed state

@@ -96,29 +96,34 @@ bindings(BindingTable, ScopeId) -> Mapping | {error, unknown_scope}
 
 ## YAWL Pattern Interface
 
-### Required Callbacks
+### Required Callbacks (gen_yawl behavior)
 ```erlang
--behaviour(pnet_net).
+-behaviour(gen_yawl).
 
--export([places/0, transitions/0, preset/1, init/1,
-         init_marking/2, modes/3, fire/3]).
+-export([place_lst/0, trsn_lst/0, preset/1, init/1,
+         init_marking/2, is_enabled/3, fire/3, trigger/3]).
 
-places() -> [p1, p2, p3].
-transitions() -> [t1, t2].
+place_lst() -> [p1, p2, p3].
+trsn_lst() -> [t1, t2].
 
 preset(t1) -> [p1].
-preset(t2) -> [p2].
 
 init(_NetArg) -> [].
 
 init_marking(p1, _UsrInfo) -> [init];
 init_marking(_Place, _UsrInfo) -> [].
 
-modes(t1, #{p1 := [init]}, _UsrInfo) -> [#{p1 => []}].
-%% modes/3: (Trsn, Marking, UsrInfo) -> [mode()]
+is_enabled(t1, _Mode, _UsrInfo) -> true.
+%% is_enabled/3: (Trsn, Mode, UsrInfo) -> boolean()
 
 fire(t1, #{p1 => []}, _UsrInfo) -> {produce, #{p2 => [done]}}.
+%% fire/3: Can return {produce, ProduceMap} or {produce, ProduceMap, NewUsrInfo}
 ```
+
+### gen_yawl vs gen_pnet
+- `gen_yawl`: YAWL wrapper with enhanced state updates
+- `gen_pnet`: Core Petri net runner
+- Callback names differ: `place_lst/0`/`trsn_lst/0` vs `places/0`/`transitions/0`
 
 ## Common Patterns
 
@@ -147,16 +152,18 @@ input3 → [t_threshold] → end
 
 ## Workflow Creation Template
 
+### gen_yawl Behavior (Recommended for YAWL workflows)
+
 ```erlang
 -module(my_workflow).
--behaviour(pnet_net).
+-behaviour(gen_yawl).
 
--export([places/0, transitions/0, preset/1, init/1,
-         init_marking/2, modes/3, fire/3]).
+-export([place_lst/0, trsn_lst/0, preset/1, init/1,
+         init_marking/2, is_enabled/3, fire/3, trigger/3]).
 
 %% Places and transitions
-places() -> [start, task1, task2, decision, end].
-transitions() -> [t_start, t_task1, t_task2, t_decision, t_end].
+place_lst() -> [start, task1, task2, decision, end].
+trsn_lst() -> [t_start, t_task1, t_task2, t_decision, t_end].
 
 %% Presets (inputs to transitions)
 preset(t_start) -> [start].
@@ -172,26 +179,66 @@ init(_NetArg) -> [].
 init_marking(start, _UsrInfo) -> [init];
 init_marking(_Place, _UsrInfo) -> [].
 
-%% Mode enumeration (modes/3: Trsn, Marking, UsrInfo)
-modes(t_decision, Marking, _UsrInfo) ->
-    %% Only fire when both tasks are done
-    case maps:get(task1, Marking, []) =/= [] andalso
-         maps:get(task2, Marking, []) =/= [] of
-        true -> [#{task1 => [], task2 => []}];
-        false -> []
-    end;
-modes(_Trsn, _Marking, _UsrInfo) ->
-    [{}].  % Default empty mode
+%% Enable check (is_enabled/3: Trsn, Mode, UsrInfo) -> boolean()
+is_enabled(t_decision, _Mode, _UsrInfo) ->
+    %% Return true when transition should fire
+    true;
+is_enabled(_Trsn, _Mode, _UsrInfo) ->
+    true.
 
-%% Transition firing
+%% Transition firing (can return 2-tuple or 3-tuple for UsrInfo updates)
 fire(t_start, #{start := [init]}, _UsrInfo) ->
     {produce, #{task1 => [enabled], task2 => [enabled]}};
 
-fire(t_decision, #{task1 := [done], task2 := [done]}, _UsrInfo) ->
-    {produce, #{decision => [approved], end => [complete]}}.
+fire(t_decision, #{task1 := [done], task2 := [done]}, UsrInfo) ->
+    %% Example: return 3-tuple to update UsrInfo
+    NewUsrInfo = maps:put(decision_made, true, UsrInfo),
+    {produce, #{decision => [approved], end => [complete]}, NewUsrInfo};
 
 fire(t_end, #{decision := [approved]}, _UsrInfo) ->
-    {produce, #{}}.  % End state
+    {produce, #{}}.
+
+%% External trigger (for human-in-the-loop, timers, etc.)
+trigger(_Trsn, _TriggerData, _UsrInfo) ->
+    {error, no_trigger}.
+```
+
+### pnet_net Behavior (Direct Petri net access)
+
+```erlang
+-module(my_pnet).
+-behaviour(pnet_net).
+
+-export([places/0, transitions/0, preset/1, init/1,
+         init_marking/2, modes/3, fire/3]).
+
+%% Places and transitions
+places() -> [p1, p2, p3].
+transitions() -> [t1, t2].
+
+%% Presets
+preset(t1) -> [p1].
+preset(t2) -> [p2].
+
+%% Initialization
+init(_NetArg) -> [].
+
+%% Initial marking
+init_marking(p1, _UsrInfo) -> [init];
+init_marking(_Place, _UsrInfo) -> [].
+
+%% Mode enumeration (modes/3: Trsn, Marking, UsrInfo)
+modes(t1, Marking, _UsrInfo) ->
+    case maps:get(p1, Marking, []) of
+        [] -> [];
+        _Tokens -> [#{p1 => []}]
+    end;
+modes(_Trsn, _Marking, _UsrInfo) ->
+    [{}].
+
+%% Transition firing
+fire(t1, #{p1 := [Token]}, _UsrInfo) ->
+    {produce, #{p2 => [Token]}}.
 ```
 
 ## Error Handling Patterns
@@ -206,25 +253,35 @@ get_tokens(Marking, Place) ->
     end.
 ```
 
-### Mode Validation
+### Enable Validation (gen_yawl)
+```erlang
+is_enabled(Trsn, Mode, _UsrInfo) ->
+    %% is_enabled/3: Return boolean() for gen_yawl
+    %% Check guard conditions before allowing transition to fire
+    case validate_mode(Mode) of
+        true -> true;
+        false -> false
+    end.
+```
+
+### Mode Validation (pnet_net)
 ```erlang
 modes(Transition, Marking, _UsrInfo) ->
-    %% modes/3: Return list of valid modes for this transition
+    %% modes/3: Return list of valid modes for this transition (pnet_net)
     %% Each mode is a map of places to token lists to consume
-    ValidModes = enum_valid_modes(Transition, Marking),
+    ValidModes = pnet_mode:enum_modes(PresetPlaces, Marking),
     lists:filter(fun is_mode_valid/1, ValidModes).
 ```
 
-### Receipt Creation
+### Receipt Handling
 ```erlang
-fire(Transition, Mode, _UsrInfo) ->
-    BeforeHash = pnet_marking:hash(Marking),
-    %% Execute transition with consume+produce
-    {ok, NewMarking} = pnet_marking:apply(Marking, Mode, ProduceMap),
-    AfterHash = pnet_marking:hash(NewMarking),
-    Move = #{trsn => Transition, mode => Mode, produce => ProduceMap},
-    Receipt = pnet_receipt:make(BeforeHash, AfterHash, Move),
-    {produce, maps:merge(ProduceMap, #{receipt => [Receipt]})}.
+%% Receipts are automatically generated by gen_yawl/gen_pnet
+%% Access them from the marking for audit trails
+get_receipts(Marking) ->
+    case pnet_marking:get(Marking, '_receipts') of
+        {ok, Receipts} -> Receipts;
+        {error, bad_place} -> []
+    end.
 ```
 
 ## Debugging Tips
@@ -249,11 +306,18 @@ Receipts = pnet_receipt:extract_receipts(Marking).
 
 ## Performance Tips
 
-### Mode Caching
+### Enable Caching (gen_yawl)
+```erlang
+% Cache static enable checks
+is_enabled(t_static, _Mode, _UsrInfo) ->
+    true.  % Always enabled for simple transitions
+```
+
+### Mode Caching (pnet_net)
 ```erlang
 % Cache static modes
 modes(t_static, _Marking, _UsrInfo) ->
-    get_cached_modes(t_static).
+    [{}].  % Single empty mode for simple transitions
 ```
 
 ### Efficient State Updates

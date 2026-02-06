@@ -59,7 +59,7 @@
 %% -------------------------------------------------------------------
 
 -module(implicit_merge).
--behaviour(gen_pnet).
+-behaviour(gen_yawl).
 
 %% gen_pnet callbacks
 -export([
@@ -132,7 +132,7 @@ new(BranchFuns, BranchCount) when is_list(BranchFuns),
     }.
 
 %%--------------------------------------------------------------------
-%% @doc Starts the Implicit Merge workflow as a gen_pnet process.
+%% @doc Starts the Implicit Merge workflow as a gen_yawl process.
 %%
 %% @param BranchFuns List of functions to execute for each branch.
 %% @return {ok, Pid} | {error, Reason}
@@ -145,7 +145,7 @@ new(BranchFuns, BranchCount) when is_list(BranchFuns),
 start(BranchFuns) when is_list(BranchFuns), length(BranchFuns) >= 2 ->
     BranchCount = length(BranchFuns),
     MergeState = new(BranchFuns, BranchCount),
-    gen_pnet:start_link(?MODULE, MergeState, []).
+    gen_yawl:start_link(?MODULE, MergeState, []).
 
 %%--------------------------------------------------------------------
 %% @doc Runs the Implicit Merge workflow synchronously.
@@ -163,10 +163,10 @@ run(BranchFuns) when is_list(BranchFuns), length(BranchFuns) >= 2 ->
         {ok, Pid} ->
             case wait_for_completion(Pid, 30000) of
                 {ok, Result} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {ok, Result};
                 {error, Reason} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {error, Reason}
             end;
         {error, Reason} ->
@@ -176,7 +176,7 @@ run(BranchFuns) when is_list(BranchFuns), length(BranchFuns) >= 2 ->
 %%--------------------------------------------------------------------
 %% @doc Gets the current state of the Implicit Merge workflow.
 %%
-%% @param Pid The pid of the gen_pnet process.
+%% @param Pid The pid of the gen_yawl process.
 %% @return {ok, State} | {error, Reason}
 %%
 %% @end
@@ -185,7 +185,7 @@ run(BranchFuns) when is_list(BranchFuns), length(BranchFuns) >= 2 ->
           {ok, implicit_merge_state()} | {error, term()}.
 
 get_state(Pid) ->
-    gen_pnet:call(Pid, get_state).
+    gen_yawl:call(Pid, get_state).
 
 %%--------------------------------------------------------------------
 %% @doc Executes the Implicit Merge pattern with given input data.
@@ -424,7 +424,7 @@ init(ImplicitMergeState) ->
           {reply, term(), term()}.
 
 handle_call(get_state, _From, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     {reply, {ok, UsrInfo}, NetState};
 handle_call(_Request, _From, NetState) ->
     {reply, {error, bad_msg}, NetState}.
@@ -467,7 +467,7 @@ code_change(_OldVsn, NetState, _Extra) ->
           ok.
 
 terminate(_Reason, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #implicit_merge_state{log_id = LogId} when LogId =/= undefined ->
             yawl_xes:log_case_end(LogId),
@@ -495,9 +495,9 @@ wait_for_completion(Pid, Timeout) ->
     receive
         {trigger, 'p_output', Ref, pass} ->
             %% Check the marking for output
-            case gen_pnet:sync(Pid, 1000) of
+            case gen_yawl:sync(Pid, 1000) of
                 {ok, _} ->
-                    UsrInfo = gen_pnet:get_usr_info(Pid),
+                    UsrInfo = gen_yawl:get_usr_info(Pid),
                     case UsrInfo of
                         #implicit_merge_state{completed = Completed} ->
                             {ok, {completed, Completed}};

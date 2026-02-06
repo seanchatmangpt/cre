@@ -53,7 +53,7 @@
 %% -------------------------------------------------------------------
 
 -module(exclusive_choice).
--behaviour(gen_pnet).
+-behaviour(gen_yawl).
 
 %% gen_pnet callbacks
 -export([
@@ -139,7 +139,7 @@ new(Branches, BranchCount) when is_map(Branches),
 start(Branches) when is_map(Branches), map_size(Branches) >= 2 ->
     BranchCount = map_size(Branches),
     ChoiceState = new(Branches, BranchCount),
-    gen_pnet:start_link(?MODULE, ChoiceState, []).
+    gen_yawl:start_link(?MODULE, ChoiceState, []).
 
 %%--------------------------------------------------------------------
 %% @doc Runs the Exclusive Choice workflow synchronously.
@@ -156,10 +156,10 @@ run(Branches) when is_map(Branches), map_size(Branches) >= 2 ->
         {ok, Pid} ->
             case wait_for_completion(Pid, 30000) of
                 {ok, Result} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {ok, Result};
                 {error, Reason} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {error, Reason}
             end;
         {error, Reason} ->
@@ -177,7 +177,7 @@ run(Branches) when is_map(Branches), map_size(Branches) >= 2 ->
 -spec get_state(Pid :: pid()) -> {ok, exclusive_choice_state()} | {error, term()}.
 
 get_state(Pid) ->
-    gen_pnet:call(Pid, get_state).
+    gen_yawl:call(Pid, get_state).
 
 %%--------------------------------------------------------------------
 %% @doc Executes the Exclusive Choice pattern with given input data.
@@ -216,7 +216,7 @@ execute(Branches, InputData) when is_map(Branches), map_size(Branches) >= 2 ->
 -spec select_branch(Pid :: pid(), BranchId :: atom()) -> ok | {error, term()}.
 
 select_branch(Pid, BranchId) ->
-    gen_pnet:cast(Pid, {select_branch, BranchId}).
+    gen_yawl:cast(Pid, {select_branch, BranchId}).
 
 %%====================================================================
 %% gen_pnet Callbacks
@@ -369,7 +369,7 @@ init(ExclusiveChoiceState) ->
           {reply, term(), term()}.
 
 handle_call(get_state, _From, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     {reply, {ok, UsrInfo}, NetState};
 handle_call(_Request, _From, NetState) ->
     {reply, {error, bad_msg}, NetState}.
@@ -382,13 +382,13 @@ handle_call(_Request, _From, NetState) ->
           {noreply, term()}.
 
 handle_cast({select_branch, BranchId}, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #exclusive_choice_state{selected = undefined, branches = Branches} = State ->
             case maps:is_key(BranchId, Branches) of
                 true ->
                     NewState = State#exclusive_choice_state{selected = BranchId},
-                    NewUsrInfo = gen_pnet:set_usr_info(NetState, NewState),
+                    NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
                     {noreply, NewUsrInfo};
                 false ->
                     {noreply, NetState}
@@ -427,7 +427,7 @@ code_change(_OldVsn, NetState, _Extra) ->
           ok.
 
 terminate(_Reason, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #exclusive_choice_state{log_id = LogId} when LogId =/= undefined ->
             yawl_xes:log_case_end(LogId),
@@ -454,9 +454,9 @@ wait_for_completion(Pid, Timeout) ->
     Pid ! {trigger, 'p_end', Ref},
     receive
         {trigger, 'p_end', Ref, pass} ->
-            case gen_pnet:sync(Pid, 1000) of
+            case gen_yawl:sync(Pid, 1000) of
                 {ok, _} ->
-                    UsrInfo = gen_pnet:get_usr_info(Pid),
+                    UsrInfo = gen_yawl:get_usr_info(Pid),
                     case UsrInfo of
                         #exclusive_choice_state{selected = Selected} when Selected =/= undefined ->
                             {ok, {Selected, selected}};

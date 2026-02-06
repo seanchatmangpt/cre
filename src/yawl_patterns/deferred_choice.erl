@@ -56,7 +56,7 @@
 %% -------------------------------------------------------------------
 
 -module(deferred_choice).
--behaviour(gen_pnet).
+-behaviour(gen_yawl).
 
 %% gen_pnet callbacks
 -export([
@@ -143,7 +143,7 @@ new(Options, OptionCount) when is_map(Options),
 start(Options) when is_map(Options), map_size(Options) >= 2 ->
     OptionCount = map_size(Options),
     ChoiceState = new(Options, OptionCount),
-    gen_pnet:start_link(?MODULE, ChoiceState, []).
+    gen_yawl:start_link(?MODULE, ChoiceState, []).
 
 %%--------------------------------------------------------------------
 %% @doc Runs the Deferred Choice workflow synchronously.
@@ -160,10 +160,10 @@ run(Options) when is_map(Options), map_size(Options) >= 2 ->
         {ok, Pid} ->
             case wait_for_completion(Pid, 30000) of
                 {ok, Result} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {ok, Result};
                 {error, Reason} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {error, Reason}
             end;
         {error, Reason} ->
@@ -181,7 +181,7 @@ run(Options) when is_map(Options), map_size(Options) >= 2 ->
 -spec get_state(Pid :: pid()) -> {ok, deferred_choice_state()} | {error, term()}.
 
 get_state(Pid) ->
-    gen_pnet:call(Pid, get_state).
+    gen_yawl:call(Pid, get_state).
 
 %%--------------------------------------------------------------------
 %% @doc Executes the Deferred Choice pattern with given input data.
@@ -241,7 +241,7 @@ execute(Options, EvalData) when is_map(Options), map_size(Options) >= 2 ->
 -spec select_option(Pid :: pid(), OptionId :: atom()) -> ok | {error, term()}.
 
 select_option(Pid, OptionId) ->
-    gen_pnet:cast(Pid, {select_option, OptionId}).
+    gen_yawl:cast(Pid, {select_option, OptionId}).
 
 %%====================================================================
 %% gen_pnet Callbacks
@@ -435,7 +435,7 @@ init(DeferredChoiceState) ->
           {reply, term(), term()}.
 
 handle_call(get_state, _From, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     {reply, {ok, UsrInfo}, NetState};
 handle_call(_Request, _From, NetState) ->
     {reply, {error, bad_msg}, NetState}.
@@ -448,11 +448,11 @@ handle_call(_Request, _From, NetState) ->
           {noreply, term()}.
 
 handle_cast({select_option, OptionId}, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #deferred_choice_state{selected = undefined} = State ->
             NewState = State#deferred_choice_state{selected = OptionId},
-            NewUsrInfo = gen_pnet:set_usr_info(NetState, NewState),
+            NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
             {noreply, NewUsrInfo};
         _ ->
             {noreply, NetState}
@@ -488,7 +488,7 @@ code_change(_OldVsn, NetState, _Extra) ->
           ok.
 
 terminate(_Reason, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #deferred_choice_state{log_id = LogId} when LogId =/= undefined ->
             yawl_xes:log_case_end(LogId),
@@ -515,9 +515,9 @@ wait_for_completion(Pid, Timeout) ->
     Pid ! {trigger, 'p_complete', Ref},
     receive
         {trigger, 'p_complete', Ref, pass} ->
-            case gen_pnet:sync(Pid, 1000) of
+            case gen_yawl:sync(Pid, 1000) of
                 {ok, _} ->
-                    UsrInfo = gen_pnet:get_usr_info(Pid),
+                    UsrInfo = gen_yawl:get_usr_info(Pid),
                     case UsrInfo of
                         #deferred_choice_state{selected = Selected} when Selected =/= undefined ->
                             {ok, {Selected, selected}};

@@ -58,7 +58,7 @@
 %% -------------------------------------------------------------------
 
 -module(n_out_of_m).
--behaviour(gen_pnet).
+-behaviour(gen_yawl).
 
 %% gen_pnet callbacks
 -export([
@@ -136,7 +136,7 @@ new(N, M, BranchFuns) when is_integer(N), N >= 1, is_integer(M), M >= N,
     }.
 
 %%--------------------------------------------------------------------
-%% @doc Starts the N out of M workflow as a gen_pnet process.
+%% @doc Starts the N out of M workflow as a gen_yawl process.
 %%
 %% @param N The quorum number (how many branches must complete).
 %% @param BranchFuns List of functions to execute.
@@ -150,7 +150,7 @@ new(N, M, BranchFuns) when is_integer(N), N >= 1, is_integer(M), M >= N,
 start(N, BranchFuns) when is_integer(N), N >= 1, is_list(BranchFuns), length(BranchFuns) >= N ->
     M = length(BranchFuns),
     NOutOfMState = new(N, M, BranchFuns),
-    gen_pnet:start_link(?MODULE, NOutOfMState, []).
+    gen_yawl:start_link(?MODULE, NOutOfMState, []).
 
 %%--------------------------------------------------------------------
 %% @doc Runs the N out of M workflow synchronously.
@@ -169,10 +169,10 @@ run(N, BranchFuns) when is_integer(N), N >= 1, is_list(BranchFuns), length(Branc
         {ok, Pid} ->
             case wait_for_completion(Pid, 30000) of
                 {ok, Results} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {ok, Results};
                 {error, Reason} ->
-                    gen_pnet:stop(Pid),
+                    gen_yawl:stop(Pid),
                     {error, Reason}
             end;
         {error, Reason} ->
@@ -182,7 +182,7 @@ run(N, BranchFuns) when is_integer(N), N >= 1, is_list(BranchFuns), length(Branc
 %%--------------------------------------------------------------------
 %% @doc Gets the current state of the N out of M workflow.
 %%
-%% @param Pid The pid of the gen_pnet process.
+%% @param Pid The pid of the gen_yawl process.
 %% @return {ok, State} | {error, Reason}
 %%
 %% @end
@@ -190,7 +190,7 @@ run(N, BranchFuns) when is_integer(N), N >= 1, is_list(BranchFuns), length(Branc
 -spec get_state(Pid :: pid()) -> {ok, n_out_of_m_state()} | {error, term()}.
 
 get_state(Pid) ->
-    gen_pnet:call(Pid, get_state).
+    gen_yawl:call(Pid, get_state).
 
 %%--------------------------------------------------------------------
 %% @doc Executes the N out of M pattern with given input data.
@@ -230,7 +230,7 @@ execute(N, BranchFuns, InputData) when is_integer(N), N >= 1,
 %%--------------------------------------------------------------------
 %% @doc Gets the current quorum count for the running workflow.
 %%
-%% @param Pid The pid of the gen_pnet process.
+%% @param Pid The pid of the gen_yawl process.
 %% @return {ok, {N, M, Completed}} | {error, Reason}
 %%
 %% @end
@@ -239,7 +239,7 @@ execute(N, BranchFuns, InputData) when is_integer(N), N >= 1,
           {ok, {pos_integer(), pos_integer(), non_neg_integer()}} | {error, term()}.
 
 get_quorum(Pid) ->
-    gen_pnet:call(Pid, get_quorum).
+    gen_yawl:call(Pid, get_quorum).
 
 %%====================================================================
 %% gen_pnet Callbacks
@@ -449,10 +449,10 @@ init(NOutOfMState) ->
           {reply, term(), term()}.
 
 handle_call(get_state, _From, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     {reply, {ok, UsrInfo}, NetState};
 handle_call(get_quorum, _From, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #n_out_of_m_state{n = N, m = M, completed = Completed} ->
             {reply, {ok, {N, M, length(Completed)}}, NetState};
@@ -500,7 +500,7 @@ code_change(_OldVsn, NetState, _Extra) ->
           ok.
 
 terminate(_Reason, NetState) ->
-    UsrInfo = gen_pnet:get_usr_info(NetState),
+    UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
         #n_out_of_m_state{log_id = LogId} when LogId =/= undefined ->
             yawl_xes:log_case_end(LogId),
@@ -527,9 +527,9 @@ wait_for_completion(Pid, Timeout) ->
     Pid ! {trigger, 'p_output', Ref},
     receive
         {trigger, 'p_output', Ref, pass} ->
-            case gen_pnet:sync(Pid, 1000) of
+            case gen_yawl:sync(Pid, 1000) of
                 {ok, _} ->
-                    UsrInfo = gen_pnet:get_usr_info(Pid),
+                    UsrInfo = gen_yawl:get_usr_info(Pid),
                     case UsrInfo of
                         #n_out_of_m_state{completed = Completed, results = Results} ->
                             {ok, Results ++ [{I, complete} || I <- Completed]};

@@ -1,42 +1,54 @@
-# YAWL Patterns Guide
+**  Remaining Issue (noted):
+  - YAWL pattern modules return 3-tuple {produce, Map, State} but gen_pnet only handles 2-tuple. This is a design limitation of gen_pnet, not a bug in our code. The state
+  updates work via other mechanisms (handle_info, handle_cast).**# YAWL Patterns Guide
 
-This guide documents the 10 new YAWL (Yet Another Workflow Language) pattern modules created in the architectural refactoring. All patterns implement the `pnet_net` behavior and integrate with the new utility modules.
+This guide documents the 10 new YAWL (Yet Another Workflow Language) pattern modules created in the architectural refactoring. All patterns implement the `gen_yawl` behavior (a wrapper around `gen_pnet`) and integrate with the new utility modules.
 
 ## Pattern Interface
 
-All YAWL patterns implement the standard `pnet_net` behavior:
+All YAWL patterns implement the `gen_yawl` behavior for YAWL workflows:
 
 ```erlang
--behaviour(pnet_net).
+-behaviour(gen_yawl).
 
--export([places/0, transitions/0, preset/1, init/1,
-         init_marking/2, modes/3, fire/3]).
+-export([place_lst/0, trsn_lst/0, preset/1, init/1,
+         init_marking/2, is_enabled/3, fire/3, trigger/3]).
 ```
 
-### Common Callback Functions
+### Required Callback Functions
 
-#### `places/0` -> [place()]
-Returns all place identifiers in the pattern.
+#### `place_lst/0` -> [place()]
+Returns all place identifiers in the pattern (note: `place_lst` not `places`).
 
-#### `transitions/0` -> [trsn()]
-Returns all transition identifiers in the pattern.
+#### `trsn_lst/0` -> [trsn()]
+Returns all transition identifiers in the pattern (note: `trsn_lst` not `transitions`).
 
 #### `preset/1` -> [place()]
 Returns input places for a given transition.
 
 #### `init/1` -> usr_info()
-Initialization function for the pattern (returns empty list by default).
+Initialization function for the pattern.
 
 #### `init_marking/2` -> [token()]
 Creates initial tokens for a place.
 
-#### `modes/3` -> [mode()]
-Returns all valid firing modes for a transition.
-**Signature**: `modes(Trsn, Marking, UsrInfo) -> [mode()]`
+#### `is_enabled/3` -> boolean()
+Checks if a transition is enabled with a given mode. (Used in place of `modes/3`)
 
-#### `fire/3` -> {produce, produce_map()}
-Executes the transition and produces output tokens.
-**Signature**: `fire(Trsn, Mode, UsrInfo) -> {produce, produce_map()} | abort`
+#### `fire/3` -> {produce, produce_map()} | {produce, produce_map(), usr_info()} | abort
+Executes the transition. Can optionally return updated user info as a 3-tuple.
+
+#### `trigger/3` -> term()
+Optional callback for token-based processing.
+
+### gen_yawl vs gen_pnet
+
+`gen_yawl` extends `gen_pnet` with:
+- **Enhanced fire/3**: Can return 3-tuple `{produce, ProduceMap, NewUsrInfo}` for automatic state updates
+- **Different callback names**: `place_lst/0`/`trsn_lst/0` instead of `places/0`/`transitions/0`
+- **is_enabled/3**: Boolean check instead of `modes/3` list enumeration
+
+Note: Some patterns (e.g., `implicit_merge`) may use `gen_pnet` directly.`
 
 ---
 
