@@ -12,3 +12,34 @@ rel/example_project
 doc
 _build
 rebar.lock
+
+# Build artifacts
+rebar3.crashdump
+
+# LaTeX build artifacts
+texput.log
+thesis/*.aux
+thesis/*.log
+thesis/*.blg
+thesis/*.bbl
+thesis/*.bcf
+thesis/*.lof
+thesis/*.lot
+thesis/*.out
+thesis/*.run.xml
+thesis/*.toc
+thesis/chapters/*.aux
+thesis/appendix/*.aux
+
+# Mnesia database files
+Mnesia.*/
+
+# Runtime state
+.claude-flow/daemon.pid
+.claude-flow/daemon-state.json
+.claude-flow/metrics/
+.claude-flow/agents/store.json
+.swarm/
+
+# Misc
+,
