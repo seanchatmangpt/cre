@@ -12,3 +12,9 @@ rel/example_project
 doc
 _build
 rebar.lock
+
+# Claude Flow runtime state files
+.claude-flow/daemon-state.json
+.claude-flow/daemon.pid
+.claude-flow/metrics/
+.swarm/state.json
