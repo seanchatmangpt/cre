@@ -27,6 +27,9 @@
 -export([log_case_start/2, log_case_complete/3]).
 -export([log_workitem_start/3, log_workitem_complete/4]).
 
+%% Petri Net Receipt Integration
+-export([log_receipt/1, log_receipt/2]).
+
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          code_change/3, terminate/2]).
@@ -267,6 +270,102 @@ log_workitem_complete(LogId, WorkitemId, TaskId, Result) ->
         }
     },
     gen_server:cast(?MODULE, {add_event, LogId, Event}).
+
+%%--------------------------------------------------------------------
+%% @doc Logs a Petri net receipt as an XES event.
+%%
+%% Converts a pnet_receipt to an XES event, logging:
+%% - before_hash: Hash of the marking before transition execution
+%% - after_hash: Hash of the marking after transition execution
+%% - move: The transition firing that was executed (with mode and produce)
+%% - timestamp: When the receipt was created (for event ordering)
+%%
+%% The receipt is converted to XES format with:
+%% - concept:name = "PetriNetReceipt"
+%% - lifecycle:transition = "receipt"
+%% - data contains all receipt fields
+%% @end
+%%--------------------------------------------------------------------
+-spec log_receipt(pnet_receipt:receipt()) -> ok.
+log_receipt(Receipt) ->
+    log_receipt(Receipt, default_log_id()).
+
+-spec log_receipt(pnet_receipt:receipt(), log_id()) -> ok.
+log_receipt(Receipt, LogId) ->
+    #{before_hash := BeforeHash,
+      after_hash := AfterHash,
+      move := Move,
+      ts := Timestamp} = Receipt,
+
+    %% Extract transition info from move
+    #{trsn := Transition,
+      mode := Mode,
+      produce := Produce} = Move,
+
+    %% Build receipt data map
+    ReceiptData = #{
+        <<"before_hash">> => binary:encode_hex(BeforeHash),
+        <<"after_hash">> => binary:encode_hex(AfterHash),
+        <<"transition">> => atom_to_binary(Transition),
+        <<"mode">> => format_mode(Mode),
+        <<"produce">> => format_produce(Produce)
+    },
+
+    EventId = generate_event_id(),
+    Event = #xes_event{
+        event_id = EventId,
+        timestamp = Timestamp,
+        concept = #{
+            <<"concept:name">> => <<"PetriNetReceipt">>,
+            <<"concept:instance">> => atom_to_binary(Transition)
+        },
+        lifecycle = #{<<"lifecycle:transition">> => <<"receipt">>},
+        data = ReceiptData
+    },
+    gen_server:cast(?MODULE, {add_event, LogId, Event}).
+
+%%--------------------------------------------------------------------
+%% @doc Formats a mode map for XES logging.
+%% @end
+%%--------------------------------------------------------------------
+format_mode(Mode) when is_map(Mode) ->
+    Formatted = maps:fold(fun(Place, Tokens, Acc) ->
+        PlaceBin = to_binary(Place),
+        TokensBin = format_tokens(Tokens),
+        <<PlaceBin/binary, "=>", TokensBin/binary, "; ", Acc/binary>>
+    end, <<"">>, Mode),
+    Formatted.
+
+%%--------------------------------------------------------------------
+%% @doc Formats tokens for XES logging.
+%% @end
+%%--------------------------------------------------------------------
+format_tokens([]) -> <<"[]">>;
+format_tokens(Tokens) when is_list(Tokens) ->
+    TokenBins = [to_binary(T) || T <- Tokens],
+    Joined = join_binaries(TokenBins, <<",">>),
+    <<"[", Joined/binary, "]">>;
+format_tokens(Token) ->
+    to_binary(Token).
+
+%%--------------------------------------------------------------------
+%% @doc Formats a produce map for XES logging.
+%% @end
+%%--------------------------------------------------------------------
+format_produce(Produce) when is_map(Produce) ->
+    Formatted = maps:fold(fun(Place, Tokens, Acc) ->
+        PlaceBin = to_binary(Place),
+        TokensBin = format_tokens(Tokens),
+        <<PlaceBin/binary, "=>", TokensBin/binary, "; ", Acc/binary>>
+    end, <<"">>, Produce),
+    Formatted.
+
+%%--------------------------------------------------------------------
+%% @doc Gets the default log ID for receipt logging.
+%% @end
+%%--------------------------------------------------------------------
+default_log_id() ->
+    <<"yawl_default_log">>.
 
 %%--------------------------------------------------------------------
 %% @doc Generic event logging.

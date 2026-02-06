@@ -96,7 +96,7 @@
 
 %% Telemetry wrappers that delegate to yawl_otel_logger
 -export([enable_telemetry/0, enable_telemetry/1, disable_telemetry/0,
-         get_workflow_metrics/1, log_workflow_event/2, log_workflow_event/3]).
+         get_workflow_metrics/1, log_workflow_event/3, log_workflow_event/4]).
 
 %%====================================================================
 %% Types
@@ -1895,6 +1895,157 @@ cancel_approval(WorkflowId, TaskId) when is_binary(WorkflowId) ->
         _Pid ->
             CheckpointId = checkpoint_id_for_task(WorkflowId, TaskId),
             yawl_approval:cancel_checkpoint(CheckpointId)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Enables telemetry collection for YAWL workflows (no options).
+%%
+%% Starts the yawl_otel_logger gen_server if not already running.
+%%
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec enable_telemetry() -> ok | {error, term()}.
+
+enable_telemetry() ->
+    enable_telemetry(#{}).
+
+%%--------------------------------------------------------------------
+%% @doc Enables telemetry collection for YAWL workflows (with options).
+%%
+%% Starts the yawl_otel_logger gen_server if not already running.
+%%
+%% @param Options Optional parameters for telemetry configuration
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec enable_telemetry(Options :: map()) -> ok | {error, term()}.
+
+enable_telemetry(Options) when is_map(Options) ->
+    case whereis(yawl_otel_logger) of
+        undefined ->
+            %% Start the telemetry server
+            case yawl_otel_logger:start_link(Options) of
+                {ok, _Pid} -> ok;
+                {error, {already_started, _Pid}} -> ok;
+                Error -> Error
+            end;
+        _Pid ->
+            ok
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Disables telemetry collection for YAWL workflows.
+%%
+%% Stops the yawl_otel_logger gen_server.
+%%
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec disable_telemetry() -> ok | {error, term()}.
+
+disable_telemetry() ->
+    case whereis(yawl_otel_logger) of
+        undefined -> ok;
+        Pid -> gen_server:stop(Pid)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Gets workflow metrics from the telemetry system.
+%%
+%% @param Workflow The workflow record or workflow ID
+%% @return Map of workflow metrics or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_workflow_metrics(Workflow :: #workflow{} | binary()) ->
+          {ok, map()} | {error, term()}.
+
+get_workflow_metrics(#workflow{id = WorkflowId}) ->
+    get_workflow_metrics(WorkflowId);
+get_workflow_metrics(WorkflowId) when is_binary(WorkflowId) ->
+    case whereis(yawl_otel_logger) of
+        undefined ->
+            {error, telemetry_not_started};
+        _Pid ->
+            %% Get events for this workflow
+            AllEvents = yawl_otel_logger:get_events(),
+            WorkflowEvents = maps:filter(
+                fun(#otel_event{trace_id = Trace}) ->
+                    binary:match(WorkflowId, Trace) orelse
+                        (WorkflowId =:= Trace)
+                end,
+                AllEvents
+            ),
+            {ok, #{
+                event_count => maps:size(WorkflowEvents),
+                events => WorkflowEvents
+            }}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Logs a workflow event.
+%%
+%% @param Workflow The workflow record or workflow ID
+%% @param Event The event type (binary or atom)
+%% @param Message The event message
+%% @return ok
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec log_workflow_event(Workflow :: #workflow{} | binary(),
+                         Event :: binary() | atom(),
+                         Message :: binary()) -> ok.
+
+log_workflow_event(#workflow{id = WorkflowId}, Event, Message) ->
+    log_workflow_event(WorkflowId, Event, Message);
+log_workflow_event(WorkflowId, Event, Message) when is_binary(WorkflowId) ->
+    case whereis(yawl_otel_logger) of
+        undefined -> ok;
+        _Pid ->
+            Attributes = #{
+                workflow_id => WorkflowId,
+                event_type => Event,
+                message => Message,
+                timestamp => erlang:system_time(millisecond)
+            },
+            yawl_otel_logger:log_event(Event, Message, Attributes)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Logs a workflow event with attributes.
+%%
+%% @param Workflow The workflow record or workflow ID
+%% @param Event The event type (binary or atom)
+%% @param Message The event message
+%% @param Attributes Additional event attributes
+%% @return ok
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec log_workflow_event(Workflow :: #workflow{} | binary(),
+                         Event :: binary() | atom(),
+                         Message :: binary(),
+                         Attributes :: map()) -> ok.
+
+log_workflow_event(#workflow{id = WorkflowId}, Event, Message, Attributes) ->
+    log_workflow_event(WorkflowId, Event, Message, Attributes);
+log_workflow_event(WorkflowId, Event, Message, Attributes)
+  when is_binary(WorkflowId), is_map(Attributes) ->
+    case whereis(yawl_otel_logger) of
+        undefined -> ok;
+        _Pid ->
+            BaseAttrs = #{
+                workflow_id => WorkflowId,
+                event_type => Event,
+                message => Message,
+                timestamp => erlang:system_time(millisecond)
+            },
+            MergedAttrs = maps:merge(BaseAttrs, Attributes),
+            yawl_otel_logger:log_event(Event, Message, MergedAttrs)
     end.
 
 %%--------------------------------------------------------------------

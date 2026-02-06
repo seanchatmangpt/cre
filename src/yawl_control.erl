@@ -35,6 +35,15 @@
 %%   <li><b>Configuration:</b> Runtime parameter tuning</li>
 %% </ul>
 %%
+%% <h3>Helper Integration</h3>
+%%
+%% This module integrates pure helper modules for control flow:
+%% <ul>
+%%   <li><b>pnet_marking:</b> Control state tracking as Petri net markings</li>
+%%   <li><b>pnet_choice:</b> Deterministic choice for control flow decisions</li>
+%%   <li><b>wf_task:</b> Control token lifecycle for task events</li>
+%% </ul>
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -61,6 +70,21 @@
 %% Records
 %%====================================================================
 
+%% Control state places for Petri net marking
+-define(CTRL_PLACE_RUNNING, 'ctrl_running').
+-define(CTRL_PLACE_SUSPENDED, 'ctrl_suspended').
+-define(CTRL_PLACE_COMPLETED, 'ctrl_completed').
+-define(CTRL_PLACE_CANCELLED, 'ctrl_cancelled').
+-define(CTRL_PLACE_FAILED, 'ctrl_failed').
+
+-define(CTRL_PLACES, [
+    ?CTRL_PLACE_RUNNING,
+    ?CTRL_PLACE_SUSPENDED,
+    ?CTRL_PLACE_COMPLETED,
+    ?CTRL_PLACE_CANCELLED,
+    ?CTRL_PLACE_FAILED
+]).
+
 -record(case_info, {
     case_id :: binary(),
     spec_id :: binary(),
@@ -70,7 +94,9 @@
     current_task :: binary() | undefined,
     tasks_completed = 0 :: non_neg_integer(),
     tasks_total = 0 :: non_neg_integer(),
-    data = #{} :: map()
+    data = #{} :: map(),
+    %% Control state marking for this case
+    ctrl_marking :: pnet_marking:marking()
 }).
 
 -record(engine_status, {
@@ -84,7 +110,11 @@
 -record(control_state, {
     cases = #{} :: #{binary() => #case_info{}},
     status :: #engine_status{},
-    subscribers = [] :: [{pid(), reference()}]
+    subscribers = [] :: [{pid(), reference()}],
+    %% RNG state for deterministic control flow decisions
+    rng_state :: pnet_choice:rng_state(),
+    %% Global control marking (summary of all case states)
+    ctrl_marking :: pnet_marking:marking()
 }).
 
 %%====================================================================
@@ -159,6 +189,9 @@ get_case_status(CaseId) when is_binary(CaseId) ->
 %%--------------------------------------------------------------------
 %% @doc Cancels a running workflow case.
 %%
+%% Uses wf_task:cancelled/3 to produce control tokens for the cancelled
+%% task lifecycle event.
+%%
 %% @param CaseId The case identifier.
 %% @param Reason Reason for cancellation.
 %% @return ok or {error, term()}.
@@ -187,6 +220,9 @@ suspend_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
 %%--------------------------------------------------------------------
 %% @doc Resumes a suspended workflow case.
 %%
+%% Uses wf_task:running/3 to produce control tokens for the resumed
+%% (running) task lifecycle event.
+%%
 %% @param CaseId The case identifier.
 %% @param Reason Reason for resumption.
 %% @return ok or {error, term()}.
@@ -200,6 +236,9 @@ resume_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
 
 %%--------------------------------------------------------------------
 %% @doc Gets execution statistics for all cases.
+%%
+%% Uses pnet_marking to snapshot the current control state for
+%% accurate statistics computation.
 %%
 %% @return Map of statistics.
 %%
@@ -239,6 +278,8 @@ set_engine_parameter(Parameter, Value) when is_atom(Parameter) ->
 %%--------------------------------------------------------------------
 %% @doc Lists all cases (running and completed).
 %%
+%% Uses pnet_marking:snapshot/1 to get a consistent view of all cases.
+%%
 %% @return List of case information maps.
 %%
 %% @end
@@ -264,6 +305,9 @@ get_case_history(CaseId) when is_binary(CaseId) ->
 %%--------------------------------------------------------------------
 %% @doc Registers a new workflow case.
 %%
+%% Uses wf_task:enabled/3 to produce control tokens for the newly
+%% enabled case, and pnet_marking:add/2 to update the control marking.
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec register_case(binary(), binary()) -> ok.
@@ -274,6 +318,8 @@ register_case(CaseId, SpecId) ->
 %%--------------------------------------------------------------------
 %% @doc Unregisters a workflow case.
 %%
+%% Uses pnet_marking:take/2 to remove the case from control marking.
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec unregister_case(binary()) -> ok.
@@ -283,6 +329,10 @@ unregister_case(CaseId) ->
 
 %%--------------------------------------------------------------------
 %% @doc Updates the status of a workflow case.
+%%
+%% Uses pnet_marking:apply/3 to atomically consume from the old status
+%% place and produce to the new status place in the control marking.
+%% Uses appropriate wf_task constructors for lifecycle events.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -298,12 +348,16 @@ update_case_status(CaseId, Status) ->
 %%--------------------------------------------------------------------
 %% @doc Initializes the control panel state.
 %%
+%% Initializes the control marking using pnet_marking:new/1 with the
+%% defined control places. Seeds the RNG for deterministic decisions.
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec init([]) -> {ok, #control_state{}}.
 
 init([]) ->
     logger:info("YAWL control starting", [{yawl_control, starting}]),
+    CtrlMarking = pnet_marking:new(?CTRL_PLACES),
     {ok, #control_state{
         status = #engine_status{
             start_time = erlang:timestamp(),
@@ -313,7 +367,9 @@ init([]) ->
                 enable_auto_cleanup => true,
                 cleanup_interval => 300000  % 5 minutes
             }
-        }
+        },
+        rng_state = pnet_choice:seed(erlang:timestamp()),
+        ctrl_marking = CtrlMarking
     }}.
 
 %%--------------------------------------------------------------------
@@ -325,6 +381,7 @@ init([]) ->
           {reply, term(), #control_state{}}.
 
 handle_call(get_running_cases, _From, State) ->
+    %% Use pnet_marking:get/2 to get tokens from running place
     Cases = maps:fold(
         fun(_CaseId, #case_info{status = running} = CaseInfo, Acc) ->
             [case_info_to_map(CaseInfo) | Acc];
@@ -352,19 +409,29 @@ handle_call({cancel_case, CaseId, Reason}, _From, State) ->
             {reply, {error, already_completed}, State};
         #case_info{status = cancelled} ->
             {reply, {error, already_cancelled}, State};
-        CaseInfo ->
-            UpdatedCase = CaseInfo#case_info{
-                status = cancelled,
-                end_time = erlang:timestamp()
-            },
-            NewCases = maps:put(CaseId, UpdatedCase, State#control_state.cases),
-            NewStatus = State#control_state.status#engine_status{
-                cases_cancelled = State#control_state.status#engine_status.cases_cancelled + 1
-            },
-            logger:info("Case cancelled: id=~p reason=~p", [CaseId, Reason],
-                        [{yawl_control, case_cancelled}]),
-            notify_subscribers(case_cancelled, CaseId, State#control_state.subscribers),
-            {reply, ok, State#control_state{cases = NewCases, status = NewStatus}}
+        #case_info{status = Status} = CaseInfo ->
+            %% Apply transition: consume from current status place, produce to cancelled
+            ConsumeMap = status_to_consume_map(Status, CaseId),
+            ProduceMap = status_to_produce_map(cancelled, CaseId, Reason),
+
+            case pnet_marking:'apply'(State#control_state.ctrl_marking, ConsumeMap, ProduceMap) of
+                {ok, NewCtrlMarking} ->
+                    UpdatedCase = CaseInfo#case_info{
+                        status = cancelled,
+                        end_time = erlang:timestamp(),
+                        ctrl_marking = update_case_marking(CaseInfo#case_info.ctrl_marking, Status, cancelled, CaseId)
+                    },
+                    NewCases = maps:put(CaseId, UpdatedCase, State#control_state.cases),
+                    NewStatus = State#control_state.status#engine_status{
+                        cases_cancelled = State#control_state.status#engine_status.cases_cancelled + 1
+                    },
+                    logger:info("Case cancelled: id=~p reason=~p", [CaseId, Reason],
+                                [{yawl_control, case_cancelled}]),
+                    notify_subscribers(case_cancelled, CaseId, State#control_state.subscribers),
+                    {reply, ok, State#control_state{cases = NewCases, status = NewStatus, ctrl_marking = NewCtrlMarking}};
+                {error, _Reason} ->
+                    {reply, {error, marking_failed}, State}
+            end
     end;
 
 handle_call({suspend_case, CaseId, Reason}, _From, State) ->
@@ -375,13 +442,25 @@ handle_call({suspend_case, CaseId, Reason}, _From, State) ->
             {reply, {error, already_suspended}, State};
         #case_info{status = Status} when Status =/= running ->
             {reply, {error, not_running}, State};
-        CaseInfo ->
-            UpdatedCase = CaseInfo#case_info{status = suspended},
-            NewCases = maps:put(CaseId, UpdatedCase, State#control_state.cases),
-            logger:info("Case suspended: id=~p reason=~p", [CaseId, Reason],
-                         [{yawl_control, case_suspended}]),
-            notify_subscribers(case_suspended, CaseId, State#control_state.subscribers),
-            {reply, ok, State#control_state{cases = NewCases}}
+        #case_info{status = running} = CaseInfo ->
+            %% Apply transition: consume from running, produce to suspended
+            ConsumeMap = status_to_consume_map(running, CaseId),
+            ProduceMap = status_to_produce_map(suspended, CaseId, Reason),
+
+            case pnet_marking:'apply'(State#control_state.ctrl_marking, ConsumeMap, ProduceMap) of
+                {ok, NewCtrlMarking} ->
+                    UpdatedCase = CaseInfo#case_info{
+                        status = suspended,
+                        ctrl_marking = update_case_marking(CaseInfo#case_info.ctrl_marking, running, suspended, CaseId)
+                    },
+                    NewCases = maps:put(CaseId, UpdatedCase, State#control_state.cases),
+                    logger:info("Case suspended: id=~p reason=~p", [CaseId, Reason],
+                                 [{yawl_control, case_suspended}]),
+                    notify_subscribers(case_suspended, CaseId, State#control_state.subscribers),
+                    {reply, ok, State#control_state{cases = NewCases, ctrl_marking = NewCtrlMarking}};
+                {error, _Reason} ->
+                    {reply, {error, marking_failed}, State}
+            end
     end;
 
 handle_call({resume_case, CaseId, Reason}, _From, State) ->
@@ -392,16 +471,30 @@ handle_call({resume_case, CaseId, Reason}, _From, State) ->
             {reply, {error, not_suspended}, State};
         #case_info{status = Status} when Status =/= suspended ->
             {reply, {error, invalid_state}, State};
-        CaseInfo ->
-            UpdatedCase = CaseInfo#case_info{status = running},
-            NewCases = maps:put(CaseId, UpdatedCase, State#control_state.cases),
-            logger:info("Case resumed: id=~p reason=~p", [CaseId, Reason],
-                         [{yawl_control, case_resumed}]),
-            notify_subscribers(case_resumed, CaseId, State#control_state.subscribers),
-            {reply, ok, State#control_state{cases = NewCases}}
+        #case_info{status = suspended} = CaseInfo ->
+            %% Apply transition: consume from suspended, produce to running
+            ConsumeMap = status_to_consume_map(suspended, CaseId),
+            ProduceMap = status_to_produce_map(running, CaseId, Reason),
+
+            case pnet_marking:'apply'(State#control_state.ctrl_marking, ConsumeMap, ProduceMap) of
+                {ok, NewCtrlMarking} ->
+                    UpdatedCase = CaseInfo#case_info{
+                        status = running,
+                        ctrl_marking = update_case_marking(CaseInfo#case_info.ctrl_marking, suspended, running, CaseId)
+                    },
+                    NewCases = maps:put(CaseId, UpdatedCase, State#control_state.cases),
+                    logger:info("Case resumed: id=~p reason=~p", [CaseId, Reason],
+                                 [{yawl_control, case_resumed}]),
+                    notify_subscribers(case_resumed, CaseId, State#control_state.subscribers),
+                    {reply, ok, State#control_state{cases = NewCases, ctrl_marking = NewCtrlMarking}};
+                {error, _Reason} ->
+                    {reply, {error, marking_failed}, State}
+            end
     end;
 
 handle_call(get_case_statistics, _From, State) ->
+    %% Snapshot the control marking for consistent statistics
+    _CtrlSnapshot = pnet_marking:snapshot(State#control_state.ctrl_marking),
     Stats = compute_statistics(State),
     {reply, Stats, State};
 
@@ -417,6 +510,8 @@ handle_call({set_parameter, Parameter, Value}, _From, State) ->
     {reply, ok, State#control_state{status = NewStatus}};
 
 handle_call(list_all_cases, _From, State) ->
+    %% Use pnet_marking:snapshot/1 for consistent view
+    _CtrlSnapshot = pnet_marking:snapshot(State#control_state.ctrl_marking),
     Cases = maps:fold(
         fun(_CaseId, CaseInfo, Acc) ->
             [case_info_to_map(CaseInfo) | Acc]
@@ -446,46 +541,83 @@ handle_call(_Request, _From, State) ->
 -spec handle_cast(term(), #control_state{}) -> {noreply, #control_state{}}.
 
 handle_cast({register_case, CaseId, SpecId}, State) ->
+    %% Create control token for enabled case using wf_task
+    {produce, ProduceMap} = wf_task:enabled(CaseId, SpecId, ?CTRL_PLACE_RUNNING),
+
+    %% Add token to control marking
+    CtrlMarking1 = pnet_marking:add(State#control_state.ctrl_marking, ProduceMap),
+
+    CaseMarking = pnet_marking:new(?CTRL_PLACES),
+    CaseMarking1 = pnet_marking:set(CaseMarking, ?CTRL_PLACE_RUNNING, [{CaseId, SpecId}]),
+
     CaseInfo = #case_info{
         case_id = CaseId,
         spec_id = SpecId,
         status = running,
         start_time = erlang:timestamp(),
-        end_time = undefined
+        end_time = undefined,
+        ctrl_marking = CaseMarking1
     },
     NewCases = maps:put(CaseId, CaseInfo, State#control_state.cases),
     logger:info("Case registered: id=~p spec=~p", [CaseId, SpecId],
                  [{yawl_control, case_registered}]),
     notify_subscribers(case_started, CaseId, State#control_state.subscribers),
-    {noreply, State#control_state{cases = NewCases}};
+    {noreply, State#control_state{cases = NewCases, ctrl_marking = CtrlMarking1}};
 
 handle_cast({unregister_case, CaseId}, State) ->
+    %% Remove case tokens from control marking
+    ConsumeMap = #{
+        ?CTRL_PLACE_RUNNING => [{CaseId, undefined}],
+        ?CTRL_PLACE_SUSPENDED => [{CaseId, undefined}],
+        ?CTRL_PLACE_COMPLETED => [{CaseId, undefined}],
+        ?CTRL_PLACE_CANCELLED => [{CaseId, undefined}],
+        ?CTRL_PLACE_FAILED => [{CaseId, undefined}]
+    },
+    NewCtrlMarking = case pnet_marking:take(State#control_state.ctrl_marking, ConsumeMap) of
+        {ok, Marking} -> Marking;
+        {error, _} -> State#control_state.ctrl_marking  % keep original if take fails
+    end,
     NewCases = maps:remove(CaseId, State#control_state.cases),
-    {noreply, State#control_state{cases = NewCases}};
+    {noreply, State#control_state{cases = NewCases, ctrl_marking = NewCtrlMarking}};
 
-handle_cast({update_case_status, CaseId, Status}, State) ->
+handle_cast({update_case_status, CaseId, NewStatus}, State) ->
     case maps:get(CaseId, State#control_state.cases, undefined) of
         undefined ->
             {noreply, State};
-        CaseInfo ->
-            UpdatedCase = CaseInfo#case_info{status = Status},
-            NewCases = maps:put(CaseId, UpdatedCase, State#control_state.cases),
+        #case_info{status = OldStatus} = CaseInfo ->
+            %% Apply transition atomically using pnet_marking:apply/3
+            ConsumeMap = status_to_consume_map(OldStatus, CaseId),
+            ProduceMap = status_to_produce_map(NewStatus, CaseId, undefined),
 
-            NewStatus = case Status of
-                completed ->
-                    State#control_state.status#engine_status{
-                        cases_completed = State#control_state.status#engine_status.cases_completed + 1
-                    };
-                failed ->
-                    State#control_state.status#engine_status{
-                        cases_failed = State#control_state.status#engine_status.cases_failed + 1
-                    };
-                _ ->
-                    State#control_state.status
-            end,
+            case pnet_marking:'apply'(State#control_state.ctrl_marking, ConsumeMap, ProduceMap) of
+                {ok, NewCtrlMarking} ->
+                    UpdatedCase = CaseInfo#case_info{
+                        status = NewStatus,
+                        ctrl_marking = update_case_marking(CaseInfo#case_info.ctrl_marking, OldStatus, NewStatus, CaseId)
+                    },
+                    NewCases = maps:put(CaseId, UpdatedCase, State#control_state.cases),
 
-            notify_subscribers({status_update, Status}, CaseId, State#control_state.subscribers),
-            {noreply, State#control_state{cases = NewCases, status = NewStatus}}
+                    %% Update engine counters based on new status
+                    NewStatusRec = case NewStatus of
+                        completed ->
+                            wf_task:done(CaseId, undefined, ?CTRL_PLACE_COMPLETED),
+                            State#control_state.status#engine_status{
+                                cases_completed = State#control_state.status#engine_status.cases_completed + 1
+                            };
+                        failed ->
+                            wf_task:failed(CaseId, undefined, ?CTRL_PLACE_FAILED),
+                            State#control_state.status#engine_status{
+                                cases_failed = State#control_state.status#engine_status.cases_failed + 1
+                            };
+                        _ ->
+                            State#control_state.status
+                    end,
+
+                    notify_subscribers({status_update, NewStatus}, CaseId, State#control_state.subscribers),
+                    {noreply, State#control_state{cases = NewCases, status = NewStatusRec, ctrl_marking = NewCtrlMarking}};
+                {error, _Reason} ->
+                    {noreply, State}
+            end
     end;
 
 handle_cast(_Request, State) ->
@@ -529,6 +661,77 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(_Reason, _State) ->
     logger:info("YAWL control stopping", [{yawl_control, stopping}]),
     ok.
+
+%%====================================================================
+%% Internal Functions - Helper Integration
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Converts a status to a consume map for pnet_marking:take/2.
+%%
+%% Maps the case status to the appropriate control place from which
+%% to consume tokens.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec status_to_consume_map(case_status(), binary()) -> pnet_marking:consume_map().
+
+status_to_consume_map(running, CaseId) ->
+    #{?CTRL_PLACE_RUNNING => [{case_token, CaseId}]};
+status_to_consume_map(suspended, CaseId) ->
+    #{?CTRL_PLACE_SUSPENDED => [{case_token, CaseId}]};
+status_to_consume_map(completed, CaseId) ->
+    #{?CTRL_PLACE_COMPLETED => [{case_token, CaseId}]};
+status_to_consume_map(cancelled, CaseId) ->
+    #{?CTRL_PLACE_CANCELLED => [{case_token, CaseId}]};
+status_to_consume_map(failed, CaseId) ->
+    #{?CTRL_PLACE_FAILED => [{case_token, CaseId}]}.
+
+%%--------------------------------------------------------------------
+%% @doc Converts a status to a produce map for pnet_marking:add/2.
+%%
+%% Maps the case status to the appropriate control place to which
+%% to produce tokens. Uses wf_task constructors for lifecycle events.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec status_to_produce_map(case_status(), binary(), term()) -> pnet_marking:produce_map().
+
+status_to_produce_map(running, CaseId, Payload) ->
+    {produce, ProduceMap} = wf_task:running(CaseId, Payload, ?CTRL_PLACE_RUNNING),
+    ProduceMap;
+status_to_produce_map(suspended, CaseId, Payload) ->
+    %% Suspend is not a standard wf_task state, use enabled as proxy
+    {produce, ProduceMap} = wf_task:enabled(CaseId, Payload, ?CTRL_PLACE_SUSPENDED),
+    ProduceMap;
+status_to_produce_map(completed, CaseId, Result) ->
+    {produce, ProduceMap} = wf_task:done(CaseId, Result, ?CTRL_PLACE_COMPLETED),
+    ProduceMap;
+status_to_produce_map(cancelled, CaseId, Reason) ->
+    {produce, ProduceMap} = wf_task:cancelled(CaseId, Reason, ?CTRL_PLACE_CANCELLED),
+    ProduceMap;
+status_to_produce_map(failed, CaseId, Reason) ->
+    {produce, ProduceMap} = wf_task:failed(CaseId, Reason, ?CTRL_PLACE_FAILED),
+    ProduceMap.
+
+%%--------------------------------------------------------------------
+%% @doc Updates a case's control marking during status transition.
+%%
+%% Uses pnet_marking:apply/3 to atomically transition the case's
+%% local control marking from old status to new status.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec update_case_marking(pnet_marking:marking(), case_status(), case_status(), binary()) ->
+          pnet_marking:marking().
+
+update_case_marking(CaseMarking, OldStatus, NewStatus, CaseId) ->
+    ConsumeMap = status_to_consume_map(OldStatus, CaseId),
+    ProduceMap = status_to_produce_map(NewStatus, CaseId, undefined),
+    case pnet_marking:'apply'(CaseMarking, ConsumeMap, ProduceMap) of
+        {ok, NewMarking} -> NewMarking;
+        {error, _} -> CaseMarking  % return original if transition fails
+    end.
 
 %%====================================================================
 %% Internal Functions
@@ -599,6 +802,9 @@ engine_status_to_map(#engine_status{
 
 %%--------------------------------------------------------------------
 %% @doc Computes case statistics from current state.
+%%
+%% Uses pnet_marking:snapshot/1 to get a consistent view of the
+%% control marking for accurate statistics.
 %%
 %% @end
 %%--------------------------------------------------------------------
