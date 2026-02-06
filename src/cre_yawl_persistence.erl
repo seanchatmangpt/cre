@@ -77,7 +77,7 @@
 %% Exports
 %%====================================================================
 
--export([save_state/1, load_state/1, delete_state/1, list_states/0]).
+-export([save_state/1, load_state/1, delete_state/1, list_states/0, doctest_test/0]).
 
 %%====================================================================
 %% API Functions

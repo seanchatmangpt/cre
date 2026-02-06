@@ -282,6 +282,17 @@ allocate_resource(TaskId, RoleList, Strategy) ->
     gen_server:call(?MODULE, {allocate_resource, TaskId, RoleList, Strategy}).
 
 %% @doc Deallocates a resource from a task.
+///
+/// Marks an active allocation as completed, releasing the participant
+/// back to available status for future task assignments.
+///
+/// Example - Deallocate after task completion:
+///
+/// ```erlang
+/// 1> ok = yawl_resourcing:deallocate_resource(<<"task_123">>, <<"allocation_abc123">>).
+/// ok
+/// '''
+///
 -spec deallocate_resource(binary(), binary()) -> ok | {error, term()}.
 deallocate_resource(TaskId, AllocationId) ->
     gen_server:call(?MODULE, {deallocate_resource, TaskId, AllocationId}).

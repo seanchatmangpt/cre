@@ -1035,7 +1035,6 @@ notify_subscribers(Event, CaseId, Subscribers) ->
 %%====================================================================
 %% Doctests
 %%====================================================================
-
 %%--------------------------------------------------------------------
 %% @doc Runs doctests for the yawl_control module.
 %%
@@ -1043,23 +1042,20 @@ notify_subscribers(Event, CaseId, Subscribers) ->
 %% control state management transitions. It creates a test control panel
 %% and verifies suspend/resume/cancel operations work correctly.
 %%
-%% <h4>Examples</h4>
+%% === Example
 %%
-%% Running the doctest:
-%% ```
+%% ```erlang
 %% 1> yawl_control:doctest_test().
 %% ok
 %% ```
 %%
-%% The test performs:
-%% <ul>
-%%   <li>Starts a control panel with a registered name</li>
-%%   <li>Registers a test workflow case</li>
-%%   <li>Suspends the case (running -> suspended transition)</li>
-%%   <li>Resumes the case (suspended -> running transition)</li>
-%%   <li>Verifies the case is running again</li>
-%%   <li>Stops the control panel</li>
-%% </ul>
+%% The test validates the complete suspend/resume lifecycle:
+%% 1. Start control panel
+%% 2. Register a test case
+%% 3. Suspend the case
+%% 4. Resume the case
+%% 5. Verify status transitions
+%% 6. Stop control panel
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -1072,13 +1068,14 @@ notify_subscribers(Event, CaseId, Subscribers) ->
 ok
 ```
 
-The test validates the complete suspend/resume lifecycle:
-1. Start control panel
-2. Register a test case
-3. Suspend the case
-4. Resume the case
-5. Verify status transitions
-6. Stop control panel
+The test validates the complete suspend/resume/cancel lifecycle:
+1. Start control panel with registered name
+2. Register a test workflow case
+3. Suspend the case (running -> suspended transition)
+4. Resume the case (suspended -> running transition)
+5. Cancel the case (running -> cancelled transition)
+6. Verify all status transitions
+7. Stop control panel
 """.
 -spec doctest_test() -> ok.
 
@@ -1088,7 +1085,7 @@ doctest_test() ->
     SpecId = <<"doctest_workflow">>,
 
     try
-        %% Step 1: Start the control panel
+        %% Step 1: Start the control panel with a unique registered name
         {ok, _Pid} = start_control(TestName),
 
         %% Step 2: Register a test case
@@ -1109,14 +1106,20 @@ doctest_test() ->
         %% Step 7: Verify the case is running again
         {ok, running} = get_status_sync(TestName, CaseId),
 
-        %% Step 8: Clean up
+        %% Step 8: Cancel the case
+        ok = cancel_case_sync(TestName, CaseId, <<"Doctest cancellation">>),
+
+        %% Step 9: Verify the case is cancelled
+        {ok, cancelled} = get_status_sync(TestName, CaseId),
+
+        %% Step 10: Clean up
         stop_sync(TestName),
         ok
     catch
-        _:Reason ->
+        _:Reason:Stack ->
             %% Ensure cleanup even on failure
             catch stop_sync(TestName),
-            error({doctest_failed, Reason})
+            error({doctest_failed, Reason, Stack})
     end.
 
 %%--------------------------------------------------------------------
@@ -1153,6 +1156,15 @@ resume_case_sync(ControlName, CaseId, Reason) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @doc Synchronous wrapper for cancelling a case in named control.
+%%--------------------------------------------------------------------
+-spec cancel_case_sync(atom(), binary(), binary()) -> ok | {error, term()}.
+
+cancel_case_sync(ControlName, CaseId, Reason) ->
+    gen_server:call(ControlName, {cancel_case, CaseId, Reason}).
+
+%%--------------------------------------------------------------------
+%% @private
 %% @doc Synchronous wrapper for registering a case in named control.
 %%--------------------------------------------------------------------
 -spec register_case(atom(), binary(), binary()) -> ok.
@@ -1169,3 +1181,14 @@ register_case(ControlName, CaseId, SpecId) ->
 
 stop_sync(ControlName) ->
     gen_server:stop(ControlName).
+
+%%====================================================================
+%% EUnit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_eunit_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.
