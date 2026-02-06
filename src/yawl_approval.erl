@@ -145,8 +145,7 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({timeout, CheckpointId}, State) ->
-    {noreply, NewState} = handle_timeout(CheckpointId, State),
-    {noreply, NewState};
+    handle_timeout(CheckpointId, State);
 
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -690,7 +689,7 @@ do_cancel_checkpoint(CheckpointId, State) ->
 handle_timeout(CheckpointId, State) ->
     Checkpoint = maps:get(CheckpointId, State#state.checkpoints, undefined),
     case maps:get(CheckpointId, State#state.decisions, undefined) of
-        undefined ->
+        undefined when Checkpoint =/= undefined ->
             Decision = #approval_decision{
                 checkpoint_id = CheckpointId,
                 approved = false,
@@ -706,9 +705,9 @@ handle_timeout(CheckpointId, State) ->
             Waiters = maps:get(CheckpointId, State#state.waiters, []),
             send_timeout_notifications(CheckpointId, Waiters),
             log_checkpoint_event(Checkpoint, timeout),
-            State#state{decisions = NewDecisions};
-        _Existing ->
-            State
+            {noreply, State#state{decisions = NewDecisions}};
+        _ ->
+            {noreply, State}
     end.
 
 %%--------------------------------------------------------------------

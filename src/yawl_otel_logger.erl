@@ -351,9 +351,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%====================================================================
 
 %% @private
-create_event(EventType, Message, Attributes, Level, State) ->
+create_event(EventType, Message, Attributes, Level, _State) ->
     TraceId = maps:get(trace_id, Attributes, generate_trace_id()),
-    SpanId = generate_span_id(),
+    SpanId = maps:get(span_id, Attributes, generate_span_id()),
     ParentSpanId = maps:get(parent_span_id, Attributes, undefined),
 
     #otel_event{

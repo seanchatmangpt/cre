@@ -183,7 +183,7 @@ yawl_persistence_test_() ->
                    ?assertEqual(CaseId, maps:get(case_id, LoadedCase)),
                    ?assertEqual(<<"workflow_test_123">>, maps:get(workflow_id, LoadedCase)),
                    ?assertEqual(running, maps:get(status, LoadedCase))
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
@@ -197,12 +197,12 @@ yawl_persistence_test_() ->
                    ?assertEqual(maps:get(data, OriginalCase), maps:get(data, LoadedCase)),
                    ?assert(maps:is_key(created_at, LoadedCase)),
                    ?assert(maps:is_key(started_at, LoadedCase))
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
                    ?assertMatch({error, not_found}, yawl_persistence:load_case(<<"nonexistent_case">>))
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
@@ -213,7 +213,7 @@ yawl_persistence_test_() ->
                    ?assertMatch({ok, CaseId}, yawl_persistence:save_case(UpdatedCase)),
                    {ok, LoadedCase} = yawl_persistence:load_case(CaseId),
                    ?assertEqual(suspended, maps:get(status, LoadedCase))
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
@@ -223,12 +223,12 @@ yawl_persistence_test_() ->
                    {ok, _Case} = yawl_persistence:load_case(CaseId),
                    ?assertEqual(ok, yawl_persistence:delete_case(CaseId)),
                    ?assertMatch({error, not_found}, yawl_persistence:load_case(CaseId))
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
                    ?assertMatch({error, not_found}, yawl_persistence:delete_case(<<"nonexistent_case">>))
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
@@ -241,7 +241,7 @@ yawl_persistence_test_() ->
                        {ok, Loaded} = yawl_persistence:load_case(CaseId),
                        ?assertEqual(Status, maps:get(status, Loaded))
                    end, StatusList)
-               end)
+               end)}
        ]},
 
       %% Workitem Persistence Tests
@@ -258,7 +258,7 @@ yawl_persistence_test_() ->
                    ?assertEqual(1, length(Workitems)),
                    [LoadedWorkitem] = Workitems,
                    ?assertEqual(WorkitemId, maps:get(workitem_id, LoadedWorkitem))
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
@@ -276,14 +276,14 @@ yawl_persistence_test_() ->
                        ?assert(maps:is_key(task_id, W)),
                        ?assert(maps:is_key(status, W))
                    end, Workitems)
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
                    CaseId = <<"case_wi_empty_003">>,
                    {ok, Workitems} = yawl_persistence:load_workitems(CaseId),
                    ?assertEqual([], Workitems)
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
@@ -297,7 +297,7 @@ yawl_persistence_test_() ->
                    {ok, [LoadedWorkitem]} = yawl_persistence:load_workitems(CaseId),
                    ?assertEqual(started, maps:get(status, LoadedWorkitem)),
                    ?assertEqual(Now, maps:get(started_at, LoadedWorkitem))
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
@@ -314,7 +314,7 @@ yawl_persistence_test_() ->
                    ok = yawl_persistence:delete_case(CaseId),
                    {ok, WorkitemsAfter} = yawl_persistence:load_workitems(CaseId),
                    ?assertEqual([], WorkitemsAfter)
-               end)
+               end)}
        ]},
 
       %% Active Cases Tests
@@ -338,13 +338,13 @@ yawl_persistence_test_() ->
                    ?assert(lists:member(suspended, Statuses)),
                    ?assertNot(lists:member(completed, Statuses)),
                    ?assertNot(lists:member(cancelled, Statuses))
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
                    {ok, ActiveCases} = yawl_persistence:list_active_cases(),
                    ?assertEqual([], ActiveCases)
-               end),
+               end)},
         ?_test(begin
                    mnesia:clear_table(persistent_case),
                    mnesia:clear_table(persistent_workitem),
@@ -360,7 +360,7 @@ yawl_persistence_test_() ->
                    ok = yawl_persistence:delete_case(<<"count_case_1">>),
                    {ok, Count4} = yawl_persistence:get_case_count(),
                    ?assertEqual(4, Count4)
-               end)
+               end)}
        ]},
 
       %% Integration Tests
@@ -401,6 +401,6 @@ yawl_persistence_test_() ->
                    ok = yawl_persistence:delete_case(CaseId),
                    ?assertMatch({error, not_found}, yawl_persistence:load_case(CaseId)),
                    {ok, []} = yawl_persistence:load_workitems(CaseId)
-               end)
+               end)}
        ]}
      ]}.

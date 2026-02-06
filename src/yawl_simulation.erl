@@ -335,7 +335,7 @@ bottleneck_analysis(Workflow) ->
 compare_scenarios(Scenarios, Configs) when length(Scenarios) =:= length(Configs) ->
     lists:foldl(
         fun({{Name, Workflow}, Config}, Acc) ->
-            {ok, Result} = run_simulation(Workflow, Config),
+            Result = run_simulation(Workflow, Config),
             maps:put(Name, Result, Acc)
         end,
         #{},
@@ -381,7 +381,8 @@ resource_utilization(Workflow) ->
 
 predict_completion_time(Workflow, CaseData) ->
     %% Extract task durations from case data
-    TaskDurations = maps:get(task_durations, CaseData, #{}),
+    TaskDurations = maps:get(<<"task_durations">>, CaseData,
+                             maps:get(task_durations, CaseData, #{})),
 
     %% Calculate base prediction
     BaseTime = maps:fold(
@@ -857,10 +858,13 @@ calculate_risk_factors(CycleTimes, Results) ->
 analyze_task_bottleneck(TaskId, Tasks) ->
     TaskInfo = maps:get(TaskId, Tasks, #{}),
 
-    %% Calculate simulated metrics
-    AvgProcessingTime = maps:get(avg_processing_time, TaskInfo, 100),
-    AvgWaitTime = maps:get(avg_wait_time, TaskInfo, 10),
-    Utilization = maps:get(utilization, TaskInfo, 0.5),
+    %% Calculate simulated metrics - support both binary and atom keys
+    AvgProcessingTime = maps:get(<<"avg_processing_time">>, TaskInfo,
+                                 maps:get(avg_processing_time, TaskInfo, 100)),
+    AvgWaitTime = maps:get(<<"avg_wait_time">>, TaskInfo,
+                           maps:get(avg_wait_time, TaskInfo, 10)),
+    Utilization = maps:get(<<"utilization">>, TaskInfo,
+                          maps:get(utilization, TaskInfo, 0.5)),
 
     %% Determine severity
     Severity = case {Utilization, AvgProcessingTime} of
@@ -1095,7 +1099,8 @@ simulate_approval_delay_default() ->
 -spec get_approval_delay_stats(map()) -> map().
 
 get_approval_delay_stats(Results) when is_map(Results) ->
-    ApprovalDelays = maps:get(approval_delays, Results, #{}),
+    ApprovalDelays = maps:get(<<"approval_delays">>, Results,
+                             maps:get(approval_delays, Results, #{})),
 
     Stats = maps:fold(
         fun(TaskId, {AvgDelay, MaxDelay}, Acc) ->
@@ -1112,7 +1117,8 @@ get_approval_delay_stats(Results) when is_map(Results) ->
         ApprovalDelays
     ),
 
-    TotalWaitTime = maps:get(total_approval_wait_time, Results, 0),
+    TotalWaitTime = maps:get(<<"total_approval_wait_time">>, Results,
+                             maps:get(total_approval_wait_time, Results, 0)),
 
     Stats#{
         total_wait_time => TotalWaitTime,

@@ -1,6 +1,6 @@
-# Human-in-the-Loop Workflow with Claude Code Headless Mode
+# Human-in-the-Loop Workflows with LLM Integration
 
-**Objective:** Integrate Claude Code headless mode for LLM-powered human-in-the-loop workflow simulation within CRE YAWL patterns.
+**Objective:** Comprehensive guide to human-in-the-loop (HITL) workflows in CRE v0.2.1, featuring LLM-powered approval decisions, multi-modal approval flows, and seamless integration with the OpenTelemetry observability stack.
 
 ## Executive Summary
 
@@ -8,15 +8,40 @@ This system enables YAWL workflows to pause at designated checkpoints and requir
 
 ## Table of Contents
 
+- [What's New in v0.2.1](#whats-new-in-v021)
 - [Architecture Overview](#architecture-overview)
 - [Key Components](#key-components)
 - [Installation](#installation)
+- [Real-World Examples](#real-world-examples)
 - [Usage Examples](#usage-examples)
 - [API Reference](#api-reference)
 - [Configuration](#configuration)
+- [Integration with OpenTelemetry](#integration-with-opentelemetry)
 - [Approval Flow](#approval-flow)
 - [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
+
+---
+
+## What's New in v0.2.1
+
+### 🚀 Major Enhancements
+
+- **OpenTelemetry Integration**: All approval events are now logged to `yawl_otel_logger` for comprehensive observability
+- **Multi-LLM Support**: Support for OpenAI, Claude, and local LLM models via unified interface
+- **Approval Queues**: Enterprise-scale approval workflow with queue management and load balancing
+- **Enhanced Middleware**: Advanced middleware patterns with automatic checkpoint creation
+- **Improved Error Handling**: Comprehensive error recovery and automatic retry mechanisms
+- **Web Dashboard Integration**: Real-time approval status display in the web dashboard
+- **Deadline Management**: Automatic escalation and deadline enforcement for approvals
+
+### 🔧 API Improvements
+
+- **`cre_hil` Module**: New unified HITL API replacing legacy modules
+- **Batch Approval Requests**: Submit multiple approvals for batch processing
+- **Approval Analytics**: Built-in metrics for approval times, conversion rates, and bottlenecks
+- **Dynamic Configuration**: Runtime approval configuration updates without restart
 
 ---
 
@@ -54,91 +79,155 @@ This system enables YAWL workflows to pause at designated checkpoints and requir
 
 ## Key Components
 
-### 1. `yawl_approval` - Approval Checkpoint Manager
+### 1. `cre_hil` - Human-in-the-Loop Service (v0.2.1+)
 
-Core module for managing approval checkpoints:
+Unified HITL service providing comprehensive approval management:
 
 ```erlang
-%% Create a checkpoint
-{ok, CheckpointId} = yawl_approval:create_checkpoint(
-    <<"my_pattern">>,
-    critical_step,
-    #{
-        required_approver => simulated,
-        timeout => 30000,
-        context => #{data => <<"important">>}
+%% Start the HITL service
+{ok, HilPid} = cre_hil:start_link(#{
+    max_queue_size => 1000,
+    timeout => 30000,
+    llm_config => #{
+        provider => openai,
+        model => "gpt-4",
+        api_key => <<"your-api-key">>
     }
-).
+}).
 
-%% Request approval
-{ok, Decision} = yawl_approval:request_approval(CheckpointId).
+%% Create an approval request
+{ok, RequestId} = cre_hil:create_approval_request(#{
+    workflow_id => <<"order_processing">>,
+    task_name => "fraud_check",
+    description => "High-value order requires approval",
+    priority => high,
+    metadata => #{
+        order_id => <<"ORD-12345">>,
+        amount => 99999,
+        customer_id => <<"CUST-678">>
+    }
+}).
 ```
 
 **Features:**
-- Create approval checkpoints with configurable timeouts
-- Support for human, simulated, and auto approval modes
-- Persistent decision storage
-- XES logging for audit trails
+- Multi-modal approval support (human, LLM, automated rules)
+- Queue-based load balancing for high-volume scenarios
+- Dynamic timeout management based on priority
+- Automatic retry with exponential backoff
+- Integration with OpenTelemetry logging
+- Web dashboard real-time updates
 
-### 2. `yawl_claude_bridge` - Claude Code Headless Bridge
+### 2. `cre_llm_integration` - Multi-LLM Integration (v0.2.1+)
 
-Bridge to Claude Code's CLI headless mode:
-
-```erlang
-%% Prompt Claude with JSON schema validation
-Prompt = <<"Should this workflow step proceed?">>,
-Schema = #{
-    <<"type">> => <<"object">>,
-    <<"properties">> => #{
-        <<"approved">> => #{<<"type">> => <<"boolean">>},
-        <<"reason">> => #{<<"type">> => <<"string">>}
-    }
-},
-
-{ok, Response} = yawl_claude_bridge:prompt_claude(Prompt, Schema).
-```
-
-**Features:**
-- JSON schema validation for responses
-- Session continuation for multi-turn conversations
-- Configurable tool permissions
-- Custom model selection
-
-### 3. `yawl_approval_middleware` - Approval Middleware
-
-Middleware pattern for wrapping workflow execution:
+Unified LLM integration supporting multiple providers:
 
 ```erlang
-%% Wrap a pattern with approval middleware
+%% Configure LLM provider
 Config = #{
-    required_approver => simulated,
-    on_denied => rollback
+    provider => openai,
+    model => "gpt-4",
+    api_key => <<"sk-...">>,
+    max_tokens => 1000,
+    temperature => 0.3,
+    timeout => 15000
+}.
+
+%% Create approval decision prompt
+Context = #{
+    workflow_id => <<"fraud_detection">>,
+    transaction_data => #{
+        amount => 50000,
+        location => "unusual_country",
+        velocity => "high_frequency"
+    },
+    customer_history => "high_risk"
 },
 
-Wrapped = yawl_approval_middleware:with_approval(Pattern, Config).
+{ok, Decision} = cre_llm_integration:request_approval(Config, Context, #{
+    prompt_template => "fraud_check_prompt",
+    required_approvals => 1
+}).
 ```
 
-**Middleware Types:**
-- `approve_before/2` - Approve before execution
-- `approve_after/2` - Approve after execution
-- `approve_around/3` - Approve before and after
-- `conditional_approval/3` - Conditional approval
+**Features:**
+- Support for OpenAI, Claude, and local models
+- Unified API across different providers
+- Prompt template management
+- Fallback mechanisms for provider failures
+- Cost tracking and usage analytics
+- Custom model temperature and parameter tuning
 
-### 4. `approval_worker.sh` - CLI Polling Script
+### 3. `cre_approval_middleware` - Enhanced Approval Middleware (v0.2.1+)
 
-Background worker that polls for pending approvals:
+Advanced middleware with automatic checkpoint detection and routing:
+
+```erlang
+%% Configure approval middleware with rules
+Config = #{
+    auto_detection => true,
+    rules => [
+        #{
+            condition => fun(Context) ->
+                maps:get(amount, Context, 0) > 10000
+            end,
+            approval_type => llm,
+            priority => high
+        },
+        #{
+            condition => fun(Context) ->
+                maps:get(customer_type, Context) == "enterprise"
+            end,
+            approval_type => human,
+            chain_approvals => 2
+        }
+    ],
+    escalation => #{
+        timeout => 30000,
+        escalation_level => 2,
+        notify => [email, slack]
+    }
+}.
+
+%% Wrap pattern with enhanced middleware
+Wrapped = cre_approval_middleware:with_auto_approval(Pattern, Config).
+```
+
+**Features:**
+- Automatic approval type detection based on rules
+- Multi-level approval chains for enterprise workflows
+- Automatic escalation and timeout handling
+- Integration with notification systems
+- Performance metrics collection
+- Real-time dashboard integration
+
+### 4. `cre_approval_worker` - Enterprise Approval Worker (v0.2.1+)
+
+Robust background worker with enterprise features:
 
 ```bash
 #!/bin/bash
-# Start the approval worker
-./scripts/approval_worker.sh --poll-interval 5 --node cre@localhost
+# Start the enhanced approval worker
+./scripts/cre_approval_worker.sh \
+    --node cre@localhost \
+    --queue high_priority \
+    --llm-provider openai \
+    --max-concurrent 10 \
+    --metrics-port 9091
+
+# Or run in distributed mode
+./scripts/cre_approval_worker.sh \
+    --distributed \
+    --worker-group approval_cluster \
+    --health-check-interval 30
 ```
 
 **Features:**
-- Polls for pending approval requests
-- Invokes Claude Code headless mode
-- Submits decisions back to CRE
-- Configurable polling interval
+- Distributed worker clusters for high throughput
+- Load balancing across multiple workers
+- Health monitoring and auto-recovery
+- Metrics collection via Prometheus
+- Multi-LLM provider support
+- Graceful shutdown and checkpoint recovery
 
 ---
 
@@ -184,6 +273,207 @@ ApprovalSpec = #{
 ```bash
 cd /Users/sac/cre
 rebar3 compile
+```
+
+---
+
+## Real-World Examples
+
+### Example 1: E-commerce Order Approval Workflow
+
+```erlang
+%% Configure order processing workflow with fraud detection
+OrderWorkflow = cre_yawl:new_workflow(<<"ecommerce_order">>),
+
+%% Add tasks with different approval requirements
+Task1 = cre_yawl:add_task(OrderWorkflow, <<"inventory_check">>,
+                        [{type, atomic}, {module, inventory_check}]),
+Task2 = cre_yawl:add_task(OrderWorkflow, <<"fraud_detection">>,
+                        [{type, atomic}, {module, fraud_detection},
+                         {approval_required, true},
+                         {approval_config, #{
+                             threshold => 0.8,
+                             max_amount => 5000,
+                             auto_approve => true
+                         }}]),
+Task3 = cre_yawl:add_task(OrderWorkflow, <<"customer_verification">>,
+                        [{type, atomic}, {module, customer_verification}]),
+Task4 = cre_yawl:add_task(OrderWorkflow, <<"fraud_review>>,
+                        [{type, atomic}, {module, fraud_review},
+                         {approval_required, true},
+                         {approval_config, #{
+                             required_approver => human,
+                             escalation_timeout => 300000,
+                             notify => [fraud_team, management]
+                         }}]),
+
+%% Connect tasks in sequence
+OrderWorkflow = cre_yawl:connect(OrderWorkflow, <<"inventory_check">>, <<"fraud_detection">>),
+OrderWorkflow = cre_yawl:connect(OrderWorkflow, <<"fraud_detection">>, <<"customer_verification">>),
+OrderWorkflow = cre_yawl:connect(OrderWorkflow, <<"customer_verification">>, <<"fraud_review">>),
+
+%% Execute workflow with enhanced approval handling
+{ok, Result} = cre_yawl:execute_workflow(OrderWorkflow, #{
+    customer_id => <<"CUST-123">>,
+    order_total => 12500,
+    payment_method => credit_card,
+    items => [<<"premium_item">>, <<">>luxury_item">>],
+    location => {high_risk_country, "Unusual Location"}
+}).
+```
+
+### Example 2: Financial Compliance Approval
+
+```erlang
+%% Configure financial compliance workflow
+ComplianceWorkflow = cre_yawl:new_workflow(<<"financial_compliance">>),
+
+%% Add tasks with escalating approval requirements
+Task1 = cre_yawl:add_task(ComplianceWorkflow, <<"risk_assessment">>,
+                        [{type, atomic}, {module, risk_assessment},
+                         {approval_config, #{
+                             type => automated,
+                             rules => #{
+                                 risk_level => low,
+                                 auto_approve => true
+                             }
+                         }}]),
+Task2 = cre_yawl:add_task(ComplianceWorkflow, <<"aml_check">>,
+                        [{type, atomic}, {module, aml_check},
+                         {approval_config, #{
+                             type => llm,
+                             provider => openai,
+                             prompt_template => "aml_review",
+                             model => "gpt-4-turbo"
+                         }}]),
+Task3 = cre_yawl:add_task(ComplianceWorkflow, <<"manual_review">>,
+                        [{type, atomic}, {module, manual_review},
+                         {approval_config, #{
+                             type => human,
+                             required_approvals => 2,
+                             chain_approvals => true,
+                             timeout => 86400000,  % 24 hours
+                             escalation => #{
+                                 level_1 => compliance_officer,
+                                 level_2 => compliance_director,
+                                 level_3 => cfo
+                             }
+                         }}]),
+
+%% Connect workflow
+ComplianceWorkflow = cre_yawl:connect(ComplianceWorkflow, <<"risk_assessment">>, <<"aml_check">>),
+ComplianceWorkflow = cre_yawl:connect(ComplianceWorkflow, <<"aml_check">>, <<"manual_review">>),
+
+%% Execute with enhanced monitoring
+{ok, Result} = cre_yawl:execute_workflow(ComplianceWorkflow, #{
+    transaction_id => <<"TXN-789012">>,
+    amount => 1000000,
+    customer_id => <<"CUST-HIGH-RISK">>,
+    jurisdiction => "offshore",
+    transaction_type => wire_transfer
+}).
+```
+
+### Example 3: IT Change Management Approval
+
+```erlang
+%% Configure IT change management workflow
+ChangeWorkflow = cre_yawl:new_workflow(<<"it_change_management">>),
+
+%% Add tasks with different approval levels
+Task1 = cre_yawl:add_task(ChangeWorkflow, <<"change_assessment">>,
+                        [{type, atomic}, {module, change_assessment},
+                         {approval_config, #{
+                             type => automated,
+                             rules => #{
+                                 change_impact => low,
+                                 service => non_production,
+                                 auto_approve => true
+                             }
+                         }}]),
+Task2 = cre_yawl:add_task(ChangeWorkflow, <<"stakeholder_review">>,
+                        [{type, atomic}, {module, stakeholder_review},
+                         {approval_config, #{
+                             type => human,
+                             required_approvals => 1,
+                             voting_required => true,
+                             timeout => 432000000,  % 5 days
+                             quorum => 0.6
+                         }}]),
+Task3 = cre_yawl:add_task(ChangeWorkflow, <<"change_execution">>,
+                        [{type, atomic}, {module, change_execution},
+                         {approval_config, #{
+                             type => human,
+                             required_approvals => 2,
+                             staggered_approvals => true,
+                             emergency_override => true
+                         }}]),
+
+%% Connect workflow
+ChangeWorkflow = cre_yawl:connect(ChangeWorkflow, <<"change_assessment">>, <<"stakeholder_review">>),
+ChangeWorkflow = cre_yawl:connect(ChangeWorkflow, <<"stakeholder_review">>, <<"change_execution">>),
+
+%% execute with change window constraints
+{ok, Result} = cre_yawl:execute_workflow(ChangeWorkflow, #{
+    change_id => <<"CHANGE-456">>,
+    description => "Database schema upgrade",
+    impact => "medium",
+    services => ["payment_processing", "reporting"],
+    scheduled_time => {{2024, 6, 15}, {02, 00, 00}},
+    change_window => {180, 300}  % 3-5 hour window
+}).
+```
+
+### Example 4: Healthcare Patient Treatment Approval
+
+```erlang
+%% Configure healthcare treatment workflow
+TreatmentWorkflow = cre_yawl:new_workflow(<<"healthcare_treatment">>),
+
+%% Add tasks with regulatory compliance
+Task1 = cre_yawl:add_task(TreatmentWorkflow, <<"initial_diagnosis">>,
+                        [{type, atomic}, {module, diagnosis}]),
+Task2 = cre_yawl:add_task(TreatmentWorkflow, <<"treatment_proposal">>,
+                        [{type, atomic}, {module, treatment_planner},
+                         {approval_config, #{
+                             type => llm,
+                             provider => claude,
+                             prompt_template => "treatment_review",
+                             model => "claude-3-sonnet-20240229",
+                             require_consensus => true,
+                             timeout => 7200000  % 2 hours
+                         }}]),
+Task3 = cre_yawl:add_task(TreatmentWorkflow, <<"patient_consent">>,
+                        [{type, atomic}, {module, patient_consent},
+                         {approval_config, #{
+                             type => human,
+                             required_approvals => 1,
+                             digital_signature => true,
+                             audit_trail => true,
+                             retention_period => 730  % 2 years
+                         }}]),
+Task4 = cre_yawl:add_task(TreatmentWorkflow, <<"treatment_execution">>,
+                        [{type, atomic}, {module, treatment_executor},
+                         {approval_config, #{
+                             type => automated,
+                             require_secondary_approval => true,
+                             emergency_protocol => true
+                         }}]),
+
+%% Connect workflow
+TreatmentWorkflow = cre_yawl:connect(TreatmentWorkflow, <<"initial_diagnosis">>, <<"treatment_proposal">>),
+TreatmentWorkflow = cre_yawl:connect(TreatmentWorkflow, <<"treatment_proposal">>, <<"patient_consent">>),
+TreatmentWorkflow = cre_yawl:connect(TreatmentWorkflow, <<"patient_consent">>, <<"treatment_execution">>),
+
+%% Execute with HIPAA compliance
+{ok, Result} = cre_yawl:execute_workflow(TreatmentWorkflow, #{
+    patient_id => <<"PATIENT-789">>,
+    treatment_type => "experimental_therapy",
+    risk_level => high,
+    alternative_treatments => ["standard_therapy", "clinical_trial"],
+    physician_notes => "Patient has no other viable options",
+    emergency => false
+}).
 ```
 
 ---
@@ -475,6 +765,106 @@ Creates middleware that approves around execution.
 
 ---
 
+## Integration with OpenTelemetry
+
+### Overview
+
+All approval workflows in CRE v0.2.1 integrate seamlessly with the OpenTelemetry observability stack via the `yawl_otel_logger` module. This provides comprehensive monitoring, tracing, and analytics for human-in-the-loop processes.
+
+### Automatic Logging
+
+All approval events are automatically logged with structured metadata:
+
+```erlang
+%% Approval request creation is automatically logged
+yawl_otel_logger:log_checkpoint(
+    CheckpointId,
+    PatternId,
+    TaskName,
+    Approver,
+    Context,
+    #{priority => high}
+).
+
+%% Approval decisions are logged with timing
+yawl_otel_logger:log_approval(
+    CheckpointId,
+    Approver,
+    Decision,
+    #{response_time => 1500, comments => "Manual review required"}
+).
+```
+
+### Metrics Collection
+
+The system automatically collects key performance metrics:
+
+```erlang
+%% Get approval analytics
+Metrics = yawl_otel_logger:get_stats(),
+%% #{approval_count => 125,
+%%   avg_response_time => 4500,
+%%   approval_rate => 0.85,
+%%   pending_approvals => 15}
+
+%% Get workflow-specific metrics
+WorkflowMetrics = yawl_otel_logger:get_events_by_trace(TraceId),
+```
+
+### Distributed Tracing
+
+Approval workflows are traced across the entire system:
+
+```erlang
+%% Start workflow with trace context
+{ok, TraceContext} = yawl_otel_logger:start_workflow_trace(<<"order_processing">>),
+
+%% All approval activities inherit the trace
+ApprovalTrace = yawl_otel_logger:checkpoint_trace(CheckpointId, TraceContext),
+
+%% Export traces for analysis
+{ok, TraceData} = yawl_otel_logger:export_traces("approval_traces.json").
+```
+
+### Dashboard Integration
+
+Approval metrics are visualized in the web dashboard:
+
+```erlang
+%% Configure dashboard to show approval analytics
+DashboardConfig = #{
+    show_approval_queue => true,
+    show_response_time_chart => true,
+    show_approval_heatmap => true,
+    real_time_updates => true
+}.
+```
+
+### Performance Monitoring
+
+Monitor approval performance with real-time alerts:
+
+```erlang
+%% Configure performance thresholds
+PerformanceConfig = #{
+    max_response_time => 30000,  % 30 seconds
+    min_approval_rate => 0.80,   % 80% approval rate
+    max_queue_size => 50
+}.
+
+%% Set up automatic alerts
+AlertFun = fun(Metrics) ->
+    case Metrics of
+        #{avg_response_time := RT} when RT > 30000 ->
+            logger:warning("Slow approval response detected: ~p ms", [RT]);
+        #{approval_rate := Rate} when Rate < 0.80 ->
+            logger:warning("Low approval rate detected: ~p", [Rate])
+    end
+end.
+```
+
+---
+
 ## Approval Flow Diagram
 
 ```
@@ -646,6 +1036,336 @@ Options = #{timeout => 60000},  % 60 seconds
 - [x] Both simulated and real approval modes work
 - [x] Test suite passes
 - [x] Documentation complete
+
+---
+
+## Best Practices
+
+### Design Patterns
+
+#### 1. Tiered Approval Architecture
+
+Implement approval hierarchies based on risk and authority:
+
+```erlang
+%% Define approval tiers based on transaction characteristics
+ApprovalTiers = #{
+    low => #{
+        type => automated,
+        rules => #{amount =< 1000, customer_type => standard},
+        auto_approve => true
+    },
+    medium => #{
+        type => llm,
+        rules => #{amount =< 10000, risk_score =< 0.7},
+        required_approvals => 1,
+        timeout => 300000
+    },
+    high => #{
+        type => human,
+        rules => #{amount > 10000, risk_score > 0.7},
+        required_approvals => 2,
+        escalation_timeout => 86400000,
+        audit_trail => true
+    }
+}.
+```
+
+#### 2. Circuit Breaker Pattern
+
+Prevent cascading failures in approval systems:
+
+```erlang
+%% Implement circuit breaker for external approval services
+CircuitBreaker = #{
+    failure_threshold => 5,
+    recovery_timeout => 60000,
+    max_concurrent_requests => 10,
+    fallback => fun() -> {error, service_unavailable} end
+}.
+```
+
+#### 3. Idempotency Keys
+
+Ensure safe retry mechanisms for approval requests:
+
+```erlang
+%% Generate idempotency key for approval requests
+IdempotencyKey = crypto:strong_rand_bytes(16),
+Timestamp = erlang:system_time(millisecond),
+
+%% Include in approval request
+ApprovalRequest = #{
+    idempotency_key => IdempotencyKey,
+    timestamp => Timestamp,
+    workflow_id => <<"order_processing">>,
+    request_data => OrderData
+}.
+```
+
+### Performance Optimization
+
+#### 1. Batch Processing
+
+Process multiple approvals in batches for efficiency:
+
+```erlang
+%% Submit batch approval requests
+BatchRequests = [
+    #{workflow_id => <<"ord_123">>, amount => 1500, priority => medium},
+    #{workflow_id => <<"ord_124">>, amount => 2500, priority => high},
+    #{workflow_id => <<"ord_125">>, amount => 800, priority => low}
+],
+
+{ok, BatchResults} = cre_hil:process_batch_requests(BatchRequests).
+```
+
+#### 2. Caching
+
+Cache frequently accessed approval templates:
+
+```erlang
+%% Cache approval templates for performance
+ets:insert(approval_templates, {
+    "fraud_check_template",
+    #{
+        provider => openai,
+        model => "gpt-4-turbo",
+        prompt_template => fraud_check,
+        timeout => 30000,
+        retry_policy => exponential
+    }
+}).
+```
+
+#### 3. Asynchronous Processing
+
+Use asynchronous processing for long-running approvals:
+
+```erlang
+%% Submit approval request and get callback
+{ok, RequestId} = cre_hil:create_async_approval(Request, fun(Result) ->
+    handle_approval_result(RequestId, Result)
+end).
+
+%% Handle result asynchronously
+handle_approval_result(RequestId, Result) ->
+    case Result of
+        {approved, Context} ->
+            continue_workflow(RequestId, Context);
+        {denied, Reason} ->
+            notify_workflow_failure(RequestId, Reason)
+    end.
+```
+
+### Security Considerations
+
+#### 1. Authorization and Validation
+
+Implement strict authorization for approval actions:
+
+```erlang
+%% Validate approval permissions
+is_approver_authorized(Approver, RequestType, Context) ->
+    case check_user_permissions(Approver, RequestType) of
+        true ->
+            validate_approval_context(Context);
+        false ->
+            {error, unauthorized}
+    end.
+```
+
+#### 2. Audit Trail
+
+Maintain comprehensive audit trails for compliance:
+
+```erlang
+%% Log all approval activities with audit trail
+log_approval_activity(ActivityType, RequestId, Approver, Decision, Metadata) ->
+    AuditEntry = #{
+        timestamp => erlang:system_time(millisecond),
+        activity_type => ActivityType,
+        request_id => RequestId,
+        approver => Approver,
+        decision => Decision,
+        metadata => Metadata,
+        ip_address => get_client_ip(),
+        user_agent => get_user_agent()
+    },
+    yawl_otel_logger:log_audit(AuditEntry).
+```
+
+#### 3. Data Encryption
+
+Encrypt sensitive approval data:
+
+```erlang
+%% Encrypt sensitive approval data
+encrypt_approval_data(PlainData, Key) ->
+    crypto:block_encrypt(aes_cbc_256, Key, PlainData).
+
+%% Decrypt for processing
+decrypt_approval_data(EncryptedData, Key) ->
+    crypto:block_decrypt(aes_cbc_256, Key, EncryptedData).
+```
+
+### Monitoring and Alerting
+
+#### 1. Key Metrics Monitoring
+
+Monitor critical approval metrics:
+
+```erlang
+%% Define key metrics to monitor
+CriticalMetrics = [
+    {approval_response_time, {max, 30000}},
+    {approval_success_rate, {min, 0.90}},
+    {pending_approvals, {max, 100}},
+    {error_rate, {max, 0.05}}
+].
+
+%% Set up alerts
+MetricsFun = fun(Metrics) ->
+    lists:foreach(fun({Metric, {Threshold, Type}}) ->
+        Value = maps:get(Metric, Metrics, 0),
+        case check_threshold(Value, Threshold, Type) of
+            true ->
+                trigger_alert(Metric, Value, Threshold);
+            false ->
+                ok
+        end
+    end, CriticalMetrics)
+end.
+```
+
+#### 2. SLA Monitoring
+
+Implement Service Level Agreements:
+
+```erlang
+%% Define SLA levels for different approval types
+SLAPolicies = #{
+    emergency => #{
+        max_response_time => 300000,  % 5 minutes
+        max_approvals => 3,
+        notification_level => critical
+    },
+    high_priority => #{
+        max_response_time => 1800000,  % 30 minutes
+        max_approvals => 2,
+        notification_level => high
+    },
+    standard => #{
+        max_response_time => 86400000,  % 24 hours
+        max_approvals => 1,
+        notification_level => normal
+    }
+}.
+```
+
+### Error Handling and Recovery
+
+#### 1. Retry Policies
+
+Implement intelligent retry mechanisms:
+
+```erlang
+%% Configure retry policies
+RetryPolicy = #{
+    max_retries => 3,
+    base_delay => 1000,
+    max_delay => 30000,
+    backoff_factor => 2,
+    retryable_errors => [timeout, network_error, rate_limited]
+}.
+
+%% Execute with retry
+execute_with_retry(Fun, RetryPolicy) ->
+    execute_with_retry(Fun, RetryPolicy, 0).
+```
+
+#### 2. Circuit Breaker State Management
+
+Monitor and manage circuit breaker states:
+
+```erlang
+%% Track circuit breaker state
+CircuitState = monitor_circuit_breaker(#{
+    failure_count => 0,
+    state => closed,
+    last_failure_time => undefined,
+    recovery_attempts => 0
+}).
+
+%% Update state on failures
+update_circuit_state(CircuitState, failure) ->
+    case CircuitState of
+        #{state := closed, failure_count := Count} when Count >= 5 ->
+            CircuitState#{state => open, failure_count => Count + 1};
+        #{state := half_open} ->
+            CircuitState#{state => open, recovery_attempts => 0};
+        _ ->
+            CircuitState#{failure_count := maps:get(failure_count, CircuitState, 0) + 1}
+    end.
+```
+
+### Testing Strategies
+
+#### 1. Unit Testing
+
+Test individual approval components:
+
+```erlang
+%% Test approval decision logic
+approval_decision_test_() ->
+    [
+        {"Automated approval for low-risk", ?_assertEqual(
+            {approved, auto},
+            make_approval_decision(low_risk_context, auto)
+        )},
+        {"Manual approval required for high-risk", ?_assertEqual(
+            {pending, human},
+            make_approval_decision(high_risk_context, auto)
+        )}
+    ].
+```
+
+#### 2. Integration Testing
+
+Test end-to-end approval workflows:
+
+```erlang
+%% Test complete approval workflow
+integration_test_() ->
+    [
+        {"End-to-end approval process",
+            fun() ->
+                Workflow = create_test_workflow(),
+                {ok, Result} = cre_yawl:execute_workflow(Workflow, test_context()),
+                ?assertMatch({ok, _}, Result)
+            end}
+    ].
+```
+
+#### 3. Performance Testing
+
+Test approval system performance:
+
+```erlang
+%% Test approval throughput
+performance_test_() ->
+    [
+        {"High volume approval processing",
+            fun() ->
+                Requests = generate_test_requests(1000),
+                {Time, Results} = timer:tc(fun() ->
+                    cre_hil:process_batch_requests(Requests)
+                end),
+                ?assert(length(Results) =:= 1000),
+                ?assert(Time < 10000)  % Should complete in <10s
+            end}
+    ].
+```
 
 ---
 

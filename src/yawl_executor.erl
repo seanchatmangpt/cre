@@ -1305,9 +1305,26 @@ generate_exec_id() ->
 ensure_state_table() ->
     case ets:whereis(?MODULE) of
         undefined ->
-            ets:new(?MODULE, [named_table, public, {read_concurrency, true}]);
+            Heir = case get_heir_process() of
+                undefined -> none;
+                Pid -> {heir, Pid, []}
+            end,
+            ets:new(?MODULE, [named_table, public, {read_concurrency, true}, Heir]);
         Table ->
             Table
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Gets the heir process for ETS tables.
+%% @end
+%%--------------------------------------------------------------------
+-spec get_heir_process() -> pid() | undefined.
+
+get_heir_process() ->
+    case whereis(yawl_executor_sup) of
+        undefined -> case whereis(cre_sup) of undefined -> undefined; Pid -> Pid end;
+        Pid -> Pid
     end.
 
 %%--------------------------------------------------------------------
@@ -1319,10 +1336,19 @@ ensure_state_table() ->
 -spec get_stats_table() -> ets:tid().
 
 get_stats_table() ->
-    TableName = list_to_existing_atom(atom_to_list(?MODULE) ++ "_stats"),
+    TableName = try
+        list_to_existing_atom(atom_to_list(?MODULE) ++ "_stats")
+    catch
+        error:badarg ->
+            list_to_atom(atom_to_list(?MODULE) ++ "_stats")
+    end,
     case ets:whereis(TableName) of
         undefined ->
-            ets:new(TableName, [named_table, public, {read_concurrency, true}]),
+            Heir = case get_heir_process() of
+                undefined -> none;
+                Pid -> {heir, Pid, []}
+            end,
+            ets:new(TableName, [named_table, public, {read_concurrency, true}, Heir]),
             TableName;
         Table ->
             Table

@@ -626,7 +626,7 @@ retry_policy_max_attempts(#retry_policy{max_attempts = N}) -> N.
 %% @doc Gets the backoff strategy.
 %% @end
 %%--------------------------------------------------------------------
--spec retry_policy_backoff(Policy :: retry_policy()) -> exponential | linear | constant.
+-spec retry_policy_backoff(Policy :: retry_policy()) -> retry_strategy().
 
 retry_policy_backoff(#retry_policy{backoff_strategy = Strategy}) -> Strategy.
 
@@ -826,10 +826,8 @@ register_handler(Handlers, #error_handler{exception_types = Types} = Handler) ->
               HandlerId = Handler#error_handler.handler_id,
               %% Filter out existing handler with same id, then add new one
               FilteredList = lists:filter(
-                  fun(H) when is_record(H, error_handler) ->
-                      H#error_handler.handler_id =/= HandlerId;
-                     (_) ->
-                      true
+                  fun(#error_handler{handler_id = Hid}) -> Hid =/= HandlerId;
+                     (_) -> true
                   end, L),
               Acc#{Type => [Handler | FilteredList]}
       end,
@@ -1219,8 +1217,8 @@ is_enabled(handle_compensation_timeout, _Marking, _UsrInfo) -> true;
 is_enabled(cancel_compensation, _Marking, _UsrInfo) -> true.
 
 %% Transition firing - Enhanced for WHP-01 to WHP-05 patterns
-fire(raise_exception, #{'Active' := [Exception]}, _UsrInfo) when is_record(Exception, yawl_exception) ->
-    ?LOG(warning, "Exception raised: ~p", [Exception#yawl_exception.type]),
+fire(raise_exception, #{'Active' := [#yawl_exception{type = Type} = Exception]}, _UsrInfo) ->
+    ?LOG(warning, "Exception raised: ~p", [Type]),
     {produce, #{
       'ExceptionRaised' => [Exception],
       'Active' => []

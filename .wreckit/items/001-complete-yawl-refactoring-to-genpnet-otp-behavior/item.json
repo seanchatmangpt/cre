@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "id": "001-complete-yawl-refactoring-to-genpnet-otp-behavior",
+  "title": "Complete YAWL refactoring to gen_pnet OTP behavior",
+  "section": "backend",
+  "state": "researched",
+  "overview": "Current YAWL system mocks gen_pnet callbacks but implements custom Petri net engine, not utilizing the actual gen_pnet library that is already a dependency\n\n**Motivation:** Using genuine gen_pnet OTP behavior provides proper Erlang/OTP integration, better maintainability, native token passing semantics, and alignment with the intended architecture\n\n**Success criteria:**\n- All 43 YAWL patterns work as gen_pnet modules\n- Workflows execute end-to-end with gen_pnet\n- Token passing semantics match YAWL specification\n- Cancellation patterns work correctly\n- Colored tokens carry data correctly\n- All existing tests pass\n- Performance matches or exceeds current implementation\n\n**Technical constraints:**\n- Must maintain backward compatibility for existing workflows\n- Cannot break existing YAWL patterns functionality\n- Must preserve YAWL token semantics\n- Must handle cancellation patterns correctly\n\n**In scope:**\n- Refactor yawl_patterns.erl to proper gen_pnet callback module\n- Replace yawl_workflow_instance.erl gen_statem with gen_pnet\n- Update yawl_orchestrator.erl for gen_pnet workflow management\n- Create gen_pnet modules for all 43 YAWL patterns\n- Implement colored Petri net extensions for gen_pnet\n- Update persistence layer for gen_pnet net_state\n- Create migration path from old to new implementation\n**Out of scope:**\n- Changes to YAWL specification semantics\n- Modifying external API contracts (without compatibility layer)\n- Removing support for existing workflow definitions\n\n**Signals:** priority: high, urgency: Major architectural refactoring requiring 5-7 weeks, should be started incrementally",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Research quality validation failed:\nMissing required sections: Key Files\nInsufficient citations: found 0, required at least 5 file:line references",
+  "created_at": "2026-02-06T06:07:43.608Z",
+  "updated_at": "2026-02-06T06:19:54.742Z",
+  "problem_statement": "Current YAWL system mocks gen_pnet callbacks but implements custom Petri net engine, not utilizing the actual gen_pnet library that is already a dependency",
+  "motivation": "Using genuine gen_pnet OTP behavior provides proper Erlang/OTP integration, better maintainability, native token passing semantics, and alignment with the intended architecture",
+  "success_criteria": [
+    "All 43 YAWL patterns work as gen_pnet modules",
+    "Workflows execute end-to-end with gen_pnet",
+    "Token passing semantics match YAWL specification",
+    "Cancellation patterns work correctly",
+    "Colored tokens carry data correctly",
+    "All existing tests pass",
+    "Performance matches or exceeds current implementation"
+  ],
+  "technical_constraints": [
+    "Must maintain backward compatibility for existing workflows",
+    "Cannot break existing YAWL patterns functionality",
+    "Must preserve YAWL token semantics",
+    "Must handle cancellation patterns correctly"
+  ],
+  "scope_in_scope": [
+    "Refactor yawl_patterns.erl to proper gen_pnet callback module",
+    "Replace yawl_workflow_instance.erl gen_statem with gen_pnet",
+    "Update yawl_orchestrator.erl for gen_pnet workflow management",
+    "Create gen_pnet modules for all 43 YAWL patterns",
+    "Implement colored Petri net extensions for gen_pnet",
+    "Update persistence layer for gen_pnet net_state",
+    "Create migration path from old to new implementation"
+  ],
+  "scope_out_of_scope": [
+    "Changes to YAWL specification semantics",
+    "Modifying external API contracts (without compatibility layer)",
+    "Removing support for existing workflow definitions"
+  ],
+  "priority_hint": "high",
+  "urgency_hint": "Major architectural refactoring requiring 5-7 weeks, should be started incrementally"
+}

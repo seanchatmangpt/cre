@@ -439,10 +439,15 @@ check_pattern_health_with_span_test_() ->
      fun(_Pid) -> cleanup(_Pid) end,
      fun(_Pid) ->
          [
-          ?_test("Checks pattern health with active span"),
-          {ok, _SpanId} = yawl_telemetry:start_span(sequence, <<"health-pattern">>),
-          Health = yawl_telemetry:check_pattern_health(<<"health-pattern">>),
-          ?assertMatch({healthy, _} | {degraded, _}, Health)
+          ?_test(begin
+                    {ok, _SpanId} = yawl_telemetry:start_span(sequence, <<"health-pattern">>),
+                    Health = yawl_telemetry:check_pattern_health(<<"health-pattern">>),
+                    ?assert(case Health of
+                        {healthy, _} -> true;
+                        {degraded, _} -> true;
+                        _ -> false
+                    end)
+               end)
          ]
      end}.
 

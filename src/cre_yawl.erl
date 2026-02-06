@@ -63,6 +63,8 @@
 
 -module(cre_yawl).
 
+-include("yawl_otel_logger.hrl").
+
 %%====================================================================
 %% Exports
 %%====================================================================
@@ -87,6 +89,14 @@
 -export([resource_create/1, role_allocate/2, resource_start/1, role_distribute/2, capability_allocate/2]).
 -export([execute_resource_create/2, execute_role_allocate/3, execute_resource_start/2,
          execute_role_distribute/3, execute_capability_allocate/3]).
+
+%% Human-in-the-loop wrappers that delegate to yawl_approval
+-export([request_approval/3, approve_task/3, reject_task/3,
+         get_approval_status/2, cancel_approval/2]).
+
+%% Telemetry wrappers that delegate to yawl_otel_logger
+-export([enable_telemetry/0, enable_telemetry/1, disable_telemetry/0,
+         get_workflow_metrics/1, log_workflow_event/2, log_workflow_event/3]).
 
 %%====================================================================
 %% Types
@@ -1737,3 +1747,175 @@ check_scope_visibility(branch, _DataId, _RequestingTaskId, _Input) ->
     ok;
 check_scope_visibility(global, _DataId, _RequestingTaskId, _Input) ->
     ok.
+
+%%====================================================================
+%% Human-in-the-Loop Wrapper Functions (Delegates to yawl_approval)
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Requests approval for a workflow task.
+%%
+%% Creates an approval checkpoint and requests approval from the specified
+%% approver. Delegates to yawl_approval:create_checkpoint.
+%%
+%% @param Workflow The workflow record or workflow ID.
+%% @param TaskId The ID of the task requiring approval.
+%% @param Approver The approver identifier (pid, name, or role).
+%% @return {ok, CheckpointId} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec request_approval(Workflow :: #workflow{} | binary(), TaskId :: binary(),
+                      Approver :: term()) -> {ok, binary()} | {error, term()}.
+
+request_approval(#workflow{id = WorkflowId}, TaskId, Approver) ->
+    request_approval(WorkflowId, TaskId, Approver);
+request_approval(WorkflowId, TaskId, Approver) when is_binary(WorkflowId) ->
+    case whereis(yawl_approval) of
+        undefined ->
+            {error, {approval_not_started, yawl_approval}};
+        _Pid ->
+            StepName = binary_to_atom(TaskId, utf8),
+            Context = #{
+                workflow_id => WorkflowId,
+                task_id => TaskId,
+                approver => Approver
+            },
+            Options = #{
+                required_approver => human,
+                timeout => 300000,
+                context => Context
+            },
+            yawl_approval:create_checkpoint(WorkflowId, StepName, Options)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Approves a pending workflow task.
+%%
+%% Records approval for a task awaiting human approval.
+%% Delegates to yawl_approval:approve.
+%%
+%% @param Workflow The workflow record or workflow ID.
+%% @param TaskId The ID of the task to approve.
+%% @param Approver The approver identifier.
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec approve_task(Workflow :: #workflow{} | binary(), TaskId :: binary(),
+                  Approver :: term()) -> ok | {error, term()}.
+
+approve_task(#workflow{id = WorkflowId}, TaskId, Approver) ->
+    approve_task(WorkflowId, TaskId, Approver);
+approve_task(WorkflowId, TaskId, Approver) when is_binary(WorkflowId) ->
+    case whereis(yawl_approval) of
+        undefined ->
+            {error, {approval_not_started, yawl_approval}};
+        _Pid ->
+            CheckpointId = checkpoint_id_for_task(WorkflowId, TaskId),
+            Reason = <<"Task approved by ", (to_binary(Approver))/binary>>,
+            yawl_approval:approve(CheckpointId, Approver, Reason)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Rejects a pending workflow task.
+%%
+%% Records denial for a task awaiting human approval.
+%% Delegates to yawl_approval:deny.
+%%
+%% @param Workflow The workflow record or workflow ID.
+%% @param TaskId The ID of the task to reject.
+%% @param Rejector The rejector identifier.
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec reject_task(Workflow :: #workflow{} | binary(), TaskId :: binary(),
+                  Rejector :: term()) -> ok | {error, term()}.
+
+reject_task(#workflow{id = WorkflowId}, TaskId, Rejector) ->
+    reject_task(WorkflowId, TaskId, Rejector);
+reject_task(WorkflowId, TaskId, Rejector) when is_binary(WorkflowId) ->
+    case whereis(yawl_approval) of
+        undefined ->
+            {error, {approval_not_started, yawl_approval}};
+        _Pid ->
+            CheckpointId = checkpoint_id_for_task(WorkflowId, TaskId),
+            Reason = <<"Task rejected by ", (to_binary(Rejector))/binary>>,
+            yawl_approval:deny(CheckpointId, Rejector, Reason)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Gets the approval status for a workflow task.
+%%
+%% Returns the current approval status for a task.
+%% Delegates to yawl_approval:check_status.
+%%
+%% @param Workflow The workflow record or workflow ID.
+%% @param TaskId The ID of the task to check.
+%% @return {ok, Status} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_approval_status(Workflow :: #workflow{} | binary(), TaskId :: binary()) ->
+          {ok, yawl_approval:approval_status()} | {error, term()}.
+
+get_approval_status(#workflow{id = WorkflowId}, TaskId) ->
+    get_approval_status(WorkflowId, TaskId);
+get_approval_status(WorkflowId, TaskId) when is_binary(WorkflowId) ->
+    case whereis(yawl_approval) of
+        undefined ->
+            {error, {approval_not_started, yawl_approval}};
+        _Pid ->
+            CheckpointId = checkpoint_id_for_task(WorkflowId, TaskId),
+            yawl_approval:check_status(CheckpointId)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Cancels a pending approval for a workflow task.
+%%
+%% Cancels an approval checkpoint that is pending.
+%% Delegates to yawl_approval:cancel_checkpoint.
+%%
+%% @param Workflow The workflow record or workflow ID.
+%% @param TaskId The ID of the task to cancel approval for.
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec cancel_approval(Workflow :: #workflow{} | binary(), TaskId :: binary()) ->
+          ok | {error, term()}.
+
+cancel_approval(#workflow{id = WorkflowId}, TaskId) ->
+    cancel_approval(WorkflowId, TaskId);
+cancel_approval(WorkflowId, TaskId) when is_binary(WorkflowId) ->
+    case whereis(yawl_approval) of
+        undefined ->
+            {error, {approval_not_started, yawl_approval}};
+        _Pid ->
+            CheckpointId = checkpoint_id_for_task(WorkflowId, TaskId),
+            yawl_approval:cancel_checkpoint(CheckpointId)
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Generates a checkpoint ID for a workflow task.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec checkpoint_id_for_task(WorkflowId :: binary(), TaskId :: binary()) -> binary().
+checkpoint_id_for_task(WorkflowId, TaskId) ->
+    <<WorkflowId/binary, ":", TaskId/binary>>.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Converts a term to binary.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec to_binary(term()) -> binary().
+to_binary(B) when is_binary(B) -> B;
+to_binary(A) when is_atom(A) -> atom_to_binary(A, utf8);
+to_binary(I) when is_integer(I) -> integer_to_binary(I);
+to_binary(L) when is_list(L) -> list_to_binary(L);
+to_binary(T) -> list_to_binary(io_lib:format("~p", [T])).

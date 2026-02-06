@@ -476,9 +476,17 @@ join_binaries([Bin | Rest], Sep) ->
 
 format_map_inline(Map) ->
     maps:fold(fun(Key, Value, Acc) ->
+        KeyBin = to_binary(Key),
         ValueStr = format_value(Value),
-        <<Key/binary, "=>", ValueStr/binary, ", ", Acc/binary>>
+        <<KeyBin/binary, "=>", ValueStr/binary, ", ", Acc/binary>>
     end, <<"">>, Map).
+
+%% @doc Convert atom, binary, list, or other term to binary.
+to_binary(Binary) when is_binary(Binary) -> Binary;
+to_binary(Atom) when is_atom(Atom) -> atom_to_binary(Atom);
+to_binary(List) when is_list(List) -> list_to_binary(List);
+to_binary(Int) when is_integer(Int) -> integer_to_binary(Int);
+to_binary(Term) -> term_to_binary(Term).
 
 format_timestamp(Millis) ->
     %% Convert milliseconds to seconds for calendar functions
