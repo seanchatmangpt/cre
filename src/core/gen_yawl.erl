@@ -19,101 +19,45 @@
 %% -------------------------------------------------------------------
 %% @author CRE Team
 %% @version 0.2.0
-%%
-%% @doc gen_yawl - A wrapper around gen_pnet that supports 3-tuple returns
-%% from fire/3 for automatic user info updates.
-%%
-%% <h3>Overview</h3>
-%%
-%% `gen_yawl' extends the `gen_pnet' behavior by allowing the `fire/3' callback
-%% to return a 3-tuple `{produce, ProduceMap, NewUsrInfo}' in addition to the
-%% standard 2-tuple `{produce, ProduceMap}' or `abort'. When a 3-tuple is
-%% returned, the user info is automatically updated.
-%%
-%% This is particularly useful for YAWL workflows where the state needs to be
-%% updated as part of transition firing, such as tracking workflow variables,
-%% case state, or execution context.
-%%
-%% <h3>Key Features</h3>
-%%
-%% <ul>
-%%   <li><b>Drop-in Replacement:</b> Same API surface as gen_pnet</li>
-%%   <li><b>Enhanced fire/3:</b> Supports 3-tuple returns for automatic state updates</li>
-%%   <li><b>Backward Compatible:</b> Works with existing gen_pnet callback modules</li>
-%%   <li><b>Transparent Wrapping:</b> No changes to Petri net semantics</li>
-%% </ul>
-%%
-%% <h3>Usage Example</h3>
-%%
-%% To use gen_yawl, implement the standard gen_pnet callbacks with the enhanced
-%% fire/3 signature:
-%%
-%% ```
-%% -module(my_workflow).
-%% -behavior(gen_yawl).
-%%
-%% -export([place_lst/0, trsn_lst/0, init_marking/2, preset/1,
-%%          is_enabled/3, fire/3, init/1, trigger/3,
-%%          handle_call/3, handle_cast/2, handle_info/2,
-%%          code_change/3, terminate/2]).
-%%
-%% %% Standard gen_pnet callbacks
-%% place_lst() -> [p1, p2].
-%% trsn_lst() -> [t1].
-%% init_marking(_Place, _UsrInfo) -> [].
-%% preset(t1) -> [p1].
-%% is_enabled(t1, _Mode, _UsrInfo) -> true.
-%%
-%% %% Enhanced fire/3 - can return 3-tuple with new user info
-%% fire(t1, Mode, UsrInfo) ->
-%%     #{p1 := [Token]} = Mode,
-%%     %% Update user info with execution data
-%%     NewUsrInfo = UsrInfo#{last_token => Token,
-%%                          count => maps:get(count, UsrInfo, 0) + 1},
-%%     {produce, #{p2 => [Token]}, NewUsrInfo}.
-%%
-%% %% Standard interface callbacks
-%% init(InitArg) -> #{initial => InitArg}.
-%% trigger(_Place, _Token, _NetState) -> pass.
-%% handle_call(_Request, _From, _NetState) -> {reply, {error, bad_msg}}.
-%% handle_cast(_Request, _NetState) -> noreply.
-%% handle_info(_Request, _NetState) -> noreply.
-%% code_change(_OldVsn, NetState, _Extra) -> {ok, NetState}.
-%% terminate(_Reason, _NetState) -> ok.
-%% '''
-%%
-%% <h3>API Functions</h3>
-%%
-%% The gen_yawl module provides the same API as gen_pnet:
-%%
-%% <ul>
-%%   <li>`start_link/3, start_link/4' - Start a gen_yawl process</li>
-%%   <li>`stop/1' - Stop the process</li>
-%%   <li>`ls/2' - Query tokens on a place</li>
-%%   <li>`marking/1' - Query the full marking</li>
-%%   <li>`usr_info/1' - Query the user info</li>
-%%   <li>`call/2, call/3' - Synchronous requests</li>
-%%   <li>`cast/2' - Asynchronous messages</li>
-%%   <li>`stats/1' - Performance statistics</li>
-%% </ul>
-%%
-%% <h3>Enhanced fire/3 Callback</h3>
-%%
-%% The fire/3 callback can return:
-%%
-%% <ul>
-%%   <li>`{produce, ProduceMap}' - Standard gen_pnet behavior, produces tokens</li>
-%%   <li>`{produce, ProduceMap, NewUsrInfo}' - Enhanced behavior, produces tokens
-%%       and updates user info</li>
-%%   <li>`abort' - Abort the transition firing</li>
-%% </ul>
-%%
-%% @end
 %% -------------------------------------------------------------------
 
 -module(gen_yawl).
 -author("CRE Team").
 -behaviour(gen_server).
+
+-moduledoc """
+gen_yawl - A wrapper around gen_pnet that supports 3-tuple returns
+from fire/3 for automatic user info updates.
+
+`gen_yawl' extends the `gen_pnet' behavior by allowing the `fire/3' callback
+to return a 3-tuple `{produce, ProduceMap, NewUsrInfo}' in addition to the
+standard 2-tuple `{produce, ProduceMap}' or `abort'. When a 3-tuple is
+returned, the user info is automatically updated.
+
+This is particularly useful for YAWL workflows where the state needs to be
+updated as part of transition firing, such as tracking workflow variables,
+case state, or execution context.
+
+<h3>Key Features</h3>
+
+<ul>
+  <li><b>Drop-in Replacement:</b> Same API surface as gen_pnet</li>
+  <li><b>Enhanced fire/3:</b> Supports 3-tuple returns for automatic state updates</li>
+  <li><b>Backward Compatible:</b> Works with existing gen_pnet callback modules</li>
+  <li><b>Transparent Wrapping:</b> No changes to Petri net semantics</li>
+</ul>
+
+<h3>Enhanced fire/3 Callback</h3>
+
+The fire/3 callback can return:
+
+<ul>
+  <li>`{produce, ProduceMap}' - Standard gen_pnet behavior, produces tokens</li>
+  <li>`{produce, ProduceMap, NewUsrInfo}' - Enhanced behavior, produces tokens
+      and updates user info</li>
+  <li>`abort' - Abort the transition firing</li>
+</ul>
+""".
 
 %%====================================================================
 %% Includes
@@ -495,52 +439,31 @@ state_property(Name, Pred, PlaceLst)
 %% Net state accessor functions (forwarded from gen_pnet)
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc Extract tokens on a place from a net state.
-%%
-%%      Throws an error if the place does not exist.
-%%
-%% === Example ===
-%% ```
-%% Tokens = gen_yawl:get_ls(place1, NetState).
-%% '''
-%%
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Extract tokens on a place from a net state.
+
+Throws an error if the place does not exist.
+""".
 -spec get_ls(Place :: atom(), NetState :: #net_state{}) -> [term()].
 
 get_ls(Place, #net_state{marking = Marking}) ->
     maps:get(Place, Marking).
 
-%%--------------------------------------------------------------------
-%% @doc Extract user info from a net state.
-%%
-%%      Returns the user info field from the net_state record.
-%%
-%% === Example ===
-%% ```
-%% UsrInfo = gen_yawl:get_usr_info(NetState).
-%% '''
-%%
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Extract user info from a net state.
+
+Returns the user info field from the net_state record.
+""".
 -spec get_usr_info(NetState :: #net_state{}) -> term().
 
 get_usr_info(#net_state{usr_info = UsrInfo}) ->
     UsrInfo.
 
-%%--------------------------------------------------------------------
-%% @doc Extract stats from a net state.
-%%
-%%      Returns the statistics record from the net_state.
-%%
-%% === Example ===
-%% ```
-%% Stats = gen_yawl:get_stats(NetState).
-%% '''
-%%
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Extract stats from a net state.
+
+Returns the statistics record from the net_state.
+""".
 -spec get_stats(NetState :: #net_state{}) -> #stats{}.
 
 get_stats(#net_state{stats = Stats}) ->
@@ -1093,3 +1016,14 @@ permut_map_keys([K | Rest], Map, Acc) ->
     Values = maps:get(K, Map),
     NewAcc = [{maps:put(K, V, M)} || M <- Acc, V <- Values],
     permut_map_keys(Rest, Map, NewAcc).
+
+%%====================================================================
+%% EUnit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

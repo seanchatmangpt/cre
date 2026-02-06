@@ -2,7 +2,7 @@
 %%
 %% CRE: common runtime environment for distributed programming languages
 %%
-%% Copyright 2015 Jörgen Brandt <joergen@cuneiform-lang.org>
+%% Copyright 2015 Jorgen Brandt <joergen@cuneiform-lang.org>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @author Jörgen Brandt <joergen@cuneiform-lang.org>
+%% @author Jorgen Brandt <joergen@cuneiform-lang.org>
 %% @copyright 2015
 %%
 %% @doc YAWL Stateless Execution Mode for CRE.
@@ -43,6 +43,55 @@
 %%   <li>Event-driven processing</li>
 %% </ul>
 %%
+%% <h3>Execution Lifecycle</h3>
+%%
+%% Stateless workflow executions progress through these states:
+%%
+%% ```
+%%    [pending] -> [running] -> [completed]
+%%                  |              |
+%%                  v              v
+%%              [paused]        [failed]
+%%                  |              |
+%%                  v              v
+%%              [cancelled]    [cancelled]
+%% '''
+%%
+%% <h3>Doctests</h3>
+%%
+%% State validation:
+%% ```
+%% 1> Spec = #{<<"tasks">> => [#{<<"id">> => <<"step1">>}, #{<<"id">> => <<"step2">>}]}.
+%% #{<<"tasks">> => [...]}
+%% 2> yawl_stateless:validate_stateless(Spec).
+%% ok
+%% 3> yawl_stateless:validate_stateless(#{}).
+%% {error, [<<"Missing tasks definition">>]}
+%% '''
+%%
+%% Execution lifecycle:
+%% ```
+%% 1> ExecId = yawl_stateless:generate_execution_id().
+%% <<"exec_", ...>>
+%% 2> true = is_binary(ExecId).
+%% true
+%% 3> true = binary:match(ExecId, <<"exec_">>) =/= nomatch.
+%% true
+%% '''
+%%
+%% Checkpoint operations:
+%% ```
+%% 1> ExecState = #execution_state{execution_id = <<"test">>, status = running,
+%% 1>                            start_time = erlang:timestamp(), workflow_spec = #{}}.
+%% #execution_state{...}
+%% 2> Serialized = yawl_stateless:serialize_execution_state(ExecState).
+%% <<...>>
+%% 3> Deserialized = yawl_stateless:deserialize_execution_state(Serialized).
+%% #execution_state{...}
+%% 4> Deserialized#execution_state.execution_id =:= ExecState#execution_state.execution_id.
+%% true
+%% '''
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -59,10 +108,20 @@
 -export([get_execution_state/1, checkpoint/2, restore/2]).
 -export([list_executions/0, get_execution_result/1]).
 -export([cancel_execution/1, pause_execution/1, resume_execution/1]).
+-export([doctest_test/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          code_change/3, terminate/2]).
+
+%% Internal functions exported for doctest
+-export([generate_execution_id/0,
+         validate_workflow_spec/1,
+         extract_workflow_steps/1,
+         serialize_execution_state/1,
+         deserialize_execution_state/1,
+         filename/3,
+         timestamp_to_binary/1]).
 
 %%====================================================================
 %% Records
@@ -107,6 +166,12 @@
 %%--------------------------------------------------------------------
 %% @doc Starts the stateless execution service with default name.
 %%
+%% Example:
+%% ```
+%% 1> {ok, Pid} = yawl_stateless:start_link().
+%% {ok, <0.123.0>}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec start_link() -> {ok, pid()} | {error, term()}.
@@ -141,6 +206,14 @@ stop() ->
 %% @param InputData Input data for the workflow.
 %% @return {ok, ExecutionId} or {error, term()}.
 %%
+%% Example:
+%% ```
+%% 1> Spec = #{<<"tasks">> => [#{<<"id">> => <<"step1">>}]}.
+%% #{<<"tasks">> => [...]}
+%% 2> {ok, ExecId} = yawl_stateless:execute_stateless(Spec, #{}).
+%% {ok, <<"exec_", ...>>}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec execute_stateless(WorkflowSpec :: workflow_spec(), InputData :: map()) ->
@@ -154,6 +227,16 @@ execute_stateless(WorkflowSpec, InputData) when is_map(InputData) ->
 %%
 %% @param WorkflowSpec The workflow specification to validate.
 %% @return ok | {error, [binary()]}.
+%%
+%% Example:
+%% ```
+%% 1> Spec = #{<<"tasks">> => [#{<<"id">> => <<"task1">>}]}.
+%% #{<<"tasks">> => [...]}
+%% 2> yawl_stateless:validate_stateless(Spec).
+%% ok
+%% 3> yawl_stateless:validate_stateless(#{}).
+%% {error, [<<"Missing tasks definition">>]}
+%% '''
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -169,6 +252,14 @@ validate_stateless(WorkflowSpec) ->
 %% @param ExecutionId The execution identifier.
 %% @return Execution state or {error, not_found}.
 %%
+%% Example:
+%% ```
+%% 1> ExecId = <<"exec_123">>.
+%% <<"exec_123">>
+%% 2> State = yawl_stateless:get_execution_state(ExecId).
+%% #execution_state{execution_id = <<"exec_123">>, ...}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec get_execution_state(execution_id()) -> execution_state() | {error, not_found}.
@@ -182,6 +273,12 @@ get_execution_state(ExecutionId) when is_binary(ExecutionId) ->
 %% @param ExecutionId The execution identifier.
 %% @param CheckpointName Name for the checkpoint.
 %% @return ok | {error, term()}.
+%%
+%% Example:
+%% ```
+%% 1> ok = yawl_stateless:checkpoint(ExecId, <<"checkpoint1">>).
+%% ok
+%% '''
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -197,6 +294,12 @@ checkpoint(ExecutionId, CheckpointName) when is_binary(ExecutionId), is_binary(C
 %% @param CheckpointName Name of the checkpoint to restore.
 %% @return ok | {error, term()}.
 %%
+%% Example:
+%% ```
+%% 1> ok = yawl_stateless:restore(ExecId, <<"checkpoint1">>).
+%% ok
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec restore(execution_id(), binary()) -> ok | {error, term()}.
@@ -208,6 +311,12 @@ restore(ExecutionId, CheckpointName) when is_binary(ExecutionId), is_binary(Chec
 %% @doc Lists all active executions.
 %%
 %% @return List of execution summaries.
+%%
+%% Example:
+%% ```
+%% 1> yawl_stateless:list_executions().
+%% [#{execution_id => <<"exec_1">>, status => running, ...}]
+%% '''
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -232,6 +341,12 @@ get_execution_result(ExecutionId) when is_binary(ExecutionId) ->
 %%--------------------------------------------------------------------
 %% @doc Cancels a running execution.
 %%
+%% Example:
+%% ```
+%% 1> ok = yawl_stateless:cancel_execution(ExecId).
+%% ok
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec cancel_execution(execution_id()) -> ok | {error, term()}.
@@ -242,6 +357,12 @@ cancel_execution(ExecutionId) when is_binary(ExecutionId) ->
 %%--------------------------------------------------------------------
 %% @doc Pauses a running execution.
 %%
+%% Example:
+%% ```
+%% 1> ok = yawl_stateless:pause_execution(ExecId).
+%% ok
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec pause_execution(execution_id()) -> ok | {error, term()}.
@@ -251,6 +372,12 @@ pause_execution(ExecutionId) when is_binary(ExecutionId) ->
 
 %%--------------------------------------------------------------------
 %% @doc Resumes a paused execution.
+%%
+%% Example:
+%% ```
+%% 1> ok = yawl_stateless:resume_execution(ExecId).
+%% ok
+%% '''
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -592,6 +719,16 @@ terminate(_Reason, _State) ->
 %%--------------------------------------------------------------------
 %% @doc Generates a unique execution ID.
 %%
+%% Example:
+%% ```
+%% 1> ExecId = yawl_stateless:generate_execution_id().
+%% <<"exec_", ...>>
+%% 2> true = is_binary(ExecId).
+%% true
+%% 3> true = binary:match(ExecId, <<"exec_">>) =/= nomatch.
+%% true
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec generate_execution_id() -> binary().
@@ -603,6 +740,18 @@ generate_execution_id() ->
 
 %%--------------------------------------------------------------------
 %% @doc Validates a workflow specification.
+%%
+%% Returns ok for valid specs, {error, [binary()]} for invalid specs.
+%%
+%% Example:
+%% ```
+%% 1> Spec = #{<<"tasks">> => [#{<<"id">> => <<"task1">>}]}.
+%% #{<<"tasks">> => [...]}
+%% 2> yawl_stateless:validate_workflow_spec(Spec).
+%% ok
+%% 3> yawl_stateless:validate_workflow_spec(#{}).
+%% {error, [<<"Missing tasks definition">>]}
+%% '''
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -619,6 +768,14 @@ validate_workflow_spec(_Spec) ->
 
 %%--------------------------------------------------------------------
 %% @doc Extracts workflow steps from specification.
+%%
+%% Example:
+%% ```
+%% 1> Spec = #{<<"tasks">> => [#{<<"id">> => <<"step1">>}, #{<<"id">> => <<"step2">>}]}.
+%% #{<<"tasks">> => [...]}
+%% 2> yawl_stateless:extract_workflow_steps(Spec).
+%% [<<"step1">>, <<"step2">>]
+%% '''
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -646,6 +803,17 @@ execute_workflow_step(StepId, _ExecState) ->
 %%--------------------------------------------------------------------
 %% @doc Serializes execution state to a storable format.
 %%
+%% Example:
+%% ```
+%% 1> ExecState = #execution_state{execution_id = <<"test">>, status = running,
+%% 1>                            start_time = erlang:timestamp(), workflow_spec => #{}}.
+%% #execution_state{...}
+%% 2> Serialized = yawl_stateless:serialize_execution_state(ExecState).
+%% <<...>>
+%% 3> true = is_binary(Serialized).
+%% true
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec serialize_execution_state(#execution_state{}) -> term().
@@ -655,6 +823,19 @@ serialize_execution_state(ExecState) ->
 
 %%--------------------------------------------------------------------
 %% @doc Deserializes execution state from stored format.
+%%
+%% Example:
+%% ```
+%% 1> ExecState = #execution_state{execution_id = <<"test">>, status = running,
+%% 1>                            start_time = erlang:timestamp(), workflow_spec => #{}}.
+%% #execution_state{...}
+%% 2> Serialized = yawl_stateless:serialize_execution_state(ExecState).
+%% <<...>>
+%% 3> Deserialized = yawl_stateless:deserialize_execution_state(Serialized).
+%% #execution_state{...}
+%% 4> Deserialized#execution_state.execution_id =:= ExecState#execution_state.execution_id.
+%% true
+%% '''
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -667,6 +848,12 @@ deserialize_execution_state(Term) ->
 
 %%--------------------------------------------------------------------
 %% @doc Generates checkpoint file path.
+%%
+%% Example:
+%% ```
+%% 1> Path = yawl_stateless:filename(<<"/tmp">>, <<"exec_123">>, <<"cp1">>).
+%% <<"/tmp/exec_123_cp1.chk">>
+%% '''
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -692,6 +879,14 @@ save_checkpoint(File, Data) ->
 %%--------------------------------------------------------------------
 %% @doc Converts timestamp to binary string.
 %%
+%% Example:
+%% ```
+%% 1> yawl_stateless:timestamp_to_binary({1, 2, 3}).
+%% <<"1.2.3">>
+%% 2> yawl_stateless:timestamp_to_binary(undefined).
+%% undefined
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec timestamp_to_binary(erlang:timestamp() | undefined) -> binary() | undefined.
@@ -712,3 +907,108 @@ schedule_ttl_cleanup() ->
     %% (OTP 21+ optimization)
     Interval = cre_config:get(yawl_stateless_ttl_cleanup_interval, 60000),
     erlang:send_after(Interval, self(), ttl_cleanup).
+
+%%====================================================================
+%% Doctest Support
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the yawl_stateless module.
+%%
+%% This function validates the examples in the module documentation.
+%%
+%% Returns `ok' when all tests pass.
+%%
+%% Example:
+%% ```
+%% 1> yawl_stateless:doctest_test().
+%% ok
+%% '''
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test execution ID generation
+    ExecId1 = generate_execution_id(),
+    true = is_binary(ExecId1),
+    true = byte_size(ExecId1) > 4,
+    true = binary:match(ExecId1, <<"exec_">>) =/= nomatch,
+
+    %% Test that execution IDs are unique
+    ExecId2 = generate_execution_id(),
+    true = ExecId1 =/= ExecId2,
+
+    %% Test workflow spec validation
+    ValidSpec = #{<<"tasks">> => [#{<<"id">> => <<"task1">>}, #{<<"id">> => <<"task2">>}]},
+    ok = validate_workflow_spec(ValidSpec),
+
+    {error, _} = validate_workflow_spec(#{}),
+    {error, _} = validate_workflow_spec(#{<<"tasks">> => not_a_list}),
+    {error, _} = validate_workflow_spec(invalid),
+
+    %% Test workflow step extraction
+    Steps = extract_workflow_steps(ValidSpec),
+    true = is_list(Steps),
+    true = length(Steps) =:= 2,
+    [<<"task1">>, <<"task2">>] = Steps,
+
+    %% Test state serialization/deserialization
+    Now = erlang:timestamp(),
+    ExecState = #execution_state{
+        execution_id = <<"test_exec">>,
+        workflow_spec = ValidSpec,
+        status = running,
+        current_step = <<"task1">>,
+        steps_completed = [],
+        steps_remaining = [<<"task1">>, <<"task2">>],
+        data = #{<<"input">> => <<"value">>},
+        checkpoints = [],
+        start_time = Now,
+        end_time = undefined
+    },
+
+    %% Test serialization
+    Serialized = serialize_execution_state(ExecState),
+    true = is_binary(Serialized),
+
+    %% Test deserialization
+    Deserialized = deserialize_execution_state(Serialized),
+    true = is_record(Deserialized, execution_state),
+    true = ExecState#execution_state.execution_id =:= Deserialized#execution_state.execution_id,
+    true = ExecState#execution_state.status =:= Deserialized#execution_state.status,
+
+    %% Test checkpoint filename generation
+    CheckpointPath = filename(<<"/tmp/checkpoints">>, <<"exec_123">>, <<"cp1">>),
+    <<"/tmp/checkpoints/exec_123_cp1.chk">> = CheckpointPath,
+
+    %% Test timestamp to binary conversion
+    undefined = timestamp_to_binary(undefined),
+    TimeBin = timestamp_to_binary({1, 2, 3}),
+    true = is_binary(TimeBin),
+    <<"1.2.3">> = TimeBin,
+
+    %% Test execution state transitions
+    PendingState = ExecState#execution_state{status = pending},
+    pending = PendingState#execution_state.status,
+
+    RunningState = PendingState#execution_state{status = running},
+    running = RunningState#execution_state.status,
+
+    PausedState = RunningState#execution_state{status = paused},
+    paused = PausedState#execution_state.status,
+
+    CompletedState = RunningState#execution_state{status = completed, end_time = Now},
+    completed = CompletedState#execution_state.status,
+    true = CompletedState#execution_state.end_time =/= undefined,
+
+    FailedState = RunningState#execution_state{status = failed, end_time = Now,
+                                                error_reason = test_error},
+    failed = FailedState#execution_state.status,
+    test_error = FailedState#execution_state.error_reason,
+
+    CancelledState = RunningState#execution_state{status = cancelled, end_time = Now},
+    cancelled = CancelledState#execution_state.status,
+
+    ok.

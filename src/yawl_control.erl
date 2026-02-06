@@ -21,6 +21,7 @@
 %% @copyright 2015
 %% -------------------------------------------------------------------
 
+-module(yawl_control).
 -moduledoc """
 YAWL Control Panel / Runtime Management for CRE.
 
@@ -97,8 +98,6 @@ ok
 ok
 ```
 """.
-
--module(yawl_control).
 -behaviour(gen_server).
 
 %%====================================================================
@@ -254,42 +253,40 @@ get_case_status(CaseId) when is_binary(CaseId) ->
 %%   <li>Notifies all subscribers of the cancellation event</li>
 %% </ul>
 %%
-%% <h4>Examples</h4>
-%%
-%% Cancel a running case:
-%% ```
-%% 1> yawl_control:cancel_case(<<"case_001">>, <<"User requested">>).
-%% ok
-%% ```
-%%
-%% Attempting to cancel an already cancelled case:
-%% ```
-%% 2> yawl_control:cancel_case(<<"case_001">>, <<"Duplicate">>).
-%% {error, already_cancelled}
-%% ```
-%%
-%% Attempting to cancel a completed case:
-%% ```
-%% 3> yawl_control:cancel_case(<<"case_002">>, <<"Too late">>).
-%% {error, already_completed}
-%% ```
-%%
-%% @param CaseId The case identifier.
-%% @param Reason Reason for cancellation.
-%% @return ok or {error, term()}.
-%%
 %% @end
 %%--------------------------------------------------------------------
--doc("Cancels a running workflow case.\n\n"
-     "Performs an atomic transition on the control marking, moving the case\n"
-     "from its current status place to the ctrl_cancelled place.\n\n"
-     "Examples:\n"
-     "  1> yawl_control:cancel_case(<<\"case_001\">>, <<\"User requested\">>).\n"
-     "  ok\n\n"
-     "  2> yawl_control:cancel_case(<<\"case_001\">>, <<\"Duplicate\">>).\n"
-     "  {error, already_cancelled}\n\n"
-     "  3> yawl_control:cancel_case(<<\"case_002\">>, <<\"Too late\">>).\n"
-     "  {error, already_completed}\n").
+-doc( """
+Cancels a running workflow case.
+
+Performs an atomic transition on the control marking, moving the case
+from its current status place to the `ctrl_cancelled` place.
+
+### Examples
+
+```erlang
+1> {ok, Pid} = yawl_control:start_control(yawl_cancel_test).
+{ok, <0.126.0>}
+2> yawl_control:register_case(yawl_cancel_test, <<"case_001">>, <<"my_workflow">>).
+ok
+3> yawl_control:cancel_case(yawl_cancel_test, <<"case_001">>, <<"User requested">>).
+ok
+4> gen_server:call(yawl_cancel_test, {get_case_status, <<"case_001">>}).
+#{case_id => <<"case_001">>, status => cancelled, ...}
+5> gen_server:stop(yawl_cancel_test).
+ok
+
+6> {ok, Pid2} = yawl_control:start_control(yawl_cancel_test2).
+{ok, <0.127.0>}
+7> yawl_control:register_case(yawl_cancel_test2, <<"case_002">>, <<"my_workflow">>).
+ok
+8> yawl_control:cancel_case(yawl_cancel_test2, <<"case_002">>, <<"User requested">>).
+ok
+9> yawl_control:cancel_case(yawl_cancel_test2, <<"case_002">>, <<"Duplicate">>).
+{error, already_cancelled}
+10> gen_server:stop(yawl_cancel_test2).
+ok
+```
+""" ).
 -spec cancel_case(binary(), binary()) -> ok | {error, term()}.
 
 cancel_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
@@ -298,43 +295,32 @@ cancel_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
 %%--------------------------------------------------------------------
 %% @doc Suspends a running workflow case.
 %%
-%% <h4>Examples</h4>
-%%
-%% Suspend a running case:
-%% ```
-%% 1> yawl_control:suspend_case(<<"case_001">>, <<"Maintenance">>).
-%% ok
-%% ```
-%%
-%% Attempting to suspend an already suspended case:
-%% ```
-%% 2> yawl_control:suspend_case(<<"case_001">>, <<"Again">>).
-%% {error, already_suspended}
-%% ```
-%%
-%% Attempting to suspend a non-running case:
-%% ```
-%% 3> yawl_control:suspend_case(<<"case_002">>, <<"Cannot">>).
-%% {error, not_running}
-%% ```
-%%
-%% @param CaseId The case identifier.
-%% @param Reason Reason for suspension.
-%% @return ok or {error, term()}.
-%%
 %% @end
 %%--------------------------------------------------------------------
--doc("Suspends a running workflow case.\n\n"
-     "Moves the case from the ctrl_running place to the ctrl_suspended place\n"
-     "in the control marking. A suspended case stops processing tasks but retains\n"
-     "its state and can be resumed.\n\n"
-     "Examples:\n"
-     "  1> yawl_control:suspend_case(<<\"case_001\">>, <<\"Maintenance\">>).\n"
-     "  ok\n\n"
-     "  2> yawl_control:suspend_case(<<\"case_001\">>, <<\"Again\">>).\n"
-     "  {error, already_suspended}\n\n"
-     "  3> yawl_control:suspend_case(<<\"case_002\">>, <<\"Cannot\">>).\n"
-     "  {error, not_running}\n").
+-doc( """
+Suspends a running workflow case.
+
+Moves the case from the `ctrl_running` place to the `ctrl_suspended` place
+in the control marking. A suspended case stops processing tasks but retains
+its state and can be resumed.
+
+### Examples
+
+```erlang
+1> {ok, Pid} = yawl_control:start_control(yawl_suspend_test).
+{ok, <0.128.0>}
+2> yawl_control:register_case(yawl_suspend_test, <<"case_001">>, <<"my_workflow">>).
+ok
+3> yawl_control:suspend_case(yawl_suspend_test, <<"case_001">>, <<"Maintenance">>).
+ok
+4> gen_server:call(yawl_suspend_test, {get_case_status, <<"case_001">>}).
+#{case_id => <<"case_001">>, status => suspended, ...}
+5> yawl_control:suspend_case(yawl_suspend_test, <<"case_001">>, <<"Again">>).
+{error, already_suspended}
+6> gen_server:stop(yawl_suspend_test).
+ok
+```
+""" ).
 -spec suspend_case(binary(), binary()) -> ok | {error, term()}.
 
 suspend_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
@@ -346,33 +332,10 @@ suspend_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
 %% Uses wf_task:running/3 to produce control tokens for the resumed
 %% (running) task lifecycle event.
 %%
-%% <h4>Examples</h4>
-%%
-%% Resume a suspended case:
-%% ```
-%% 1> yawl_control:resume_case(<<"case_001">>, <<"Maintenance complete">>).
-%% ok
-%% ```
-%%
-%% Attempting to resume a running case:
-%% ```
-%% 2> yawl_control:resume_case(<<"case_002">>, <<"Already running">>).
-%% {error, not_suspended}
-%% ```
-%%
-%% Attempting to resume a cancelled case:
-%% ```
-%% 3> yawl_control:resume_case(<<"case_003">>, <<"Cannot resume">>).
-%% {error, invalid_state}
-%% ```
-%%
-%% @param CaseId The case identifier.
-%% @param Reason Reason for resumption.
-%% @return ok or {error, term()}.
-%%
 %% @end
 %%--------------------------------------------------------------------
--doc """Resumes a suspended workflow case.
+-doc( """
+Resumes a suspended workflow case.
 
 Moves the case from the `ctrl_suspended` place back to the `ctrl_running`
 place in the control marking. The case continues processing tasks from
@@ -390,7 +353,7 @@ ok
 3> yawl_control:resume_case(<<"case_003">>, <<"Cannot resume">>).
 {error, invalid_state}
 ```
-""".
+""" ).
 -spec resume_case(binary(), binary()) -> ok | {error, term()}.
 
 resume_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
@@ -1042,24 +1005,10 @@ notify_subscribers(Event, CaseId, Subscribers) ->
 %% control state management transitions. It creates a test control panel
 %% and verifies suspend/resume/cancel operations work correctly.
 %%
-%% === Example
-%%
-%% ```erlang
-%% 1> yawl_control:doctest_test().
-%% ok
-%% ```
-%%
-%% The test validates the complete suspend/resume lifecycle:
-%% 1. Start control panel
-%% 2. Register a test case
-%% 3. Suspend the case
-%% 4. Resume the case
-%% 5. Verify status transitions
-%% 6. Stop control panel
-%%
 %% @end
 %%--------------------------------------------------------------------
--doc """Runs doctests for control state management.
+-doc( """
+Runs doctests for control state management.
 
 ### Example
 
@@ -1076,7 +1025,7 @@ The test validates the complete suspend/resume/cancel lifecycle:
 5. Cancel the case (running -> cancelled transition)
 6. Verify all status transitions
 7. Stop control panel
-""".
+""" ).
 -spec doctest_test() -> ok.
 
 doctest_test() ->

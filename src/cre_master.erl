@@ -53,6 +53,8 @@
 %% ```
 %%
 %% @end
+-module(cre_master).
+
 -moduledoc("""
 CRE Master Process with Petri Net Worker Pool Management.
 
@@ -88,9 +90,7 @@ Start an anonymous CRE master:
 ok
 ```
 """).
-%% -------------------------------------------------------------------
 
--module(cre_master).
 -behavior(gen_server).
 
 %%====================================================================

@@ -17,48 +17,37 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc YAWL Workflow Pattern Module
-%%
-%% This module implements YAWL workflow patterns as composable
-%% pattern records and functions. It integrates the helper modules
-%% (pnet_marking, pnet_mode, pnet_choice, wf_timerq, wf_scope) to
-%% provide comprehensive pattern composition capabilities.
-%%
-%% <h3>Key Features</h3>
-%% <ul>
-%%   <li><b>Pattern Composition:</b> Combine multiple workflow patterns</li>
-%%   <li><b>Marking Validation:</b> Use pnet_marking for token state validation</li>
-%%   <li><b>Mode Enumeration:</b> Use pnet_mode for transition firing modes</li>
-%%   <li><b>Nondeterministic Choice:</b> Use pnet_choice for pattern selection</li>
-%%   <li><b>Timeout Support:</b> Use wf_timerq for timed patterns</li>
-%%   <li><b>Scope Boundaries:</b> Use wf_scope for nested patterns</li>
-%% </ul>
-%%
-%% <h3>Usage Example</h3>
-%% <pre><code>
-%% %% Create a basic pattern
-%% Pattern1 = yawl_patterns:new_pattern(implicit_termination,
-%%     #implicit_termination{trigger_function = fun() -> ok end}),
-%%
-%% %% Create a deferred choice pattern
-%% Pattern2 = yawl_patterns:deferred_choice(
-%%     fun() -> option_a end,
-%%     fun() -> option_b end,
-%%     fun() -> true end
-%% ),
-%%
-%% %% Combine patterns using marking operations
-%% Combined = yawl_patterns:combine_patterns(Pattern1, Pattern2),
-%%
-%% %% Validate pattern with marking
-%% Marking = pnet_marking:new([p1, p2, p3]),
-%% Valid = yawl_patterns:validate_pattern(Pattern1, Marking).
-%% </code></pre>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(yawl_patterns).
+-moduledoc """
+YAWL Workflow Pattern Module.
+
+This module implements YAWL workflow patterns as composable
+pattern records and functions. It integrates the helper modules
+(pnet_marking, pnet_mode, pnet_choice, wf_timerq, wf_scope) to
+provide comprehensive pattern composition capabilities.
+
+```erlang
+> IT = yawl_patterns:implicit_termination(fun() -> done end), element(1, IT).
+implicit_termination
+
+> yawl_patterns:validate_pattern(yawl_patterns:new_pattern(test, #{}), undefined).
+true
+
+> Empty = yawl_patterns:chain_patterns([]), element(2, Empty).
+empty
+```
+
+<h3>Key Features</h3>
+<ul>
+  <li><b>Pattern Composition:</b> Combine multiple workflow patterns</li>
+  <li><b>Marking Validation:</b> Use pnet_marking for token state validation</li>
+  <li><b>Mode Enumeration:</b> Use pnet_mode for transition firing modes</li>
+  <li><b>Nondeterministic Choice:</b> Use pnet_choice for pattern selection</li>
+  <li><b>Timeout Support:</b> Use wf_timerq for timed patterns</li>
+  <li><b>Scope Boundaries:</b> Use wf_scope for nested patterns</li>
+</ul>
+""".
 
 %%====================================================================
 %% Exports
@@ -171,6 +160,11 @@
 
 %%--------------------------------------------------------------------
 %% @doc Creates an implicit termination pattern.
+%%
+%% ```erlang
+%%> IT = yawl_patterns:implicit_termination(fun() -> terminated end), element(1, IT).
+%% implicit_termination
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec implicit_termination(TriggerFun :: function()) -> #implicit_termination{}.
@@ -179,6 +173,11 @@ implicit_termination(TriggerFun) when is_function(TriggerFun) ->
 
 %%--------------------------------------------------------------------
 %% @doc Creates a multiple instances no synchronization pattern.
+%%
+%% ```erlang
+%%> Fun = fun(X) -> X * 2 end, Minst = yawl_patterns:multiple_instances_no_sync(Fun, 3, []), element(1, Minst).
+%% multiple_instances_no_sync
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec multiple_instances_no_sync(MapFun :: function(), Count :: pos_integer(),
@@ -191,6 +190,11 @@ multiple_instances_no_sync(MapFun, Count, _Input) when is_function(MapFun), is_i
 %%
 %% This pattern uses pnet_choice internally for deterministic
 %% nondeterministic selection between options.
+%%
+%% ```erlang
+%%> DC = yawl_patterns:deferred_choice(fun() -> a end, fun() -> b end, fun() -> true end), element(1, DC).
+%% deferred_choice
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec deferred_choice(OptionAFun :: function(), OptionBFun :: function(),
@@ -204,6 +208,11 @@ deferred_choice(OptionAFun, OptionBFun, ChoiceFun) ->
 
 %%--------------------------------------------------------------------
 %% @doc Creates an error handler pattern.
+%%
+%% ```erlang
+%%> EH = yawl_patterns:error_handler(fun() -> ok end, fun(_) -> error_handled end), element(1, EH).
+%% error_handler
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec error_handler(RiskyFun :: function(), HandlerFun :: function()) -> #error_handler{}.
@@ -215,6 +224,11 @@ error_handler(RiskyFun, HandlerFun) ->
 
 %%--------------------------------------------------------------------
 %% @doc Creates a retry pattern.
+%%
+%% ```erlang
+%%> Retr = yawl_patterns:retry(fun() -> result end, {max_retries, 3}), element(1, Retr).
+%% retry
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec retry(WorkFun :: function(), Policy :: term()) -> #retry{}.
@@ -223,6 +237,11 @@ retry(WorkFun, Policy) when is_function(WorkFun) ->
 
 %%--------------------------------------------------------------------
 %% @doc Creates a compensation pattern.
+%%
+%% ```erlang
+%%> Comp = yawl_patterns:compensate(fun() -> activity_result end, fun() -> undo end), element(1, Comp).
+%% compensate
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec compensate(ActivityFun :: function(), CompensationFun :: function()) ->
@@ -235,6 +254,11 @@ compensate(ActivityFun, CompensationFun) ->
 
 %%--------------------------------------------------------------------
 %% @doc Creates a triggered compensation pattern.
+%%
+%% ```erlang
+%%> TC = yawl_patterns:triggered_compensation(fun() -> result end, fun() -> compensate end, fun() -> trigger end), element(1, TC).
+%% triggered_compensation
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec triggered_compensation(ActivityFun :: function(), CompensationFun :: function(),
@@ -248,6 +272,11 @@ triggered_compensation(ActivityFun, CompensationFun, TriggerFun) ->
 
 %%--------------------------------------------------------------------
 %% @doc Creates a consecutive compensation pattern.
+%%
+%% ```erlang
+%%> CC = yawl_patterns:consecutive_compensate([{fun() -> a1 end, fun() -> c1 end}, {fun() -> a2 end, fun() -> c2 end}]), element(1, CC).
+%% consecutive_compensate
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec consecutive_compensate(Activities :: [{function(), function()}]) ->
@@ -259,6 +288,12 @@ consecutive_compensate(Activities) when is_list(Activities) ->
 %% @doc Creates a new pattern record.
 %%
 %% Initializes a pattern with optional marking state for validation.
+%%
+%% ```erlang
+%%> P = yawl_patterns:new_pattern(my_type, #{key => value}),
+%%> element(1, P).
+%% pattern
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec new_pattern(Type :: atom(), Data :: term()) -> #pattern{}.
@@ -282,6 +317,12 @@ new_pattern(Type, Data) ->
 %% @doc Creates a new pattern with an initial marking.
 %%
 %% Uses pnet_marking to initialize the pattern's token state.
+%%
+%% ```erlang
+%%> P = yawl_patterns:new_pattern_with_marking(test, #{}, [p1, p2, p3]),
+%%> element(1, P).
+%% pattern
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec new_pattern_with_marking(Type :: atom(), Data :: term(),
@@ -301,10 +342,10 @@ new_pattern_with_marking(Type, Data, Places) when is_list(Places) ->
 %% Uses pnet_marking:apply/3 to merge the markings of both patterns.
 %% The combination type can be 'sequence', 'parallel', or 'choice'.
 %%
-%% @param PatternA First pattern to combine
-%% @param PatternB Second pattern to combine
-%% @return Combined pattern record
-%%
+%% ```erlang
+%%> P1 = yawl_patterns:new_pattern(type1, #{a => 1}), P2 = yawl_patterns:new_pattern(type2, #{b => 2}), Combined = yawl_patterns:combine_patterns(P1, P2), element(1, Combined).
+%% combined_pattern
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec combine_patterns(PatternA :: #pattern{} | term(),
@@ -333,6 +374,14 @@ combine_patterns(PatternA, PatternB) ->
 %% @doc Validates a pattern against a marking.
 %%
 %% Uses pnet_marking to verify the pattern's token state is valid.
+%%
+%% ```erlang
+%%> P = yawl_patterns:new_pattern(test, #{}), yawl_patterns:validate_pattern(P, undefined).
+%% true
+%%
+%%> yawl_patterns:validate_pattern(not_a_pattern, #{}).
+%% {error, invalid_pattern}
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec validate_pattern(Pattern :: #pattern{}, Marking :: pnet_marking:marking()) ->
@@ -413,6 +462,11 @@ select_weighted_pattern(Patterns, Seed) when is_list(Patterns) ->
 %% @doc Chains patterns sequentially.
 %%
 %% Creates a combined pattern where patterns execute in order.
+%%
+%% ```erlang
+%%> yawl_patterns:chain_patterns([]).
+%%{pattern,empty,undefined,0,unlimited,[],[],[],#{},[],undefined,undefined,undefined}
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec chain_patterns(Patterns :: [#pattern{} | term()]) -> #pattern{}.
@@ -696,3 +750,15 @@ execute_with_mode(_Type, Marking, Mode) ->
         {ok, NewMarking} -> {ok, NewMarking};
         {error, Reason} -> {error, Reason}
     end.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+%% Run doctests for this module
+doctest_test_() ->
+    {timeout, 30, fun() -> ok = doctest:module(?MODULE, #{moduledoc => true, doc => true}) end}.
+-endif.

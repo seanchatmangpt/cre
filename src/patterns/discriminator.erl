@@ -17,52 +17,80 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Discriminator Pattern (WCP-09) for YAWL
-%%
-%% This module implements the Discriminator pattern as a gen_pnet behaviour.
-%%
-%% <h3>Pattern Description</h3>
-%% The Discriminator pattern (WCP-09) merges multiple concurrent branches,
-%% triggering on the FIRST completion and accepting remaining branches
-%% without re-triggering. After all branches complete, it resets to allow
-%% another cycle.
-%%
-%% <h3>Petri Net Structure</h3>
-%% <pre>
-%%   Places:
-%%     p_input         - Initial input place
-%%     p_branch_1      - Branch 1 execution place
-%%     p_branch_2      - Branch 2 execution place
-%%     p_branch_N      - Branch N execution place
-%%     p_trigger_ready - Trigger is ready
-%%     p_triggered     - Trigger has fired (first complete)
-%%     p_consume       - Consuming remaining completions
-%%     p_reset         - Reset for next cycle
-%%     p_output        - Output place
-%%
-%%   Transitions:
-%%     t_split         - Split into branches
-%%     t_complete_1    - Complete branch 1
-%%     t_complete_2    - Complete branch 2
-%%     t_complete_N    - Complete branch N
-%%     t_trigger       - Trigger on first completion
-%%     t_consume       - Consume remaining completions
-%%     t_reset         - Reset for next cycle
-%%     t_output        - Produce output
-%% </pre>
-%%
-%% <h3>Soundness Properties</h3>
-%% <ul>
-%%   <li><b>Option to complete:</b> Always true (trigger fires on first completion)</li>
-%%   <li><b>Proper completion:</b> Exactly one output token per N input tokens</li>
-%%   <li><b>No dead transitions:</b> All branches complete and are consumed</li>
-%% </ul>
-%%
-%% @end
-%% -------------------------------------------------------------------
-
 -module(discriminator).
 -behaviour(gen_yawl).
+
+-moduledoc """
+Discriminator Pattern (WCP-09) for YAWL.
+
+This module implements the Discriminator pattern as a gen_pnet behaviour.
+
+## Pattern Description
+
+The Discriminator pattern (WCP-09) merges multiple concurrent branches,
+triggering on the FIRST completion and accepting remaining branches
+without re-triggering. After all branches complete, it resets to allow
+another cycle.
+
+## Petri Net Structure
+
+```
+Places:
+  p_input         - Initial input place
+  p_branch_pool   - Pool of branch execution tokens
+  p_trigger_ready - Trigger is ready
+  p_triggered     - Trigger has fired (first complete)
+  p_consume       - Consuming remaining completions
+  p_reset         - Reset for next cycle
+  p_output        - Output place
+
+Transitions:
+  t_split              - Split into branches
+  t_complete_branch    - Complete a branch
+  t_trigger            - Trigger on first completion
+  t_consume_remaining  - Consume remaining completions
+  t_reset              - Reset for next cycle
+  t_output             - Produce output
+```
+
+## Examples
+
+Get the list of places in the discriminator Petri net:
+
+```erlang
+> discriminator:place_lst().
+['p_input','p_branch_pool','p_trigger_ready','p_triggered',
+ 'p_consume','p_reset','p_output']
+```
+
+Get the list of transitions in the discriminator Petri net:
+
+```erlang
+> discriminator:trsn_lst().
+['t_split','t_complete_branch','t_trigger','t_consume_remaining',
+ 't_reset','t_output']
+```
+
+Get the preset (input places) for the split transition:
+
+```erlang
+> discriminator:preset('t_split').
+['p_input']
+```
+
+Get the preset for the trigger transition:
+
+```erlang
+> discriminator:preset('t_trigger').
+['p_trigger_ready']
+```
+
+## Soundness Properties
+
+- **Option to complete:** Always true (trigger fires on first completion)
+- **Proper completion:** Exactly one output token per N input tokens
+- **No dead transitions:** All branches complete and are consumed
+""".
 
 %% gen_pnet callbacks
 -export([
@@ -114,15 +142,9 @@
 %% API Functions
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc Creates a new Discriminator pattern state.
-%%
-%% @param BranchFuns List of functions to execute for each branch.
-%% @param BranchCount Number of branches (must match length of BranchFuns).
-%% @return A new discriminator_state record.
-%%
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Creates a new Discriminator pattern state.
+""".
 -spec new(BranchFuns :: [function()], BranchCount :: pos_integer()) ->
           discriminator_state().
 
@@ -248,10 +270,17 @@ reset(Pid) ->
 %% gen_pnet Callbacks
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc Returns the list of places for the Discriminator Petri net.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the list of places for the Discriminator Petri net.
+
+## Examples
+
+```erlang
+> discriminator:place_lst().
+['p_input','p_branch_pool','p_trigger_ready','p_triggered',
+ 'p_consume','p_reset','p_output']
+```
+""".
 -spec place_lst() -> [atom()].
 
 place_lst() ->
@@ -265,10 +294,17 @@ place_lst() ->
         'p_output'
     ].
 
-%%--------------------------------------------------------------------
-%% @doc Returns the list of transitions for the Discriminator Petri net.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the list of transitions for the Discriminator Petri net.
+
+## Examples
+
+```erlang
+> discriminator:trsn_lst().
+['t_split','t_complete_branch','t_trigger','t_consume_remaining',
+ 't_reset','t_output']
+```
+""".
 -spec trsn_lst() -> [atom()].
 
 trsn_lst() ->
@@ -295,10 +331,26 @@ init_marking('p_trigger_ready', _UsrInfo) ->
 init_marking(_, _UsrInfo) ->
     [].
 
-%%--------------------------------------------------------------------
-%% @doc Returns the preset (input places) for each transition.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the preset (input places) for each transition.
+
+## Examples
+
+```erlang
+> discriminator:preset('t_split').
+['p_input']
+```
+
+```erlang
+> discriminator:preset('t_trigger').
+['p_trigger_ready']
+```
+
+```erlang
+> discriminator:preset('t_reset').
+['p_reset']
+```
+""".
 -spec preset(Trsn :: atom()) -> [atom()].
 
 preset('t_split') -> ['p_input'];
@@ -627,3 +679,14 @@ log_event(#discriminator_state{log_id = LogId}, Concept, Lifecycle, Data) when L
     yawl_xes:log_event(LogId, Concept, Lifecycle, Data);
 log_event(_State, _Concept, _Lifecycle, _Data) ->
     ok.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

@@ -335,12 +335,28 @@ consume_tokens([Token | RestAvailable], TokensToTake) ->
 
 ## 3. `pnet_mode` - Mode Enumeration
 
+### Types
+
+```erlang
+%% Mode enumeration types for basic and colored Petri nets
+-type mode() :: #{place() => [token()]}.
+-type cmode() :: {binding(), mode()}.
+-type binding() :: #{var() => term()}.
+```
+
 ### Functions
 
 ```erlang
 %% @doc Returns the count of tokens needed from each preset place (from actual implementation)
 %% Handles multiplicity: repeated places in preset list increment the count.
 %% This function returns a map indicating the requirement for each place.
+%%
+%% Doctests:
+%% > pnet_mode:preset_counts([p, p, q]).
+%% #{p => 2, q => 1}
+%%
+%% > pnet_mode:preset_counts([a, b, a, c]).
+%% #{a => 2, b => 1, c => 1}
 -spec preset_counts(PresetPlaces :: [place()]) ->
          #{place() => non_neg_integer()}.
 preset_counts(PresetPlaces) when is_list(PresetPlaces) ->
@@ -352,11 +368,29 @@ preset_counts(PresetPlaces) when is_list(PresetPlaces) ->
         PresetPlaces
     ).
 
-%% Example: preset_counts([p, p, q]) => #{p => 2, q => 1}
-
 %% @doc Enumerates all possible modes given the current marking (from actual implementation)
 %% A mode represents one valid way to fire a transition by selecting
 %% tokens from each preset place. Handles repeated places via preset_counts.
+%% Results are in deterministic term order.
+%%
+%% Doctests:
+%% > pnet_mode:enum_modes([p], #{p => [a, b, c]}).
+%% [#{p => [a]}, #{p => [b]}, #{p => [c]}]
+%%
+%% > pnet_mode:enum_modes([p, q], #{p => [a], q => [x]}).
+%% [#{p => [a], q => [x]}]
+%%
+%% > pnet_mode:enum_modes([p, q], #{p => [a, b], q => [x, y]}).
+%% [#{p => [a], q => [x]},
+%%  #{p => [a], q => [y]},
+%%  #{p => [b], q => [x]},
+%%  #{p => [b], q => [y]}]
+%%
+%% > pnet_mode:enum_modes([p, p, q], #{p => [a, b], q => [x]}).
+%% [#{p => [a, b], q => [x]}]
+%%
+%% > pnet_mode:enum_modes([p], #{p => []}).
+%% []
 -spec enum_modes(PresetPlaces :: [place()], Marking :: marking()) ->
          [mode()].
 enum_modes(PresetPlaces, Marking) when is_list(PresetPlaces), is_map(Marking) ->
@@ -364,29 +398,20 @@ enum_modes(PresetPlaces, Marking) when is_list(PresetPlaces), is_map(Marking) ->
     UniquePlaces = lists:usort(PresetPlaces),
     enum_modes_for_places(UniquePlaces, Counts, Marking).
 
-%% Internal helper
-enum_modes_for_places([], _Counts, _Marking) ->
-    [#{ }];
-enum_modes_for_places([Place | Rest], Counts, Marking) ->
-    case maps:get(Place, Marking, []) of
-        [] ->
-            [];  %% No tokens available, no modes possible
-        Tokens ->
-            Count = maps:get(Place, Counts, 1),
-            TokenCombos = combinations(Count, Tokens),
-            RestModes = enum_modes_for_places(Rest, Counts, Marking),
-            lists:flatmap(
-                fun(Combo) ->
-                    [M#{Place => Combo} || M <- RestModes]
-                end,
-                TokenCombos
-            ).
-
 %% @doc Enumerates colored modes with variable bindings (from actual implementation)
 %% For colored Petri nets, this function calls the net module's
 %% cmodes callback to get modes that include variable bindings.
 %% If the net module doesn't implement colored modes, falls back
-%% to basic mode enumeration.
+%% to basic mode enumeration with empty bindings.
+%%
+%% Doctests (assuming net module implements cmodes/3):
+%% > pnet_mode:enum_cmodes(t1, #{p => [a,b]}, ctx, basic_net).
+%% [{#{}, #{p => [a]}}, {#{}, #{p => [b]}}]
+%%
+%% Colored net example:
+%% > Marking = #{input => [{user, alice, "report"}]},
+%% > pnet_mode:enum_cmodes(process, Marking, #{role => "manager"}, workflow_net).
+%% [{{user => alice}, #{input => [{user, alice, "report"}]}}]
 -spec enum_cmodes(Trsn :: atom(), Marking :: marking(),
                   Ctx :: usr_info(), NetMod :: net_mod()) ->
          [cmode()].
@@ -405,6 +430,38 @@ enum_cmodes(Trsn, Marking, Ctx, NetMod) when is_atom(Trsn), is_map(Marking),
             Modes = enum_modes(NetMod:preset(Trsn), Marking),
             [{#{}, M} || M <- Modes]
     end.
+
+%% @doc Internal helper for mode enumeration (from actual implementation)
+%% Recursive function that generates modes for multiple places.
+enum_modes_for_places([], _Counts, _Marking) ->
+    [#{ }];
+enum_modes_for_places([Place | Rest], Counts, Marking) ->
+    case maps:get(Place, Marking, []) of
+        [] ->
+            [];  %% No tokens available, no modes possible
+        Tokens ->
+            Count = maps:get(Place, Counts, 1),
+            TokenCombos = combinations(Count, Tokens),
+            RestModes = enum_modes_for_places(Rest, Counts, Marking),
+            lists:flatmap(
+                fun(Combo) ->
+                    [M#{Place => Combo} || M <- RestModes]
+                end,
+                TokenCombos
+            ).
+
+%% @doc Internal helper for combination generation (from actual implementation)
+%% Generates all combinations of N elements from a list in deterministic order.
+combinations(0, _List) ->
+    [[]];
+combinations(_N, []) ->
+    [];
+combinations(N, [H | T]) ->
+    %% Combinations including H (need N-1 more from T)
+    WithH = [[H | Rest] || Rest <- combinations(N - 1, T)],
+    %% Combinations excluding H (need N from T)
+    WithoutH = combinations(N, T),
+    WithH ++ WithoutH.
 ```
 
 ---

@@ -439,49 +439,97 @@ is_list(Errors).
 get_errors(#workflow{} = Workflow) ->
     validate_workflow(Workflow).
 
-%%--------------------------------------------------------------------
-%% @doc Gets the workflow ID from a workflow record.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Gets the workflow ID from a workflow record.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(<<"my_workflow">>),
+{ok, Id} = cre_yawl:get_workflow_id(Workflow),
+Id =:= <<"my_workflow">>.
+```
+""".
 -spec get_workflow_id(#workflow{}) -> {ok, element_id()}.
 get_workflow_id(#workflow{id = Id}) -> {ok, Id}.
 
-%%--------------------------------------------------------------------
-%% @doc Gets the workflow name from a workflow record.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Gets the workflow name from a workflow record.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(<<"my_workflow">>),
+{ok, Name} = cre_yawl:get_workflow_name(Workflow),
+Name =:= <<"Untitled Workflow">>.
+```
+""".
 -spec get_workflow_name(#workflow{}) -> {ok, binary()}.
 get_workflow_name(#workflow{name = Name}) -> {ok, Name}.
 
-%%--------------------------------------------------------------------
-%% @doc Gets the tasks map from a workflow record.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Gets the tasks map from a workflow record.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_task(Workflow, <<"task1">>, [{name, <<"My Task">>}]),
+{ok, Tasks} = cre_yawl:get_tasks(W1),
+maps:is_key(<<"task1">>, Tasks).
+```
+""".
 -spec get_tasks(#workflow{}) -> {ok, #{element_id() => #task{}}}.
 get_tasks(#workflow{tasks = Tasks}) -> {ok, Tasks}.
 
-%%--------------------------------------------------------------------
-%% @doc Gets the connections list from a workflow record.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Gets the connections list from a workflow record.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_task(Workflow, <<"t1">>, []),
+W2 = cre_yawl:add_task(W1, <<"t2">>, []),
+W3 = cre_yawl:connect(W2, <<"t1">>, <<"t2">>),
+{ok, Conns} = cre_yawl:get_connections(W3),
+length(Conns) > 0.
+```
+""".
 -spec get_connections(#workflow{}) -> {ok, [#connection{}]}.
 get_connections(#workflow{connections = Conns}) -> {ok, Conns}.
 
-%%--------------------------------------------------------------------
-%% @doc Gets the conditions map from a workflow record.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Gets the conditions map from a workflow record.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_condition(Workflow, <<"cond1">>, fun() -> true end),
+{ok, Conds} = cre_yawl:get_conditions(W1),
+maps:is_key(<<"cond1">>, Conds).
+```
+""".
 -spec get_conditions(#workflow{}) -> {ok, #{element_id() => #yawl_condition{}}}.
 get_conditions(#workflow{conditions = Conds}) -> {ok, Conds}.
 
-%%--------------------------------------------------------------------
-%% @doc Sets the start and end task boundaries for a workflow.
-%%
-%% Validates that the specified start and end tasks exist in the workflow
-%% before setting them. Returns an error if any task is not found.
-%%
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Sets the start and end task boundaries for a workflow.
+
+Validates that the specified start and end tasks exist in the workflow
+before setting them. Returns an error if any task is not found.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_task(Workflow, <<"start">>, [{name, <<"Start">>}]),
+W2 = cre_yawl:add_task(W1, <<"finish">>, [{name, <<"Finish">>}]),
+W3 = cre_yawl:set_workflow_boundaries(W2, <<"start">>, [<<"finish">>]),
+ok = cre_yawl:validate(W3).
+```
+""".
 -spec set_workflow_boundaries(Workflow :: #workflow{},
                               StartTaskId :: element_id(),
                               EndTaskIds :: [element_id()]) ->

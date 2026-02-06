@@ -519,7 +519,7 @@ inject_trace_context(Headers) ->
         Context ->
             TraceId = maps:get(trace_id, Context, generate_trace_id()),
             SpanId = maps:get(span_id, Context, generate_span_id()),
-            TraceParent = <<16#00, TraceId/binary, "-", SpanId/binary, "-01">>,
+            TraceParent = <<"00-", TraceId/binary, "-", SpanId/binary, "-01">>,
             maps:put(<<"traceparent">>, TraceParent,
                 maps:put(<<"x-yawl-trace-id">>, TraceId,
                     maps:put(<<"x-yawl-span-id">>, SpanId, Headers)))
@@ -549,7 +549,7 @@ extract_trace_context(Headers) ->
             %% Try to parse W3C traceparent format: 00-traceId-spanId-flags
             Parts = binary:split(Bin, <<"-">>, [global]),
             case Parts of
-                [<<0>>, TraceId, SpanId, _Flags] ->
+                [<<"00">>, TraceId, SpanId, _Flags] ->
                     maps:put(trace_id, TraceId, maps:put(span_id, SpanId, maps:new()));
                 _ ->
                     maps:put(trace_id, Bin, maps:new())
@@ -572,8 +572,8 @@ extract_trace_context(Headers) ->
 %% ```
 -spec generate_trace_id() -> trace_id().
 generate_trace_id() ->
-    <<Id:128>> = crypto:strong_rand_bytes(16),
-    binary:encode_hex(Id).
+    Bin = crypto:strong_rand_bytes(16),
+    binary:encode_hex(Bin).
 
 %% @doc Generate a unique 64-bit span ID as hexadecimal string.
 %%
@@ -591,8 +591,8 @@ generate_trace_id() ->
 %% ```
 -spec generate_span_id() -> binary().
 generate_span_id() ->
-    <<Id:64>> = crypto:strong_rand_bytes(8),
-    binary:encode_hex(Id).
+    Bin = crypto:strong_rand_bytes(8),
+    binary:encode_hex(Bin).
 
 %%====================================================================
 %% Health Checks

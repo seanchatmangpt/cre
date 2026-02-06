@@ -17,66 +17,57 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Simple Merge Pattern (WCP-05) for YAWL
-%%
-%% This module implements the Simple Merge pattern as a gen_pnet behaviour.
-%%
-%% <h3>Pattern Description</h3>
-%% The Simple Merge pattern (WCP-05) merges multiple incoming branches
-%% without requiring synchronization. Unlike Synchronization (WCP-03) which
-%% waits for ALL branches to complete, Simple Merge allows ANY incoming
-%% branch to proceed through the merge point immediately.
-%%
-%% This is the XOR join counterpart to Exclusive Choice (WCP-04), providing
-%% a merge point for mutually exclusive branches.
-%%
-%% <h3>Petri Net Structure</h3>
-%% <pre>
-%%   Places:
-%%     p_start       - Initial input place
-%%     p_branch_a    - Branch A execution place
-%%     p_branch_b    - Branch B execution place
-%%     p_merge_ready - Merge point is ready to receive
-%%     p_merged      - Branch has been merged
-%%     p_end         - Final output place
-%%
-%%   Transitions:
-%%     t_split_a     - Split into branch A
-%%     t_split_b     - Split into branch B
-%%     t_merge       - Merge any incoming branch (XOR semantics)
-%%     t_finish      - Complete the workflow
-%% </pre>
-%%
-%% <h3>Soundness Properties</h3>
-%% <ul>
-%%   <li><b>Option to complete:</b> Always true (no cycles)</li>
-%%   <li><b>Proper completion:</b> Exactly one output token per input token</li>
-%%   <li><b>No dead transitions:</b> All transitions fire appropriately</li>
-%% </ul>
-%%
-%% <h3>Usage Example</h3>
-%% <pre>
-%%   %% Define branch functions
-%%   BranchA = fun(Input) ->
-%%       {ok, Input * 2}
-%%   end,
-%%   BranchB = fun(Input) ->
-%%       {ok, Input + 10}
-%%   end,
-%%
-%%   %% Create simple merge
-%%   MergeState = simple_merge:new(BranchA, BranchB),
-%%   {ok, Pid} = simple_merge:start_link(MergeState),
-%%
-%%   %% Execute branch A
-%%   {ok, Result} = simple_merge:execute_branch(Pid, branch_a, 5).
-%%   %% Result = 10
-%% </pre>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(simple_merge).
+-moduledoc """
+Simple Merge Pattern (WCP-05) for YAWL.
+
+This module implements the Simple Merge pattern as a gen_pnet behaviour.
+
+The Simple Merge pattern (WCP-05) merges multiple incoming branches
+without requiring synchronization. Unlike Synchronization (WCP-03) which
+waits for ALL branches to complete, Simple Merge allows ANY incoming
+branch to proceed through the merge point immediately.
+
+This is the XOR join counterpart to Exclusive Choice (WCP-04), providing
+a merge point for mutually exclusive branches.
+
+## Petri Net Structure
+
+**Places:**
+- `p_start` - Initial input place
+- `p_branch_a` - Branch A execution place
+- `p_branch_b` - Branch B execution place
+- `p_merge_ready` - Merge point is ready to receive
+- `p_merged` - Branch has been merged
+- `p_end` - Final output place
+
+**Transitions:**
+- `t_split_a` - Split into branch A
+- `t_split_b` - Split into branch B
+- `t_merge_a` - Merge branch A (XOR semantics)
+- `t_merge_b` - Merge branch B (XOR semantics)
+- `t_finish` - Complete the workflow
+
+## Examples
+
+```erlang
+> simple_merge:place_lst().
+[p_start,p_branch_a,p_branch_b,p_merge_ready,p_merged,p_end]
+
+> simple_merge:trsn_lst().
+[t_split_a,t_split_b,t_merge_a,t_merge_b,t_finish]
+
+> simple_merge:preset(t_split_a).
+[p_start]
+
+> simple_merge:preset(t_merge_a).
+[p_branch_a,p_merge_ready]
+
+> simple_merge:preset(t_finish).
+[p_merged]
+```
+""".
 -behaviour(gen_yawl).
 
 %% gen_pnet callbacks
@@ -129,15 +120,15 @@
 %% API Functions
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc Creates a new Simple Merge pattern state.
-%%
-%% @param BranchAFun Function for branch A.
-%% @param BranchBFun Function for branch B.
-%% @return A new simple_merge_state record.
-%%
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Creates a new Simple Merge pattern state.
+
+Creates a state record containing the two branch functions. Each function
+should take a single input argument and return a result.
+
+The log_id field is automatically generated using crypto:hash/2 for XES
+event tracing purposes.
+""".
 -spec new(BranchAFun :: function(), BranchBFun :: function()) ->
           simple_merge_state().
 
@@ -267,10 +258,16 @@ execute(SimpleMergeState, {Branch, InputData}) ->
 %% gen_pnet Callbacks
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc Returns the list of places for the Simple Merge Petri net.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the list of places for the Simple Merge Petri net.
+
+## Examples
+
+```erlang
+> simple_merge:place_lst().
+[p_start,p_branch_a,p_branch_b,p_merge_ready,p_merged,p_end]
+```
+""".
 -spec place_lst() -> [atom()].
 
 place_lst() ->
@@ -283,10 +280,16 @@ place_lst() ->
         'p_end'
     ].
 
-%%--------------------------------------------------------------------
-%% @doc Returns the list of transitions for the Simple Merge Petri net.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the list of transitions for the Simple Merge Petri net.
+
+## Examples
+
+```erlang
+> simple_merge:trsn_lst().
+[t_split_a,t_split_b,t_merge_a,t_merge_b,t_finish]
+```
+""".
 -spec trsn_lst() -> [atom()].
 
 trsn_lst() ->
@@ -298,10 +301,32 @@ trsn_lst() ->
         't_finish'
     ].
 
-%%--------------------------------------------------------------------
-%% @doc Returns the initial marking for a given place.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the initial marking for a given place.
+
+The initial marking provides tokens at startup to begin the workflow.
+Only `p_start` and `p_merge_ready` have initial tokens. All other places
+return an empty marking.
+
+The second argument (UsrInfo) is a simple_merge_state record, typically
+created via new/2, but its contents are not used by init_marking/2.
+
+## Examples
+
+```erlang
+> simple_merge:init_marking(p_start, undefined).
+[start]
+
+> simple_merge:init_marking(p_merge_ready, undefined).
+[ready]
+
+> simple_merge:init_marking(p_branch_a, undefined).
+[]
+
+> simple_merge:init_marking(p_end, undefined).
+[]
+```
+""".
 -spec init_marking(Place :: atom(), UsrInfo :: simple_merge_state()) ->
           [term()].
 
@@ -312,10 +337,31 @@ init_marking('p_merge_ready', _UsrInfo) ->
 init_marking(_, _UsrInfo) ->
     [].
 
-%%--------------------------------------------------------------------
-%% @doc Returns the preset (input places) for each transition.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the preset (input places) for each transition.
+
+## Examples
+
+```erlang
+> simple_merge:preset(t_split_a).
+[p_start]
+
+> simple_merge:preset(t_split_b).
+[p_start]
+
+> simple_merge:preset(t_merge_a).
+[p_branch_a,p_merge_ready]
+
+> simple_merge:preset(t_merge_b).
+[p_branch_b,p_merge_ready]
+
+> simple_merge:preset(t_finish).
+[p_merged]
+
+> simple_merge:preset(unknown).
+[]
+```
+""".
 -spec preset(Trsn :: atom()) -> [atom()].
 
 preset('t_split_a') -> ['p_start'];
@@ -617,3 +663,14 @@ log_event(#simple_merge_state{log_id = LogId}, Concept, Lifecycle, Data) when Lo
     yawl_xes:log_event(LogId, Concept, Lifecycle, Data);
 log_event(_State, _Concept, _Lifecycle, _Data) ->
     ok.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

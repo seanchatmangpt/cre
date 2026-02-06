@@ -2,7 +2,7 @@
 %%
 %% CRE: common runtime environment for distributed programming languages
 %%
-%% Copyright 2015 Jörgen Brandt <joergen@cuneiform-lang.org>
+%% Copyright 2015 Jorgen Brandt <joergen@cuneiform-lang.org>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -17,12 +17,17 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @author Jörgen Brandt <joergen@cuneiform-lang.org>
-%% @copyright 2015
+%% @doc CRE History HTTP Handler
 %%
+%% This module provides a Cowboy HTTP handler that returns the workflow
+%% execution history as JSON. The history contains cached results from
+%% previous workflow executions organized by application name.
 %%
+%% <h3>HTTP Endpoint</h3>
+%% Returns JSON with structure: <code>{"history": [{"app": "...", "delta": ...}]}</code>
 %%
-%%
+%% <h3>Usage</h3>
+%% Access via HTTP GET to the configured history route.
 %%
 %% @end
 %% -------------------------------------------------------------------
@@ -35,6 +40,91 @@
 
 -export([init/2]).
 
+-ifdef(TEST).
+-export([doctest_test/0]).
+-endif.
+
+%%====================================================================
+%% Includes
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
+%%====================================================================
+%% Module Documentation with Examples
+%%====================================================================
+
+-moduledoc("""
+CRE History HTTP Handler
+
+This module provides a Cowboy HTTP handler that returns the workflow
+execution history as JSON. The history contains cached results from
+previous workflow executions organized by application name.
+
+## HTTP Endpoint
+
+The handler responds to HTTP requests with JSON containing:
+- `history`: Array of objects with `app` (application name) and `delta` (cached result)
+
+## Examples
+
+Handler returns JSON response with workflow history:
+
+```erlang
+% When cre_master has cached workflow results
+% Response contains application names and their cached deltas
+% Response body:
+% {"history":[{"app":"my_workflow","delta":{...}}]}
+```
+
+Run doctests:
+
+```erlang
+1> cre_history_handler:doctest_test().
+ok
+```
+""").
+
+%%====================================================================
+%% Cowboy handler callback functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Cowboy handler init callback.
+%%
+%% Retrieves workflow history from cre_master and returns it as JSON.
+%%
+%% @param Req0 The initial Cowboy request
+%% @param State Handler state (passed through)
+%% @returns {ok, Req, State} where Req contains the JSON response
+%%
+%% @end
+%%--------------------------------------------------------------------
+-doc("""
+Cowboy handler init callback.
+
+Retrieves workflow history from cre_master and returns it as JSON.
+
+## Examples
+
+The handler is called automatically by Cowboy when a request matches
+the configured route:
+
+```erlang
+% HTTP GET request to history endpoint returns:
+% {
+%   "history": [
+%     {"app": "workflow1", "delta": {...}},
+%     {"app": "workflow2", "delta": {...}}
+%   ]
+% }
+```
+
+""").
+-spec init(Req0 :: cowboy_req:req(), State :: term()) ->
+          {ok, cowboy_req:req(), State :: term()}.
 
 init(Req0, State) ->
 
@@ -49,3 +139,20 @@ init(Req0, State) ->
           Req0),
 
     {ok, Reply, State}.
+
+%%====================================================================
+%% Tests
+%%====================================================================
+
+-ifdef(TEST).
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the module.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+-endif.

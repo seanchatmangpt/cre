@@ -43,6 +43,26 @@
 %%   <li><b>mapping:</b> Data input/output mappings</li>
 %% </ul>
 %%
+%% <h3>Examples</h3>
+%%
+%% ```erlang
+%% %% Parse a YAWL specification from XML string
+%% Xml = <<"<specification id=\"order_wf\"><name>Order Processing</name>...</specification>">>,
+%% {ok, Spec} = yawl_schema:parse_specification(Xml).
+%% ```
+%%
+%% ```erlang
+%% %% Validate a parsed specification
+%% {ok, Spec} = yawl_schema:parse_specification(File),
+%% ok = yawl_schema:validate_specification(Spec).
+%% ```
+%%
+%% ```erlang
+%% %% Extract tasks from specification
+%% Tasks = yawl_schema:get_tasks(Spec),
+%% #{<<"Task1">> := #{type := atomic, name := <<"Process Order">>}} = Tasks.
+%% ```
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -60,7 +80,8 @@
          get_conditions/1,
          get_flows/1,
          get_data_mappings/1,
-         to_internal_format/1]).
+         to_internal_format/1,
+         doctest_test/0]).
 
 %%====================================================================
 %% Types
@@ -128,6 +149,13 @@
 %% Supports YAWL 2.0 XML format. Returns a specification map with
 %% all extracted elements.
 %%
+%% Example:
+%% ```erlang
+%% 1> Xml = <<"<specification id=\"wf1\"><name>Test</name></specification>">>,
+%% 1> {ok, Spec} = yawl_schema:parse_specification(Xml).
+%% {ok,#{id => <<"wf1">>,name => <<"Test">>,...}}
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec parse_specification(FileOrXml :: file:filename_all() | binary()) ->
@@ -163,6 +191,13 @@ parse_specification(XmlContent) when is_binary(XmlContent) ->
 %% - Required attributes present
 %%
 %% Returns `ok' or `{error, [validation_error()]}'.
+%%
+%% Example:
+%% ```erlang
+%% 1> Spec = #{id => <<"wf1">>, tasks => #{}, conditions => #{}, flows => []},
+%% 1> ok = yawl_schema:validate_specification(Spec).
+%% ok
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec validate_specification(Spec :: specification()) ->
@@ -185,6 +220,12 @@ validate_specification(Spec) ->
 %%
 %% The root decomposition contains the main net structure.
 %%
+%% Example:
+%% ```erlang
+%% 1> Spec = #{decomposition => #{id => <<"root">>, type => root}},
+%% 1> {ok, Decomp} = yawl_schema:get_root_decomposition(Spec).
+%% {ok,#{id => <<"root">>,type => root}}
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec get_root_decomposition(Spec :: specification()) ->
@@ -200,6 +241,12 @@ get_root_decomposition(_Spec) ->
 %%
 %% Returns a map of task ID to task record.
 %%
+%% Example:
+%% ```erlang
+%% 1> Spec = #{tasks => #{<<"t1">> => #{id => <<"t1">>, name => <<"Task1">>, type => atomic}}},
+%% 1> Tasks = yawl_schema:get_tasks(Spec).
+%% #{<<"t1">> => #{id => <<"t1">>,name => <<"Task1">>,type => atomic}}
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec get_tasks(Spec :: specification()) -> #{binary() => task()}.
@@ -214,6 +261,12 @@ get_tasks(_Spec) ->
 %%
 %% Returns a map of condition ID to condition record.
 %%
+%% Example:
+%% ```erlang
+%% 1> Spec = #{conditions => #{<<"c1">> => #{id => <<"c1">>, type => input_condition}}},
+%% 1> Conds = yawl_schema:get_conditions(Spec).
+%% #{<<"c1">> => #{id => <<"c1">>,type => input_condition}}
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec get_conditions(Spec :: specification()) -> #{binary() => condition()}.
@@ -228,6 +281,12 @@ get_conditions(_Spec) ->
 %%
 %% Returns a list of flow records representing connections.
 %%
+%% Example:
+%% ```erlang
+%% 1> Spec = #{flows => [#{id => <<"f1">>, source => <<"t1">>, target => <<"t2">>}]},
+%% 1> Flows = yawl_schema:get_flows(Spec).
+%% [#{id => <<"f1">>,source => <<"t1">>,target => <<"t2">>,predicate => undefined}]
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec get_flows(Spec :: specification()) -> [flow()].
@@ -242,6 +301,12 @@ get_flows(_Spec) ->
 %%
 %% Returns a list of data mapping records.
 %%
+%% Example:
+%% ```erlang
+%% 1> Spec = #{data_mappings => [#{task_id => <<"t1">>, input => [], output => []}]},
+%% 1> Maps = yawl_schema:get_data_mappings(Spec).
+%% [#{input => [],output => [],task_id => <<"t1">>}]
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec get_data_mappings(Spec :: specification()) -> [mapping()].
@@ -908,3 +973,131 @@ task_to_proplist(#{id := Id, name := Name, type := Type} = Task) ->
         JoinType -> [{join_type, JoinType}]
     end,
     Base ++ Split ++ Join.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+%% @doc Run doctests for the yawl_schema module.
+%%
+%% This function validates:
+%% <ul>
+%%   <li>Getting tasks from specification map</li>
+%%   <li>Getting conditions from specification map</li>
+%%   <li>Getting flows from specification map</li>
+%%   <li>Getting data mappings from specification map</li>
+%%   <li>Getting root decomposition from specification</li>
+%%   <li>Validating a minimal valid specification</li>
+%%   <li>Validating specification with empty ID fails</li>
+%%   <li>Validating specification with invalid flow references fails</li>
+%%   <li>Converting task map to proplist</li>
+%% </ul>
+%%
+%% Running the doctests:
+%%
+%% ```erlang
+%% 1> yawl_schema:doctest_test().
+%% ok
+%% ```
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Get tasks from specification
+    Spec1 = #{
+        id => <<"test_wf">>,
+        name => <<"Test Workflow">>,
+        tasks => #{<<"task1">> => #{
+            id => <<"task1">>,
+            name => <<"Task 1">>,
+            type => atomic,
+            split_type => undefined,
+            join_type => undefined,
+            decomposition => undefined,
+            min_instances => undefined,
+            max_instances => undefined,
+            continuation_threshold => undefined
+        }},
+        conditions => #{},
+        flows => [],
+        data_mappings => []
+    },
+    Tasks = get_tasks(Spec1),
+    1 = map_size(Tasks),
+    #{<<"task1">> := #{type := atomic}} = Tasks,
+
+    %% Test 2: Get conditions from specification
+    Spec2 = Spec1#{conditions => #{<<"cond1">> => #{
+        id => <<"cond1">>,
+        type => input_condition,
+        expression => <<"true">>
+    }}},
+    Conds = get_conditions(Spec2),
+    1 = map_size(Conds),
+    #{<<"cond1">> := #{type := input_condition}} = Conds,
+
+    %% Test 3: Get flows from specification
+    Spec3 = Spec1#{flows => [#{id => <<"flow1">>, source => <<"task1">>, target => <<"task2">>, predicate => undefined}]},
+    Flows = get_flows(Spec3),
+    1 = length(Flows),
+    #{source := <<"task1">>} = lists:nth(1, Flows),
+
+    %% Test 4: Get data mappings from specification
+    Spec4 = Spec1#{data_mappings => [#{task_id => <<"task1">>, input => [], output => []}]},
+    Maps = get_data_mappings(Spec4),
+    1 = length(Maps),
+    #{task_id := <<"task1">>} = lists:nth(1, Maps),
+
+    %% Test 5: Get root decomposition
+    Spec5 = Spec1#{decomposition => #{id => <<"root">>, type => root}},
+    {ok, #{id := <<"root">>}} = get_root_decomposition(Spec5),
+
+    %% Test 6: Get root decomposition when missing
+    {error, not_found} = get_root_decomposition(Spec1),
+
+    %% Test 7: Validate valid specification (minimal)
+    ok = validate_specification(Spec1),
+
+    %% Test 8: Validate specification with empty ID should fail
+    BadSpec = Spec1#{id => <<>>},
+    {error, Errors} = validate_specification(BadSpec),
+    true = length(Errors) > 0,
+
+    %% Test 9: Validate flow references
+    SpecWithBadFlow = Spec1#{flows => [#{id => <<"f1">>, source => <<"nonexistent">>, target => <<"task1">>, predicate => undefined}]},
+    {error, RefErrors} = validate_specification(SpecWithBadFlow),
+    true = length(RefErrors) > 0,
+
+    %% Test 10: Task to proplist conversion
+    Task = #{
+        id => <<"t1">>,
+        name => <<"Task 1">>,
+        type => atomic,
+        split_type => xor_split,
+        join_type => and_join
+    },
+    Plist = task_to_proplist(Task),
+    true = is_list(Plist),
+    true = lists:keymember(id, 1, Plist),
+    true = lists:keymember(name, 1, Plist),
+    true = lists:keymember(type, 1, Plist),
+    true = lists:keymember(split_type, 1, Plist),
+    true = lists:keymember(join_type, 1, Plist),
+
+    %% Test 11: Task to proplist with undefined split/join
+    Task2 = Task#{split_type => undefined, join_type => undefined},
+    Plist2 = task_to_proplist(Task2),
+    false = lists:keymember(split_type, 1, Plist2),
+    false = lists:keymember(join_type, 1, Plist2),
+
+    %% Test 12: Empty specification edge cases
+    EmptySpec = #{id => <<"empty">>, name => <<"Empty">>, tasks => #{}, conditions => #{}, flows => [], data_mappings => []},
+    ok = validate_specification(EmptySpec),
+    #{} = get_tasks(EmptySpec),
+    #{} = get_conditions(EmptySpec),
+    [] = get_flows(EmptySpec),
+    [] = get_data_mappings(EmptySpec),
+
+    ok.

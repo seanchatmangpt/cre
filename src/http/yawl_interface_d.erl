@@ -84,6 +84,9 @@
 -export([code_change/3, handle_call/3, handle_cast/2,
          handle_info/2, init/1, terminate/2]).
 
+%% Doctests
+-export([doctest_test/0]).
+
 %%====================================================================
 %% Type Definitions
 %%====================================================================
@@ -101,6 +104,18 @@
 %% Returns `{ok, Pid}' on success.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Starts the Interface D server.
+
+## Examples
+
+```erlang
+1> {ok, Pid} = yawl_interface_d:start_link().
+{ok, <0.123.0>}
+2> gen_server:stop(yawl_interface_d).
+ok
+```
+""").
 -spec start_link() -> {ok, pid()} | {error, term()}.
 
 start_link() ->
@@ -112,6 +127,16 @@ start_link() ->
 %% Returns `ok' on success.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Stops the Interface D server.
+
+## Examples
+
+```erlang
+1> yawl_interface_d:stop().
+ok
+```
+""").
 -spec stop() -> ok.
 
 stop() ->
@@ -128,6 +153,17 @@ stop() ->
 %% Returns `{ok, ExecutionId}' on success, `{error, Reason}' on failure.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Launches a worklet for exception handling.
+
+## Examples
+
+```erlang
+1> {ok, ExecId} = yawl_interface_d:launch_worklet(
+     <<"case_001">>, <<"worklet_retry">>, #{task_id => <<"task_1">>}).
+{ok, <<"exec_", ...>>}
+```
+""").
 -spec launch_worklet(CaseId :: case_id(),
                      WorkletSpecId :: worklet_spec_id(),
                      ExceptionData :: map()) ->
@@ -146,6 +182,19 @@ launch_worklet(CaseId, WorkletSpecId, ExceptionData) ->
 %% Returns `ok' on success, `{error, Reason}' on failure.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Completes a worklet execution with results.
+
+## Examples
+
+```erlang
+1> {ok, ExecId} = yawl_interface_d:launch_worklet(
+     <<"case_001">>, <<"worklet_retry">>, #{}).
+{ok, <<"exec_", ...>>}
+2> ok = yawl_interface_d:complete_worklet(ExecId, #{success => true}).
+ok
+```
+""").
 -spec complete_worklet(ExecutionId :: execution_id(),
                        Result :: term()) -> ok | {error, term()}.
 
@@ -166,6 +215,20 @@ complete_worklet(ExecutionId, Result) ->
 %% `{error, no_handler}' if no worklet is registered for this exception type.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Routes an exception to the appropriate worklet.
+
+## Examples
+
+```erlang
+1> {ok, SvcId} = yawl_interface_d:register_exception_service(
+     <<"my_handler">>, [{service_type, local}, {priority, 1}]).
+{ok, <<"svc_", ...>>}
+2> {ok, ExecId} = yawl_interface_d:handle_exception(
+     runtime_error, #{case_id => <<"case_001">>}).
+{ok, <<"exec_", ...>>}
+```
+""").
 -spec handle_exception(ExceptionType :: atom(),
                        ExceptionData :: map()) ->
         {ok, execution_id()} | {error, no_handler | term()}.
@@ -187,6 +250,20 @@ handle_exception(ExceptionType, ExceptionData) ->
 %% Returns `{ok, ServiceId}' on success, `{error, Reason}' on failure.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Registers an exception handler service.
+
+## Examples
+
+```erlang
+1> {ok, SvcId} = yawl_interface_d:register_exception_service(
+     <<"my_handler">>, [{endpoint, <<"http://localhost:8080">>}]).
+{ok, <<"svc_", ...>>}
+2> Services = yawl_interface_d:get_exception_services().
+3> length(Services) > 0.
+true
+```
+""").
 -spec register_exception_service(ServiceName :: binary(),
                                   Config :: proplists:proplist()) ->
         {ok, service_id()} | {error, term()}.
@@ -206,6 +283,17 @@ register_exception_service(ServiceName, Config) when is_binary(ServiceName) ->
 %% `{error, Reason}' if validation fails.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Validates worklet preconditions before execution.
+
+## Examples
+
+```erlang
+1> {ok, true} = yawl_interface_d:check_preconditions(
+     <<"worklet_retry">>, #{case_id => <<"case_001">>}).
+{ok, true}
+```
+""").
 -spec check_preconditions(WorkletSpecId :: worklet_spec_id(),
                           Context :: map()) ->
         {ok, boolean()} | {error, term()}.
@@ -225,6 +313,17 @@ check_preconditions(WorkletSpecId, Context) ->
 %% `{error, Reason}' if validation fails.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Validates worklet postconditions after execution.
+
+## Examples
+
+```erlang
+1> {ok, true} = yawl_interface_d:check_postconditions(
+     <<"worklet_retry">>, #{result => success}).
+{ok, true}
+```
+""").
 -spec check_postconditions(WorkletSpecId :: worklet_spec_id(),
                            Context :: map()) ->
         {ok, boolean()} | {error, term()}.
@@ -238,6 +337,20 @@ check_postconditions(WorkletSpecId, Context) ->
 %% Returns a list of exception service records.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Lists all registered exception services.
+
+## Examples
+
+```erlang
+1> {ok, _} = yawl_interface_d:register_exception_service(
+     <<"test_handler">>, []).
+{ok, <<"svc_", ...>>}
+2> Services = yawl_interface_d:get_exception_services().
+3> is_list(Services).
+true
+```
+""").
 -spec get_exception_services() -> [#exception_service{}].
 
 get_exception_services() ->
@@ -256,6 +369,17 @@ get_exception_services() ->
 %% Returns `ok' if propagation was successful.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Propagates an exception to the parent workflow.
+
+## Examples
+
+```erlang
+1> ok = yawl_interface_d:propagate_exception(
+     <<"case_001">>, #{error => timeout}).
+ok
+```
+""").
 -spec propagate_exception(CaseId :: case_id(),
                           ExceptionData :: map()) -> ok.
 
@@ -276,6 +400,17 @@ propagate_exception(CaseId, ExceptionData) ->
 %% Returns `ok' if propagation was successful.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Propagates an exception to the parent workflow with level.
+
+## Examples
+
+```erlang
+1> ok = yawl_interface_d:propagate_exception(
+     <<"case_001">>, #{error => timeout}, 2).
+ok
+```
+""").
 -spec propagate_exception(CaseId :: case_id(),
                           ExceptionData :: map(),
                           PropagationLevel :: non_neg_integer()) -> ok.
@@ -296,6 +431,19 @@ propagate_exception(CaseId, ExceptionData, PropagationLevel) ->
 %% `{error, Reason}' on failure.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Coordinates compensation actions for failed worklets.
+
+## Examples
+
+```erlang
+1> {ok, ExecId} = yawl_interface_d:launch_worklet(
+     <<"case_001">>, <<"worklet_compensate">>, #{compensation_actions => []}).
+{ok, <<"exec_", ...>>}
+2> {ok, _} = yawl_interface_d:coordinate_compensation(ExecId).
+{ok, _}
+```
+""").
 -spec coordinate_compensation(ExecutionId :: execution_id()) ->
         {ok, boolean()} | {error, term()}.
 
@@ -308,6 +456,17 @@ coordinate_compensation(ExecutionId) ->
 %% Returns a list of active worklet execution records.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Gets all active worklet executions.
+
+## Examples
+
+```erlang
+1> Active = yawl_interface_d:get_active_worklets().
+2> is_list(Active).
+true
+```
+""").
 -spec get_active_worklets() -> [#worklet_execution{}].
 
 get_active_worklets() ->
@@ -319,6 +478,20 @@ get_active_worklets() ->
 %% Returns a list of worklet executions for the specified case.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Gets worklets by case ID.
+
+## Examples
+
+```erlang
+1> {ok, ExecId} = yawl_interface_d:launch_worklet(
+     <<"case_001">>, <<"worklet_test">>, #{}).
+{ok, <<"exec_", ...>>}
+2> CaseWorklets = yawl_interface_d:get_worklets_by_case(<<"case_001">>).
+3> length(CaseWorklets) > 0.
+true
+```
+""").
 -spec get_worklets_by_case(CaseId :: case_id()) -> [#worklet_execution{}].
 
 get_worklets_by_case(CaseId) ->
@@ -330,6 +503,21 @@ get_worklets_by_case(CaseId) ->
 %% Returns `ok' on success, `{error, not_found}' if service ID not found.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Unregisters an exception service.
+
+## Examples
+
+```erlang
+1> {ok, SvcId} = yawl_interface_d:register_exception_service(
+     <<"temp_handler">>, []).
+{ok, <<"svc_", ...>>}
+2> ok = yawl_interface_d:unregister_exception_service(SvcId).
+ok
+3> {error, not_found} = yawl_interface_d:unregister_exception_service(<<"nonexistent">>).
+{error, not_found}
+```
+""").
 -spec unregister_exception_service(ServiceId :: service_id()) ->
         ok | {error, not_found}.
 
@@ -342,6 +530,19 @@ unregister_exception_service(ServiceId) ->
 %% Returns `ok' on success, `{error, not_found}' if service ID not found.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Enables an exception service.
+
+## Examples
+
+```erlang
+1> {ok, SvcId} = yawl_interface_d:register_exception_service(
+     <<"my_handler">>, [{enabled, false}]).
+{ok, <<"svc_", ...>>}
+2> ok = yawl_interface_d:enable_exception_service(SvcId).
+ok
+```
+""").
 -spec enable_exception_service(ServiceId :: service_id()) ->
         ok | {error, not_found}.
 
@@ -354,6 +555,19 @@ enable_exception_service(ServiceId) ->
 %% Returns `ok' on success, `{error, not_found}' if service ID not found.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Disables an exception service.
+
+## Examples
+
+```erlang
+1> {ok, SvcId} = yawl_interface_d:register_exception_service(
+     <<"my_handler">>, []).
+{ok, <<"svc_", ...>>}
+2> ok = yawl_interface_d:disable_exception_service(SvcId).
+ok
+```
+""").
 -spec disable_exception_service(ServiceId :: service_id()) ->
         ok | {error, not_found}.
 
@@ -366,6 +580,19 @@ disable_exception_service(ServiceId) ->
 %% Returns `ok' on success, `{error, not_found}' if service ID not found.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Sets the priority of an exception service.
+
+## Examples
+
+```erlang
+1> {ok, SvcId} = yawl_interface_d:register_exception_service(
+     <<"my_handler">>, [{priority, 0}]).
+{ok, <<"svc_", ...>>}
+2> ok = yawl_interface_d:set_service_priority(SvcId, 10).
+ok
+```
+""").
 -spec set_service_priority(ServiceId :: service_id(), Priority :: non_neg_integer()) ->
         ok | {error, not_found}.
 
@@ -379,6 +606,20 @@ set_service_priority(ServiceId, Priority) ->
 %% pending, running, completed, failed, aborted.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Gets the status of an active worklet.
+
+## Examples
+
+```erlang
+1> {ok, ExecId} = yawl_interface_d:launch_worklet(
+     <<"case_001">>, <<"worklet_test">>, #{}).
+{ok, <<"exec_", ...>>}
+2> {ok, Status} = yawl_interface_d:get_worklet_status(ExecId).
+3> Status =:= running orelse Status =:= completed.
+true
+```
+""").
 -spec get_worklet_status(ExecutionId :: execution_id()) ->
         {ok, worklet_status()} | {error, not_found}.
 
@@ -392,11 +633,94 @@ get_worklet_status(ExecutionId) ->
 %% `{error, invalid_status}' if worklet is not in a state that can be aborted.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Aborts a running worklet.
+
+## Examples
+
+```erlang
+1> {ok, ExecId} = yawl_interface_d:launch_worklet(
+     <<"case_001">>, <<"worklet_test">>, #{}).
+{ok, <<"exec_", ...>>}
+2> ok = yawl_interface_d:abort_worklet(ExecId).
+ok
+```
+""").
 -spec abort_worklet(ExecutionId :: execution_id()) ->
         ok | {error, not_found | invalid_status}.
 
 abort_worklet(ExecutionId) ->
     gen_server:call(?MODULE, {abort_worklet, ExecutionId}).
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the yawl_interface_d module.
+%%
+%% Tests basic functionality including:
+%% - Service registration and management
+%% - Worklet lifecycle operations
+%% - Exception handling
+%%
+%% Returns `ok' when all tests pass.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Register exception service
+    {ok, SvcId} = register_exception_service(<<"doctest_handler">>,
+        [{service_type, local}, {priority, 1}, {enabled, true}]),
+
+    %% Test 2: Get exception services
+    Services = get_exception_services(),
+    true = length(Services) > 0,
+
+    %% Test 3: Launch worklet (with minimal exception data)
+    {ok, ExecId} = launch_worklet(<<"doctest_case">>, <<"doctest_worklet">>,
+        #{task_id => <<"task_1">>}),
+
+    %% Test 4: Get worklet status
+    {ok, Status} = get_worklet_status(ExecId),
+    true = Status =:= running orelse Status =:= completed,
+
+    %% Test 5: Get worklets by case
+    CaseWorklets = get_worklets_by_case(<<"doctest_case">>),
+    true = length(CaseWorklets) > 0,
+
+    %% Test 6: Complete worklet
+    ok = complete_worklet(ExecId, #{result => success}),
+
+    %% Test 7: Abort worklet (launch a new one since first is completed)
+    {ok, ExecId2} = launch_worklet(<<"doctest_case2">>, <<"doctest_worklet2">>,
+        #{task_id => <<"task_2">>}),
+    ok = abort_worklet(ExecId2),
+
+    %% Test 8: Set service priority
+    ok = set_service_priority(SvcId, 5),
+
+    %% Test 9: Disable/enable service
+    ok = disable_exception_service(SvcId),
+    ok = enable_exception_service(SvcId),
+
+    %% Test 10: Unregister service
+    ok = unregister_exception_service(SvcId),
+
+    %% Test 11: Verify service not found after unregister
+    {error, not_found} = unregister_exception_service(<<"nonexistent_service">>),
+
+    %% Test 12: Check preconditions (should pass when yawl_worklet not available)
+    {ok, true} = check_preconditions(<<"test_worklet">>, #{}),
+
+    %% Test 13: Check postconditions (should pass when yawl_worklet not available)
+    {ok, true} = check_postconditions(<<"test_worklet">>, #{}),
+
+    %% Test 14: Propagate exception (cast, returns immediately)
+    ok = propagate_exception(<<"doctest_case">>, #{error => test}),
+
+    %% Test 15: Get active worklets (should return list)
+    ActiveWorklets = get_active_worklets(),
+    true = is_list(ActiveWorklets),
+
+    ok.
 
 %%====================================================================
 %% gen_server Callback Functions

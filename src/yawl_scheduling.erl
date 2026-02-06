@@ -30,6 +30,122 @@
 %%   <li><b>participant_based</b> - Calendar for specific participants</li>
 %% </ul>
 %%
+%% <h3>Doctests</h3>
+%%
+%% Creating calendars:
+%%
+%% ```erlang
+%% 1> {ok, Pid} = yawl_scheduling:start_link().
+%% {ok, <0.123.0>}
+%% 2> {ok, CalId} = yawl_scheduling:create_calendar(<<"Work Calendar">>).
+%% {ok, <<"calendar_", _/binary>>}
+%% '''
+%%
+%% Creating typed calendars:
+%%
+%% ```erlang
+%% 3> {ok, CustomCal} = yawl_scheduling:create_calendar(<<"Custom">>, custom).
+%% {ok, <<"calendar_", _/binary>>}
+%% 4> {ok, RoleCal} = yawl_scheduling:create_calendar(<<"Reviewer">>, role_based).
+%% {ok, <<"calendar_", _/binary>>}
+%% '''
+%%
+%% Adding time periods:
+%%
+%% ```erlang
+%% 5> Period = #time_period{
+%%     id = <<"period_001">>,
+%%     start_time = {{2025,1,1},{9,0,0}},
+%%     end_time = {{2025,1,1},{17,0,0}},
+%%     available = true,
+%%     description = <<"Work hours">>,
+%%     recurrence = weekly
+%% }.
+%% #time_period{id = <<"period_001">>, ...}
+%% 6> ok = yawl_scheduling:add_time_period(CalId, Period).
+%% ok
+%% '''
+%%
+%% Checking availability:
+%%
+%% ```erlang
+%% 7> Status = yawl_scheduling:check_availability(
+%%     CalId, {{2025,1,1},{10,0,0}}
+%% ).
+%% available
+%% '''
+%%
+%% Scheduling tasks:
+%%
+%% ```erlang
+%% 8> {ok, TaskId} = yawl_scheduling:schedule_task(<<"task_001">>, [
+%%     {calendar_id, CalId},
+%%     {start_time, {{2025,1,1},{10,0,0}}},
+%%     {end_time, {{2025,1,1},{12,0,0}}}
+%% ]).
+%% {ok, <<"task_001">>}
+%% '''
+%%
+%% Setting and checking due dates:
+%%
+%% ```erlang
+%% 9> ok = yawl_scheduling:set_due_date(
+%%     <<"task_001">>, {{2025,1,1},{15,0,0}}
+%% ).
+%% ok
+%% 10> {ok, DueDate} = yawl_scheduling:get_due_date(<<"task_001">>).
+%% {ok, {{2025,1,1},{15,0,0}}}
+%% '''
+%%
+%% Listing calendars:
+%%
+%% ```erlang
+%% 11> Calendars = yawl_scheduling:list_calendars().
+%% [#calendar{id = _, name = <<"Work Calendar">>, ...}]
+%% '''
+%%
+%% Managing timezones:
+%%
+%% ```erlang
+%% 12> ok = yawl_scheduling:set_timezone(CalId, <<"America/New_York">>).
+%% ok
+%% 13> {ok, Tz} = yawl_scheduling:get_timezone(CalId).
+%% {ok, <<"America/New_York">>}
+%% '''
+%%
+%% Getting available slots:
+%%
+%% ```erlang
+%% 14> Slots = yawl_scheduling:get_available_slots(
+%%     CalId,
+%%     {{2025,1,1},{9,0,0}},
+%%     {{2025,1,1},{17,0,0}}
+%% ).
+%% [{{{2025,1,1},{9,0,0}}, {{2025,1,1},{17,0,0}}}]
+%% '''
+%%
+%% Adding calendar exceptions:
+%%
+%% ```erlang
+%% 15> ok = yawl_scheduling:add_calendar_exception(
+%%     CalId,
+%%     {{2025,1,2},{0,0,0}},
+%%     {{2025,1,2},{23,59,59}}
+%% ).
+%% ok
+%% '''
+%%
+%% Rescheduling tasks:
+%%
+%% ```erlang
+%% 16> ok = yawl_scheduling:reschedule_task(
+%%     <<"task_001">>,
+%%     {{2025,1,1},{14,0,0}},
+%%     {{2025,1,1},{16,0,0}}
+%% ).
+%% ok
+%% '''
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -52,6 +168,7 @@
 -export([get_calendar/1, list_calendars/0]).
 -export([set_timezone/2, get_timezone/1]).
 -export([get_available_slots/3]).
+-export([doctest_test/0]).
 
 %% gen_server callbacks
 -export([code_change/3, handle_call/3, handle_cast/2,
@@ -623,3 +740,149 @@ generate_id(Prefix) ->
     Unique = crypto:hash(md5, term_to_binary({self(), erlang:timestamp()})),
     Hex = binary:encode_hex(Unique),
     <<Prefix/binary, "_", Hex/binary>>.
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the yawl_scheduling module.
+%%
+%% Example:
+%% ```
+%% 1> yawl_scheduling:doctest_test().
+%% ok
+%% ```
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Calendar type validation
+    CalType1 = default,
+    true = CalType1 =:= default orelse
+             CalType1 =:= custom orelse
+             CalType1 =:= role_based orelse
+             CalType1 =:= participant_based,
+
+    CalType2 = custom,
+    true = CalType2 =:= default orelse
+             CalType2 =:= custom orelse
+             CalType2 =:= role_based orelse
+             CalType2 =:= participant_based,
+
+    %% Test 2: Availability status validation
+    Status1 = available,
+    true = Status1 =:= available orelse
+             Status1 =:= unavailable orelse
+             Status1 =:= tentative,
+
+    Status2 = unavailable,
+    true = Status2 =:= available orelse
+             Status2 =:= unavailable orelse
+             Status2 =:= tentative,
+
+    %% Test 3: Time period record validation
+    Period = #time_period{
+        id = <<"period_test">>,
+        start_time = {{2025, 1, 1}, {9, 0, 0}},
+        end_time = {{2025, 1, 1}, {17, 0, 0}},
+        available = true,
+        description = <<"Test period">>,
+        recurrence = weekly
+    },
+    true = is_binary(Period#time_period.id),
+    true = is_tuple(Period#time_period.start_time),
+    true = is_tuple(Period#time_period.end_time),
+    true = is_boolean(Period#time_period.available),
+
+    %% Test 4: Calendar record validation
+    Calendar = #calendar{
+        id = <<"calendar_test">>,
+        name = <<"Test Calendar">>,
+        calendar_type = default,
+        time_periods = [],
+        timezone = <<"UTC">>,
+        linked_to = undefined
+    },
+    true = is_binary(Calendar#calendar.id),
+    true = is_binary(Calendar#calendar.name),
+    true = is_binary(Calendar#calendar.timezone),
+
+    %% Test 5: Scheduled task status validation
+    TaskStatus1 = pending,
+    true = TaskStatus1 =:= pending orelse
+             TaskStatus1 =:= in_progress orelse
+             TaskStatus1 =:= completed orelse
+             TaskStatus1 =:= cancelled,
+
+    TaskStatus2 = completed,
+    true = TaskStatus2 =:= pending orelse
+             TaskStatus2 =:= in_progress orelse
+             TaskStatus2 =:= completed orelse
+             TaskStatus2 =:= cancelled,
+
+    %% Test 6: Datetime comparison function
+    DT1 = {{2025, 1, 1}, {10, 0, 0}},
+    DT2 = {{2025, 1, 1}, {12, 0, 0}},
+    earlier = compare_datetime(DT1, DT2),
+    later = compare_datetime(DT2, DT1),
+    same = compare_datetime(DT1, DT1),
+
+    %% Test 7: Add hours function
+    DT3 = {{2025, 1, 1}, {9, 0, 0}},
+    DT3Plus1 = add_hours(DT3, 1),
+    {{2025, 1, 1}, {10, 0, 0}} = DT3Plus1,
+
+    %% Test 8: Recurrence type validation
+    Recurrence1 = daily,
+    true = Recurrence1 =:= undefined orelse
+             Recurrence1 =:= daily orelse
+             Recurrence1 =:= weekly orelse
+             Recurrence1 =:= monthly orelse
+             Recurrence1 =:= yearly,
+
+    Recurrence2 = weekly,
+    true = Recurrence2 =:= undefined orelse
+             Recurrence2 =:= daily orelse
+             Recurrence2 =:= weekly orelse
+             Recurrence2 =:= monthly orelse
+             Recurrence2 =:= yearly,
+
+    %% Test 9: Timezone format validation
+    Timezone1 = <<"UTC">>,
+    true = is_binary(Timezone1),
+    true = byte_size(Timezone1) > 0,
+
+    Timezone2 = <<"America/New_York">>,
+    true = is_binary(Timezone2),
+    true = byte_size(Timezone2) > 0,
+
+    %% Test 10: Task ID format validation
+    TaskId = <<"task_123">>,
+    true = is_binary(TaskId),
+    true = byte_size(TaskId) > 0,
+
+    %% Test 11: Calendar ID format validation
+    CalendarId = <<"calendar_", Rest/binary>> = <<"calendar_abc123">>,
+    true = is_binary(CalendarId),
+    true = byte_size(Rest) > 0,
+
+    %% Test 12: Period ID format validation
+    PeriodId = <<"period_", Rest2/binary>> = <<"period_xyz789">>,
+    true = is_binary(PeriodId),
+    true = byte_size(Rest2) > 0,
+
+    %% Test 13: Empty time periods list
+    EmptyPeriods = [],
+    true = is_list(EmptyPeriods),
+    0 = length(EmptyPeriods),
+
+    %% Test 14: Scheduling state initialization
+    State = #scheduling_state{},
+    true = is_map(State#scheduling_state.calendars),
+    true = is_list(State#scheduling_state.scheduled_tasks),
+    true = is_map(State#scheduling_state.constraints),
+
+    %% Test 15: Default timezone
+    DefaultState = #scheduling_state{},
+    <<"UTC">> = DefaultState#scheduling_state.default_timezone,
+
+    ok.

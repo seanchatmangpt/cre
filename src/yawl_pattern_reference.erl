@@ -13,47 +13,58 @@
 %%
 %% @author CRE Team
 %% @version 1.0.0
-%% @doc YAWL Workflow Patterns Reference Implementation
 %%
-%% <h3>Overview</h3>
-%% This module implements 15 core YAWL workflow control patterns with:
-%% <ul>
-%%   <li>Formal Petri net structure definitions</li>
-%%   <li>Soundness property verification</li>
-%%   <li>XES event logging (IEEE 1849-2016)</li>
-%%   <li>Execution and analysis functions</li>
-%% </ul>
+%% @doc YAWL Workflow Patterns Reference Implementation.
 %%
-%% <h3>Implemented Patterns</h3>
-%% <table border="1">
-%%   <tr><th>WCP #</th><th>Pattern</th><th>Description</th></tr>
-%%   <tr><td>WCP-01</td><td>Sequence</td><td>Sequential task execution</td></tr>
-%%   <tr><td>WCP-02</td><td>Parallel Split</td><td>AND-split into concurrent branches</td></tr>
-%%   <tr><td>WCP-03</td><td>Synchronization</td><td>AND-join of concurrent branches</td></tr>
-%%   <tr><td>WCP-04</td><td>Exclusive Choice</td><td>XOR-split based on condition</td></tr>
-%%   <tr><td>WCP-07</td><td>Structured Sync Merge</td><td>N-way merge with synchronization</td></tr>
-%%   <tr><td>WCP-09</td><td>Discriminator</td><td>Trigger on first completion</td></tr>
-%%   <tr><td>WCP-13</td><td>Multi-Instance (Static)</td><td>Fixed parallel instances</td></tr>
-%%   <tr><td>WCP-15</td><td>Multi-Instance (Dynamic)</td><td>Dynamic parallel instances</td></tr>
-%%   <tr><td>WCP-16</td><td>Deferred Choice</td><td>Runtime choice based on availability</td></tr>
-%%   <tr><td>WCP-17</td><td>Interleaved Routing</td><td>Non-deterministic interleaving</td></tr>
-%%   <tr><td>WCP-18</td><td>Milestone</td><td>State-based activity enabling</td></tr>
-%%   <tr><td>WCP-19</td><td>Cancel Activity</td><td>Activity cancellation</td></tr>
-%%   <tr><td>WCP-20</td><td>Cancel Case</td><td>Workflow case cancellation</td></tr>
-%%   <tr><td>WCP-25</td><td>Cancel Region</td><td>Scoped cancellation</td></tr>
-%%   <tr><td>WCP-39</td><td>Critical Section</td><td>Mutual exclusion</td></tr>
-%% </table>
+%% This module implements 15 core YAWL workflow control patterns with formal
+%% Petri net structure definitions, soundness property verification, and XES
+%% event logging support.
 %%
-%% <h3>Formal Properties</h3>
-%% Each pattern satisfies these soundness properties:
-%% <ul>
-%%   <li><b>Option to complete:</b> From any reachable marking, a final marking is reachable</li>
-%%   <li><b>Proper completion:</b> When a final marking is reached, it contains the completion token</li>
-%%   <li><b>No dead transitions:</b> No transition is permanently enabled but never fires</li>
-%%   <li><b>Liveness:</b> No deadlock states except final markings</li>
-%% </ul>
+%% <h3>Pattern Examples</h3>
+%%
+%% <b>Sequence Pattern (WCP-01):</b>
+%% ```erlang
+%% > Pattern = yawl_pattern_reference:sequence([task1, task2]),
+%%   Info = yawl_pattern_reference:get_pattern_info(Pattern).
+%% #{name := <<"WCP-01: Sequence">>, wcp_number := {1, 1}}
+%% ```
+%%
+%% <b>Parallel Split (WCP-02):</b>
+%% ```erlang
+%% > Pattern = yawl_pattern_reference:parallel_split(3, [task1, task2, task3]),
+%%   PetriNet = yawl_pattern_reference:get_petri_net(Pattern).
+%% #{type := petri_net, places := Places, transitions := Trans}
+%% ```
+%%
+%% <b>Synchronization (WCP-03):</b>
+%% ```erlang
+%% > Pattern = yawl_pattern_reference:synchronization(2, [task1, task2]),
+%%   Soundness = yawl_pattern_reference:verify_soundness(Pattern).
+%% #{option_to_complete := true, proper_completion := true}
+%% ```
+%%
+%% <b>Pattern Validation:</b>
+%% ```erlang
+%% > Pattern = yawl_pattern_reference:sequence([a, b]),
+%%   ok = yawl_pattern_reference:validate_pattern(Pattern).
+%% ok
+%% ```
+%%
+%% <b>Pattern Execution:</b>
+%% ```erlang
+%% > Pattern = yawl_pattern_reference:sequence([task1, task2]),
+%%   Result = yawl_pattern_reference:execute(Pattern, input, #{}).
+%% #{status := complete, trace := Trace}
+%% ```
+%%
+%% <b>Get Pattern Info:</b>
+%% ```erlang
+%% > Pattern = yawl_pattern_reference:sequence([a, b]),
+%%   Info = yawl_pattern_reference:get_pattern_info(Pattern),
+%%   maps:get(name, Info).
+%% <<"WCP-01: Sequence">>
+%% ```
 %% @end
-%% -------------------------------------------------------------------
 
 -module(yawl_pattern_reference).
 -author("CRE Team").
@@ -96,6 +107,9 @@
     find_deadlocks/1,
     get_pattern_info/1
 ]).
+
+%% Doctests
+-export([doctest_test/0]).
 
 %%====================================================================
 %% Types
@@ -152,7 +166,6 @@
 %% <b>Petri Net Structure:</b>
 %%   p_start --t_start--> p_task1 --t_complete_task1--> p_task2 --t_complete_task2--> p_end
 %%
-%% @spec sequence([task_id()]) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec sequence([task_id()]) -> #wcp_pattern{}.
@@ -228,7 +241,6 @@ sequence(TaskIds) when length(TaskIds) >= 2 ->
 %%   p_split --|
 %%              --> p_branch_2 --> (subsequent synchronization)
 %%
-%% @spec parallel_split(pos_integer(), [task_id()]) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec parallel_split(pos_integer(), [task_id()]) -> #wcp_pattern{}.
@@ -281,7 +293,6 @@ parallel_split(BranchCount, TaskIds) when BranchCount >= 2, length(TaskIds) >= B
 %%   - t_sync is enabled iff all p_join_i have exactly one token
 %%   - After firing, p_sync contains exactly one token
 %%
-%% @spec synchronization(pos_integer(), [task_id()]) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec synchronization(pos_integer(), [task_id()]) -> #wcp_pattern{}.
@@ -333,7 +344,6 @@ synchronization(BranchCount, TaskIds) when BranchCount >= 2, length(TaskIds) >= 
 %%   - Mutual exclusion: Only one t_select_i fires per execution
 %%   - Determinism: Condition function uniquely determines branch
 %%
-%% @spec exclusive_choice(fun(() -> {branch_id(), term()}), [task_id()]) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec exclusive_choice(fun(() -> {integer(), term()}), [task_id()]) -> #wcp_pattern{}.
@@ -387,7 +397,6 @@ exclusive_choice(ConditionFun, TaskIds) when length(TaskIds) >= 2 ->
 %%   - All incoming branches must have tokens
 %%   - Exactly one token produced after merge
 %%
-%% @spec structured_sync_merge(pos_integer(), [task_id()]) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec structured_sync_merge(pos_integer(), [task_id()]) -> #wcp_pattern{}.
@@ -440,7 +449,6 @@ structured_sync_merge(BranchCount, TaskIds) when BranchCount >= 2, length(TaskId
 %%   - Exactly ONE output token per N input tokens
 %%   - First-come-first-served semantics
 %%
-%% @spec discriminator(pos_integer(), [task_id()]) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec discriminator(pos_integer(), [task_id()]) -> #wcp_pattern{}.
@@ -501,7 +509,6 @@ discriminator(BranchCount, TaskIds) when BranchCount >= 2, length(TaskIds) >= Br
 %%   - Exactly N instances created
 %%   - All N must complete before continuation
 %%
-%% @spec multi_instance_static(pos_integer(), fun((term()) -> term()), [term()]) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec multi_instance_static(pos_integer(), fun((term()) -> term()), [term()]) -> #wcp_pattern{}.
@@ -558,7 +565,6 @@ multi_instance_static(InstanceCount, InstanceFun, InputData) when InstanceCount 
 %%   - Dynamic instance creation
 %%   - Guarantees termination when data exhausted
 %%
-%% @spec multi_instance_dynamic(fun(() -> {more, term()} | done), fun((term()) -> term())) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec multi_instance_dynamic(fun(() -> {more, term()} | done), fun((term()) -> term())) -> #wcp_pattern{}.
@@ -622,7 +628,6 @@ multi_instance_dynamic(DataFun, InstanceFun) ->
 %%   - Exactly ONE branch executes
 %%   - Choice is non-deterministic from static analysis
 %%
-%% @spec deferred_choice([{task_id(), term()}], fun((term()) -> boolean()), term()) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec deferred_choice([{task_id(), term()}], fun((term()) -> boolean()), term()) -> #wcp_pattern{}.
@@ -680,7 +685,6 @@ deferred_choice(Options, ConditionFun, InitialData) when length(Options) >= 2 ->
 %%   - All branches complete exactly once
 %%   - Non-deterministic interleaving
 %%
-%% @spec interleaved_routing([fun((term()) -> term())], term()) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec interleaved_routing([fun((term()) -> term())], term()) -> #wcp_pattern{}.
@@ -743,7 +747,6 @@ interleaved_routing(Branches, InitialData) when length(Branches) >= 2 ->
 %%   - Activity only starts when milestone condition true
 %%   - Milestone state persists once reached
 %%
-%% @spec milestone(fun((term()) -> term()), fun((term()) -> boolean()), term()) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec milestone(fun((term()) -> term()), fun((term()) -> boolean()), term()) -> #wcp_pattern{}.
@@ -803,7 +806,6 @@ milestone(Activity, MilestoneFun, InitialData) ->
 %%   - Cancellation is safe (no resource leaks)
 %%   - Either activity completes OR cancellation succeeds
 %%
-%% @spec cancel_activity(fun((term()) -> term()), fun((term()) -> boolean())) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec cancel_activity(fun((term()) -> term()), fun((term()) -> boolean())) -> #wcp_pattern{}.
@@ -863,7 +865,6 @@ cancel_activity(Activity, CancelFun) ->
 %%   - Global cancellation terminates all execution
 %%   - Resources properly released
 %%
-%% @spec cancel_case([fun((term()) -> term())], fun((term()) -> boolean())) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec cancel_case([fun((term()) -> term())], fun((term()) -> boolean())) -> #wcp_pattern{}.
@@ -923,7 +924,6 @@ cancel_case(Activities, CancelFun) when length(Activities) >= 1 ->
 %%   - Cancellation limited to region
 %%   - Outside activities unaffected
 %%
-%% @spec cancel_region([fun((term()) -> term())], fun((term()) -> boolean()), [atom()]) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec cancel_region([fun((term()) -> term())], fun((term()) -> boolean()), [atom()]) -> #wcp_pattern{}.
@@ -984,7 +984,6 @@ cancel_region(RegionActivities, CancelFun, RegionIds) when length(RegionActiviti
 %%   - Mutual exclusion guaranteed
 %%   - No starvation with fair scheduling
 %%
-%% @spec critical_section(fun((term()) -> term()), atom()) -> #wcp_pattern{}
 %% @end
 %%--------------------------------------------------------------------
 -spec critical_section(fun((term()) -> term()), atom()) -> #wcp_pattern{}.
@@ -1040,7 +1039,6 @@ critical_section(CriticalActivity, LockId) ->
 %%
 %% Returns execution result with status, result, and execution trace.
 %%
-%% @spec execute(#wcp_pattern{}, term(), map()) -> execution_result()
 %% @end
 %%--------------------------------------------------------------------
 -spec execute(#wcp_pattern{}, term(), map()) -> execution_result().
@@ -1053,7 +1051,6 @@ execute(Pattern, InputData, Options) ->
 %%
 %% Logs all events to the specified XES log ID.
 %%
-%% @spec execute_with_logging(#wcp_pattern{}, term(), map(), binary() | undefined) -> execution_result()
 %% @end
 %%--------------------------------------------------------------------
 -spec execute_with_logging(#wcp_pattern{}, term(), map(), binary() | undefined) -> execution_result().
@@ -1106,7 +1103,6 @@ execute_with_logging(#wcp_pattern{id = Id, name = Name} = Pattern, InputData, Op
 %%--------------------------------------------------------------------
 %% @doc Validates a pattern structure.
 %%
-%% @spec validate_pattern(#wcp_pattern{}) -> ok | {error, term()}
 %% @end
 %%--------------------------------------------------------------------
 -spec validate_pattern(#wcp_pattern{}) -> ok | {error, term()}.
@@ -1137,7 +1133,6 @@ validate_pattern(#wcp_pattern{places = Places, transitions = Transitions,
 %%--------------------------------------------------------------------
 %% @doc Gets the Petri net structure for a pattern.
 %%
-%% @spec get_petri_net(#wcp_pattern{}) -> map()
 %% @end
 %%--------------------------------------------------------------------
 -spec get_petri_net(#wcp_pattern{}) -> map().
@@ -1161,9 +1156,20 @@ get_petri_net(#wcp_pattern{places = Places, transitions = Transitions,
 %%
 %% Returns a map indicating which soundness properties hold.
 %%
-%% @spec verify_soundness(#wcp_pattern{}) -> map()
 %% @end
 %%--------------------------------------------------------------------
+%%
+%% @doc Verifies soundness properties of a pattern.
+%%
+%% Returns a map indicating which soundness properties hold.
+%%
+%% <b>Example:</b>
+%% ```erlang
+%% > Pattern = yawl_pattern_reference:sequence([task1, task2]),
+%%   Soundness = yawl_pattern_reference:verify_soundness(Pattern).
+%% #{option_to_complete := true, proper_completion := true, no_dead_transitions := true, liveness := true}
+%% ```
+%% @end
 -spec verify_soundness(#wcp_pattern{}) -> map().
 
 verify_soundness(#wcp_pattern{soundness = Soundness}) ->
@@ -1178,7 +1184,6 @@ verify_soundness(#wcp_pattern{soundness = Soundness}) ->
 %%--------------------------------------------------------------------
 %% @doc Gets all reachable markings for a pattern.
 %%
-%% @spec get_reachable_markings(#wcp_pattern{}, term()) -> [marking()]
 %% @end
 %%--------------------------------------------------------------------
 -spec get_reachable_markings(#wcp_pattern{}, term()) -> [marking()].
@@ -1191,7 +1196,6 @@ get_reachable_markings(Pattern, InputData) ->
 %%--------------------------------------------------------------------
 %% @doc Finds deadlock states in a pattern.
 %%
-%% @spec find_deadlocks(#wcp_pattern{}) -> [marking()]
 %% @end
 %%--------------------------------------------------------------------
 -spec find_deadlocks(#wcp_pattern{}) -> [marking()].
@@ -1208,9 +1212,25 @@ find_deadlocks(Pattern) ->
 %%--------------------------------------------------------------------
 %% @doc Gets pattern information.
 %%
-%% @spec get_pattern_info(#wcp_pattern{}) -> map()
 %% @end
 %%--------------------------------------------------------------------
+%%
+%% @doc Gets pattern information including name, WCP number, and complexity metrics.
+%%
+%% <b>Examples:</b>
+%% ```erlang
+%% > Pattern = yawl_pattern_reference:sequence([task1, task2]),
+%%   Info = yawl_pattern_reference:get_pattern_info(Pattern),
+%%   maps:get(name, Info).
+%% <<"WCP-01: Sequence">>
+%%
+%% > Pattern = yawl_pattern_reference:parallel_split(3, [a, b, c]),
+%%   Info = yawl_pattern_reference:get_pattern_info(Pattern),
+%%   maps:get(place_count, Info) >= 4,
+%%   maps:get(transition_count, Info) >= 3.
+%% true
+%% ```
+%% @end
 -spec get_pattern_info(#wcp_pattern{}) -> map().
 
 get_pattern_info(#wcp_pattern{id = Id, name = Name, wcp_number = {Major, Minor},
@@ -1673,3 +1693,84 @@ generate_id(Prefix) ->
     <<Prefix/binary, "_", Hex/binary>>.
 
 test_input() -> test_input.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+%%
+%% @doc Runs doctests for the yawl_pattern_reference module.
+%%
+%% This function executes fast, minimal tests that verify the core
+%% pattern lookup and metadata functions work correctly.
+%%
+%% <b>Example:</b>
+%% ```erlang
+%% > yawl_pattern_reference:doctest_test().
+%% ok
+%% ```
+%% @end
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Create sequence pattern and verify structure
+    SeqPattern = sequence([task1, task2]),
+    #wcp_pattern{name = <<"WCP-01: Sequence">>,
+                 wcp_number = {1, 1},
+                 places = Places1,
+                 transitions = Trans1} = SeqPattern,
+    true = length(Places1) >= 4,
+    true = length(Trans1) >= 3,
+
+    %% Test 2: Create parallel split and verify name
+    ParPattern = parallel_split(3, [t1, t2, t3]),
+    #wcp_pattern{name = <<"WCP-02: Parallel Split">>,
+                 wcp_number = {2, 2}} = ParPattern,
+
+    %% Test 3: Create synchronization and verify soundness
+    SyncPattern = synchronization(2, [a, b]),
+    #wcp_pattern{name = <<"WCP-03: Synchronization">>} = SyncPattern,
+    #{option_to_complete := true,
+      proper_completion := true} = verify_soundness(SyncPattern),
+
+    %% Test 4: Validate a pattern
+    ok = validate_pattern(SeqPattern),
+
+    %% Test 5: Get Petri net structure
+    PetriNet = get_petri_net(SeqPattern),
+    #{type := petri_net,
+      places := _,
+      transitions := _} = PetriNet,
+
+    %% Test 6: Get pattern info
+    Info = get_pattern_info(SeqPattern),
+    #{name := <<"WCP-01: Sequence">>,
+      wcp_number := {1, 1},
+      place_count := PC,
+      transition_count := TC} = Info,
+    true = is_integer(PC),
+    true = is_integer(TC),
+
+    %% Test 7: Create discriminator pattern
+    DiscPattern = discriminator(2, [x, y]),
+    #wcp_pattern{name = <<"WCP-09: Discriminator">>,
+                 wcp_number = {9, 1}} = DiscPattern,
+
+    %% Test 8: Create multi-instance static pattern
+    IdFun = fun(X) -> X end,
+    MIStatic = multi_instance_static(3, IdFun, [1, 2, 3]),
+    #wcp_pattern{name = <<"WCP-13: Multi-Instance (Static)">>,
+                 wcp_number = {13, 1}} = MIStatic,
+
+    %% Test 9: Create critical section pattern
+    CSPattern = critical_section(IdFun, my_lock),
+    #wcp_pattern{name = <<"WCP-39: Critical Section">>,
+                 wcp_number = {39, 1}} = CSPattern,
+
+    %% Test 10: Verify soundness contains expected keys
+    Soundness = verify_soundness(SeqPattern),
+    true = maps:is_key(option_to_complete, Soundness),
+    true = maps:is_key(proper_completion, Soundness),
+    true = maps:is_key(liveness, Soundness),
+
+    ok.

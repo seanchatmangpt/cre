@@ -20,6 +20,58 @@
 %%   <li>Composable middleware chains</li>
 %% </ul>
 %%
+%% <h3>Doctests</h3>
+%%
+%% Creating approval config:
+%% ```erlang
+%% 1> Config = #{required_approver => human, timeout => 5000, on_denied => stop}.
+%% #{required_approver => human,timeout => 5000,on_denied => stop}
+%% '''
+%%
+%% Unwrapping a pattern:
+%% ```erlang
+%% 1> Wrapped = #approval_wrapped{original_pattern = test_pattern, approval_config => #{}, middleware_chain => []}.
+%% #approval_wrapped{original_pattern = test_pattern, approval_config => #{}, middleware_chain = []}
+%% 2> test_pattern = yawl_approval_middleware:unwrap(Wrapped).
+%% test_pattern
+%% '''
+%%
+%% Checking if pattern is wrapped:
+%% ```erlang
+%% 1> Wrapped = #approval_wrapped{original_pattern = test, approval_config => #{}, middleware_chain => []}.
+%% #approval_wrapped{original_pattern = test, approval_config => #{}, middleware_chain = []}
+%% 2> true = yawl_approval_middleware:is_wrapped(Wrapped).
+%% true
+%% 3> false = yawl_approval_middleware:is_wrapped(not_wrapped).
+%% false
+%% '''
+%%
+%% Conditional approval with false condition:
+%% ```erlang
+%% 1> Pattern = some_pattern.
+%% some_pattern
+%% 2> Config = #{required_approver => auto}.
+%% #{required_approver => auto}
+%% 3> ConditionFun = fun() -> false end.
+%% #Fun<erl_eval.43.3316493>
+%% 4> some_pattern = yawl_approval_middleware:conditional_approval(Pattern, Config, ConditionFun).
+%% some_pattern
+%% '''
+%%
+%% Getting step name from pattern:
+%% ```erlang
+%% 1> Pattern = #wcp_pattern{name = <<"my_step">>, type => atomic}.
+%% #wcp_pattern{name = <<"my_step">>, type => atomic}
+%% 2> StepName = yawl_approval_middleware:get_step_name(Pattern).
+%% my_step
+%% '''
+%%
+%% Running all doctests:
+%% ```erlang
+%% 1> yawl_approval_middleware:doctest_test().
+%% ok
+%% '''
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -51,6 +103,9 @@
     unwrap/1,
     is_wrapped/1
 ]).
+
+%% Doctests
+-export([doctest_test/0, get_step_name/1]).
 
 %%====================================================================
 %% Types
@@ -355,6 +410,139 @@ is_wrapped(#approval_wrapped{}) -> true;
 is_wrapped(_) -> false.
 
 %%====================================================================
+%% Doctest Function
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Runs all doctests for this module.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% === Test 1: Approval config map creation ===
+    Config1 = #{required_approver => human, timeout => 5000, on_denied => stop},
+    human = maps:get(required_approver, Config1),
+    5000 = maps:get(timeout, Config1),
+    stop = maps:get(on_denied, Config1),
+
+    %% === Test 2: Approval config with defaults ===
+    Config2 = #{required_approver => auto},
+    auto = maps:get(required_approver, Config2),
+
+    %% === Test 3: Unwrap wrapped pattern ===
+    OriginalPattern = test_pattern,
+    Wrapped1 = #approval_wrapped{
+        original_pattern = OriginalPattern,
+        approval_config = Config1,
+        middleware_chain = []
+    },
+    OriginalPattern = unwrap(Wrapped1),
+
+    %% === Test 4: Unwrap non-wrapped pattern ===
+    NotWrapped = some_other_pattern,
+    NotWrapped = unwrap(NotWrapped),
+
+    %% === Test 5: is_wrapped on wrapped pattern ===
+    true = is_wrapped(Wrapped1),
+
+    %% === Test 6: is_wrapped on non-wrapped pattern ===
+    false = is_wrapped(not_wrapped),
+
+    %% === Test 7: is_wrapped on atom ===
+    false = is_wrapped(some_atom),
+
+    %% === Test 8: is_wrapped on list ===
+    false = is_wrapped([]),
+
+    %% === Test 9: is_wrapped on map ===
+    false = is_wrapped(#{}),
+
+    %% === Test 10: Conditional approval with false condition ===
+    Pattern3 = conditional_pattern,
+    Config3 = #{required_approver => auto},
+    FalseCondition = fun() -> false end,
+    Pattern3 = conditional_approval(Pattern3, Config3, FalseCondition),
+
+    %% === Test 11: Conditional approval with true condition returns wrapped ===
+    TrueCondition = fun() -> true end,
+    Wrapped2 = conditional_approval(Pattern3, Config3, TrueCondition),
+    true = is_wrapped(Wrapped2),
+
+    %% === Test 12: Get step name from wcp_pattern ===
+    WcpPattern = #wcp_pattern{name = <<"my_test_step">>},
+    my_test_step = get_step_name(WcpPattern),
+
+    %% === Test 13: Get step name from approval_wrapped ===
+    InnerPattern = #wcp_pattern{name = <<"inner_step">>},
+    WrappedPattern = #approval_wrapped{original_pattern = InnerPattern},
+    inner_step = get_step_name(WrappedPattern),
+
+    %% === Test 14: Get step name from pattern_state ===
+    PatternState = #pattern_state{pattern_type = my_pattern},
+    my_pattern = get_step_name(PatternState),
+
+    %% === Test 15: Get step name from sequence record ===
+    SequenceRec = #sequence{},
+    sequence = get_step_name(SequenceRec),
+
+    %% === Test 16: Get step name from parallel_split ===
+    ParallelRec = #parallel_split{},
+    parallel_split = get_step_name(ParallelRec),
+
+    %% === Test 17: Get step name from synchronization ===
+    SyncRec = #synchronization{},
+    synchronization = get_step_name(SyncRec),
+
+    %% === Test 18: Get step name from exclusive_choice ===
+    ChoiceRec = #exclusive_choice{},
+    exclusive_choice = get_step_name(ChoiceRec),
+
+    %% === Test 19: Chain approval with single config ===
+    BasePattern = base_pattern,
+    SingleConfig = [#{required_approver => auto}],
+    Chained1 = chain_approval(BasePattern, SingleConfig),
+    true = is_wrapped(Chained1),
+
+    %% === Test 20: Chain approval with multiple configs ===
+    MultiConfigs = [
+        #{required_approver => auto},
+        #{required_approver => human, timeout => 10000}
+    ],
+    Chained2 = chain_approval(BasePattern, MultiConfigs),
+    true = is_wrapped(Chained2),
+
+    %% === Test 21: Chain approval with empty list returns pattern ===
+    EmptyPattern = empty_pattern,
+    EmptyResult = chain_approval(EmptyPattern, []),
+    EmptyPattern = unwrap(EmptyResult),
+
+    %% === Test 22: Middleware chain is list of functions ===
+    WrappedWithChain = #approval_wrapped{
+        original_pattern = test,
+        approval_config = #{},
+        middleware_chain = [fun(_) -> ok end, fun(_) -> ok end]
+    },
+    Chain = WrappedWithChain#approval_wrapped.middleware_chain,
+    true = is_list(Chain),
+    2 = length(Chain),
+
+    %% === Test 23: Approval config with on_denied continue ===
+    ConfigContinue = #{required_approver => auto, on_denied => continue},
+    continue = maps:get(on_denied, ConfigContinue),
+
+    %% === Test 24: Approval config with on_denied rollback ===
+    ConfigRollback = #{required_approver => auto, on_denied => rollback},
+    rollback = maps:get(on_denied, ConfigRollback),
+
+    %% === Test 25: Approval config with on_timeout ===
+    ConfigTimeout = #{required_approver => auto, on_timeout => stop},
+    stop = maps:get(on_timeout, ConfigTimeout),
+
+    ok.
+
+%%====================================================================
 %% Internal Functions
 %%====================================================================
 
@@ -453,6 +641,8 @@ handle_timeout(_Pattern, Config) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec get_step_name(term()) -> atom().
+
 get_step_name(Pattern) ->
     case Pattern of
         #approval_wrapped{original_pattern = Original} ->

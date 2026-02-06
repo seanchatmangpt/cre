@@ -135,7 +135,126 @@ modes(t_process, Marking, Ctx) ->
 
 ---
 
-### 5. [Workflow Migration Tutorial](tutorials/workflow_migration_tutorial.md)
+### 5. [PNet Mode Enumeration Tutorial](PNET_MODE_TUTORIAL.md)
+
+**Level**: Beginner-Intermediate
+**Time**: 60 minutes
+**Focus**: Mode enumeration for Petri net transitions
+
+#### Learning Objectives
+- Understand mode enumeration concepts
+- Enumerate basic and colored modes
+- Handle multiplicity and Cartesian products
+- Integrate mode selection with transition firing
+- Implement colored net patterns with variable bindings
+
+#### Topics Covered
+- Basic mode enumeration algorithms
+- Preset counting and multiplicity
+- Cartesian product computation
+- Colored mode enumeration with variable bindings
+- Fallback mechanisms for uncolored nets
+- Performance considerations
+- Integration with transition firing
+
+#### Key Examples
+```erlang
+% Mode enumeration with doctests
+> pnet_mode:preset_counts([p, p, q]).
+#{p => 2, q => 1}
+
+> Marking = #{p => [a,b], q => [x,y]}.
+> pnet_mode:enum_modes([p,q], Marking).
+[#{p => [a], q => [x]},
+ #{p => [a], q => [y]},
+ #{p => [b], q => [x]},
+ #{p => [b], q => [y]}]
+
+% Colored mode enumeration
+> pnet_mode:enum_cmodes(auth, #{user => [alice,bob]}, #{}, user_net).
+[{#{user => alice}, #{user => [alice]}},
+ {#{user => bob}, #{user => [bob]}}]
+```
+
+---
+
+### 6. [PNet Marking Tutorial](PNET_MARKING_TUTORIAL.md)
+
+**Level**: Beginner-Intermediate
+**Time**: 60 minutes
+**Focus**: Mastering multiset marking algebra for workflow state management
+
+#### Learning Objectives
+- Understand the mathematical foundation of Petri net markings
+- Create and manipulate workflow states using multiset operations
+- Implement atomic transition firing with proper error handling
+- Use canonical hashing for state comparison and caching
+- Apply marking algebra to real-world workflow patterns
+- Debug and optimize marking operations
+
+#### Topics Covered
+- Marking creation and initialization patterns
+- All multiset operations (add, take, apply) with doctest examples
+- Hashing and snapshot functions with examples
+- Integration with workflow patterns
+- Performance characteristics and best practices
+- Edge cases handled by the implementation
+
+#### Key Examples
+```erlang
+% Create and manipulate markings
+> M0 = pnet_marking:new([start, end]).
+#{start => [], end => []}
+
+% Multiset operations
+> {ok, M1} = pnet_marking:add(M0, #{start => ["init"]).
+#{start => ["init"], end => []}
+
+% Atomic transition firing
+> {ok, M2} = pnet_marking:apply(M1, #{start => ["init"]}, #{end => ["done"]).
+#{start => [], end => ["done"]}
+
+% Hash-based state comparison
+> Hash1 = pnet_marking:hash(M1), Hash2 = pnet_marking:hash(M2).
+Hash1 =:= Hash2.  % Check if states are equal
+```
+
+---
+
+### 7. [PNet Types Tutorial](PNET_TYPES_TUTORIAL.md)
+
+**Level**: Beginner-Intermediate
+**Time**: 45 minutes
+**Focus**: Understanding and using the type system
+
+#### Learning Objectives
+- Understand type definitions and categories
+- Use validation functions correctly
+- Work with colored Petri nets
+- Integrate types with workflow execution
+
+#### Topics Covered
+- Basic types (place, trsn, token)
+- State types (marking, mode, consume/produce maps)
+- Colored types (var, binding, cmode)
+- Validation functions and their usage
+- Integration patterns with other modules
+- Error handling and best practices
+
+#### Key Examples
+```erlang
+% Basic type validation
+> pnet_types:is_marking(#{p1 => [a,b], p2 => []}).
+true
+
+% Colored mode validation
+> pnet_types:is_cmode({#{x => 1}, #{p1 => [a]}}).
+true
+```
+
+---
+
+### 6. [Workflow Migration Tutorial](tutorials/workflow_migration_tutorial.md)
 
 **Level**: Advanced
 **Time**: 90 minutes
@@ -196,19 +315,22 @@ modes(t_process, Marking, Ctx) ->
 ### For Beginners
 1. **Start with**: Getting Started
 2. **Then**: Basic Patterns Tutorial
-3. **Next**: Colored Tokens Tutorial (optional)
+3. **Next**: PNet Types Tutorial
+4. **Then**: Colored Tokens Tutorial (optional)
 
 ### For Intermediate Developers
 1. **Start with**: Basic Patterns Tutorial (if needed)
 2. **Then**: Advanced Patterns Tutorial
-3. **Next**: Colored Tokens Tutorial
-4. **Finally**: Workflow Migration Tutorial (if migrating)
+3. **Next**: PNet Types Tutorial
+4. **Then**: Colored Tokens Tutorial
+5. **Finally**: Workflow Migration Tutorial (if migrating)
 
 ### For Advanced Users
 1. **Review**: Getting Started (for new concepts)
 2. **Then**: Advanced Patterns Tutorial
-3. **Next**: Colored Tokens Tutorial
-4. **Optionally**: Workflow Migration Tutorial
+3. **Next**: PNet Types Tutorial
+4. **Then**: Colored Tokens Tutorial
+5. **Optionally**: Workflow Migration Tutorial
 
 ---
 
@@ -216,17 +338,22 @@ modes(t_process, Marking, Ctx) ->
 
 ### Path 1: New to CRE
 ```
-Getting Started → Basic Patterns → Advanced Patterns → Colored Tokens
+Getting Started → Basic Patterns → PNet Types Tutorial → Advanced Patterns → Colored Tokens
 ```
 
 ### Path 2: Migrating from Old CRE
 ```
-Getting Started → Workflow Migration → Basic Patterns → Advanced Patterns
+Getting Started → Workflow Migration → Basic Patterns → PNet Types Tutorial → Advanced Patterns
 ```
 
 ### Path 3: Experienced with YAWL
 ```
-Getting Started (for new architecture) → Advanced Patterns → Colored Tokens
+Getting Started (for new architecture) → Advanced Patterns → PNet Types Tutorial → Colored Tokens
+```
+
+### Path 4: Focused on Type Safety
+```
+PNet Types Tutorial → Getting Started → Basic Patterns → Colored Tokens → Advanced Patterns
 ```
 
 ---
@@ -279,6 +406,11 @@ rebar3 shell
 c(yawl_patterns).
 c(getting_started_example).
 getting_started_example:demo().
+
+% Test pnet types
+c(pnet_types).
+pnet_types:is_marking(#{p1 => [a,b]}).
+pnet_types:is_cmode({#{x => 1}, #{p1 => [a]}}).
 ```
 
 ### Running Tests

@@ -21,13 +21,14 @@
 %% @copyright 2015
 %% @version 0.1.0
 %%
-%% @doc YAWL Workflow Control Patterns for CRE (WCP-11 through WCP-17)
+%% @doc YAWL Workflow Control Patterns for CRE (WCP-11 through WCP-28)
 %%
 %% This module implements YAWL (Yet Another Workflow Language) workflow
-%% control patterns WCP-11 through WCP-17 as Petri net structures compatible
-%% with the gen_pnet behavior and CRE runtime environment.
+%% control patterns WCP-11 through WCP-28 and exception handling patterns
+%% WHP-1 through WHP-5 as Petri net structures compatible with the gen_pnet
+%% behavior and CRE runtime environment.
 %%
-%% <h3>Patterns Implemented</h3>
+%% <h3>Basic Control Patterns (WCP-11 through WCP-17)</h3>
 %%
 %% <ul>
 %%   <li><b>WCP-11: Implicit Termination</b> - A subprocess should terminate
@@ -46,6 +47,32 @@
 %%       parallel branches in a non-deterministic manner.</li>
 %% </ul>
 %%
+%% <h3>State-Based Patterns (WCP-18 through WCP-28)</h3>
+%%
+%% <ul>
+%%   <li><b>WCP-18: Milestone</b> - Activity enabled only when milestone reached.</li>
+%%   <li><b>WCP-19: Cancel Activity</b> - Cancel specific running activities.</li>
+%%   <li><b>WCP-20: Cancel Case</b> - Cancel entire workflow case.</li>
+%%   <li><b>WCP-21: Structured Synchronization</b> - Synchronized block with barrier.</li>
+%%   <li><b>WCP-22: Partial Join</b> - Wait for quorum of parallel branches.</li>
+%%   <li><b>WCP-23: Structured Loop</b> - While/until loop constructs.</li>
+%%   <li><b>WCP-24: Recursion</b> - Recursive workflow invocation.</li>
+%%   <li><b>WCP-25: Interleaved Loop</b> - Loop with interleaved parallel execution.</li>
+%%   <li><b>WCP-26: Critical Section</b> - Mutual exclusion for shared resources.</li>
+%%   <li><b>WCP-27: Protocol</b> - Request-response communication pattern.</li>
+%%   <li><b>WCP-28: Try-Catch</b> - Exception handling with protected regions.</li>
+%% </ul>
+%%
+%% <h3>Exception Handling Patterns (WHP-1 through WHP-5)</h3>
+%%
+%% <ul>
+%%   <li><b>WHP-1: Error Handler</b> - Catch-all error handling mechanism.</li>
+%%   <li><b>WHP-2: Retry</b> - Automatic retry with backoff.</li>
+%%   <li><b>WHP-3: Compensation</b> - Undo completed activities on failure.</li>
+%%   <li><b>WHP-4: Triggered Compensation</b> - Explicitly triggered compensation.</li>
+%%   <li><b>WHP-5: Consecutive Compensation</b> - Reverse-order compensation chain.</li>
+%% </ul>
+%%
 %% <h3>Petri Net Mapping</h3>
 %%
 %% Each pattern is represented as a structure containing:
@@ -57,6 +84,318 @@
 %%   <li><code>is_enabled/3</code> - Transition enabling conditions</li>
 %%   <li><code>fire/3</code> - Token production on firing</li>
 %% </ul>
+%%
+%% <h3>Doctests</h3>
+%%
+%% Pattern registration - WCP-11 (Implicit Termination):
+%% ```erlang
+%% > Pattern1 = cre_yawl_patterns:implicit_termination(fun(X) -> X * 2 end),
+%% Pattern1#pattern_state.pattern_type.
+%% implicit_termination
+%%
+%% > Pattern1#pattern_state.subprocess(5).
+%% 10
+%% ```
+%%
+%% Pattern registration - WCP-12 (Multiple Instances without Sync):
+%% ```erlang
+%% > Pattern2 = cre_yawl_patterns:multiple_instances_no_sync(fun(X) -> X + 1 end, 3, [1, 2, 3]),
+%% Pattern2#pattern_state.pattern_type.
+%% multiple_instances_no_sync
+%%
+%% > Pattern2#pattern_state.instance_count.
+%% 3
+%% ```
+%%
+%% Pattern registration - WCP-13 (Static Multiple Instances):
+%% ```erlang
+%% > Pattern3 = cre_yawl_patterns:multiple_instances_static(fun(X) -> X end, 2, []),
+%% Pattern3#pattern_state.pattern_type.
+%% multiple_instances_static
+%%
+%% > Pattern3#pattern_state.max_instances.
+%% 2
+%% ```
+%%
+%% Pattern registration - WCP-14 (Runtime Multiple Instances):
+%% ```erlang
+%% > Pattern4 = cre_yawl_patterns:multiple_instances_runtime(fun(X) -> X end, fun(_) -> 3 end, test_data),
+%% Pattern4#pattern_state.pattern_type.
+%% multiple_instances_runtime
+%%
+%% > Pattern4#pattern_state.instance_count.
+%% 3
+%% ```
+%%
+%% Pattern registration - WCP-15 (Dynamic Multiple Instances):
+%% ```erlang
+%% > DataFun = fun() -> done end,
+%% Pattern5 = cre_yawl_patterns:multiple_instances_dynamic(fun(X) -> X end, DataFun, start),
+%% Pattern5#pattern_state.pattern_type.
+%% multiple_instances_dynamic
+%%
+%% > Pattern5#pattern_state.max_instances.
+%% unlimited
+%% ```
+%%
+%% Pattern registration - WCP-16 (Deferred Choice):
+%% ```erlang
+%% > Options = #{a => fun() -> option_a end, b => fun() -> option_b end},
+%% Pattern6 = cre_yawl_patterns:deferred_choice(Options, fun(_) -> true end, ignored),
+%% Pattern6#pattern_state.pattern_type.
+%% deferred_choice
+%%
+%% > maps:is_key(options, Pattern6#pattern_state.choice_data).
+%% true
+%% ```
+%%
+%% Pattern registration - WCP-17 (Interleaved Routing):
+%% ```erlang
+%% > Branches = #{branch1 => fun(X) -> X end, branch2 => fun(X) -> X * 2 end},
+%% Pattern7 = cre_yawl_patterns:interleaved_routing(Branches, ignored),
+%% Pattern7#pattern_state.pattern_type.
+%% interleaved_routing
+%%
+%% > maps:is_key(branches, Pattern7#pattern_state.choice_data).
+%% true
+%% ```
+%%
+%% Pattern registration - WCP-18 (Milestone):
+%% ```erlang
+%% > Pattern8 = cre_yawl_patterns:milestone(fun() -> work end, fun() -> true end),
+%% Pattern8#pattern_state.pattern_type.
+%% milestone
+%%
+%% > maps:is_key(milestone_check, Pattern8#pattern_state.choice_data).
+%% true
+%% ```
+%%
+%% Pattern registration - WCP-19 (Cancel Activity):
+%% ```erlang
+%% > Pattern9 = cre_yawl_patterns:cancel_activity(fun() -> work end, fun() -> false end),
+%% Pattern9#pattern_state.pattern_type.
+%% cancel_activity
+%%
+%% > maps:is_key(cancel_check, Pattern9#pattern_state.choice_data).
+%% true
+%% ```
+%%
+%% Pattern registration - WCP-20 (Cancel Case):
+%% ```erlang
+%% > Activities = [fun() -> a end, fun() -> b end],
+%% Pattern10 = cre_yawl_patterns:cancel_case(Activities, fun() -> false end),
+%% Pattern10#pattern_state.pattern_type.
+%% cancel_case
+%%
+%% > Pattern10#pattern_state.instance_count.
+%% 2
+%% ```
+%%
+%% Pattern registration - WCP-21 (Structured Sync):
+%% ```erlang
+%% > SyncActivities = [fun() -> a end, fun() -> b end],
+%% Pattern11 = cre_yawl_patterns:structured_sync(SyncActivities, data),
+%% Pattern11#pattern_state.pattern_type.
+%% structured_sync
+%%
+%% > Pattern11#pattern_state.instance_count.
+%% 2
+%% ```
+%%
+%% Pattern registration - WCP-22 (Partial Join):
+%% ```erlang
+%% > JoinActivities = [fun() -> a end, fun() -> b end, fun() -> c end],
+%% Pattern12 = cre_yawl_patterns:partial_join(JoinActivities, 2),
+%% Pattern12#pattern_state.pattern_type.
+%% partial_join
+%%
+%% > Pattern12#pattern_state.max_instances.
+%% 2
+%% ```
+%%
+%% Pattern registration - WCP-23 (Structured Loop):
+%% ```erlang
+%% > LoopBody = fun(X) -> X + 1 end,
+%% Pattern13 = cre_yawl_patterns:structured_loop(LoopBody, while, fun(_) -> false end),
+%% Pattern13#pattern_state.pattern_type.
+%% structured_loop
+%%
+%% > maps:get(loop_type, Pattern13#pattern_state.choice_data).
+%% while
+%% ```
+%%
+%% Pattern registration - WCP-24 (Recursion):
+%% ```erlang
+%% > RecFun = fun(X) -> X - 1 end,
+%% BaseCase = fun(X) -> X =< 0 end,
+%% Pattern14 = cre_yawl_patterns:recursion(RecFun, BaseCase),
+%% Pattern14#pattern_state.pattern_type.
+%% recursion
+%%
+%% > maps:is_key(base_case, Pattern14#pattern_state.choice_data).
+%% true
+%% ```
+%%
+%% Pattern registration - WCP-25 (Interleaved Loop):
+%% ```erlang
+%% > LoopActivities = [fun() -> a end, fun() -> b end],
+%% LoopCond = fun(_) -> false end,
+%% Pattern15 = cre_yawl_patterns:interleaved_loop(LoopActivities, LoopCond),
+%% Pattern15#pattern_state.pattern_type.
+%% interleaved_loop
+%%
+%% > Pattern15#pattern_state.subprocess.
+%% [fun() -> a end, fun() -> b end]
+%% ```
+%%
+%% Pattern registration - WCP-26 (Critical Section):
+%% ```erlang
+%% > CriticalFun = fun(X) -> X end,
+%% Pattern16 = cre_yawl_patterns:critical_section(CriticalFun, my_lock),
+%% Pattern16#pattern_state.pattern_type.
+%% critical_section
+%%
+%% > maps:get(lock_id, Pattern16#pattern_state.choice_data).
+%% my_lock
+%% ```
+%%
+%% Pattern registration - WCP-27 (Protocol Pattern):
+%% ```erlang
+%% > ReqFun = fun() -> request end,
+%% RespFun = fun(_) -> response end,
+%% Pattern17 = cre_yawl_patterns:protocol_pattern(ReqFun, RespFun, 5000),
+%% Pattern17#pattern_state.pattern_type.
+%% protocol
+%%
+%% > maps:get(timeout, Pattern17#pattern_state.choice_data).
+%% 5000
+%% ```
+%%
+%% Pattern registration - WCP-28 (Try-Catch):
+%% ```erlang
+%% > TryFun = fun() -> try_work end,
+%% CatchFun = fun(_) -> catch_work end,
+%% Pattern18 = cre_yawl_patterns:try_catch(TryFun, CatchFun, [error, exit]),
+%% Pattern18#pattern_state.pattern_type.
+%% try_catch
+%%
+%% > maps:get(exceptions, Pattern18#pattern_state.choice_data).
+%% [error, exit]
+%% ```
+%%
+%% Pattern registration - WHP-1 (Error Handler):
+%% ```erlang
+%% > Protected = fun() -> work end,
+%% Handler = fun(_) -> handled end,
+%% Pattern19 = cre_yawl_patterns:error_handler(Protected, Handler),
+%% Pattern19#pattern_state.pattern_type.
+%% error_handler
+%%
+%% > maps:is_key(error_handler, Pattern19#pattern_state.choice_data).
+%% true
+%% ```
+%%
+%% Pattern registration - WHP-2 (Retry):
+%% ```erlang
+%% > Activity = fun() -> retry_work end,
+%% Backoff = fun(N) -> N * 100 end,
+%% Pattern20 = cre_yawl_patterns:retry(Activity, 3, Backoff),
+%% Pattern20#pattern_state.pattern_type.
+%% retry
+%%
+%% > maps:get(max_retries, Pattern20#pattern_state.choice_data).
+%% 3
+%% ```
+%%
+%% Pattern registration - WHP-3 (Compensation):
+%% ```erlang
+%% > Compensable = fun() -> work end,
+%% Compensator = fun(_) -> undo end,
+%% Pattern21 = cre_yawl_patterns:compensate(Compensable, Compensator),
+%% Pattern21#pattern_state.pattern_type.
+%% compensation
+%%
+%% > maps:is_key(compensator, Pattern21#pattern_state.choice_data).
+%% true
+%% ```
+%%
+%% Pattern registration - WHP-4 (Triggered Compensation):
+%% ```erlang
+%% > TrigComp = fun() -> work end,
+%% CompFun = fun(_) -> undo end,
+%% TrigFun = fun() -> false end,
+%% Pattern22 = cre_yawl_patterns:triggered_compensation(TrigComp, CompFun, TrigFun),
+%% Pattern22#pattern_state.pattern_type.
+%% triggered_compensation
+%%
+%% > maps:is_key(compensator, Pattern22#pattern_state.choice_data),
+%% maps:is_key(trigger, Pattern22#pattern_state.choice_data).
+%% true
+%% ```
+%%
+%% Pattern registration - WHP-5 (Consecutive Compensation):
+%% ```erlang
+%% > Pairs = [{fun() -> a end, fun(_) -> undo_a end}, {fun() -> b end, fun(_) -> undo_b end}],
+%% Pattern23 = cre_yawl_patterns:consecutive_compensate(Pairs),
+%% Pattern23#pattern_state.pattern_type.
+%% consecutive_compensation
+%%
+%% > Pattern23#pattern_state.instance_count.
+%% 2
+%% ```
+%%
+%% Petri net enumeration - places:
+%% ```erlang
+%% > Places = cre_yawl_patterns:place_lst(),
+%% length(Places) > 50.
+%% true
+%%
+%% > lists:member('p_start', Places).
+%% true
+%%
+%% > lists:member('p_terminate', Places).
+%% true
+%% ```
+%%
+%% Petri net enumeration - transitions:
+%% ```erlang
+%% > Transitions = cre_yawl_patterns:trsn_lst(),
+%% length(Transitions) > 50.
+%% true
+%%
+%% > lists:member('t_activate', Transitions).
+%% true
+%%
+%% > lists:member('t_implicit_term', Transitions).
+%% true
+%% ```
+%%
+%% Petri net preset lookup:
+%% ```erlang
+%% > cre_yawl_patterns:preset('t_activate').
+%% ['p_start']
+%%
+%% > cre_yawl_patterns:preset('t_implicit_term').
+%% ['p_active', 'p_work']
+%%
+%% > cre_yawl_patterns:preset('t_spawn_all_static').
+%% ['p_instance_pool']
+%% ```
+%%
+%% Petri net initial marking:
+%% ```erlang
+%% > cre_yawl_patterns:init_marking('p_start', #pattern_state{}).
+%% [start]
+%%
+%% > cre_yawl_patterns:init_marking('p_instance_pool', #pattern_state{}).
+%% []
+%% ```
+%%
+%% Running the doctests:
+%% ```erlang
+%% > cre_yawl_patterns:doctest_test().
+%% ok
+%% ```
 %%
 %% @end
 %% -------------------------------------------------------------------
@@ -2952,3 +3291,180 @@ collect_pending_results([{Pid, Key} | Rest], Results) ->
     after 1000 ->
         collect_pending_results(Rest, [{Key, {error, timeout}} | Results])
     end.
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the cre_yawl_patterns module.
+%%
+%% This function executes all doctests defined in the module documentation
+%% and individual function documentation. Uses the doctest library for
+%% automated testing of code examples.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Pattern registration - WCP-11 (Implicit Termination)
+    Pattern1 = implicit_termination(fun(X) -> X * 2 end),
+    implicit_termination = Pattern1#pattern_state.pattern_type,
+    10 = (Pattern1#pattern_state.subprocess)(5),
+
+    %% Test 2: Pattern registration - WCP-12 (Multiple Instances without Sync)
+    Pattern2 = multiple_instances_no_sync(fun(X) -> X + 1 end, 3, [1, 2, 3]),
+    multiple_instances_no_sync = Pattern2#pattern_state.pattern_type,
+    3 = Pattern2#pattern_state.instance_count,
+
+    %% Test 3: Pattern registration - WCP-13 (Static Multiple Instances)
+    Pattern3 = multiple_instances_static(fun(X) -> X end, 2, []),
+    multiple_instances_static = Pattern3#pattern_state.pattern_type,
+    2 = Pattern3#pattern_state.max_instances,
+
+    %% Test 4: Pattern registration - WCP-14 (Runtime Multiple Instances)
+    Pattern4 = multiple_instances_runtime(fun(X) -> X end, fun(_) -> 3 end, test_data),
+    multiple_instances_runtime = Pattern4#pattern_state.pattern_type,
+    3 = Pattern4#pattern_state.instance_count,
+
+    %% Test 5: Pattern registration - WCP-15 (Dynamic Multiple Instances)
+    DataFun = fun() -> done end,
+    Pattern5 = multiple_instances_dynamic(fun(X) -> X end, DataFun, start),
+    multiple_instances_dynamic = Pattern5#pattern_state.pattern_type,
+    unlimited = Pattern5#pattern_state.max_instances,
+
+    %% Test 6: Pattern registration - WCP-16 (Deferred Choice)
+    Options = #{a => fun() -> option_a end, b => fun() -> option_b end},
+    Pattern6 = deferred_choice(Options, fun(_) -> true end, ignored),
+    deferred_choice = Pattern6#pattern_state.pattern_type,
+    true = maps:is_key(options, Pattern6#pattern_state.choice_data),
+
+    %% Test 7: Pattern registration - WCP-17 (Interleaved Routing)
+    Branches = #{branch1 => fun(X) -> X end, branch2 => fun(X) -> X * 2 end},
+    Pattern7 = interleaved_routing(Branches, ignored),
+    interleaved_routing = Pattern7#pattern_state.pattern_type,
+    true = maps:is_key(branches, Pattern7#pattern_state.choice_data),
+
+    %% Test 8: Pattern registration - WCP-18 (Milestone)
+    Pattern8 = milestone(fun() -> work end, fun() -> true end),
+    milestone = Pattern8#pattern_state.pattern_type,
+    true = maps:is_key(milestone_check, Pattern8#pattern_state.choice_data),
+
+    %% Test 9: Pattern registration - WCP-19 (Cancel Activity)
+    Pattern9 = cancel_activity(fun() -> work end, fun() -> false end),
+    cancel_activity = Pattern9#pattern_state.pattern_type,
+    true = maps:is_key(cancel_check, Pattern9#pattern_state.choice_data),
+
+    %% Test 10: Pattern registration - WCP-20 (Cancel Case)
+    Activities = [fun() -> a end, fun() -> b end],
+    Pattern10 = cancel_case(Activities, fun() -> false end),
+    cancel_case = Pattern10#pattern_state.pattern_type,
+    2 = Pattern10#pattern_state.instance_count,
+
+    %% Test 11: Pattern registration - WCP-21 (Structured Sync)
+    SyncActivities = [fun() -> a end, fun() -> b end],
+    Pattern11 = structured_sync(SyncActivities, data),
+    structured_sync = Pattern11#pattern_state.pattern_type,
+    2 = Pattern11#pattern_state.instance_count,
+
+    %% Test 12: Pattern registration - WCP-22 (Partial Join)
+    JoinActivities = [fun() -> a end, fun() -> b end, fun() -> c end],
+    Pattern12 = partial_join(JoinActivities, 2),
+    partial_join = Pattern12#pattern_state.pattern_type,
+    2 = Pattern12#pattern_state.max_instances,
+
+    %% Test 13: Pattern registration - WCP-23 (Structured Loop)
+    LoopBody = fun(X) -> X + 1 end,
+    Pattern13 = structured_loop(LoopBody, while, fun(_) -> false end),
+    structured_loop = Pattern13#pattern_state.pattern_type,
+    while = maps:get(loop_type, Pattern13#pattern_state.choice_data),
+
+    %% Test 14: Pattern registration - WCP-24 (Recursion)
+    RecFun = fun(X) -> X - 1 end,
+    BaseCase = fun(X) -> X =< 0 end,
+    Pattern14 = recursion(RecFun, BaseCase),
+    recursion = Pattern14#pattern_state.pattern_type,
+    true = maps:is_key(base_case, Pattern14#pattern_state.choice_data),
+
+    %% Test 15: Pattern registration - WCP-25 (Interleaved Loop)
+    LoopActivities = [fun() -> a end, fun() -> b end],
+    LoopCond = fun(_) -> false end,
+    Pattern15 = interleaved_loop(LoopActivities, LoopCond),
+    interleaved_loop = Pattern15#pattern_state.pattern_type,
+    true = is_list(Pattern15#pattern_state.subprocess),
+
+    %% Test 16: Pattern registration - WCP-26 (Critical Section)
+    CriticalFun = fun(X) -> X end,
+    Pattern16 = critical_section(CriticalFun, my_lock),
+    critical_section = Pattern16#pattern_state.pattern_type,
+    my_lock = maps:get(lock_id, Pattern16#pattern_state.choice_data),
+
+    %% Test 17: Pattern registration - WCP-27 (Protocol Pattern)
+    ReqFun = fun() -> request end,
+    RespFun = fun(_) -> response end,
+    Pattern17 = protocol_pattern(ReqFun, RespFun, 5000),
+    protocol = Pattern17#pattern_state.pattern_type,
+    5000 = maps:get(timeout, Pattern17#pattern_state.choice_data),
+
+    %% Test 18: Pattern registration - WCP-28 (Try-Catch)
+    TryFun = fun() -> try_work end,
+    CatchFun = fun(_) -> catch_work end,
+    Pattern18 = try_catch(TryFun, CatchFun, [error, exit]),
+    try_catch = Pattern18#pattern_state.pattern_type,
+    [error, exit] = maps:get(exceptions, Pattern18#pattern_state.choice_data),
+
+    %% Test 19: Pattern registration - WHP-1 (Error Handler)
+    Protected = fun() -> work end,
+    Handler = fun(_) -> handled end,
+    Pattern19 = error_handler(Protected, Handler),
+    error_handler = Pattern19#pattern_state.pattern_type,
+    true = maps:is_key(error_handler, Pattern19#pattern_state.choice_data),
+
+    %% Test 20: Pattern registration - WHP-2 (Retry)
+    Activity = fun() -> retry_work end,
+    Backoff = fun(N) -> N * 100 end,
+    Pattern20 = retry(Activity, 3, Backoff),
+    retry = Pattern20#pattern_state.pattern_type,
+    3 = maps:get(max_retries, Pattern20#pattern_state.choice_data),
+
+    %% Test 21: Pattern registration - WHP-3 (Compensation)
+    Compensable = fun() -> work end,
+    Compensator = fun(_) -> undo end,
+    Pattern21 = compensate(Compensable, Compensator),
+    compensation = Pattern21#pattern_state.pattern_type,
+    true = maps:is_key(compensator, Pattern21#pattern_state.choice_data),
+
+    %% Test 22: Pattern registration - WHP-4 (Triggered Compensation)
+    TrigComp = fun() -> work end,
+    CompFun = fun(_) -> undo end,
+    TrigFun = fun() -> false end,
+    Pattern22 = triggered_compensation(TrigComp, CompFun, TrigFun),
+    triggered_compensation = Pattern22#pattern_state.pattern_type,
+    true = maps:is_key(compensator, Pattern22#pattern_state.choice_data),
+    true = maps:is_key(trigger, Pattern22#pattern_state.choice_data),
+
+    %% Test 23: Pattern registration - WHP-5 (Consecutive Compensation)
+    Pairs = [{fun() -> a end, fun(_) -> undo_a end}, {fun() -> b end, fun(_) -> undo_b end}],
+    Pattern23 = consecutive_compensate(Pairs),
+    consecutive_compensation = Pattern23#pattern_state.pattern_type,
+    2 = Pattern23#pattern_state.instance_count,
+
+    %% Test 24: Petri net enumeration - places
+    Places = place_lst(),
+    true = length(Places) > 50,
+    true = lists:member('p_start', Places),
+    true = lists:member('p_terminate', Places),
+
+    %% Test 25: Petri net enumeration - transitions
+    Transitions = trsn_lst(),
+    true = length(Transitions) > 50,
+    true = lists:member('t_activate', Transitions),
+    true = lists:member('t_implicit_term', Transitions),
+
+    %% Test 26: Petri net preset lookup
+    ['p_start'] = preset('t_activate'),
+    ['p_active', 'p_work'] = preset('t_implicit_term'),
+    ['p_instance_pool'] = preset('t_spawn_all_static'),
+
+    %% Test 27: Petri net initial marking
+    [start] = init_marking('p_start', #pattern_state{}),
+    [] = init_marking('p_instance_pool', #pattern_state{}),
+
+    ok.

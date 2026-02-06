@@ -17,46 +17,74 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Deferred Choice Pattern (WCP-16) for YAWL
-%%
-%% This module implements the Deferred Choice pattern as a gen_pnet behaviour.
-%%
-%% <h3>Pattern Description</h3>
-%% The Deferred Choice pattern (WCP-16) represents a divergence in the process
-%% where the choice is made at runtime based on which branch becomes available
-%% first, rather than being predetermined by data or conditions.
-%%
-%% <h3>Petri Net Structure</h3>
-%% <pre>
-%%   Places:
-%%     p_start          - Start of the deferred choice
-%%     p_offer_pending  - Offer is pending
-%%     p_option_a       - Option A available
-%%     p_option_b       - Option B available
-%%     p_selected       - An option has been selected
-%%     p_discarded      - Non-selected options
-%%     p_complete       - Choice completed
-%%
-%%   Transitions:
-%%     t_offer          - Offer all options
-%%     t_select_a       - Select option A
-%%     t_select_b       - Select option B
-%%     t_discard_others - Discard non-selected options
-%%     t_complete       - Complete the choice
-%% </pre>
-%%
-%% <h3>Soundness Properties</h3>
-%% <ul>
-%%   <li><b>Option to complete:</b> Always true (exactly one option selected)</li>
-%%   <li><b>Proper completion:</b> Exactly one output token</li>
-%%   <li><b>No dead transitions:</b> All options are eventually selected or discarded</li>
-%% </ul>
-%%
-%% @end
-%% -------------------------------------------------------------------
-
 -module(deferred_choice).
 -behaviour(gen_yawl).
+
+-moduledoc """
+Deferred Choice Pattern (WCP-16) for YAWL.
+
+This module implements the Deferred Choice pattern as a gen_pnet behaviour.
+
+## Pattern Description
+
+The Deferred Choice pattern (WCP-16) represents a divergence in the process
+where the choice is made at runtime based on which branch becomes available
+first, rather than being predetermined by data or conditions.
+
+## Petri Net Structure
+
+```
+Places:
+  p_start          - Start of the deferred choice
+  p_offer_pending  - Offer is pending
+  p_option_pool    - Pool of available options
+  p_selected       - An option has been selected
+  p_discarded      - Non-selected options
+  p_complete       - Choice completed
+
+Transitions:
+  t_offer          - Offer all options
+  t_evaluate_option - Evaluate an option from the pool
+  t_select         - Select an option
+  t_discard_others - Discard non-selected options
+  t_complete       - Complete the choice
+```
+
+## Soundness Properties
+
+- **Option to complete:** Always true (exactly one option selected)
+- **Proper completion:** Exactly one output token
+- **No dead transitions:** All options are eventually selected or discarded
+
+## Examples
+
+Getting the list of places:
+
+```erlang
+> deferred_choice:place_lst().
+[p_start,p_offer_pending,p_option_pool,p_selected,p_discarded,p_complete]
+```
+
+Getting the list of transitions:
+
+```erlang
+> deferred_choice:trsn_lst().
+[t_offer,t_evaluate_option,t_select,t_discard_others,t_complete]
+```
+
+Getting the preset for a transition:
+
+```erlang
+> deferred_choice:preset(t_offer).
+[p_start]
+> deferred_choice:preset(t_select).
+[p_offer_pending]
+> deferred_choice:preset(t_complete).
+[p_discarded]
+> deferred_choice:preset(unknown).
+[]
+```
+""".
 
 %% gen_pnet callbacks
 -export([
@@ -619,3 +647,14 @@ log_event(#deferred_choice_state{log_id = LogId}, Concept, Lifecycle, Data) when
     yawl_xes:log_event(LogId, Concept, Lifecycle, Data);
 log_event(_State, _Concept, _Lifecycle, _Data) ->
     ok.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

@@ -17,42 +17,71 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Exclusive Choice Pattern (WCP-04) for YAWL
-%%
-%% This module implements the Exclusive Choice pattern as a gen_pnet behaviour.
-%%
-%% <h3>Pattern Description</h3>
-%% The Exclusive Choice pattern (WCP-04) represents a divergence in the process
-%% where exactly one of multiple alternative branches is selected based on
-%% conditions or data available at runtime. Only ONE branch is taken.
-%%
-%% <h3>Petri Net Structure</h3>
-%% <pre>
-%%   Places:
-%%     p_start          - Start of the exclusive choice
-%%     p_choice         - Choice point (one token consumed)
-%%     p_branch_a       - Branch A execution place
-%%     p_branch_b       - Branch B execution place
-%%     p_selected       - Indicates which branch was selected
-%%     p_end            - End of the pattern
-%%
-%%   Transitions:
-%%     t_select_a       - Select branch A (consumes from p_choice)
-%%     t_select_b       - Select branch B (consumes from p_choice)
-%%     t_finish         - Complete the pattern
-%% </pre>
-%%
-%% <h3>Soundness Properties</h3>
-%% <ul>
-%%   <li><b>Option to complete:</b> Always true (exactly one branch selected)</li>
-%%   <li><b>Proper completion:</b> Exactly one output token per input</li>
-%%   <li><b>No dead transitions:</b> One selection transition always fires</li>
-%% </ul>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(exclusive_choice).
+-moduledoc """
+Exclusive Choice Pattern (WCP-04) for YAWL.
+
+This module implements the Exclusive Choice pattern as a gen_yawl behaviour.
+
+## Pattern Description
+
+The Exclusive Choice pattern (WCP-04) represents a divergence in the process
+where exactly one of multiple alternative branches is selected based on
+conditions or data available at runtime. Only ONE branch is taken.
+
+## Petri Net Structure
+
+Places:
+- `p_start` - Start of the exclusive choice
+- `p_choice` - Choice point (one token consumed)
+- `p_selected` - Indicates which branch was selected
+- `p_end` - End of the pattern
+
+Transitions:
+- `t_select_a` - Select branch A (consumes from p_choice)
+- `t_select_b` - Select branch B (consumes from p_choice)
+- `t_finish` - Complete the pattern
+
+## Soundness Properties
+
+- **Option to complete:** Always true (exactly one branch selected)
+- **Proper completion:** Exactly one output token per input
+- **No dead transitions:** One selection transition always fires
+
+## Examples
+
+Get the list of places in the Petri net:
+
+```erlang
+> exclusive_choice:place_lst().
+[p_start,p_choice,p_selected,p_end]
+```
+
+Get the list of transitions:
+
+```erlang
+> exclusive_choice:trsn_lst().
+[t_select_a,t_select_b,t_finish]
+```
+
+Get the preset (input places) for a transition:
+
+```erlang
+> exclusive_choice:preset(t_select_a).
+[p_start]
+```
+
+```erlang
+> exclusive_choice:preset(t_finish).
+[p_selected]
+```
+
+```erlang
+> exclusive_choice:preset(unknown).
+[]
+```
+""".
 -behaviour(gen_yawl).
 
 %% gen_pnet callbacks
@@ -107,10 +136,8 @@
 %%--------------------------------------------------------------------
 %% @doc Creates a new Exclusive Choice pattern state.
 %%
-%% @param Branches Map of branch identifiers to functions.
-%% @param BranchCount Number of branches (must match size of Branches map).
-%% @return A new exclusive_choice_state record.
-%%
+%% The function validates that the number of branches matches the branch count
+%% and that at least 2 branches are specified.
 %% @end
 %%--------------------------------------------------------------------
 -spec new(Branches :: map(), BranchCount :: pos_integer()) -> exclusive_choice_state().
@@ -509,3 +536,59 @@ log_event(#exclusive_choice_state{log_id = LogId}, Concept, Lifecycle, Data) whe
     yawl_xes:log_event(LogId, Concept, Lifecycle, Data);
 log_event(_State, _Concept, _Lifecycle, _Data) ->
     ok.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+%% @doc Runs all doctests for the module.
+%% @private
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%% Test basic place_lst callback
+place_lst_test() ->
+    Expected = [p_start, p_choice, p_selected, p_end],
+    ?assertEqual(Expected, place_lst()).
+
+%% Test basic trsn_lst callback
+trsn_lst_test() ->
+    Expected = [t_select_a, t_select_b, t_finish],
+    ?assertEqual(Expected, trsn_lst()).
+
+%% Test preset for various transitions
+preset_t_select_a_test() ->
+    ?assertEqual([p_start], preset(t_select_a)).
+
+preset_t_select_b_test() ->
+    ?assertEqual([p_start], preset(t_select_b)).
+
+preset_t_finish_test() ->
+    ?assertEqual([p_selected], preset(t_finish)).
+
+preset_unknown_test() ->
+    ?assertEqual([], preset(unknown)).
+
+%% Test new/2 constructor
+new_2_branches_test() ->
+    Branches = #{a => fun(_) -> ok end, b => fun(_) -> ok end},
+    State = new(Branches, 2),
+    ?assertEqual(2, State#exclusive_choice_state.branch_count),
+    ?assertEqual(2, map_size(State#exclusive_choice_state.branches)),
+    ?assertEqual(undefined, State#exclusive_choice_state.selected).
+
+%% Test init_marking callback
+init_marking_p_start_test() ->
+    State = new(#{a => fun(_) -> ok end, b => fun(_) -> ok end}, 2),
+    ?assertEqual([start], init_marking(p_start, State)).
+
+init_marking_other_place_test() ->
+    State = new(#{a => fun(_) -> ok end, b => fun(_) -> ok end}, 2),
+    ?assertEqual([], init_marking(p_choice, State)),
+    ?assertEqual([], init_marking(p_selected, State)),
+    ?assertEqual([], init_marking(p_end, State)).
+
+-endif.

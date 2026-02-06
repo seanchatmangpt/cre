@@ -36,18 +36,74 @@
 %%
 %% <h3>Usage</h3>
 %%
-%% <pre>
-%% %% Post a tweet on workflow completion
-%% yawl_twitter:post_tweet(<<"Workflow completed successfully!">>).
+%% ```erlang
+%% > %% Post a tweet on workflow completion
+%% > {ok, TweetId} = yawl_twitter:post_tweet(<<"Workflow completed!">>).
+%% {ok, <<"tweet_", _/binary>>}
 %%
-%% %% Send a DM notification
-%% yawl_twitter:send_direct_message(<<"@user">>, <<"Your case is ready">>).
-%% </pre>
+%% > %% Send a DM notification
+%% > {ok, DMId} = yawl_twitter:send_direct_message(<<"@user">>, <<"Your case is ready">>).
+%% {ok, <<"dm_", _/binary>>}
+%%
+%% > %% Check rate limits
+%% > Remaining = yawl_twitter:get_remaining_tweets().
+%% 50..100
+%% ```
 %%
 %% @end
 %% -------------------------------------------------------------------
 
 -module(yawl_twitter).
+
+-moduledoc """
+YAWL Twitter/X Social Media Integration Module for CRE.
+
+This module provides integration with Twitter/X API for workflow
+notifications and social media interactions.
+
+## Features
+
+- **Tweet Posting:** Post tweets from workflow tasks
+- **Detection:** Monitor hashtags and mentions
+- **Direct Messages:** Send DMs for notifications
+- **Webhooks:** Handle Twitter webhooks
+
+## Examples
+
+Check rate limit status:
+
+```erlang
+> maps:get(limit, yawl_twitter:get_rate_limit_status()).
+100
+```
+
+Ensure hashtag format:
+
+```erlang
+> yawl_twitter:ensure_hashtag(<<"yawl">>).
+<<"#yawl">>
+
+> yawl_twitter:ensure_hashtag(<<"#yawl">>).
+<<"#yawl">>
+```
+
+Ensure user handle format:
+
+```erlang
+> yawl_twitter:ensure_at_sign(<<"user">>).
+<<"@user">>
+
+> yawl_twitter:ensure_at_sign(<<"@user">>).
+<<"@user">>
+```
+
+Clear credentials:
+
+```erlang
+> yawl_twitter:clear_credentials().
+ok
+```
+""".
 
 %%====================================================================
 %% Exports
@@ -77,7 +133,11 @@
 
          %% Rate limiting
          get_rate_limit_status/0,
-         get_remaining_tweets/0]).
+         get_remaining_tweets/0,
+
+         %% Internal helpers (exported for testing)
+         ensure_hashtag/1,
+         ensure_at_sign/1]).
 
 %%====================================================================
 %% Types
@@ -116,9 +176,21 @@
 
 %%--------------------------------------------------------------------
 %% @doc Posts a tweet with default settings.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Posts a tweet with the provided text.
+
+The tweet must not exceed 280 characters. In demo mode, returns a
+mock tweet ID without making actual API calls.
+
+## Examples
+
+```erlang
+> yawl_twitter:post_tweet(<<"Hello world!">>).
+{ok, _}
+```
+""".
 -spec post_tweet(Text :: binary()) -> {ok, tweet_id()} | {error, term()}.
 
 post_tweet(Text) ->
@@ -160,9 +232,20 @@ post_tweet(Text, Options) ->
 
 %%--------------------------------------------------------------------
 %% @doc Posts a tweet with media attachment.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Posts a tweet with a media attachment.
+
+In demo mode, returns a mock tweet ID without making actual API calls.
+
+## Examples
+
+```erlang
+> yawl_twitter:post_tweet_with_media(<<"Check!">>, <<"https://example.com/img.png">>).
+{ok, _}
+```
+""".
 -spec post_tweet_with_media(Text :: binary(), MediaUrl :: media_url()) ->
           {ok, tweet_id()} | {error, term()}.
 
@@ -181,9 +264,20 @@ post_tweet_with_media(Text, _MediaUrl) ->
 
 %%--------------------------------------------------------------------
 %% @doc Sends a direct message to a user.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Sends a direct message to a user.
+
+In demo mode, returns a mock DM ID without making actual API calls.
+
+## Examples
+
+```erlang
+> {ok, DMId} = yawl_twitter:send_direct_message(<<"@user">>, <<"Ready!">>), element(1, DMId).
+ok
+```
+""".
 -spec send_direct_message(UserHandle :: user_handle(), Message :: binary()) ->
           {ok, binary()} | {error, term()}.
 
@@ -192,9 +286,20 @@ send_direct_message(UserHandle, Message) ->
 
 %%--------------------------------------------------------------------
 %% @doc Sends a direct message with options.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Sends a direct message with additional options.
+
+Options map may contain `case_id` for metric recording.
+
+## Examples
+
+```erlang
+> {ok, DMId} = yawl_twitter:send_direct_message(<<"@user">>, <<"Ready!">>, #{}), element(1, DMId).
+ok
+```
+""".
 -spec send_direct_message(UserHandle :: user_handle(),
                          Message :: binary(),
                          Options :: map()) ->
@@ -221,9 +326,20 @@ send_direct_message(UserHandle, _Message, Options) ->
 
 %%--------------------------------------------------------------------
 %% @doc Searches for tweets matching a query.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Searches for tweets matching a query string.
+
+Returns mock tweet records in demo mode.
+
+## Examples
+
+```erlang
+> yawl_twitter:search_tweets(<<"#erlang">>, 5).
+{ok, _}
+```
+""".
 -spec search_tweets(Query :: binary(), MaxResults :: pos_integer()) ->
           {ok, [tweet()]} | {error, term()}.
 
@@ -243,9 +359,20 @@ search_tweets(_Query, MaxResults) ->
 
 %%--------------------------------------------------------------------
 %% @doc Starts monitoring a hashtag.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Starts monitoring a hashtag for new tweets.
+
+Returns a monitor reference that can be used to stop monitoring.
+
+## Examples
+
+```erlang
+> yawl_twitter:monitor_hashtag(<<"#erlang">>, self()).
+{ok, _}
+```
+""".
 -spec monitor_hashtag(Hashtag :: hashtag(), CallbackPid :: pid()) ->
           {ok, reference()}.
 
@@ -268,9 +395,20 @@ monitor_hashtag(Hashtag, CallbackPid) ->
 
 %%--------------------------------------------------------------------
 %% @doc Starts monitoring mentions.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Starts monitoring mentions for a user handle.
+
+Returns a monitor reference that can be used to stop monitoring.
+
+## Examples
+
+```erlang
+> yawl_twitter:monitor_mentions(<<"@myhandle">>, self()).
+{ok, _}
+```
+""".
 -spec monitor_mentions(UserHandle :: user_handle(), CallbackPid :: pid()) ->
           {ok, reference()}.
 
@@ -292,9 +430,18 @@ monitor_mentions(UserHandle, CallbackPid) ->
 
 %%--------------------------------------------------------------------
 %% @doc Stops an active monitor.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Stops an active monitoring session.
+
+## Examples
+
+```erlang
+> yawl_twitter:stop_monitoring(make_ref()).
+ok
+```
+""".
 -spec stop_monitoring(MonitorId :: reference()) -> ok.
 
 stop_monitoring(MonitorId) ->
@@ -304,9 +451,16 @@ stop_monitoring(MonitorId) ->
 
 %%--------------------------------------------------------------------
 %% @doc Sets API credentials using bearer token.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Sets Twitter API credentials using app key and bearer token.
+
+```erlang
+> ok = yawl_twitter:set_credentials(<<"app_key">>, <<"bearer_token">>).
+ok
+```
+""".
 -spec set_credentials(AppKey :: binary(), BearerToken :: binary()) -> ok.
 
 set_credentials(_AppKey, _BearerToken) ->
@@ -315,9 +469,18 @@ set_credentials(_AppKey, _BearerToken) ->
 
 %%--------------------------------------------------------------------
 %% @doc Sets API credentials using consumer keys.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Sets Twitter API credentials using OAuth 1.0a consumer keys.
+
+## Examples
+
+```erlang
+> ok = yawl_twitter:set_credentials(<<"consumer_key">>, <<"consumer_secret">>, <<"access_token">>, <<"access_secret">>).
+ok
+```
+""".
 -spec set_credentials(ConsumerKey :: binary(),
                      ConsumerSecret :: binary(),
                      AccessToken :: binary(),
@@ -329,9 +492,18 @@ set_credentials(_ConsumerKey, _ConsumerSecret, _AccessToken, _AccessSecret) ->
 
 %%--------------------------------------------------------------------
 %% @doc Clears stored credentials.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Clears any stored Twitter API credentials.
+
+## Examples
+
+```erlang
+> ok = yawl_twitter:clear_credentials().
+ok
+```
+""".
 -spec clear_credentials() -> ok.
 
 clear_credentials() ->
@@ -340,9 +512,18 @@ clear_credentials() ->
 
 %%--------------------------------------------------------------------
 %% @doc Verifies webhook configuration.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Generates a challenge response for webhook verification.
+
+## Examples
+
+```erlang
+> {ok, Challenge} = yawl_twitter:verify_webhook(), is_binary(Challenge).
+true
+```
+""".
 -spec verify_webhook() -> {ok, binary()} | {error, term()}.
 
 verify_webhook() ->
@@ -352,9 +533,18 @@ verify_webhook() ->
 
 %%--------------------------------------------------------------------
 %% @doc Gets current rate limit status.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Returns a map with current rate limit status.
+
+## Examples
+
+```erlang
+> maps:get(limit, yawl_twitter:get_rate_limit_status()).
+100
+```
+""".
 -spec get_rate_limit_status() -> map().
 
 get_rate_limit_status() ->
@@ -367,9 +557,18 @@ get_rate_limit_status() ->
 
 %%--------------------------------------------------------------------
 %% @doc Gets remaining tweets for current window.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Returns the number of tweets remaining in the current rate limit window.
+
+## Examples
+
+```erlang
+> is_integer(yawl_twitter:get_remaining_tweets()).
+true
+```
+""".
 -spec get_remaining_tweets() -> non_neg_integer().
 
 get_remaining_tweets() ->
@@ -409,9 +608,21 @@ generate_dm_id() ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc Ensures a string starts with #.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Ensures a binary string starts with the # hashtag prefix.
+
+## Examples
+
+```erlang
+> yawl_twitter:ensure_hashtag(<<"erlang">>).
+<<"#erlang">>
+
+> yawl_twitter:ensure_hashtag(<<"#erlang">>).
+<<"#erlang">>
+```
+""".
 -spec ensure_hashtag(binary()) -> binary().
 
 ensure_hashtag(<<$#, _/binary>> = Hashtag) ->
@@ -422,12 +633,35 @@ ensure_hashtag(Hashtag) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc Ensures a string starts with @.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Ensures a binary string starts with the @ handle prefix.
+
+## Examples
+
+```erlang
+> yawl_twitter:ensure_at_sign(<<"user">>).
+<<"@user">>
+
+> yawl_twitter:ensure_at_sign(<<"@user">>).
+<<"@user">>
+```
+""".
 -spec ensure_at_sign(binary()) -> binary().
 
 ensure_at_sign(<<$@, _/binary>> = Handle) ->
     Handle;
 ensure_at_sign(Handle) ->
     <<$@, Handle/binary>>.
+
+%%====================================================================
+%% Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

@@ -2,7 +2,7 @@
 %%
 %% CRE: common runtime environment for distributed programming languages
 %%
-%% Copyright 2015 Jörgen Brandt <joergen@cuneiform-lang.org>
+%% Copyright 2015 Jorgen Brandt <joergen@cuneiform-lang.org>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -46,47 +46,52 @@
 %%
 %% <h3>Doctests</h3>
 %%
-%% Starting the resourcing service and registering participants:
-///
-/// ```erlang
-/// 1> {ok, Pid} = yawl_resourcing:start_link().
-/// {ok, <0.123.0>}
-/// 2> Props = [
-///     {name, <<"Alice">>},
-///     {roles, [<<"reviewer">>, <<"approver">>]},
-///     {capabilities, [<<"document_review">>]},
-///     {is_user, true},
-///     {resource_type, human}
-/// ].
-/// [...]
-/// 3> {ok, ParticipantId} = yawl_resourcing:register_participant(Props, <<"participant_001">>).
-/// {ok, <<"participant_001">>}
-/// '''
-///
-/// Allocating resources to tasks:
-///
-/// ```erlang
-/// 4> {ok, AllocationId} = yawl_resourcing:allocate_resource(
-///     <<"task_123">>, [<<"reviewer">>], eager
-/// ).
-/// {ok, <<"allocation_", _/binary>>}
-/// '''
-///
-/// Checking resource availability:
-///
-/// ```erlang
-/// 5> Available = yawl_resourcing:get_available_resources([<<"reviewer">>]).
-/// [#participant{id = <<"participant_001">>, name = <<"Alice">>, ...}]
-/// '''
-///
-/// Getting resources by role:
-///
-/// ```erlang
-/// 6> Approvers = yawl_resourcing:get_resources_by_role(<<"approver">>).
-/// [#participant{id = <<"participant_001">>, name = <<"Alice">>,
-///               roles := [<<"reviewer">>, <<"approver">>], ...}]
-/// '''
-///
+%% Starting the resourcing service:
+%%
+%% ```erlang
+%% 1> {ok, Pid} = yawl_resourcing:start_link().
+%% {ok, <0.123.0>}
+%% '''
+%%
+%% Registering participants:
+%%
+%% ```erlang
+%% 2> Props = [
+%%     {name, <<"Alice">>},
+%%     {roles, [<<"reviewer">>, <<"approver">>]},
+%%     {capabilities, [<<"document_review">>]},
+%%     {is_user, true},
+%%     {resource_type, human}
+%% ].
+%% [...]
+%% 3> {ok, ParticipantId} = yawl_resourcing:register_participant(Props, <<"participant_001">>).
+%% {ok, <<"participant_001">>}
+%% '''
+%%
+%% Allocating resources to tasks:
+%%
+%% ```erlang
+%% 4> {ok, AllocationId} = yawl_resourcing:allocate_resource(
+%%     <<"task_123">>, [<<"reviewer">>], eager
+%% ).
+%% {ok, <<"allocation_", _/binary>>}
+%% '''
+%%
+%% Checking resource availability:
+%%
+%% ```erlang
+%% 5> Available = yawl_resourcing:get_available_resources([<<"reviewer">>]).
+%% [#participant{id = <<"participant_001">>, name = <<"Alice">>, ...}]
+%% '''
+%%
+%% Getting resources by role:
+%%
+%% ```erlang
+%% 6> Approvers = yawl_resourcing:get_resources_by_role(<<"approver">>).
+%% [#participant{id = <<"participant_001">>, name = <<"Alice">>,
+%%               roles := [<<"reviewer">>, <<"approver">>], ...}]
+%% '''
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -175,55 +180,24 @@ start_link(Name) ->
 
 %% @doc Registers a new participant with the resourcing service.
 %%
-%% Participants are human or system resources that can be allocated to workflow tasks.
-%% Each participant has roles, capabilities, and a status that determine their eligibility
-%% for task assignment.
+%%      Props must include: name, roles, capabilities
+%%      Optional: is_user (default false), resource_type (default system)
 %%
-%% <h4>Required Properties:</h4>
-%% <ul>
-%%   <li><b>name</b> - Display name for the participant</li>
-%%   <li><b>roles</b> - List of role identifiers the participant fulfills</li>
-%%   <li><b>capabilities</b> - List of capability identifiers</li>
-%% </ul>
-%%
-%% <h4>Optional Properties:</h4>
-%% <ul>
-%%   <li><b>is_user</b> - Boolean indicating if this is a user (default: false)</li>
-%%   <li><b>resource_type</b> - human | machine | non_human | system (default: system)</li>
-%%   <li><b>status</b> - Initial status (default: available)</li>
-%%   <li><b>metadata</b> - Additional metadata map</li>
-%% </ul>
-///
-/// Example - Register a human reviewer:
-///
-/// ```erlang
-/// 1> Props = [
-///     {name, <<"Bob">>},
-///     {roles, [<<"analyst">>, <<"reviewer">>]},
-///     {capabilities, [<<"data_analysis">>, <<"report_generation">>]},
-///     {is_user, true},
-///     {resource_type, human},
-///     {status, available}
-/// ].
-/// [...]
-/// 2> {ok, ParticipantId} = yawl_resourcing:register_participant(Props, <<"participant_bob">>).
-/// {ok, <<"participant_bob">>}
-/// '''
-///
-/// Example - Register a system resource:
-///
-/// ```erlang
-/// 3> SystemProps = [
-///     {name, <<"Auto-Scaler">>},
-%%     {roles, [<<"executor">>]},
-///     {capabilities, [<<"auto_scaling">>]},
-///     {resource_type, machine}
-/// ].
-/// [...]
-/// 4> {ok, _} = yawl_resourcing:register_participant(SystemProps, <<"system_scaler">>).
-/// {ok, <<"system_scaler">>}
-/// '''
-///
+%% Example:
+%% ```erlang
+%% 1> Props = [
+%%     {name, <<"Bob">>},
+%%     {roles, [<<"analyst">>]},
+%%     {capabilities, [<<"data_analysis">>]},
+%%     {is_user, true},
+%%     {resource_type, human}
+%% ].
+%% [...]
+%% 2> {ok, Pid} = yawl_resourcing:start_link().
+%% {ok, <0.123.0>}
+%% 3> {ok, ParticipantId} = yawl_resourcing:register_participant(Props, <<"participant_002">>).
+%% {ok, <<"participant_002">>}
+%% '''
 -spec register_participant(proplists:proplist(), binary()) ->
     {ok, binary()} | {error, term()}.
 register_participant(Props, ParticipantId) ->
@@ -234,65 +208,24 @@ register_participant(Props, ParticipantId) ->
 unregister_participant(ParticipantId) ->
     gen_server:call(?MODULE, {unregister_participant, ParticipantId}).
 
-%% @doc Allocates a resource to a task based on specified role criteria.
-///
-/// Searches for available participants that have at least one of the required roles
-/// and creates an allocation record. The allocation strategy (eager/lazy) determines
-/// when the resource is actually assigned to the task.
-///
-/// <h4>Allocation Flow:</h4>
-/// <ol>
-///   <li>Find participants with matching roles</li>
-///   <li>Filter to only those with 'available' status</li>
-///   <li>Select first available participant</li>
-///   <li>Create allocation record with unique ID</li>
-///   <li>Return allocation ID for tracking</li>
-/// </ol>
-///
-/// Example - Allocate a reviewer for a task:
-///
-/// ```erlang
-/// 1> {ok, AllocationId} = yawl_resourcing:allocate_resource(
-///     <<"review_task_001">>, [<<"reviewer">>], eager
-/// ).
-/// {ok, <<"allocation_", _/binary>>}
-/// '''
-///
-/// Example - Allocate with multiple role options:
-///
-/// ```erlang
-/// 2> {ok, AllocId} = yawl_resourcing:allocate_resource(
-///     <<"data_task">>, [<<"analyst">>, <<"scientist">>, <<"reviewer">>], lazy
-/// ).
-/// {ok, <<"allocation_", _/binary>>}
-/// '''
-///
-/// Example - No resources available:
-///
-/// ```erlang
-/// 3> {error, no_resources_available} = yawl_resourcing:allocate_resource(
-///     <<"urgent_task">>, [<<"specialist">>], eager
-/// ).
-/// {error, no_resources_available}
-/// '''
-///
+%% @doc Allocates a resource to a task based on specified criteria.
+%%
+%% Example:
+%% ```erlang
+%% 1> {ok, AllocationId} = yawl_resourcing:allocate_resource(
+%%     <<"review_task_001">>, [<<"reviewer">>], eager
+%% ).
+%% {ok, <<"allocation_", _/binary>>}
+%% '''
+%%
+%% Returns {error, no_resources_available} if no matching participants exist.
+%%
 -spec allocate_resource(binary(), [binary()], allocation_strategy()) ->
     {ok, binary()} | {error, term()}.
 allocate_resource(TaskId, RoleList, Strategy) ->
     gen_server:call(?MODULE, {allocate_resource, TaskId, RoleList, Strategy}).
 
 %% @doc Deallocates a resource from a task.
-///
-/// Marks an active allocation as completed, releasing the participant
-/// back to available status for future task assignments.
-///
-/// Example - Deallocate after task completion:
-///
-/// ```erlang
-/// 1> ok = yawl_resourcing:deallocate_resource(<<"task_123">>, <<"allocation_abc123">>).
-/// ok
-/// '''
-///
 -spec deallocate_resource(binary(), binary()) -> ok | {error, term()}.
 deallocate_resource(TaskId, AllocationId) ->
     gen_server:call(?MODULE, {deallocate_resource, TaskId, AllocationId}).
@@ -703,24 +636,26 @@ to_binary(I) when is_integer(I) -> integer_to_binary(I).
 %%====================================================================
 
 %% @doc Runs doctests for the yawl_resourcing module.
-///
-/// This function validates core resource management functionality including:
-/// <ul>
-///   <li>Participant registration and property handling</li>
-///   <li>Resource allocation to tasks</li>
-///   <li>Role-based participant queries</li>
-///   <li>Status management</li>
-///   <li>Participant capability tracking</li>
-/// </ul>
-///
-/// Running the doctests:
-///
-/// ```erlang
-/// 1> yawl_resourcing:doctest_test().
-/// ok
-/// ```
-///
-/// @end
+%%
+%% This function validates core resource management functionality including:
+%% <ul>
+%%   <li>Participant ID format validation</li>
+%%   <li>Role and capability list validation</li>
+%%   <li>Resource type validation</li>
+%%   <li>Allocation strategy validation</li>
+%%   <li>Participant status validation</li>
+%%   <li>Binary list conversion</li>
+%%   <li>Type conversion utilities</li>
+%% </ul>
+%%
+%% Running the doctests:
+%%
+%% ```erlang
+%% 1> yawl_resourcing:doctest_test().
+%% ok
+%% ```
+%%
+%% @end
 %%--------------------------------------------------------------------
 -spec doctest_test() -> ok.
 
@@ -771,11 +706,11 @@ doctest_test() ->
     %% Test 9: Verify to_binary conversion handles all types
     Bin1 = to_binary(<<"already_binary">>),
     true = is_binary(Bin1),
-    <<"/binary>> = to_binary(atom),
+    Bin2 = to_binary(atom),
     true = is_binary(Bin2),
-    <<"list"/utf8>> = to_binary("list"),
+    Bin3 = to_binary("list"),
     true = is_binary(Bin3),
-    <<"123">> = to_binary(123),
+    Bin4 = to_binary(123),
     true = is_binary(Bin4),
 
     ok.

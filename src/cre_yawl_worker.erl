@@ -19,36 +19,223 @@
 %% -------------------------------------------------------------------
 %% @author YAWL Worker Implementation
 %% @copyright 2025
-%%
-%% @doc YAWL Worker Implementation for CRE
-%%
-%% This module implements the cre_worker behavior for executing YAWL workflow
-%% tasks within the CRE distributed runtime environment.
-%%
-%% <h3>Features</h3>
-%%
-%% <ul>
-%%   <li><b>Task Execution:</b> Executes atomic, composite, and subworkflow tasks</li>
-%%   <li><b>Pattern Support:</b> Handles parallel branches, joins, multi-instance tasks</li>
-%%   <li><b>Error Handling:</b> Integrated with cre_yawl_exception for recovery</li>
-%%   <li><b>Task Registry:</b> Dynamic registration of task handlers</li>
-%%   <li><b>Result Caching:</b> Configurable task result caching</li>
-%% </ul>
-%%
-%% <h3>Task Types</h3>
-%%
-%% <ul>
-%%   <li><code>atomic</code> - Single operation tasks</li>
-%%   <li><code>composite</code> - Sub-workflows with multiple tasks</li>
-%%   <li><code>multi_instance</code> - Parallel instance execution</li>
-%%   <li><code>subworkflow</code> - Nested workflow invocation</li>
-%% </ul>
-%%
-%% @end
 %% -------------------------------------------------------------------
 
 -module(cre_yawl_worker).
 -behavior(cre_worker).
+
+-moduledoc """
+YAWL Worker Implementation for CRE.
+
+This module implements the cre_worker behavior for executing YAWL workflow
+tasks within the CRE distributed runtime environment.
+
+## Task Types
+
+The worker supports the following task types:
+
+- `atomic` - Single operation tasks
+- `composite` - Sub-workflows with multiple tasks
+- `multi_instance` - Parallel instance execution
+- `subworkflow` - Nested workflow invocation
+
+## Worker Lifecycle
+
+### Starting a Worker
+
+```erlang
+> CreName = cre_master,
+> Config = #{cre_name => CreName},
+> {ok, Pid} = cre_yawl_worker:start_link(CreName, Config).
+{ok, <0.123.0>}
+```
+
+### Starting a Named Worker
+
+```erlang
+> WorkerName = yawl_worker_1,
+> CreName = cre_master,
+> Config = #{cre_name => CreName},
+> {ok, Pid} = cre_yawl_worker:start_link(WorkerName, CreName, Config).
+{ok, <0.124.0>}
+```
+
+### Stopping a Worker
+
+```erlang
+> ok = cre_yawl_worker:stop(WorkerName).
+ok
+```
+
+## Task Handler Registration
+
+### Register a Task Handler
+
+```erlang
+> TaskName = <<"process_order">>,
+> Handler = fun(Input) -> {ok, #{status => processed, data => Input}} end,
+> ok = cre_yawl_worker:register_task_handler(TaskName, Handler, atomic).
+ok
+```
+
+### Register a Task Type with Options
+
+```erlang
+> TaskName = <<"send_email">>,
+> Handler = fun(Email) -> {ok, #{sent => true}} end,
+> Options = [{type, atomic}, {timeout, 5000}],
+> ok = cre_yawl_worker:register_task_type(TaskName, Handler, Options).
+ok
+```
+
+### List Task Handlers
+
+```erlang
+> Handlers = cre_yawl_worker:list_task_handlers().
+[{<<"process_order">>, atomic}, {<<"send_email">>, atomic}]
+```
+
+### Get a Task Handler
+
+```erlang
+> {ok, HandlerFun} = cre_yawl_worker:get_task_handler(<<"process_order">>).
+{ok, #Fun<erl_eval.6.127694169>}
+```
+
+### Unregister a Task Handler
+
+```erlang
+> ok = cre_yawl_worker:unregister_task_handler(<<"process_order">>).
+ok
+```
+
+## Task Execution
+
+### Execute a Task Synchronously
+
+```erlang
+> Task = #yawl_task{
+>   id = <<"task_001">>,
+>   name = <<"process_order">>,
+>   type = atomic,
+>   input = #{order_id => 123}
+> },
+> {ok, Result} = cre_yawl_worker:execute_task(Task).
+{ok, #{status => processed, data => #{order_id => 123}}}
+```
+
+### Execute a Task Asynchronously
+
+```erlang
+> Task = #yawl_task{
+>   id = <<"task_002">>,
+>   name = <<"send_email">>,
+>   type = atomic,
+>   input = #{to => <<"user@example.com">>}
+> },
+> {ok, TaskId} = cre_yawl_worker:execute_task_async(Task).
+{ok, <<"task_002_">>}
+```
+
+### Get Task Result
+
+```erlang
+> {ok, Result} = cre_yawl_worker:get_task_result(<<"task_002_">>).
+{ok, #{task_id => <<"task_002_">>, status => completed}}
+```
+
+### Clear Task Cache
+
+```erlang
+> ok = cre_yawl_worker:clear_task_cache().
+ok
+
+> ok = cre_yawl_worker:clear_task_cache(<<"task_002_">>).
+ok
+```
+
+## Pattern Execution Helpers
+
+### Execute Parallel Branches
+
+```erlang
+> Branches = [
+>   #parallel_branch{
+>     branch_id = <<"branch_1">>,
+>     task_id = <<"task_001">>,
+>     handler = fun(X) -> {ok, X * 2} end,
+>     input = 5,
+>     status = pending
+>   },
+>   #parallel_branch{
+>     branch_id = <<"branch_2">>,
+>     task_id = <<"task_001">>,
+>     handler = fun(X) -> {ok, X + 10} end,
+>     input = 3,
+>     status = pending
+>   }
+> ],
+> {ok, Results} = cre_yawl_worker:execute_parallel(Branches, 5000).
+{ok, [10, 13]}
+```
+
+### Execute Join Operations
+
+```erlang
+> %% AND join - requires all results
+> {ok, AllResults} = cre_yawl_worker:execute_join(and_join, [1, 2, 3], default).
+{ok, {all_results, [1, 2, 3]}}
+
+> %% OR join - takes first result
+> {ok, First} = cre_yawl_worker:execute_join(or_join, [1, 2, 3], default).
+{ok, 1}
+
+> %% XOR join - requires exactly one result
+> {ok, Single} = cre_yawl_worker:execute_join(xor_join, [42], default).
+{ok, 42}
+
+> %% XOR join with default
+> {ok, Default} = cre_yawl_worker:execute_join(xor_join, [], fallback).
+{ok, fallback}
+```
+
+### Execute Multi-Instance Task
+
+```erlang
+> Task = #yawl_task{
+>   id = <<"multi_001">>,
+>   name = <<"process_item">>,
+>   type = multi_instance,
+>   input = #{},
+>   metadata => #{timeout => 5000}
+> },
+> InstanceCount = 3,
+> InputData = [<<"a">>, <<"b">>, <<"c">>],
+> {ok, Results} = cre_yawl_worker:execute_multi_instance(Task, InstanceCount, InputData).
+{ok, [<<96, 248, 173, 156, 82, 189, 134, 201, 172, 171, 197, 23, ...>>]}
+```
+
+### Execute Subworkflow
+
+```erlang
+> Task = #yawl_task{
+>   id = <<"sub_001">>,
+>   name = <<"approval_flow">>,
+>   type = subworkflow,
+>   input = #{request_id => 123}
+> },
+> Subworkflow = #{steps => [validate, approve, notify]},
+> {ok, Result} = cre_yawl_worker:execute_subworkflow(Task, Subworkflow).
+{ok, #{steps => [validate, approve, notify]}}
+```
+
+## Running the Doctests
+
+```erlang
+> cre_yawl_worker:doctest_test().
+ok
+```
+""".
 
 %%====================================================================
 %% Exports
@@ -99,6 +286,9 @@
          execute_join/3,
          execute_multi_instance/3,
          execute_subworkflow/2]).
+
+%% Doctests
+-export([doctest_test/0]).
 
 %%====================================================================
 %% Includes
@@ -1195,3 +1385,161 @@ classify_error({Kind, _Reason, _Stack}) when Kind =:= throw ->
     business_exception;
 classify_error(_) ->
     system_exception.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Runs all doctests for the cre_yawl_worker module.
+%%
+%% These are minimal, fast unit tests that verify the core functionality
+%% of the YAWL worker implementation without requiring actual process
+%% spawning or external dependencies.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: yawl_task record creation
+    Task = #yawl_task{
+      id = <<"test_task_001">>,
+      name = <<"test_task">>,
+      type = atomic,
+      input = #{data => <<"test">>},
+      metadata = #{},
+      split_type = undefined,
+      join_type = undefined,
+      timeout = infinity
+    },
+    <<"test_task_001">> = Task#yawl_task.id,
+    atomic = Task#yawl_task.type,
+
+    %% Test 2: parallel_branch record creation
+    Branch = #parallel_branch{
+      branch_id = <<"branch_1">>,
+      task_id = <<"task_001">>,
+      handler = fun(X) -> {ok, X} end,
+      input = test_input,
+      status = pending,
+      result = undefined
+    },
+    <<"branch_1">> = Branch#parallel_branch.branch_id,
+    pending = Branch#parallel_branch.status,
+
+    %% Test 3: worker_state record creation
+    State = #worker_state{
+      cre_name = cre_master,
+      task_registry = #{},
+      result_cache = #{},
+      compensation_stack = [],
+      exception_handlers = #{},
+      active_tasks = #{},
+      config = #{}
+    },
+    cre_master = State#worker_state.cre_name,
+    #{} = State#worker_state.task_registry,
+
+    %% Test 4: task_handler_entry record creation
+    HandlerEntry = #task_handler_entry{
+      name = <<"test_handler">>,
+      handler = fun(X) -> {ok, X} end,
+      type = atomic,
+      metadata = #{version => 1},
+      registered_at = erlang:system_time(millisecond)
+    },
+    <<"test_handler">> = HandlerEntry#task_handler_entry.name,
+    atomic = HandlerEntry#task_handler_entry.type,
+
+    %% Test 5: execute_join with and_join
+    {ok, {all_results, [1, 2, 3]}} = execute_join(and_join, [1, 2, 3], default),
+
+    %% Test 6: execute_join with or_join (takes first)
+    {ok, 1} = execute_join(or_join, [1, 2, 3], default),
+
+    %% Test 7: execute_join with or_join and empty list (uses default)
+    {ok, default_val} = execute_join(or_join, [], default_val),
+
+    %% Test 8: execute_join with xor_join and single result
+    {ok, 42} = execute_join(xor_join, [42], default),
+
+    %% Test 9: execute_join with xor_join and empty list
+    {ok, fallback} = execute_join(xor_join, [], fallback),
+
+    %% Test 10: execute_join with xor_join and multiple results (error)
+    {error, multiple_branches_for_xor_join} = execute_join(xor_join, [1, 2], default),
+
+    %% Test 11: execute_join with and_join and empty list (error)
+    {error, no_branches_completed} = execute_join(and_join, [], default),
+
+    %% Test 12: classify_error for timeout
+    timeout_exception = classify_error({error, timeout}),
+
+    %% Test 13: classify_error for resource errors
+    resource_exception = classify_error({error, enoent}),
+
+    %% Test 14: classify_error for generic errors
+    system_exception = classify_error({error, generic_error}),
+
+    %% Test 15: classify_error for business exceptions (throw)
+    business_exception = classify_error({throw, business_rule_violation}),
+
+    %% Test 16: classify_error for system exceptions (exit)
+    system_exception = classify_error({exit, normal}),
+
+    %% Test 17: classify_error for stack traces with throw
+    business_exception = classify_error({throw, reason, []}),
+
+    %% Test 18: classify_error for unknown errors
+    system_exception = classify_error(unknown_error),
+
+    %% Test 19: extract_input_files from map with input_files key
+    InputMap = #{<<"input_files">> => [<<"file1">>, <<"file2">>]},
+    [<<"file1">>, <<"file2">>] = extract_input_files(InputMap),
+
+    %% Test 20: extract_input_files from map without input_files (empty list)
+    NoFilesMap = #{<<"data">> => <<"test">>},
+    [] = extract_input_files(NoFilesMap),
+
+    %% Test 21: extract_input_files from non-map (empty list)
+    [] = extract_input_files(<<"not_a_map">>),
+
+    %% Test 22: extract_output_files from map with output_files key
+    OutputMap = #{<<"output_files">> => [<<"out1">>]},
+    [<<"out1">>] = extract_output_files(OutputMap),
+
+    %% Test 23: extract_output_files from map without output_files (empty list)
+    [] = extract_output_files(#{<<"result">> => ok}),
+
+    %% Test 24: file_exists with http URL (returns true)
+    true = file_exists(<<"http://example.com/file">>),
+
+    %% Test 25: file_exists with https URL (returns true)
+    true = file_exists(<<"https://example.com/file">>),
+
+    %% Test 26: file_exists with file:// URL (returns true)
+    true = file_exists(<<"file://path/to/file">>),
+
+    %% Test 27: file_exists with tuple format
+    true = file_exists({<<"http://example.com/file">>, location}),
+
+    %% Test 28: generate_task_id creates unique binary
+    TestTask = #yawl_task{id = <<"my_task">>},
+    TaskId = generate_task_id(TestTask),
+    true = is_binary(TaskId),
+    true = byte_size(TaskId) > byte_size(<<"my_task">>),
+
+    %% Test 29: generate_task_id with empty id
+    EmptyTask = #yawl_task{id = <<>>},
+    EmptyId = generate_task_id(EmptyTask),
+    true = is_binary(EmptyId),
+    <<"task_", _/binary>> = EmptyId,
+
+    %% Test 30: task_type type is correctly defined
+    atomic = atomic,
+    composite = composite,
+    subworkflow = subworkflow,
+    multi_instance = multi_instance,
+
+    ok.

@@ -19,44 +19,38 @@
 %% -------------------------------------------------------------------
 %% @author YAWL Client Module
 %% @copyright 2025
-%%
-%% @doc YAWL Client Implementation for CRE
-%%
-%% This module implements the cre_client behavior for executing YAWL workflows
-%% within the CRE distributed runtime environment. It bridges workflow patterns
-%% defined in cre_yawl with the execution capabilities of the CRE system.
-%%
-%% <h3>Architecture</h3>
-%%
-%% The client maintains workflow state and orchestrates task execution through:
-%% <ul>
-%%   <li><b>Workflow State:</b> Tracks active tasks, completed work, and pending operations</li>
-%%   <li><b>Task Queue:</b> Manages tasks ready for CRE execution</li>
-%%   <li><b>Result Accumulation:</b> Collects results from completed worker executions</li>
-%%   <li><b>Pattern Composition:</b> Supports combining multiple patterns</li>
-%% </ul>
-%%
-%% <h3>Usage Example</h3>
-%%
-%% <pre>
-%% % Create a workflow with sequence and parallel split
-%% Workflow = cre_yawl:new_workflow(),
-%% Workflow1 = cre_yawl:add_task(Workflow, <<"task1">>,
-%%     [{name, <<"First Task">>}, {type, atomic}]),
-%% Workflow2 = cre_yawl:add_task(Workflow1, <<"task2">>,
-%%     [{name, <<"Second Task">>}, {type, atomic}]),
-%% Workflow3 = cre_yawl:connect(Workflow2, <<"task1">>, <<"task2">>),
-%%
-%% cre:start(),
-%% {ok, CrePid} = cre:pid(node()),
-%% {ok, ClientPid} = cre_yawl_client:start_link(CrePid, Workflow3),
-%% Result = cre_yawl_client:execute_workflow(ClientPid, #{data => input}).
-%% </pre>
-%%
-%% @end
 %% -------------------------------------------------------------------
 
 -module(cre_yawl_client).
+
+-moduledoc """
+YAWL Client Implementation for CRE.
+
+This module implements the `cre_client` behavior for executing YAWL workflows
+within the CRE distributed runtime environment. It bridges workflow patterns
+defined in `cre_yawl` with the execution capabilities of the CRE system.
+
+<h3>Architecture</h3>
+The client maintains workflow state and orchestrates task execution through:
+<ul>
+  <li><b>Workflow State:</b> Tracks active tasks, completed work, and pending operations</li>
+  <li><b>Task Queue:</b> Manages tasks ready for CRE execution</li>
+  <li><b>Result Accumulation:</b> Collects results from completed worker executions</li>
+  <li><b>Pattern Composition:</b> Supports combining multiple patterns</li>
+</ul>
+
+<h3>Examples</h3>
+
+Pattern composition:
+
+```erlang
+> cre_yawl_client:compose_patterns([pattern1, pattern2], #{mode => sequence}).
+{sequence,[pattern1,pattern2]}
+
+> cre_yawl_client:compose_patterns([pattern1, pattern2], #{mode => parallel}).
+{parallel_split,[pattern1,pattern2]}
+```
+""".
 
 %%====================================================================
 %% Includes
@@ -1010,3 +1004,14 @@ set_pattern_field(task_ids, Value, Pattern) ->
     setelement(2, Pattern, Value);
 set_pattern_field(_Field, _Value, Pattern) ->
     Pattern.
+
+%%====================================================================
+%% EUnit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

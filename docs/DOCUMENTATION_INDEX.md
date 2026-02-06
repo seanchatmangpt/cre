@@ -13,6 +13,13 @@ docs/
 ├── HELPER_INTEGRATION_GUIDE.md          # Integration patterns
 ├── MIGRATION_GUIDE.md                    # Migration from old architecture
 ├── UTILITY_MODULES_GUIDE.md              # Utility modules documentation
+├── PNET_TYPES_GUIDE.md                  # PNet types system documentation
+├── PNET_TYPES_QUICK_REFERENCE.md        # PNet types quick reference
+├── PNET_TYPES_API_REFERENCE.md          # PNet types API specification
+├── PNET_TYPES_TUTORIAL.md               # PNet types tutorial
+├── PNET_MODE_GUIDE.md                  # PNet mode enumeration documentation
+├── PNET_MODE_QUICK_REFERENCE.md        # PNet mode quick reference
+├── PNET_MODE_TUTORIAL.md               # PNet mode enumeration tutorial
 ├── YAWL_PATTERNS_GUIDE.md               # Pattern implementations
 ├── EXAMPLES_GUIDE.md                    # Usage examples
 ├── TUTORIALS_INDEX.md                    # Tutorial overview
@@ -50,6 +57,7 @@ docs/
 - **Examples Guide**: Working implementations and usage patterns
 
 ### 📖 **Reference Documentation**
+- **PNet Types Documentation**: Complete type system documentation
 - **YAWL Pattern Specifications**: Formal specifications
 - **API Reference**: Additional technical reference
 
@@ -87,6 +95,7 @@ DOCUMENTATION_INDEX.md
 DOCUMENTATION_INDEX.md
 ├── MIGRATION_GUIDE.md (high-level migration)
 ├── UTILITY_MODULES_GUIDE.md (new capabilities)
+├── PNET_MODE_GUIDE.md (mode enumeration)
 ├── YAWL_PATTERNS_GUIDE.md (new patterns)
 └── tutorials/workflow_migration_tutorial.md (hands-on migration)
 ```
@@ -172,22 +181,47 @@ Every concept includes:
 **Content**: Function specifications, usage examples, best practices.
 **Audience**: All developers using the framework.
 
-### 7. **YAWL_PATTERNS_GUIDE.md**
+### 7. **PNET_TYPES_GUIDE.md**
+**Purpose**: Comprehensive documentation for the type system.
+**Content**: All type definitions, validation functions, doctest examples, usage patterns.
+**Audience**: All developers working with Petri net types.
+
+### 8. **PNET_TYPES_QUICK_REFERENCE.md**
+**Purpose**: Quick reference for type system essentials.
+**Content**: Type definitions, validation functions, common patterns.
+**Audience**: Developers needing quick lookup during development.
+
+### 9. **PNET_TYPES_API_REFERENCE.md**
+**Purpose**: Complete API specification for type system.
+**Content**: Detailed function specifications, doctest examples, error handling.
+**Audience**: Developers implementing with the type system.
+
+### 10. **PNET_MODE_GUIDE.md**
+**Purpose**: Comprehensive guide to mode enumeration utilities.
+**Content**: Basic and colored Petri net mode enumeration, algorithms, examples.
+**Audience**: Developers implementing workflow execution logic.
+
+### 11. **PNET_TYPES_TUTORIAL.md**
+**Purpose**: Step-by-step learning guide for the type system.
+**Content**: Hands-on examples, integration patterns, advanced usage.
+**Audience**: Developers learning the type system.
+
+### 12. **YAWL_PATTERNS_GUIDE.md**
 **Purpose**: Implementation guide for workflow patterns.
 **Content**: Pattern specifications, examples, integration.
 **Audience**: Developers implementing business workflows.
 
-### 8. **TUTORIALS_INDEX.md**
+### 13. **TUTORIALS_INDEX.md**
 **Purpose**: Learning roadmap for the new architecture.
 **Content**: Tutorial overview, prerequisites, learning paths.
 **Audience**: New developers and learners.
 
-### 9. **EXAMPLES_GUIDE.md**
+### 13. **EXAMPLES_GUIDE.md**
 **Purpose**: Working implementations and usage patterns.
 **Content**: Complete examples, execution scripts, best practices.
 **Audience**: Developers wanting practical examples.
 
-### 10. **YAWL Pattern Specifications**
+### 14. **YAWL Pattern Specifications**
 **Purpose**: Formal specifications for technical compliance.
 **Content**: API specifications, integration architecture.
 **Audience**: Technical architects and implementers.
@@ -199,15 +233,18 @@ Every concept includes:
 ### For New Developers
 1. Start with **NEW_FILES_OVERVIEW.md** to understand the scope
 2. Read **DIATAXIS_ARCHITECTURE.md** for concepts
-3. Work through **getting_started.md** tutorial
-4. Study **UTILITY_MODULES_GUIDE.md** for reference
-5. Look at **EXAMPLES_GUIDE.md** for practical patterns
+3. Study **PNET_TYPES_GUIDE.md** for type system understanding
+4. Work through **PNET_TYPES_TUTORIAL.md** for hands-on learning
+5. Use **PNET_TYPES_QUICK_REFERENCE.md** for quick reference
+6. Study **UTILITY_MODULES_GUIDE.md** for comprehensive reference
+7. Look at **EXAMPLES_GUIDE.md** for practical patterns
 
 ### For Experienced Developers
 1. Review **COMPLETE_API_REFERENCE.md** for API details
-2. Study **HELPER_INTEGRATION_GUIDE.md** for integration patterns
-3. Explore **YAWL_PATTERNS_GUIDE.md** for workflow implementation
-4. Check **MIGRATION_GUIDE.md** if migrating from old architecture
+2. Study **PNET_TYPES_API_REFERENCE.md** for type system specifics
+3. Study **HELPER_INTEGRATION_GUIDE.md** for integration patterns
+4. Explore **YAWL_PATTERNS_GUIDE.md** for workflow implementation
+5. Check **MIGRATION_GUIDE.md** if migrating from old architecture
 
 ### For Architects
 1. Read **DIATAXIS_ARCHITECTURE.md** for design rationale

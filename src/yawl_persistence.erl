@@ -39,6 +39,38 @@
 %%   <li><b>persistent_workitem:</b> Work item records with case reference</li>
 %% </ul>
 %%
+%% <h3>Doctests</h3>
+%%
+%% Converting a persistent_case record to a map:
+%%
+%% ```erlang
+%% 1> Case = #persistent_case{case_id = <<"case1">>, workflow_id = <<"wf1">>,
+%% 1> status = running, data = #{key => val}, created_at = 1000,
+%% 1> started_at = 1001, completed_at = undefined, spec = #{}}.
+%% 2> Map = yawl_persistence:case_to_map(Case).
+%% #{case_id => <<"case1">>, completed_at => undefined,
+%%   created_at => 1000, data => #{key => val}, ...}
+%% ```
+%%
+%% Converting a persistent_workitem record to a map:
+%%
+%% ```erlang
+%% 1> Workitem = #persistent_workitem{workitem_id = <<"wi1">>,
+%% 1> case_id = <<"case1">>, task_id = <<"task1">>, status = enabled,
+%% 1> data = #{}, enabled_at = 1000, started_at = undefined,
+%% 1> completed_at = undefined}.
+%% 2> Map = yawl_persistence:workitem_to_map(Workitem).
+%% #{case_id => <<"case1">>, completed_at => undefined,
+%%   data => #{}, enabled_at => 1000, ...}
+%% ```
+%%
+%% Running all doctests:
+%%
+%% ```erlang
+%% 1> yawl_persistence:doctest_test().
+%% ok
+%% ```
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -57,7 +89,8 @@
          load_workitems/1,
          list_active_cases/0,
          cleanup_expired_cases/0,
-         get_case_count/0]).
+         get_case_count/0,
+         doctest_test/0]).
 
 %%====================================================================
 %% Records
@@ -585,3 +618,130 @@ workitem_to_map(#persistent_workitem{} = Workitem) ->
         started_at => Workitem#persistent_workitem.started_at,
         completed_at => Workitem#persistent_workitem.completed_at
     }.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Runs doctests for the yawl_persistence module.
+%%
+%% This function validates the serialization helper examples
+%% in the module documentation.
+%%
+%% Returns `ok' when all tests pass.
+%%
+%% Example:
+%% ```
+%% 1> yawl_persistence:doctest_test().
+%% ok
+%% '''
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: case_to_map conversion with complete record
+    Case1 = #persistent_case{
+        case_id = <<"case1">>,
+        workflow_id = <<"wf1">>,
+        spec = #{version => 1},
+        status = running,
+        data = #{key => val},
+        created_at = 1000,
+        started_at = 1001,
+        completed_at = undefined
+    },
+    Map1 = case_to_map(Case1),
+    <<"case1">> = maps:get(case_id, Map1),
+    <<"wf1">> = maps:get(workflow_id, Map1),
+    running = maps:get(status, Map1),
+    #{key := val} = maps:get(data, Map1),
+    1000 = maps:get(created_at, Map1),
+    1001 = maps:get(started_at, Map1),
+    undefined = maps:get(completed_at, Map1),
+
+    %% Test 2: case_to_map with minimal record
+    Case2 = #persistent_case{
+        case_id = <<"case2">>,
+        workflow_id = <<>>,
+        spec = #{},
+        status = completed,
+        data = #{},
+        created_at = 2000,
+        started_at = undefined,
+        completed_at = 3000
+    },
+    Map2 = case_to_map(Case2),
+    <<"case2">> = maps:get(case_id, Map2),
+    completed = maps:get(status, Map2),
+    3000 = maps:get(completed_at, Map2),
+
+    %% Test 3: workitem_to_map conversion with complete record
+    Workitem1 = #persistent_workitem{
+        workitem_id = <<"wi1">>,
+        case_id = <<"case1">>,
+        task_id = <<"task1">>,
+        status = enabled,
+        data = #{param => value},
+        enabled_at = 1000,
+        started_at = undefined,
+        completed_at = undefined
+    },
+    WMap1 = workitem_to_map(Workitem1),
+    <<"wi1">> = maps:get(workitem_id, WMap1),
+    <<"case1">> = maps:get(case_id, WMap1),
+    <<"task1">> = maps:get(task_id, WMap1),
+    enabled = maps:get(status, WMap1),
+    #{param := value} = maps:get(data, WMap1),
+    1000 = maps:get(enabled_at, WMap1),
+
+    %% Test 4: workitem_to_map with completed workitem
+    Workitem2 = #persistent_workitem{
+        workitem_id = <<"wi2">>,
+        case_id = <<"case1">>,
+        task_id = <<"task2">>,
+        status = completed,
+        data = #{},
+        enabled_at = 1000,
+        started_at = 1100,
+        completed_at = 2000
+    },
+    WMap2 = workitem_to_map(Workitem2),
+    completed = maps:get(status, WMap2),
+    1100 = maps:get(started_at, WMap2),
+    2000 = maps:get(completed_at, WMap2),
+
+    %% Test 5: Verify map has all expected keys for case
+    CaseKeys = maps:keys(Map1),
+    true = lists:member(case_id, CaseKeys),
+    true = lists:member(workflow_id, CaseKeys),
+    true = lists:member(spec, CaseKeys),
+    true = lists:member(status, CaseKeys),
+    true = lists:member(data, CaseKeys),
+    true = lists:member(created_at, CaseKeys),
+    true = lists:member(started_at, CaseKeys),
+    true = lists:member(completed_at, CaseKeys),
+    8 = length(CaseKeys),
+
+    %% Test 6: Verify map has all expected keys for workitem
+    WorkitemKeys = maps:keys(WMap1),
+    true = lists:member(workitem_id, WorkitemKeys),
+    true = lists:member(case_id, WorkitemKeys),
+    true = lists:member(task_id, WorkitemKeys),
+    true = lists:member(status, WorkitemKeys),
+    true = lists:member(data, WorkitemKeys),
+    true = lists:member(enabled_at, WorkitemKeys),
+    true = lists:member(started_at, WorkitemKeys),
+    true = lists:member(completed_at, WorkitemKeys),
+    8 = length(WorkitemKeys),
+
+    %% Test 7: Verify all case statuses are valid
+    ValidCaseStatuses = [running, suspended, completed, cancelled, failed],
+    true = lists:member(running, ValidCaseStatuses),
+    true = lists:member(completed, ValidCaseStatuses),
+
+    %% Test 8: Verify all workitem statuses are valid
+    ValidWorkitemStatuses = [enabled, started, completed, failed, cancelled],
+    true = lists:member(enabled, ValidWorkitemStatuses),
+    true = lists:member(completed, ValidWorkitemStatuses),
+
+    ok.

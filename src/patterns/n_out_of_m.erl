@@ -17,47 +17,77 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc N out of M Pattern (WCP-22 Partial Join variant) for YAWL
-%%
-%% This module implements the N out of M pattern as a gen_pnet behaviour.
-%%
-%% <h3>Pattern Description</h3>
-%% The N out of M pattern (a variant of WCP-22 Partial Join) merges multiple
-%% concurrent branches, proceeding when N out of M branches have completed.
-%% The quorum can be any number from 1 to M, allowing flexible synchronization.
-%%
-%% <h3>Petri Net Structure</h3>
-%% <pre>
-%%   Places:
-%%     p_start         - Start of the workflow
-%%     p_branch_pool   - Pool of all branches
-%%     p_running       - Currently running branches
-%%     p_completed     - Completed branches (count toward quorum)
-%%     p_quorum_met    - Quorum has been reached
-%%     p_remaining     - Remaining branches to complete
-%%     p_output        - Final output
-%%
-%%   Transitions:
-%%     t_split         - Split into M branches
-%%     t_execute       - Execute a branch
-%%     t_complete      - Complete a branch
-%%     t_check_quorum  - Check if N branches completed
-%%     t_proceed       - Proceed when quorum met
-%%     t_wait_remaining - Wait for remaining branches (optional)
-%%     t_complete_all  - Complete when all done (optional)
-%% </pre>
-%%
-%% <h3>Soundness Properties</h3>
-%% <ul>
-%%   <li><b>Option to complete:</b> Always true (quorum reachable)</li>
-%%   <li><b>Proper completion:</b> Proceeds when exactly N branches complete</li>
-%%   <li><b>No dead transitions:</b> All branches execute and complete</li>
-%% </ul>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(n_out_of_m).
+-moduledoc """
+N out of M Pattern (WCP-22 Partial Join variant) for YAWL.
+
+This module implements the N out of M pattern as a gen_pnet behaviour.
+
+## Pattern Description
+
+The N out of M pattern (a variant of WCP-22 Partial Join) merges multiple
+concurrent branches, proceeding when N out of M branches have completed.
+The quorum can be any number from 1 to M, allowing flexible synchronization.
+
+## Examples
+
+Get the list of places:
+
+```erlang
+> n_out_of_m:place_lst().
+[p_start,p_branch_pool,p_running,p_completed,p_quorum_met,p_remaining,p_output]
+```
+
+Get the list of transitions:
+
+```erlang
+> n_out_of_m:trsn_lst().
+[t_split,t_execute,t_complete,t_check_quorum,t_proceed,t_complete_all]
+```
+
+Get presets for transitions:
+
+```erlang
+> n_out_of_m:preset(t_split).
+[p_start]
+```
+
+```erlang
+> n_out_of_m:preset(t_check_quorum).
+[p_completed]
+```
+
+```erlang
+> n_out_of_m:preset(t_execute).
+[p_branch_pool]
+```
+
+## Petri Net Structure
+
+Places:
+- `p_start` - Start of the workflow
+- `p_branch_pool` - Pool of all branches
+- `p_running` - Currently running branches
+- `p_completed` - Completed branches (count toward quorum)
+- `p_quorum_met` - Quorum has been reached
+- `p_remaining` - Remaining branches to complete
+- `p_output` - Final output
+
+Transitions:
+- `t_split` - Split into M branches
+- `t_execute` - Execute a branch
+- `t_complete` - Complete a branch
+- `t_check_quorum` - Check if N branches completed
+- `t_proceed` - Proceed when quorum met
+- `t_complete_all` - Complete when all done (optional)
+
+## Soundness Properties
+
+- **Option to complete:** Always true (quorum reachable)
+- **Proper completion:** Proceeds when exactly N branches complete
+- **No dead transitions:** All branches execute and complete
+""".
 -behaviour(gen_yawl).
 
 %% gen_pnet callbacks
@@ -612,3 +642,14 @@ log_event(#n_out_of_m_state{log_id = LogId}, Concept, Lifecycle, Data) when LogI
     yawl_xes:log_event(LogId, Concept, Lifecycle, Data);
 log_event(_State, _Concept, _Lifecycle, _Data) ->
     ok.
+
+%%====================================================================
+%% DocTests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

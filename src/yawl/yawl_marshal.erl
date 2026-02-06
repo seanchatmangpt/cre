@@ -31,6 +31,40 @@
 %%   <li>XSLT stylesheet application</li>
 %% </ul>
 %%
+%% <h3>Doctests</h3>
+%%
+%% Data serialization:
+%% ```erlang
+%% > {ok, Xml} = yawl_marshal:marshal_to_xml(#{name => <<"test">>, value => 42}).
+%% {ok, _}
+%%
+%% > {ok, Map} = yawl_marshal:xml_to_map(<<"<root><name>test</name></root>">>),
+%% is_map(Map).
+%% true
+%% ```
+%%
+%% XML escaping:
+%% ```erlang
+%% > yawl_marshal:escape_xml(<<"<tag>">>).
+%% <<"&lt;tag&gt;">>
+%%
+%% > yawl_marshal:unescape_xml(<<"&lt;tag&gt;">>).
+%% <<"<tag>">>
+%% ```
+%%
+%% Building XML:
+%% ```erlang
+%% > XmlBin = yawl_marshal:build_xml({<<"root">>, [], [{<<"child">>, [], <<"content">>}]}),
+%% is_list(XmlBin).
+%% true
+%% ```
+%%
+%% Running the doctests:
+%% ```erlang
+%% > yawl_marshal:doctest_test().
+%% ok
+%% ```
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -51,6 +85,9 @@
 %% Helper functions for XML processing
 -export([escape_xml/1, unescape_xml/1]).
 -export([parse_xml/1, build_xml/1]).
+
+%% Doctests
+-export([doctest_test/0]).
 
 %%====================================================================
 %% Type Definitions
@@ -744,3 +781,152 @@ element_to_map(Name, Attrs, Content) ->
         [] -> WithAttrs;
         _ -> maps:put(<<"__content">>, content_to_map(Content), WithAttrs)
     end.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Run doctests for yawl_marshal module.
+%%
+%% Validates data marshalling functions including XML serialization,
+%% deserialization, escaping/unescaping, and map conversion.
+%%
+%% Example:
+%% ```erlang
+%% > yawl_marshal:doctest_test().
+%% ok
+%% ```
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: marshal_to_xml with simple map
+    SimpleMap = #{name => <<"test">>, value => 42},
+    {ok, Xml1} = marshal_to_xml(SimpleMap),
+    true = is_binary(Xml1),
+    true = binary:match(Xml1, <<"<root>">>) =/= nomatch,
+
+    %% Test 2: marshal_to_xml with primitive integer
+    {ok, Xml2} = marshal_to_xml(42),
+    <<"42">> = Xml2,
+
+    %% Test 3: marshal_to_xml with primitive binary
+    {ok, Xml3} = marshal_to_xml(<<"hello">>),
+    <<"hello">> = Xml3,
+
+    %% Test 4: marshal_to_xml with primitive atom
+    {ok, Xml4} = marshal_to_xml(test_atom),
+    true = is_binary(Xml4),
+
+    %% Test 5: xml_to_map with simple XML
+    SimpleXml = <<"<root><name>test</name></root>">>,
+    {ok, Map5} = xml_to_map(SimpleXml),
+    true = is_map(Map5),
+
+    %% Test 6: xml_to_map with element tuple
+    Element = {<<"root">>, [], [{<<"child">>, [], <<"content">>}]},
+    {ok, Map6} = xml_to_map(Element),
+    true = is_map(Map6),
+    <<"root">> = maps:get(<<"__name">>, Map6),
+
+    %% Test 7: map_to_xml roundtrip
+    TestMap = #{<<"key">> => <<"value">>, <<"number">> => 123},
+    {ok, Xml7} = map_to_xml(TestMap),
+    true = is_binary(Xml7),
+    true = binary:match(Xml7, <<"<root>">>) =/= nomatch,
+
+    %% Test 8: escape_xml handles ampersand
+    Escaped1 = escape_xml(<<"a & b">>),
+    true = binary:match(Escaped1, <<"&amp;">>) =/= nomatch,
+
+    %% Test 9: escape_xml handles less than
+    Escaped2 = escape_xml(<<"<tag>">>),
+    <<"&lt;tag&gt;">> = Escaped2,
+
+    %% Test 10: escape_xml handles greater than
+    Escaped3 = escape_xml(<<">">>),
+    <<"&gt;">> = Escaped3,
+
+    %% Test 11: escape_xml handles double quote
+    Escaped4 = escape_xml(<<"\"quote\"">>),
+    true = binary:match(Escaped4, <<"&quot;">>) =/= nomatch,
+
+    %% Test 12: escape_xml handles single quote
+    Escaped5 = escape_xml(<<"'apostrophe'">>),
+    true = binary:match(Escaped5, <<"&apos;">>) =/= nomatch,
+
+    %% Test 13: unescape_xml reverses escape_xml for tags
+    Unescaped1 = unescape_xml(<<"&lt;tag&gt;">>),
+    <<"<tag>">> = Unescaped1,
+
+    %% Test 14: unescape_xml handles ampersand
+    Unescaped2 = unescape_xml(<<"a &amp; b">>),
+    <<"a & b">> = Unescaped2,
+
+    %% Test 15: unescape_xml handles quotes
+    Unescaped3 = unescape_xml(<<"&quot;hello&quot;">>),
+    <<"\"hello\"">> = Unescaped3,
+
+    %% Test 16: build_xml creates simple element
+    BuiltXml = build_xml({<<"root">>, [], []}),
+    true = is_list(BuiltXml),
+
+    %% Test 17: build_xml with attributes
+    BuiltXml2 = build_xml({<<"root">>, [{<<"id">>, <<"123">>}], []}),
+    true = is_list(BuiltXml2),
+    true = lists:member(<<"id">>, BuiltXml2),
+
+    %% Test 18: build_xml with content
+    BuiltXml3 = build_xml({<<"root">>, [], [<<"text">>]}),
+    true = is_list(BuiltXml3),
+
+    %% Test 19: validate_xml accepts valid XML
+    ValidXml = <<"<root></root>">>,
+    {ok, true} = validate_xml(ValidXml, <<"<schema></schema>">>),
+
+    %% Test 20: validate_xml with rules
+    {ok, true} = validate_xml(ValidXml, {schema, []}),
+
+    %% Test 21: pretty_print_xml formats XML
+    {ok, PrettyXml} = pretty_print_xml(<<"<root><child>x</child></root>">>),
+    true = is_binary(PrettyXml),
+
+    %% Test 22: format_xml minifies XML
+    {ok, MinifiedXml} = format_xml(<<"<root><child>x</child></root>">>),
+    true = is_binary(MinifiedXml),
+
+    %% Test 23: term_to_map converts map
+    InputMap = #{a => 1, b => 2},
+    OutputMap = term_to_map(InputMap),
+    true = InputMap =:= OutputMap,
+
+    %% Test 24: term_to_map converts list
+    ListMap = term_to_map([1, 2, 3]),
+    true = is_map(ListMap),
+    true = maps:is_key(<<"items">>, ListMap),
+
+    %% Test 25: term_to_map converts tuple
+    TupleMap = term_to_map({a, b, c}),
+    true = is_map(TupleMap),
+
+    %% Test 26: term_to_map converts atom
+    AtomMap = term_to_map(my_atom),
+    true = is_map(AtomMap),
+
+    %% Test 27: format_primitive handles binary
+    <<"test">> = format_primitive(<<"test">>),
+
+    %% Test 28: format_primitive handles integer
+    "42" = format_primitive(42),
+
+    %% Test 29: format_primitive handles float
+    FloatStr = format_primitive(3.14),
+    true = is_list(FloatStr),
+
+    %% Test 30: format_primitive handles atom
+    "test_atom" = format_primitive(test_atom),
+
+    ok.

@@ -31,6 +31,82 @@
 %%   <li>Support for RSA and ECDSA algorithms</li>
 %% </ul>
 %%
+%% <h3>Doctests</h3>
+%%
+%% Creating a self-signed certificate:
+%%
+%% ```erlang
+%% 1> {ok, Cert} = yawl_signature:create_self_signed_cert(<<"CN=Test">>, 365).
+%% {ok, #certificate{id = _, subject = <<"CN=Test">>, issuer = <<"CN=Test">>, public_key = _, valid_until = _}}
+%% ```
+%%
+%% Getting signer from certificate:
+%%
+%% ```erlang
+%% 2> {ok, <<"CN=Test">>} = yawl_signature:get_signer(Cert).
+%% {ok, <<"CN=Test">>}
+%% ```
+%%
+%% Validating a certificate:
+%%
+%% ```erlang
+%% 3> {ok, true} = yawl_signature:validate_certificate(Cert).
+%% {ok, true}
+%% ```
+%%
+%% Loading certificate from PEM format:
+%%
+%% ```erlang
+%% 4> PemCert = <<"-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJAK...-----END CERTIFICATE-----">>.
+%% <<"-----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----">>
+%% 5> {ok, LoadedCert} = yawl_signature:load_certificate(PemCert).
+%% {ok, #certificate{}}
+%% ```
+%%
+%% Getting certificate fields:
+%%
+%% ```erlang
+%% 6> Id = yawl_signature:get_cert_id(LoadedCert).
+%% <<"cert_", _/binary>>
+%% 7> Subject = yawl_signature:get_subject(LoadedCert).
+%% <<"CN=Test Certificate">>
+%% 8> Issuer = yawl_signature:get_issuer(LoadedCert).
+%% <<"CN=Test CA">>
+%% 9> PublicKey = yawl_signature:get_public_key(LoadedCert).
+%% <<"extracted_public_key">>
+%% 10> ValidUntil = yawl_signature:get_valid_until(LoadedCert).
+%% ValidUntil when is_integer(ValidUntil), ValidUntil > 0.
+%% ```
+%%
+%% Creating signature records:
+%%
+%% ```erlang
+%% 11> Sig = yawl_signature:signature(<<"doc1">>, <<"sigvalue">>, rsa_sha256, <<"sig123">>).
+%% #signature{id = <<"sig123">>, document_id = <<"doc1">>, signature_value = <<"sigvalue">>, algorithm = rsa_sha256}
+%% 12> SigId = yawl_signature:get_sig_id(Sig).
+%% <<"sig123">>
+%% 13> DocId = yawl_signature:get_document_id(Sig).
+%% <<"doc1">>
+%% 14> SigValue = yawl_signature:get_signature_value(Sig).
+%% <<"sigvalue">>
+%% 15> Algo = yawl_signature:get_algorithm(Sig).
+%% rsa_sha256
+%% ```
+%%
+%% Creating certificate records:
+%%
+%% ```erlang
+%% 16> CertRec = yawl_signature:certificate(<<"CN=Subject">>, <<"CN=Issuer">>, <<"pubkey">>, 99999999999, <<"cert456">>).
+%% #certificate{id = <<"cert456">>, subject = <<"CN=Subject">>, issuer = <<"CN=Issuer">>, public_key = <<"pubkey">>, valid_until = 99999999999}
+%% ```
+%%
+%% Running all doctests:
+%%
+%% ```erlang
+%% 1> yawl_signature:doctest_test().
+%% ok
+%% ```
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -50,7 +126,7 @@
 -export([sign_document/2, verify_signature/2]).
 -export([get_signer/1, validate_certificate/1]).
 -export([load_certificate/1, load_private_key/2]).
--export([create_self_signed_cert/2]).
+-export([create_self_signed_cert/2, doctest_test/0]).
 
 %%====================================================================
 %% Type Definitions
@@ -172,6 +248,66 @@ create_self_signed_cert(Subject, ValidDays) when is_binary(Subject), is_integer(
         valid_until = ValidUntil
     },
     {ok, Cert}.
+
+%%--------------------------------------------------------------------
+%% @doc Runs all doctests.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+doctest_test() ->
+    %% Test 1: Create self-signed certificate
+    {ok, Cert} = create_self_signed_cert(<<"CN=Test">>, 365),
+    <<"CN=Test">> = Cert#certificate.subject,
+    <<"CN=Test">> = Cert#certificate.issuer,
+
+    %% Test 2: Get signer from certificate record
+    {ok, <<"CN=Test">>} = get_signer(Cert),
+
+    %% Test 3: Validate certificate (should be valid)
+    {ok, true} = validate_certificate(Cert),
+
+    %% Test 4: Load PEM certificate
+    PemCert = <<"-----BEGIN CERTIFICATE-----\nABCD1234\n-----END CERTIFICATE-----">>,
+    {ok, LoadedCert} = load_certificate(PemCert),
+    true = is_record(LoadedCert, certificate),
+
+    %% Test 5: Get certificate fields
+    CertId = get_cert_id(LoadedCert),
+    true = is_binary(CertId),
+    <<"CN=Test Certificate">> = get_subject(LoadedCert),
+    <<"CN=Test CA">> = get_issuer(LoadedCert),
+    <<"extracted_public_key">> = get_public_key(LoadedCert),
+    ValidUntil = get_valid_until(LoadedCert),
+    true = is_integer(ValidUntil),
+    true = ValidUntil > erlang:system_time(second),
+
+    %% Test 6: Create signature record
+    Sig = signature(<<"doc1">>, <<"sigvalue">>, rsa_sha256, <<"sig123">>),
+    <<"sig123">> = get_sig_id(Sig),
+    <<"doc1">> = get_document_id(Sig),
+    <<"sigvalue">> = get_signature_value(Sig),
+    rsa_sha256 = get_algorithm(Sig),
+
+    %% Test 7: Create certificate record
+    CertRec = certificate(<<"CN=Subject">>, <<"CN=Issuer">>, <<"pubkey">>, 99999999999, <<"cert456">>),
+    <<"cert456">> = get_cert_id(CertRec),
+    <<"CN=Subject">> = get_subject(CertRec),
+    <<"CN=Issuer">> = get_issuer(CertRec),
+    <<"pubkey">> = get_public_key(CertRec),
+    99999999999 = get_valid_until(CertRec),
+
+    %% Test 8: Default signature generation
+    DefaultSig = signature(),
+    true = is_record(DefaultSig, signature),
+
+    %% Test 9: Default certificate generation
+    DefaultCert = certificate(),
+    true = is_record(DefaultCert, certificate),
+
+    %% Test 10: Get signer from binary certificate data
+    {ok, <<"CN=Test Certificate">>} = get_signer(PemCert),
+
+    ok.
 
 %%====================================================================
 %% Record Constructors and Accessors

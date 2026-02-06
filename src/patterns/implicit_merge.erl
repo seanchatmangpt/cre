@@ -17,49 +17,67 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Implicit Merge Pattern (WCP-06) for YAWL
-%%
-%% This module implements the Implicit Merge pattern as a gen_pnet behaviour.
-%%
-%% <h3>Pattern Description</h3>
-%% The Implicit Merge pattern (WCP-06) merges multiple concurrent branches
-%% without requiring explicit synchronization. The merge occurs when the
-%% first branch completes, and subsequent branches are consumed without
-%% triggering additional forward flow.
-%%
-%% <h3>Petri Net Structure</h3>
-%% <pre>
-%%   Places:
-%%     p_input        - Initial input place
-%%     p_branch_1     - First branch execution place
-%%     p_branch_2     - Second branch execution place
-%%     p_branch_N     - Nth branch execution place
-%%     p_merge_ready  - Merge is ready to receive
-%%     p_merge_done   - Merge completed
-%%     p_output       - Final output place
-%%
-%%   Transitions:
-%%     t_split         - Split into branches
-%%     t_complete_1    - Complete branch 1
-%%     t_complete_2    - Complete branch 2
-%%     t_complete_N    - Complete branch N
-%%     t_merge_trigger - Trigger on first completion
-%%     t_consume       - Consume remaining completions
-%%     t_complete      - Final completion
-%% </pre>
-%%
-%% <h3>Soundness Properties</h3>
-%% <ul>
-%%   <li><b>Option to complete:</b> Always true (no cycles)</li>
-%%   <li><b>Proper completion:</b> Exactly one output token per N input tokens</li>
-%%   <li><b>No dead transitions:</b> All transitions fire exactly once per branch</li>
-%% </ul>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(implicit_merge).
 -behaviour(gen_yawl).
+
+-moduledoc """
+Implicit Merge Pattern (WCP-06) for YAWL.
+
+This module implements the Implicit Merge pattern as a gen_yawl behaviour.
+
+<h3>Pattern Description</h3>
+The Implicit Merge pattern (WCP-06) merges multiple concurrent branches
+without requiring explicit synchronization. The merge occurs when the
+first branch completes, and subsequent branches are consumed without
+triggering additional forward flow.
+
+<h3>Petri Net Structure</h3>
+<pre>
+  Places:
+    p_input        - Initial input place
+    p_branch_pool  - Branch execution token pool
+    p_merge_ready  - Merge is ready to receive
+    p_merge_done   - Merge completed
+    p_output       - Final output place
+
+  Transitions:
+    t_split              - Split into branches
+    t_complete_branch    - Complete a branch
+    t_merge_trigger      - Trigger on first completion
+    t_consume_remaining  - Consume remaining completions
+    t_complete           - Final completion
+</pre>
+
+<h3>Soundness Properties</h3>
+<ul>
+  <li><b>Option to complete:</b> Always true (no cycles)</li>
+  <li><b>Proper completion:</b> Exactly one output token per N input tokens</li>
+  <li><b>No dead transitions:</b> All transitions fire exactly once per branch</li>
+</ul>
+
+```erlang
+%% Create a new implicit merge state with 2 branches
+> State = implicit_merge:new([fun() -> ok end, fun() -> result end], 2).
+{implicit_merge_state,2,[#Fun<...>,#Fun<...>],[],undefined,<<"implicit_merge_",...>>}
+
+%% Get the list of places
+> implicit_merge:place_lst().
+[p_input,p_branch_pool,p_merge_ready,p_merge_done,p_output]
+
+%% Get the list of transitions
+> implicit_merge:trsn_lst().
+[t_split,t_complete_branch,t_merge_trigger,t_consume_remaining,t_complete]
+
+%% Get preset for a transition
+> implicit_merge:preset('t_split').
+[p_input]
+
+> implicit_merge:preset('t_complete').
+[p_merge_done]
+```
+""".
+%% -------------------------------------------------------------------
 
 %% gen_pnet callbacks
 -export([
@@ -109,15 +127,14 @@
 %% API Functions
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc Creates a new Implicit Merge pattern state.
-%%
-%% @param BranchFuns List of functions to execute for each branch.
-%% @param BranchCount Number of branches (must match length of BranchFuns).
-%% @return A new implicit_merge_state record.
-%%
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Creates a new Implicit Merge pattern state.
+
+```erlang
+> State = implicit_merge:new([fun() -> a end, fun() -> b end], 2).
+{implicit_merge_state,2,[#Fun<...>,#Fun<...>],[],undefined,<<"implicit_merge_",...>>}
+```
+""".
 -spec new(BranchFuns :: [function()], BranchCount :: pos_integer()) ->
           implicit_merge_state().
 
@@ -231,10 +248,14 @@ execute(BranchFuns, InputData) when is_list(BranchFuns), length(BranchFuns) >= 2
 %% gen_pnet Callbacks
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc Returns the list of places for the Implicit Merge Petri net.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the list of places for the Implicit Merge Petri net.
+
+```erlang
+> implicit_merge:place_lst().
+[p_input,p_branch_pool,p_merge_ready,p_merge_done,p_output]
+```
+""".
 -spec place_lst() -> [atom()].
 
 place_lst() ->
@@ -246,10 +267,14 @@ place_lst() ->
         'p_output'
     ].
 
-%%--------------------------------------------------------------------
-%% @doc Returns the list of transitions for the Implicit Merge Petri net.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the list of transitions for the Implicit Merge Petri net.
+
+```erlang
+> implicit_merge:trsn_lst().
+[t_split,t_complete_branch,t_merge_trigger,t_consume_remaining,t_complete]
+```
+""".
 -spec trsn_lst() -> [atom()].
 
 trsn_lst() ->
@@ -273,10 +298,20 @@ init_marking('p_input', _UsrInfo) ->
 init_marking(_, _UsrInfo) ->
     [].
 
-%%--------------------------------------------------------------------
-%% @doc Returns the preset (input places) for each transition.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the preset (input places) for each transition.
+
+```erlang
+> implicit_merge:preset('t_split').
+[p_input]
+
+> implicit_merge:preset('t_merge_trigger').
+[p_merge_ready]
+
+> implicit_merge:preset(unknown).
+[]
+```
+""".
 -spec preset(Trsn :: atom()) -> [atom()].
 
 preset('t_split') -> ['p_input'];
@@ -585,3 +620,14 @@ log_event(#implicit_merge_state{log_id = LogId}, Concept, Lifecycle, Data) when 
     yawl_xes:log_event(LogId, Concept, Lifecycle, Data);
 log_event(_State, _Concept, _Lifecycle, _Data) ->
     ok.
+
+%%====================================================================
+%% EUnit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

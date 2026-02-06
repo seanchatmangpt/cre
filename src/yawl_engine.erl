@@ -1628,6 +1628,6 @@ doctest_test() ->
     true = is_map(WiMap),
     true = maps:is_key(id, WiMap),
     true = maps:is_key(status, WiMap),
-    CompletedWi#workitem.id =:= maps:get(id, WiMap),
+    true = (CompletedWi#workitem.id =:= maps:get(id, WiMap)),
 
     ok.

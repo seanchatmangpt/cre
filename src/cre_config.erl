@@ -44,6 +44,88 @@
 -module(cre_config).
 -behaviour(application).
 
+%% Disable auto-import warnings for get/1 since we export get/1, get/2
+-compile({no_auto_import, [get/1]}).
+
+-moduledoc("""
+CRE Persistent Term Configuration Module.
+
+This module manages persistent_term storage for frequently accessed
+constant data in CRE. persistent_term provides O(1) access time
+and is optimized for read-heavy workloads.
+
+## Performance Benefits
+
+- **O(1) constant time access**: vs process dictionary or ETS
+- **No copying on read**: shared memory access
+- **Global access**: no message passing required
+- **Atomic updates**: process-wide consistency
+
+## Usage Pattern
+
+Initialize during application start, then retrieve values:
+
+```erlang
+1> cre_config:init().
+ok
+2> cre_config:get(cre_auth_pbkdf2_iterations).
+100000
+3> cre_config:get(cre_default_port).
+4142
+```
+
+## Examples
+
+Get configuration values:
+
+```erlang
+1> cre_config:init().
+ok
+2> cre_config:get(cre_auth_pbkdf2_iterations).
+100000
+3> cre_config:get(cre_default_port).
+4142
+4> cre_config:get(cre_status_route).
+"/[status.json]"
+```
+
+Get configuration with default value:
+
+```erlang
+1> cre_config:init().
+ok
+2> cre_config:get(nonexistent_key, default_value).
+default_value
+```
+
+Set configuration value:
+
+```erlang
+1> cre_config:set(custom_key, custom_value).
+true
+2> cre_config:get(custom_key).
+custom_value
+```
+
+Get all configuration:
+
+```erlang
+1> cre_config:init().
+ok
+2> AllConfig = cre_config:get_all().
+[{cre_auth_pbkdf2_iterations,100000},
+ {cre_auth_default_session_timeout,3600},
+ ...]
+```
+
+Run doctests:
+
+```erlang
+1> cre_config:doctest_test().
+ok
+```
+""").
+
 %%====================================================================
 %% Exports
 %%====================================================================
@@ -51,6 +133,7 @@
 -export([init/0, reload/0]).
 -export([get/1, get/2, set/2]).
 -export([get_all/0]).
+-export([doctest_test/0]).
 
 %%====================================================================
 %% Persistent Term Keys
@@ -105,6 +188,21 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Initializes all persistent terms for the CRE application.
+
+This function sets up all configuration values in persistent_term storage.
+It should be called during application start.
+
+## Examples
+
+```erlang
+1> cre_config:init().
+ok
+2> cre_config:get(cre_auth_pbkdf2_iterations).
+100000
+```
+""").
 -spec init() -> ok.
 
 init() ->
@@ -137,6 +235,25 @@ init() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Reloads all persistent terms with current values.
+
+This function re-initializes all configuration values. Useful for
+runtime configuration updates.
+
+## Examples
+
+```erlang
+1> cre_config:init().
+ok
+2> cre_config:set(cre_auth_pbkdf2_iterations, 50000).
+true
+3> cre_config:reload().
+ok
+4> cre_config:get(cre_auth_pbkdf2_iterations).
+100000
+```
+""").
 -spec reload() -> ok.
 
 reload() ->
@@ -148,6 +265,23 @@ reload() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Gets a persistent term value by key.
+
+Returns the value stored for the given key. Raises `badarg` if the
+key does not exist.
+
+## Examples
+
+```erlang
+1> cre_config:init().
+ok
+2> cre_config:get(cre_default_port).
+4142
+3> cre_config:get(cre_auth_pbkdf2_iterations).
+100000
+```
+""").
 -spec get(key()) -> value().
 
 get(Key) ->
@@ -158,6 +292,23 @@ get(Key) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Gets a persistent term value by key with explicit default.
+
+Returns the value stored for the given key, or `Default` if the key
+does not exist.
+
+## Examples
+
+```erlang
+1> cre_config:init().
+ok
+2> cre_config:get(cre_default_port, 8080).
+4142
+3> cre_config:get(nonexistent_key, default_value).
+default_value
+```
+""").
 -spec get(key(), value()) -> value().
 
 get(Key, Default) ->
@@ -174,16 +325,48 @@ get(Key, Default) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Sets a persistent term key to a value.
+
+Sets the value for the given key in persistent_term storage.
+Use sparingly - persistent_term is intended for constants.
+
+## Examples
+
+```erlang
+1> cre_config:set(custom_key, custom_value).
+true
+2> cre_config:get(custom_key).
+custom_value
+```
+""").
 -spec set(key(), value()) -> true.
 
 set(Key, Value) ->
-    persistent_term:put(Key, Value).
+    persistent_term:put(Key, Value),
+    true.
 
 %%--------------------------------------------------------------------
 %% @doc Returns all CRE persistent term keys and their values.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Returns all CRE persistent term keys and their values.
+
+Returns a proplist of all known configuration keys and their current
+values.
+
+## Examples
+
+```erlang
+1> cre_config:init().
+ok
+2> AllConfig = cre_config:get_all().
+3> proplists:get_value(cre_default_port, AllConfig).
+4142
+```
+""").
 -spec get_all() -> [{key(), value()}].
 
 get_all() ->
@@ -208,6 +391,86 @@ get_all() ->
         ?CRE_MASTER_LOG_MODULE
     ],
     [{Key, get(Key, undefined)} || Key <- Keys].
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the cre_config module.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-doc("""
+Run doctests for the cre_config module.
+
+This function provides a simple test entry point that verifies
+basic configuration functionality including:
+- Initializing configuration values
+- Getting configuration values
+- Getting configuration with default values
+- Setting custom configuration values
+- Getting all configuration
+
+## Examples
+
+```erlang
+1> cre_config:doctest_test().
+ok
+```
+""").
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Initialize configuration
+    ok = init(),
+
+    %% Test 2: Get authentication configuration
+    100000 = get(cre_auth_pbkdf2_iterations),
+    3600 = get(cre_auth_default_session_timeout),
+    8 = get(cre_auth_min_password_length),
+
+    %% Test 3: Get YAWL stateless configuration
+    1000 = get(yawl_stateless_max_executions),
+    3600000 = get(yawl_stateless_execution_ttl),
+
+    %% Test 4: Get YAWL timeout configuration
+    30000 = get(yawl_timeout_default_timeout),
+    5000 = get(yawl_timeout_deadlock_interval),
+
+    %% Test 5: Get web configuration
+    4142 = get(cre_default_port),
+    "/[status.json]" = get(cre_status_route),
+    "/history.json" = get(cre_history_route),
+
+    %% Test 6: Get with default value for nonexistent key
+    default_value = get(nonexistent_config_key, default_value),
+
+    %% Test 7: Set and get custom value
+    true = set(doctest_custom_key, doctest_custom_value),
+    doctest_custom_value = get(doctest_custom_key),
+
+    %% Test 8: Get all configuration
+    AllConfig = get_all(),
+    true = is_list(AllConfig),
+    true = length(AllConfig) >= 10,
+
+    %% Test 9: Verify place list is a list of atoms
+    PlaceList = get(yawl_patterns_place_lst),
+    true = is_list(PlaceList),
+    true = lists:all(fun is_atom/1, PlaceList),
+
+    %% Test 10: Verify transition list is a list of atoms
+    TrsnList = get(yawl_patterns_trsn_lst),
+    true = is_list(TrsnList),
+    true = lists:all(fun is_atom/1, TrsnList),
+
+    %% Test 11: Reload configuration
+    ok = reload(),
+
+    %% Test 12: Verify values after reload
+    4142 = get(cre_default_port),
+
+    %% Clean up test values
+    persistent_term:erase(doctest_custom_key),
+
+    ok.
 
 %%====================================================================
 %% Internal Initialization Functions

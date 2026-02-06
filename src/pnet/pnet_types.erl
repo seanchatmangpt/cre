@@ -44,6 +44,16 @@ false
 true
 > pnet_types:is_cmode({#{}, #{p1 => a}}).
 false
+
+> pnet_types:is_consume_map(#{p1 => [a], p2 => [b]}).
+true
+> pnet_types:is_consume_map(#{p1 => a}).
+false
+
+> pnet_types:is_produce_map(#{p1 => [c], p2 => [d]}).
+true
+> pnet_types:is_produce_map(#{p1 => c}).
+false
 ```
 
 <h3>Type Categories</h3>
@@ -57,6 +67,10 @@ false
 <h3>Usage</h3>
 All validation functions are total - they return boolean() and
 never crash, making them safe to use in guards and assertions.
+
+<h3>Comprehensive Documentation</h3>
+For detailed doctest examples, usage patterns, and advanced scenarios,
+see `docs/PNET_TYPES_DOCTEST_REFERENCE.md`.
 """.
 
 %%====================================================================

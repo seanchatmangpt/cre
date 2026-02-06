@@ -67,7 +67,6 @@ enum_modes/2 enumerates deterministic modes:
 #{p => 2, q => 1}
 
 > Marking = #{p => [a,b,c], q => [x]}.
-_
 > pnet_mode:enum_modes([p,p,q], Marking).
 [#{p => [a,b], q => [x]},
  #{p => [a,c], q => [x]},
@@ -75,6 +74,16 @@ _
 
 > pnet_mode:enum_modes([p], #{p => []}).
 []
+
+> pnet_mode:enum_modes([p,q], #{p => [a,b], q => [x,y]}).
+[#{p => [a], q => [x]},
+ #{p => [a], q => [y]},
+ #{p => [b], q => [x]},
+ #{p => [b], q => [y]}]
+
+> % Colored mode enumeration fallback
+> pnet_mode:enum_cmodes(t1, #{p => [a,b]}, ctx, basic_net).
+[{#{}, #{p => [a]}}, {#{}, #{p => [b]}}]
 ```
 """.
 

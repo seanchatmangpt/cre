@@ -17,45 +17,84 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Parallel Split Pattern (WCP-02) for YAWL
-%%
-%% This module implements the Parallel Split pattern as a gen_pnet behaviour.
-%%
-%% <h3>Pattern Description</h3>
-%% The Parallel Split pattern (WCP-02) splits a single thread of execution
-%% into multiple concurrent branches that execute in parallel. All branches
-%% are activated simultaneously from the same starting point.
-%%
-%% <h3>Petri Net Structure</h3>
-%% <pre>
-%%   Places:
-%%     p_start         - Start of the parallel split
-%%     p_branch1       - Branch 1 execution place
-%%     p_branch2       - Branch 2 execution place
-%%     p_branchN       - Branch N execution place
-%%     p_join_ready    - Join synchronization point
-%%     p_all_done      - All branches completed
-%%     p_end           - Final output place
-%%
-%%   Transitions:
-%%     t_split         - Split into parallel branches
-%%     t_join_branch1  - Join branch 1 completion
-%%     t_join_branch2  - Join branch 2 completion
-%%     t_join_branchN  - Join branch N completion
-%%     t_finish        - Complete when all branches done
-%% </pre>
-%%
-%% <h3>Soundness Properties</h3>
-%% <ul>
-%%   <li><b>Option to complete:</b> Always true (all branches complete)</li>
-%%   <li><b>Proper completion:</b> All branches complete exactly once</li>
-%%   <li><b>No dead transitions:</b> All branches execute and reach join</li>
-%% </ul>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(parallel_split).
+-moduledoc """
+Parallel Split Pattern (WCP-02) for YAWL.
+
+This module implements the Parallel Split pattern as a gen_yawl behaviour.
+
+The Parallel Split pattern (WCP-02) splits a single thread of execution
+into multiple concurrent branches that execute in parallel. All branches
+are activated simultaneously from the same starting point.
+
+## Pattern Description
+
+The Parallel Split pattern enables parallel execution of multiple branches
+from a single starting point. It ensures that all branches complete
+before the workflow continues, providing synchronization at the join.
+
+## Petri Net Structure
+
+Places:
+- `p_start` - Start of the parallel split
+- `p_branch1` - Branch 1 execution place
+- `p_branch2` - Branch 2 execution place
+- `p_branch3` - Branch 3 execution place
+- `p_branch4` - Branch 4 execution place
+- `p_join_ready` - Join synchronization point
+- `p_all_done` - All branches completed
+- `p_end` - Final output place
+
+Transitions:
+- `t_split` - Split into parallel branches
+- `t_join_branch1` - Join branch 1 completion
+- `t_join_branch2` - Join branch 2 completion
+- `t_join_branch3` - Join branch 3 completion
+- `t_join_branch4` - Join branch 4 completion
+- `t_finish` - Complete when all branches done
+
+## Examples
+
+Get the list of places in the Petri net:
+
+```erlang
+> parallel_split:place_lst().
+[p_start,p_branch1,p_branch2,p_branch3,p_branch4,
+ p_join_ready,p_all_done,p_end]
+```
+
+Get the list of transitions:
+
+```erlang
+> parallel_split:trsn_lst().
+[t_split,t_join_branch1,t_join_branch2,t_join_branch3,t_join_branch4,
+ t_finish]
+```
+
+Get the preset (input places) for a transition:
+
+```erlang
+> parallel_split:preset(t_split).
+[p_start]
+```
+
+```erlang
+> parallel_split:preset(t_finish).
+[p_join_ready]
+```
+
+```erlang
+> parallel_split:preset(unknown).
+[]
+```
+
+## Soundness Properties
+
+- **Option to complete:** Always true (all branches complete)
+- **Proper completion:** All branches complete exactly once
+- **No dead transitions:** All branches execute and reach join
+""".
 -behaviour(gen_yawl).
 
 %% gen_pnet callbacks
@@ -108,14 +147,17 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Creates a new Parallel Split pattern state.
-%%
-%% @param BranchFuns List of functions to execute for each branch.
-%% @param BranchCount Number of branches (must match length of BranchFuns).
-%% @return A new parallel_split_state record.
-%%
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Creates a new Parallel Split pattern state.
+
+The function validates that the number of branch functions matches
+the branch count and that at least 2 branches are specified.
+
+```erlang
+> State = parallel_split:new([fun() -> ok end, fun() -> ok end], 2).
+{parallel_split_state,2,_,[],undefined,_,_}
+```
+""".
 -spec new(BranchFuns :: [function()], BranchCount :: pos_integer()) ->
           parallel_split_state().
 
@@ -190,14 +232,40 @@ get_state(Pid) ->
     gen_yawl:call(Pid, get_state).
 
 %%--------------------------------------------------------------------
-%% @doc Executes the Parallel Split pattern with given input data.
-%%
-%% @param BranchFuns List of functions to execute for each branch.
-%% @param InputData Input data to pass to each branch.
-%% @return {ok, Results} | {error, Reason}
-%%
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Executes the Parallel Split pattern with given input data.
+
+This is a simplified synchronous execution that spawns processes
+for each branch and waits for all to complete.
+
+## Examples
+
+Execute 2 branches in parallel:
+
+```erlang
+> Fun1 = fun(X) -> X + 1 end,
+> Fun2 = fun(X) -> X * 2 end,
+> parallel_split:execute([Fun1, Fun2], 10).
+{ok,#{1 => 11,2 => 20}}
+```
+
+Execute with different branch logic:
+
+```erlang
+> Fun1 = fun(_) -> {branch1, result} end,
+> Fun2 = fun(_) -> {branch2, result} end,
+> Fun3 = fun(_) -> {branch3, result} end,
+> parallel_split:execute([Fun1, Fun2, Fun3], input).
+{ok,#{1 => {branch1,result},2 => {branch2,result},3 => {branch3,result}}}
+```
+
+Parameters:
+- `BranchFuns` - List of functions to execute for each branch
+- `InputData` - Input data to pass to each branch
+
+Returns `{ok, Results}` map with branch indices as keys, or
+`{error, Reason}` if execution fails.
+""".
 -spec execute(BranchFuns :: [function()], InputData :: term()) ->
           {ok, #{pos_integer() => term()}} | {error, term()}.
 
@@ -227,9 +295,15 @@ execute(BranchFuns, InputData) when is_list(BranchFuns), length(BranchFuns) >= 2
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Returns the list of places for the Parallel Split Petri net.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the list of places for the Parallel Split Petri net.
+
+```erlang
+> parallel_split:place_lst().
+[p_start,p_branch1,p_branch2,p_branch3,p_branch4,
+ p_join_ready,p_all_done,p_end]
+```
+""".
 -spec place_lst() -> [atom()].
 
 place_lst() ->
@@ -245,9 +319,15 @@ place_lst() ->
     ].
 
 %%--------------------------------------------------------------------
-%% @doc Returns the list of transitions for the Parallel Split Petri net.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the list of transitions for the Parallel Split Petri net.
+
+```erlang
+> parallel_split:trsn_lst().
+[t_split,t_join_branch1,t_join_branch2,t_join_branch3,t_join_branch4,
+ t_finish]
+```
+""".
 -spec trsn_lst() -> [atom()].
 
 trsn_lst() ->
@@ -273,9 +353,34 @@ init_marking(_, _UsrInfo) ->
     [].
 
 %%--------------------------------------------------------------------
-%% @doc Returns the preset (input places) for each transition.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the preset (input places) for each transition.
+
+## Examples
+
+```erlang
+> parallel_split:preset(t_split).
+[p_start]
+```
+
+```erlang
+> parallel_split:preset(t_join_branch1).
+[p_branch1]
+```
+
+```erlang
+> parallel_split:preset(t_finish).
+[p_join_ready]
+```
+
+```erlang
+> parallel_split:preset(unknown).
+[]
+```
+
+The preset defines which places must contain tokens for a transition
+to be enabled. Unknown transitions return an empty list.
+""".
 -spec preset(Trsn :: atom()) -> [atom()].
 
 preset('t_split') -> ['p_start'];
@@ -621,3 +726,60 @@ log_event(#parallel_split_state{log_id = LogId}, Concept, Lifecycle, Data) when 
     yawl_xes:log_event(LogId, Concept, Lifecycle, Data);
 log_event(_State, _Concept, _Lifecycle, _Data) ->
     ok.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+%% @doc Runs all doctests for the module.
+%% @private
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%% Test basic place_lst callback
+place_lst_test() ->
+    Expected = [p_start, p_branch1, p_branch2, p_branch3, p_branch4,
+                p_join_ready, p_all_done, p_end],
+    ?assertEqual(Expected, place_lst()).
+
+%% Test basic trsn_lst callback
+trsn_lst_test() ->
+    Expected = [t_split, t_join_branch1, t_join_branch2, t_join_branch3,
+                t_join_branch4, t_finish],
+    ?assertEqual(Expected, trsn_lst()).
+
+%% Test preset for various transitions
+preset_t_split_test() ->
+    ?assertEqual([p_start], preset(t_split)).
+
+preset_t_join_branch1_test() ->
+    ?assertEqual([p_branch1], preset(t_join_branch1)).
+
+preset_t_finish_test() ->
+    ?assertEqual([p_join_ready], preset(t_finish)).
+
+preset_unknown_test() ->
+    ?assertEqual([], preset(unknown)).
+
+%% Test new/2 constructor
+new_2_branches_test() ->
+    Funs = [fun() -> ok end, fun() -> ok end],
+    State = new(Funs, 2),
+    ?assertEqual(2, State#parallel_split_state.branch_count),
+    ?assertEqual(2, length(State#parallel_split_state.branch_funs)),
+    ?assertEqual([], State#parallel_split_state.completed).
+
+%% Test init_marking callback
+init_marking_p_start_test() ->
+    State = new([fun() -> ok end, fun() -> ok end], 2),
+    ?assertEqual([start], init_marking(p_start, State)).
+
+init_marking_other_place_test() ->
+    State = new([fun() -> ok end, fun() -> ok end], 2),
+    ?assertEqual([], init_marking(p_branch1, State)),
+    ?assertEqual([], init_marking(p_end, State)).
+
+-endif.

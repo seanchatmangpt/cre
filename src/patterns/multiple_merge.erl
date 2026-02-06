@@ -17,47 +17,75 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Multiple Merge Pattern (WCP-07) for YAWL
-%%
-%% This module implements the Multiple Merge pattern as a gen_pnet behaviour.
-%%
-%% <h3>Pattern Description</h3>
-%% The Multiple Merge pattern (WCP-07) merges multiple concurrent paths
-%% without requiring all paths to complete. Unlike the Discriminator (WCP-09)
-%% which triggers only once, Multiple Merge allows multiple triggers while
-%% maintaining merge semantics.
-%%
-%% <h3>Petri Net Structure</h3>
-%% <pre>
-%%   Places:
-%%     p_input        - Initial input place
-%%     p_path_1       - Path 1 execution place
-%%     p_path_2       - Path 2 execution place
-%%     p_path_N       - Path N execution place
-%%     p_merge_pending- Pending merge requests
-%%     p_merge_active - Active merge state
-%%     p_output       - Output place (can have multiple tokens)
-%%
-%%   Transitions:
-%%     t_split        - Split into paths
-%%     t_complete_1   - Complete path 1
-%%     t_complete_2   - Complete path 2
-%%     t_complete_N   - Complete path N
-%%     t_merge        - Merge completed path
-%%     t_forward      - Forward merged result
-%% </pre>
-%%
-%% <h3>Soundness Properties</h3>
-%% <ul>
-%%   <li><b>Option to complete:</b> Always true (no cycles)</li>
-%%   <li><b>Proper completion:</b> One output token per path completion</li>
-%%   <li><b>No dead transitions:</b> All transitions fire appropriately</li>
-%% </ul>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(multiple_merge).
+-moduledoc """
+Multiple Merge Pattern (WCP-07) for YAWL.
+
+This module implements the Multiple Merge pattern as a gen_pnet behaviour.
+
+## Pattern Description
+
+The Multiple Merge pattern (WCP-07) merges multiple concurrent paths
+without requiring all paths to complete. Unlike the Discriminator (WCP-09)
+which triggers only once, Multiple Merge allows multiple triggers while
+maintaining merge semantics.
+
+## Petri Net Structure
+
+```
+Places:
+  p_input        - Initial input place
+  p_path_pool    - Pool of active path tokens
+  p_merge_pending- Pending merge requests
+  p_merge_active - Active merge state
+  p_output       - Output place (can have multiple tokens)
+
+Transitions:
+  t_split          - Split into paths
+  t_complete_path  - Complete a path
+  t_merge          - Merge completed path
+  t_forward        - Forward merged result
+```
+
+## Soundness Properties
+
+- **Option to complete**: Always true (no cycles)
+- **Proper completion**: One output token per path completion
+- **No dead transitions**: All transitions fire appropriately
+
+## Examples
+
+Get the list of places in the Petri net:
+
+```erlang
+> multiple_merge:place_lst().
+['p_input','p_path_pool','p_merge_pending','p_merge_active','p_output']
+```
+
+Get the list of transitions in the Petri net:
+
+```erlang
+> multiple_merge:trsn_lst().
+['t_split','t_complete_path','t_merge','t_forward']
+```
+
+Get the preset (input places) for a transition:
+
+```erlang
+> multiple_merge:preset('t_split').
+['p_input']
+
+> multiple_merge:preset('t_merge').
+['p_merge_pending']
+
+> multiple_merge:preset('t_forward').
+['p_merge_active']
+
+> multiple_merge:preset(unknown).
+[]
+```
+""".
 -behaviour(gen_yawl).
 
 %% gen_pnet callbacks
@@ -108,15 +136,15 @@
 %% API Functions
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc Creates a new Multiple Merge pattern state.
-%%
-%% @param PathFuns List of functions to execute for each path.
-%% @param PathCount Number of paths (must match length of PathFuns).
-%% @return A new multiple_merge_state record.
-%%
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Creates a new Multiple Merge pattern state.
+
+Parameters:
+- PathFuns: List of functions to execute for each path
+- PathCount: Number of paths (must match length of PathFuns and be >= 2)
+
+Returns a new multiple_merge_state record with the given path functions.
+""".
 -spec new(PathFuns :: [function()], PathCount :: pos_integer()) ->
           multiple_merge_state().
 
@@ -223,10 +251,16 @@ execute(PathFuns, InputData) when is_list(PathFuns), length(PathFuns) >= 2 ->
 %% gen_pnet Callbacks
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc Returns the list of places for the Multiple Merge Petri net.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the list of places for the Multiple Merge Petri net.
+
+## Examples
+
+```erlang
+> multiple_merge:place_lst().
+['p_input','p_path_pool','p_merge_pending','p_merge_active','p_output']
+```
+""".
 -spec place_lst() -> [atom()].
 
 place_lst() ->
@@ -238,10 +272,16 @@ place_lst() ->
         'p_output'
     ].
 
-%%--------------------------------------------------------------------
-%% @doc Returns the list of transitions for the Multiple Merge Petri net.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the list of transitions for the Multiple Merge Petri net.
+
+## Examples
+
+```erlang
+> multiple_merge:trsn_lst().
+['t_split','t_complete_path','t_merge','t_forward']
+```
+""".
 -spec trsn_lst() -> [atom()].
 
 trsn_lst() ->
@@ -264,10 +304,25 @@ init_marking('p_input', _UsrInfo) ->
 init_marking(_, _UsrInfo) ->
     [].
 
-%%--------------------------------------------------------------------
-%% @doc Returns the preset (input places) for each transition.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Returns the preset (input places) for each transition.
+
+## Examples
+
+```erlang
+> multiple_merge:preset('t_split').
+['p_input']
+
+> multiple_merge:preset('t_merge').
+['p_merge_pending']
+
+> multiple_merge:preset('t_forward').
+['p_merge_active']
+
+> multiple_merge:preset(unknown).
+[]
+```
+""".
 -spec preset(Trsn :: atom()) -> [atom()].
 
 preset('t_split') -> ['p_input'];
@@ -523,3 +578,60 @@ log_event(#multiple_merge_state{log_id = LogId}, Concept, Lifecycle, Data) when 
     yawl_xes:log_event(LogId, Concept, Lifecycle, Data);
 log_event(_State, _Concept, _Lifecycle, _Data) ->
     ok.
+
+%%====================================================================
+%% EUnit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+%% Doctest test runner
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%% Unit tests for core pure functions
+
+place_lst_test() ->
+    Expected = ['p_input', 'p_path_pool', 'p_merge_pending',
+                'p_merge_active', 'p_output'],
+    ?assertEqual(Expected, place_lst()).
+
+trsn_lst_test() ->
+    Expected = ['t_split', 't_complete_path', 't_merge', 't_forward'],
+    ?assertEqual(Expected, trsn_lst()).
+
+preset_t_split_test() ->
+    ?assertEqual(['p_input'], preset('t_split')).
+
+preset_t_complete_path_test() ->
+    ?assertEqual(['p_path_pool'], preset('t_complete_path')).
+
+preset_t_merge_test() ->
+    ?assertEqual(['p_merge_pending'], preset('t_merge')).
+
+preset_t_forward_test() ->
+    ?assertEqual(['p_merge_active'], preset('t_forward')).
+
+preset_unknown_test() ->
+    ?assertEqual([], preset(unknown)).
+
+new_state_test() ->
+    Fun1 = fun(X) -> X * 2 end,
+    Fun2 = fun(X) -> X + 10 end,
+    State = new([Fun1, Fun2], 2),
+    ?assertEqual(2, State#multiple_merge_state.path_count),
+    ?assertEqual(2, length(State#multiple_merge_state.path_funs)),
+    ?assertEqual([], State#multiple_merge_state.completed),
+    ?assertEqual(0, State#multiple_merge_state.output_count).
+
+init_marking_p_input_test() ->
+    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
+    ?assertEqual([start], init_marking('p_input', State)).
+
+init_marking_other_place_test() ->
+    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
+    ?assertEqual([], init_marking('p_output', State)),
+    ?assertEqual([], init_marking('p_path_pool', State)).
+
+-endif.

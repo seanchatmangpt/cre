@@ -336,21 +336,45 @@ SameRng0 = pnet_choice:seed(12345),
 ### Overview
 Enumerates all possible firing modes for transitions. A mode specifies which tokens are consumed from each input place when a transition fires. Supports both basic and colored Petri nets.
 
+### Core Theory
+
+A **mode** represents one valid way to fire a transition by selecting tokens from each preset place. For uncolored Petri nets, this is simply choosing N tokens from each place where N is the place's multiplicity in the preset. For colored Petri nets, a **colored mode** extends this with variable bindings that match token values against arc expressions.
+
 ### Core Operations
 
 #### Basic Mode Enumeration
 ```erlang
 % Get required token counts for preset places (handles multiplicity)
+% Doctest: > pnet_mode:preset_counts([p, p, q]).
+% #{p => 2, q => 1}
+%
+% Doctest: > pnet_mode:preset_counts([a, b, a, c]).
+% #{a => 2, b => 1, c => 1}
 -spec preset_counts([place()]) -> #{place() => non_neg_integer()}.
 preset_counts(PresetPlaces) ->
     lists:foldl(fun(P, Acc) ->
         maps:update_with(P, fun(V) -> V + 1 end, 1, Acc)
     end, #{}, PresetPlaces).
 
-% Example: preset_counts([p, p, q]) => #{p => 2, q => 1}
-
 % Enumerate all possible modes given current marking
-% Handles repeated places via preset_counts
+% Handles repeated places via preset_counts, results in deterministic term order
+% Doctest: > pnet_mode:enum_modes([p], #{p => [a, b, c]}).
+% [#{p => [a]}, #{p => [b]}, #{p => [c]}]
+%
+% Doctest: > pnet_mode:enum_modes([p, q], #{p => [a], q => [x]}).
+% [#{p => [a], q => [x]}]
+%
+% Doctest: > pnet_mode:enum_modes([p, q], #{p => [a, b], q => [x, y]}).
+% [#{p => [a], q => [x]},
+%  #{p => [a], q => [y]},
+%  #{p => [b], q => [x]},
+%  #{p => [b], q => [y]}]
+%
+% Doctest: > pnet_mode:enum_modes([p, p, q], #{p => [a, b], q => [x]}).
+% [#{p => [a, b], q => [x]}]
+%
+% Doctest: > pnet_mode:enum_modes([p], #{p => []}).
+% []
 -spec enum_modes([place()], marking()) -> [mode()].
 enum_modes(PresetPlaces, Marking) ->
     Counts = preset_counts(PresetPlaces),
@@ -361,6 +385,14 @@ enum_modes(PresetPlaces, Marking) ->
 #### Colored Net Extension
 ```erlang
 % Enumerate colored modes with variable bindings
+% Calls net module's cmodes callback, falls back to basic enumeration
+% Doctest: > pnet_mode:enum_cmodes(t1, #{p => [a,b]}, ctx, basic_net).
+% [{#{}, #{p => [a]}}, {#{}, #{p => [b]}}]
+%
+% Colored net example with user workflow:
+% Doctest: > Marking = #{input => [{user, alice, "report"}]},
+% > pnet_mode:enum_cmodes(process, Marking, #{role => "manager"}, workflow_net).
+% [{{user => alice}, #{input => [{user, alice, "report"}]}}]
 -spec enum_cmodes(atom(), marking(), term(), module()) -> [cmode()].
 enum_cmodes(Trsn, Marking, Ctx, NetMod) ->
     %% Check if net module implements colored modes
@@ -378,29 +410,72 @@ enum_cmodes(Trsn, Marking, Ctx, NetMod) ->
     end.
 ```
 
+### Internal Implementation
+
+#### Mode Enumeration Algorithm
+The `enum_modes_for_places/3` function implements a recursive Cartesian product algorithm:
+1. Base case: Empty place list returns a single empty mode
+2. Recursive case: For each place, generate combinations and combine with rest
+3. Early termination: If any place has insufficient tokens, return empty list
+
+#### Combination Generation
+The `combinations/2` function generates all N-element combinations from a list in deterministic order, ensuring predictable results across multiple runs.
+
 ### Usage Examples
 
+#### Basic Mode Enumeration
 ```erlang
-% Basic mode enumeration
-PresetPlaces = [p1, p2, p3],
-Marking = #{p1 => [a, b], p2 => [c], p3 => [d, e]},
+% Simple single place
+PresetPlaces = [p],
+Marking = #{p => [a, b, c]},
 Modes = pnet_mode:enum_modes(PresetPlaces, Marking),
-% Returns all combinations:
-% [#{p1 => [a], p2 => [c], p3 => [d]},
-%  #{p1 => [a], p2 => [c], p3 => [e]},
-%  #{p1 => [b], p2 => [c], p3 => [d]},
-%  #{p1 => [b], p2 => [c], p3 => [e]}]
+% => [#{p => [a]}, #{p => [b]}, #{p => [c]}]
 
-% Colored mode enumeration
-% Assuming my_net:cmodes/3 exists and returns colored modes
-Cmodes = pnet_mode:enum_cmodes(t1, Marking, my_context, my_net).
-% Returns list of {Binding, Mode} tuples
+% Multiple places with multiplicity
+PresetPlaces = [p, p, q],
+Marking = #{p => [a, b], q => [x]},
+Modes = pnet_mode:enum_modes(PresetPlaces, Marking),
+% => [#{p => [a, b], q => [x]}]
+
+% Complex Cartesian product
+PresetPlaces = [a, b],
+Marking = #{a => [1, 2], b => [x, y]},
+Modes = pnet_mode:enum_modes(PresetPlaces, Marking),
+% => [#{a => [1], b => [x]},
+%      #{a => [1], b => [y]},
+%      #{a => [2], b => [x]},
+%      #{a => [2], b => [y]}]
 ```
 
+#### Colored Net Examples
+```erlang
+% User workflow with variable bindings
+Marking = #{input => [{user, alice, "report"}, {user, bob, "data"}]},
+Cmodes = pnet_mode:enum_cmodes(process, Marking, #{role => "manager"}, workflow_net),
+% => [{{user => alice}, #{input => [{user, alice, "report"}]}},
+%     {{user => bob}, #{input => [{user, bob, "data"}]}}]
+
+% Data validation with type variables
+Marking = #{data => [{type, int, 42}, {type, string, "hello"}]},
+Cmodes = pnet_mode:enum_cmodes(validate, Marking, #{}, validation_net),
+% => [{{type => int}, #{data => [{type, int, 42}]}},
+%     {{type => string}, #{data => [{type, string, "hello"}]}}]
+```
+
+### Integration with Transition Firing
+
+Mode enumeration is used by the `gen_pnet` runtime in the transition firing process:
+1. **Enumeration**: Generate all possible modes for enabled transitions
+2. **Selection**: Choose one mode (typically nondeterministically)
+3. **Execution**: Fire transition with selected mode
+4. **Production**: Generate output tokens according to firing rules
+
 ### Key Features
-- **Cartesian Product**: Generates all possible token combinations
-- **Colored Net Support**: Variable bindings for complex patterns
-- **Graceful Handling**: Empty token lists return no modes
+- **Deterministic Ordering**: Results always in term order for predictable behavior
+- **Multiplicity Handling**: Accurately counts tokens needed from each place
+- **Colored Net Support**: Seamless integration with variable bindings
+- **Graceful Degradation**: Handles edge cases (empty token lists, insufficient tokens)
+- **Performance Optimizations**: Early termination and efficient combination generation
 - **Fallback Mechanism**: Basic enumeration for uncolored nets
 
 ---

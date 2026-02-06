@@ -19,40 +19,64 @@
 %% -------------------------------------------------------------------
 %% @author YAWL Simulation Implementation
 %% @copyright 2025
-%%
-%% @doc YAWL Workflow Simulation Module for CRE
-%%
-%% This module implements workflow simulation capabilities including
-%% Monte Carlo analysis, what-if scenarios, and bottleneck detection.
-%%
-%% <h3>Features</h3>
-%%
-%% <ul>
-%%   <li><b>Simulation:</b> Run workflow simulations with case data</li>
-%%   <li><b>Monte Carlo:</b> Probabilistic simulation for risk analysis</li>
-%%   <li><b>What-If Analysis:</b> Compare different scenarios</li>
-%%   <li><b>Bottleneck Detection:</b> Identify workflow constraints</li>
-%%   <li><b>Resource Utilization:</b> Analyze resource usage patterns</li>
-%% </ul>
-%%
-%% <h3>Usage</h3>
-%%
-%% <pre>
-%% %% Run a basic simulation
-%% Config = #simulation_config{iterations = 100, ...},
-%% {ok, Result} = yawl_simulation:run_simulation(Workflow, Config).
-%%
-%% %% Run Monte Carlo simulation
-%% {ok, MCResult} = yawl_simulation:monte_carlo_simulation(Workflow, 1000, Config).
-%%
-%% %% Analyze bottlenecks
-%% Bottlenecks = yawl_simulation:bottleneck_analysis(Workflow).
-%% </pre>
-%%
-%% @end
 %% -------------------------------------------------------------------
 
 -module(yawl_simulation).
+
+-moduledoc """
+YAWL Workflow Simulation Module for CRE.
+
+This module implements workflow simulation capabilities including
+Monte Carlo analysis, what-if scenarios, and bottleneck detection.
+
+<h3>Features</h3>
+
+<ul>
+  <li><b>Simulation:</b> Run workflow simulations with case data</li>
+  <li><b>Monte Carlo:</b> Probabilistic simulation for risk analysis</li>
+  <li><b>What-If Analysis:</b> Compare different scenarios</li>
+  <li><b>Bottleneck Detection:</b> Identify workflow constraints</li>
+  <li><b>Resource Utilization:</b> Analyze resource usage patterns</li>
+</ul>
+
+<h3>Examples</h3>
+
+Calculate confidence interval:
+
+```erlang
+> yawl_simulation:get_confidence_interval([100, 110, 90, 105, 95], 95.0).
+{93.80193578606998,106.19806421393002}
+```
+
+Empty list returns zero:
+
+```erlang
+> yawl_simulation:get_confidence_interval([], 95.0).
+{0.0, 0.0}
+```
+
+Get percentile from results:
+
+```erlang
+> yawl_simulation:get_percentile([10, 20, 30, 40, 50], 50).
+20
+```
+
+Get 90th percentile:
+
+```erlang
+> yawl_simulation:get_percentile([10, 20, 30, 40, 50], 90).
+40
+```
+
+Empty list returns zero:
+
+```erlang
+> yawl_simulation:get_percentile([], 50).
+0
+```
+
+""".
 
 %%====================================================================
 %% Exports
@@ -129,6 +153,12 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Runs a workflow simulation with default configuration.
+
+Returns a map with simulation results including total_cases, completed_cases,
+average_cycle_time, min_cycle_time, max_cycle_time, and other statistics.
+""".
 -spec run_simulation(Workflow :: workflow(),
                     Config :: simulation_config()) ->
           {ok, simulation_result()}.
@@ -198,6 +228,13 @@ run_simulation(Workflow, #simulation_config{iterations = N} = Config, Options) -
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Runs Monte Carlo simulation with probabilistic analysis.
+
+Returns {ok, MonteCarloResult} with statistical analysis including
+mean_cycle_time, median_cycle_time, percentiles, confidence intervals,
+probability distribution, and risk factors.
+""".
 -spec monte_carlo_simulation(Workflow :: workflow(),
                             Iterations :: pos_integer(),
                             Config :: simulation_config()) ->
@@ -296,6 +333,12 @@ what_if_analysis(Scenarios, Metric) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Analyzes workflow for potential bottlenecks.
+
+Returns list of bottleneck records containing task_id, severity,
+avg_wait_time, avg_processing_time, utilization, and recommendations.
+""".
 -spec bottleneck_analysis(Workflow :: workflow()) -> [bottleneck()].
 
 bottleneck_analysis(Workflow) ->
@@ -376,6 +419,11 @@ resource_utilization(Workflow) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Predicts completion time for a workflow with given case data.
+
+Returns {ok, PredictedTime} where time is in milliseconds.
+""".
 -spec predict_completion_time(Workflow :: workflow(), CaseData :: case_data()) ->
           {ok, number()} | {error, term()}.
 
@@ -406,6 +454,12 @@ predict_completion_time(Workflow, CaseData) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Gets statistics from simulation results.
+
+Returns a map with total_cases, completion_rate, average_cycle_time,
+min_cycle_time, max_cycle_time, cycle_time_stddev, and bottleneck_count.
+""".
 -spec get_simulation_stats(simulation_result()) -> map().
 
 get_simulation_stats(Result) ->
@@ -429,6 +483,17 @@ get_simulation_stats(Result) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Gets confidence interval for simulation results.
+
+```erlang
+> yawl_simulation:get_confidence_interval([100, 110, 90, 105, 95], 95.0).
+{93.80193578606998,106.19806421393002}
+
+> yawl_simulation:get_confidence_interval([], 95.0).
+{0.0, 0.0}
+```
+""".
 -spec get_confidence_interval([number()], float()) -> {number(), number()}.
 
 get_confidence_interval([], _ConfidenceLevel) ->
@@ -458,6 +523,20 @@ get_confidence_interval(Results, ConfidenceLevel) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Gets percentile value from simulation results.
+
+```erlang
+> yawl_simulation:get_percentile([10, 20, 30, 40, 50], 50).
+20
+
+> yawl_simulation:get_percentile([10, 20, 30, 40, 50], 90).
+40
+
+> yawl_simulation:get_percentile([], 50).
+0
+```
+""".
 -spec get_percentile([number()], float()) -> number().
 
 get_percentile(Results, Percentile) when length(Results) > 0 ->
@@ -1024,6 +1103,13 @@ generate_case_id() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Simulates approval delay based on configuration.
+
+Returns delay in milliseconds based on approval_delay_config settings.
+Returns 0 if approval delay is disabled or probability check fails.
+""".
+
 -spec simulate_approval_delay(simulation_config()) -> number().
 
 simulate_approval_delay(Config) ->
@@ -1257,3 +1343,14 @@ terminate(_Reason, _State) ->
 %% @private
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+%%====================================================================
+%% EUnit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

@@ -31,6 +31,66 @@
 %%   <li>Data structure utilities (deep merge, proplist to map conversion)</li>
 %% </ul>
 %%
+%% <h3>Doctests</h3>
+%%
+%% ID generation:
+%% ```erlang
+%% > Id = yawl_util:generate_id(),
+%% is_binary(Id).
+%% true
+%%
+%% > PrefixedId = yawl_util:generate_id(<<"test">>),
+%% byte_size(PrefixedId) > 4.
+%% true
+%%
+%% > CaseId = yawl_util:generate_case_id(),
+%% binary:match(CaseId, <<"case_">>) =/= nomatch.
+%% true
+%%
+%% > WorkitemId = yawl_util:generate_workitem_id(<<"case_123">>),
+%% binary:match(WorkitemId, <<"case_123_wi_">>) =/= nomatch.
+%% true
+%% ```
+%%
+%% Type conversions:
+%% ```erlang
+%% > yawl_util:to_binary(<<"already">>).
+%% <<"already">>
+%%
+%% > yawl_util:to_binary(atom).
+%% <<"atom">>
+%%
+%% > yawl_util:to_list(<<"binary">>).
+%% "binary"
+%%
+%% > yawl_util:to_atom(<<"binary_atom">>).
+%% 'binary_atom'
+%% ```
+%%
+%% Map utilities:
+%% ```erlang
+%% > yawl_util:sanitize_map(#{a => 1, b => undefined}).
+%% #{a => 1}
+%%
+%% > yawl_util:proplist_to_map([{a, 1}, {b, 2}]).
+%% #{<<"a">> => 1, <<"b">> => 2}
+%% ```
+%%
+%% XML escaping:
+%% ```erlang
+%% > yawl_util:escape_xml(<<"<tag>">>).
+%% <<"&lt;tag&gt;">>
+%%
+%% > yawl_util:unescape_xml(<<"&lt;tag&gt;">>).
+%% <<"<tag>">>
+%% ```
+%%
+%% Running the doctests:
+%% ```erlang
+%% > yawl_util:doctest_test().
+%% ok
+%% ```
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -81,6 +141,9 @@
          ensure_binary/1,
          uuid_v4/0,
          hash/1]).
+
+%% Doctests
+-export([doctest_test/0]).
 
 %%====================================================================
 %% Types
@@ -194,8 +257,9 @@ timestamp_to_binary() ->
 -spec timestamp_to_binary(timestamp()) -> binary().
 
 timestamp_to_binary(Millis) when is_integer(Millis) ->
+    Seconds = Millis div 1000,
     {{Year, Month, Day}, {Hour, Minute, Second}} =
-        calendar:system_time_to_universal_time(Millis div 1000, seconds_from_1970),
+        calendar:system_time_to_universal_time(Seconds, second),
 
     Micros = Millis rem 1000 * 1000,
 
@@ -314,6 +378,12 @@ xml_to_binary(XmlElement) ->
 %%
 %% Replaces: < -> &lt;, > -> &gt;, & -> &amp;, " -> &quot;, ' -> &apos;
 %%
+%% Example:
+%% ```erlang
+%% > yawl_util:escape_xml(<<"<tag>">>).
+%% <<"&lt;tag&gt;">>
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec escape_xml(binary() | string()) -> binary().
@@ -321,20 +391,23 @@ xml_to_binary(XmlElement) ->
 escape_xml(Text) when is_binary(Text) ->
     escape_xml(binary_to_list(Text));
 escape_xml(Text) when is_list(Text) ->
-    Replacements = [
-        {$<,  <<"&lt;">>},
-        {$>,  <<"&gt;">>},
-        {$&,  <<"&amp;">>},
-        {$",  <<"&quot;">>},
-        {$',  <<"&apos;">>}
-    ],
-    Escaped = lists:foldl(fun({Char, Entity}, Acc) ->
-        re:replace(Acc, Char, Entity, [global, {return, binary}])
-    end, list_to_binary(Text), Replacements),
-    Escaped.
+    Bin = list_to_binary(Text),
+    %% Order matters: & must be escaped first
+    AmpEscaped = binary:replace(Bin, <<"&">>, <<"&amp;">>, [global]),
+    LtEscaped = binary:replace(AmpEscaped, <<"<">>, <<"&lt;">>, [global]),
+    GtEscaped = binary:replace(LtEscaped, <<">">>, <<"&gt;">>, [global]),
+    QuotEscaped = binary:replace(GtEscaped, <<"\"">>, <<"&quot;">>, [global]),
+    AposEscaped = binary:replace(QuotEscaped, <<"'">>, <<"&apos;">>, [global]),
+    AposEscaped.
 
 %%--------------------------------------------------------------------
 %% @doc Unescapes XML entities in a string.
+%%
+%% Example:
+%% ```erlang
+%% > yawl_util:unescape_xml(<<"&lt;tag&gt;">>).
+%% <<"<tag>">>
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -343,17 +416,14 @@ escape_xml(Text) when is_list(Text) ->
 unescape_xml(Text) when is_binary(Text) ->
     unescape_xml(binary_to_list(Text));
 unescape_xml(Text) when is_list(Text) ->
-    Replacements = [
-        {<<"&lt;">>, $<},
-        {<<"&gt;">>, $>},
-        {<<"&amp;">>, $&},
-        {<<"&quot;">>, $"},
-        {<<"&apos;">>, $'}
-    ],
-    Unescaped = lists:foldl(fun({Entity, Char}, Acc) ->
-        re:replace(Acc, Entity, Char, [global, {return, binary}])
-    end, list_to_binary(Text), Replacements),
-    Unescaped.
+    Bin = list_to_binary(Text),
+    %% Order matters: &amp; must be unescaped last
+    LtUnescaped = binary:replace(Bin, <<"&lt;">>, <<"<">>, [global]),
+    GtUnescaped = binary:replace(LtUnescaped, <<"&gt;">>, <<">">>, [global]),
+    QuotUnescaped = binary:replace(GtUnescaped, <<"&quot;">>, <<"\"">>, [global]),
+    AposUnescaped = binary:replace(QuotUnescaped, <<"&apos;">>, <<"'">>, [global]),
+    AmpUnescaped = binary:replace(AposUnescaped, <<"&amp;">>, <<"&">>, [global]),
+    AmpUnescaped.
 
 %%====================================================================
 %% XPath Functions
@@ -671,3 +741,153 @@ uuid_v4() ->
 hash(Value) ->
     Data = term_to_binary(Value),
     crypto:hash(md5, Data).
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Run doctests for yawl_util module.
+%%
+%% Validates utility functions including ID generation, type conversion,
+%% map operations, and XML escaping.
+%%
+%% Example:
+%% ```erlang
+%% > yawl_util:doctest_test().
+%% ok
+%% ```
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: generate_id/0 returns binary with prefix
+    Id = generate_id(),
+    true = is_binary(Id),
+    true = byte_size(Id) > 3,
+
+    %% Test 2: generate_id/1 with custom prefix
+    CustomId = generate_id(<<"custom">>),
+    true = is_binary(CustomId),
+    <<"custom_", _/binary>> = CustomId,
+
+    %% Test 3: generate_case_id returns proper format
+    CaseId = generate_case_id(),
+    true = is_binary(CaseId),
+    <<"case_", _/binary>> = CaseId,
+
+    %% Test 4: generate_workitem_id includes case_id
+    BaseCaseId = <<"case_abc123">>,
+    WorkitemId = generate_workitem_id(BaseCaseId),
+    true = is_binary(WorkitemId),
+    true = binary:match(WorkitemId, BaseCaseId) =/= nomatch,
+
+    %% Test 5: generate_task_id uses "task" prefix
+    TaskId = generate_task_id(),
+    true = is_binary(TaskId),
+    <<"task_", _/binary>> = TaskId,
+
+    %% Test 6: timestamp returns positive integer
+    Ts = timestamp(),
+    true = is_integer(Ts),
+    true = Ts > 0,
+
+    %% Test 7: timestamp_to_binary returns ISO 8601 format
+    TsBin = timestamp_to_binary(),
+    true = is_binary(TsBin),
+    true = byte_size(TsBin) > 0,
+
+    %% Test 8: parse_timestamp handles valid format
+    {ok, ParsedTs} = parse_timestamp(<<"2024-01-01T12:00:00.000Z">>),
+    true = is_integer(ParsedTs),
+
+    %% Test 9: parse_timestamp rejects invalid format
+    {error, invalid_format} = parse_timestamp(<<"invalid">>),
+
+    %% Test 10: to_binary handles various types
+    true = to_binary(<<"binary">>) =:= <<"binary">>,
+    true = to_binary(atom) =:= <<"atom">>,
+    true = is_binary(to_binary(123)),
+    true = is_binary(to_binary(1.5)),
+
+    %% Test 11: to_list handles various types
+    "binary" = to_list(<<"binary">>),
+    "atom" = to_list(atom),
+    "123" = to_list(123),
+
+    %% Test 12: to_atom handles various types
+    atom = to_atom(<<"atom">>),
+    atom = to_atom(atom),
+    'test_atom' = to_atom("test_atom"),
+
+    %% Test 13: ensure_binary returns binary
+    true = is_binary(ensure_binary(<<"already">>)),
+    true = is_binary(ensure_binary(atom)),
+    true = is_binary(ensure_binary(123)),
+
+    %% Test 14: deep_merge combines maps
+    Map1 = #{a => 1, b => #{x => 10}},
+    Map2 = #{c => 3, b => #{y => 20}},
+    Merged = deep_merge(Map1, Map2),
+    true = maps:get(a, Merged) =:= 1,
+    true = maps:get(c, Merged) =:= 3,
+    true = maps:get(x, maps:get(b, Merged)) =:= 10,
+    true = maps:get(y, maps:get(b, Merged)) =:= 20,
+
+    %% Test 15: proplist_to_map converts proplist
+    Plist = [{a, 1}, {b, 2}, {c, 3}],
+    Pmap = proplist_to_map(Plist),
+    true = is_map(Pmap),
+    3 = maps:size(Pmap),
+    true = lists:all(fun(K) -> lists:member(K, [<<"a">>, <<"b">>, <<"c">>]) end, maps:keys(Pmap)),
+
+    %% Test 16: map_to_proplist converts map
+    TestMap = #{<<"x">> => 1, <<"y">> => 2},
+    PlistResult = map_to_proplist(TestMap),
+    true = is_list(PlistResult),
+    true = length(PlistResult) =:= 2,
+
+    %% Test 17: keys_to_binaries converts all keys
+    MixedKeysMap = #{a => 1, <<"b">> => 2, "c" => 3},
+    BinKeysMap = keys_to_binaries(MixedKeysMap),
+    true = lists:all(fun(K) -> is_binary(K) end, maps:keys(BinKeysMap)),
+
+    %% Test 18: sanitize_map removes undefined/null values
+    DirtyMap = #{a => 1, b => undefined, c => null, d => 2},
+    CleanMap = sanitize_map(DirtyMap),
+    true = maps:get(a, CleanMap) =:= 1,
+    true = maps:get(d, CleanMap) =:= 2,
+    false = maps:is_key(b, CleanMap),
+    false = maps:is_key(c, CleanMap),
+
+    %% Test 19: escape_xml handles special characters
+    Escaped = escape_xml(<<"<tag>&'\"</tag>">>),
+    true = binary:match(Escaped, <<"&lt;">>) =/= nomatch,
+    true = binary:match(Escaped, <<"&gt;">>) =/= nomatch,
+    true = binary:match(Escaped, <<"&amp;">>) =/= nomatch,
+
+    %% Test 20: unescape_xml reverses escape_xml
+    Unescaped = unescape_xml(<<"&lt;tag&gt;">>),
+    <<"<tag>">> = Unescaped,
+
+    %% Test 21: validate_xpath accepts valid XPath
+    ok = validate_xpath(<<"root/child">>),
+    ok = validate_xpath(<<"//element">>),
+    ok = validate_xpath(<<"/absolute/path">>),
+
+    %% Test 22: validate_xpath rejects invalid input
+    {error, invalid_xpath} = validate_xpath(<<"123invalid">>),
+
+    %% Test 23: uuid_v4 generates 32-char hex string
+    Uuid = uuid_v4(),
+    true = is_binary(Uuid),
+    32 = byte_size(Uuid),
+
+    %% Test 24: hash returns binary
+    HashResult = hash(<<"test">>),
+    true = is_binary(HashResult),
+    16 = byte_size(HashResult),  % MD5 is 16 bytes
+
+    ok.

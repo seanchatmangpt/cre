@@ -32,6 +32,49 @@
 %%   <li>SOAP fault handling</li>
 %% </ul>
 %%
+%% <h3>Examples</h3>
+%%
+%% Create a web service record:
+%% ```
+%% 1> Service = yawl_wsif:ws_service(<<"http://example.com/wsdl">>,
+%%                                  <<"MyService">>,
+%%                                  <<"MyPort">>,
+%%                                  <<"MyOperation">>,
+%%                                  <<"http://example.com/endpoint">>,
+%%                                  undefined).
+%% {ws_service,<<"service_",...>>,...}
+%% ```
+%%
+%% Parse a SOAP fault from XML:
+%% ```
+%% 1> FaultXml = <<"<soap:Envelope><soap:Body><soap:Fault><faultcode>Client</faultcode><faultstring>Invalid input</faultstring></soap:Fault></soap:Body></soap:Envelope>">>.
+%% <<"...">>
+%% 2> yawl_wsif:parse_soap_fault(FaultXml).
+%% {fault,#{detail => undefined,faultactor => undefined,...}}
+%% ```
+%%
+%% Build a SOAP fault message:
+%% ```
+%% 1> Fault = yawl_wsif:build_soap_fault(<<"Client">>, <<"Invalid input">>, undefined).
+%% ["<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",...]
+%% 2> iolist_to_binary(Fault).
+%% <<"<soap:Envelope>...",...>>
+%% ```
+%%
+%% Query string building:
+%% ```
+%% 1> yawl_wsif:build_query_string(#{a => 1, b => "test"}).
+%% "a=1&b=test"
+%% 2> yawl_wsif:build_query_string(#{}).
+%% ""
+%% ```
+%%
+%% JSON encoding:
+%% ```
+%% 1> yawl_wsif:encode_json(#{key => <<"value">>}).
+%% <<"{\"key\":\"value\"}">>
+%% ```
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -61,6 +104,9 @@
 -export([parse_wsdl/1, generate_stub/2, test_connection/1]).
 -export([parse_soap_fault/1, build_soap_fault/3]).
 -export([list_services/0, get_service_by_id/1]).
+
+%% Doctest
+-export([doctest_test/0]).
 
 %%====================================================================
 %% Type Definitions
@@ -1041,7 +1087,7 @@ urlencode([C | Rest], Acc) when C >= $0, C =< $9; C >= $a, C =< $z; C >= $A, C =
     urlencode(Rest, [C | Acc]);
 urlencode([C | Rest], Acc) ->
     Hex = erlang:integer_to_list(C, 16),
-    urlencode(Rest, [$%, Hex | Acc]).
+    urlencode(Rest, lists:reverse([$% | Hex]) ++ Acc).
 
 %%--------------------------------------------------------------------
 %% @private Encodes a map to JSON (simple implementation).
@@ -1098,3 +1144,108 @@ generate_id(Prefix) ->
 -spec coalesce(term(), term()) -> term().
 coalesce(undefined, Default) -> Default;
 coalesce(Value, _Default) -> Value.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+%% @doc Runs doctests for the yawl_wsif module.
+%%
+%% Usage:
+%% ```erlang
+%% 1> yawl_wsif:doctest_test().
+%% ok
+%% ```
+%%
+%% The test validates:
+%% 1. Service record construction
+%% 2. SOAP fault parsing
+%% 3. SOAP fault building
+%% 4. Query string building
+%% 5. JSON encoding
+%% 6. URL encoding
+%% 7. Service ID generation
+%% 8. Coalesce function
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Service record construction
+    Service = ws_service(
+        <<"http://example.com/wsdl">>,
+        <<"MyService">>,
+        <<"MyPort">>,
+        <<"MyOperation">>,
+        <<"http://example.com/endpoint">>,
+        undefined
+    ),
+    true = is_record(Service, ws_service),
+    <<"MyService">> = get_service(Service),
+    <<"MyPort">> = get_port(Service),
+
+    %% Test 2: SOAP fault element detection
+    true = is_fault_element('Fault'),
+    true = is_fault_element('soap:Fault'),
+    true = is_fault_element('soapenv:Fault'),
+    false = is_fault_element('Body'),
+
+    %% Test 3: Invalid XML returns no_fault (catch block)
+    no_fault = parse_soap_fault(<<"not valid xml">>),
+
+    %% Test 4: Build SOAP fault
+    FaultIolist = build_soap_fault(<<"Server">>, <<"Internal error">>, undefined),
+    FaultBin = iolist_to_binary(FaultIolist),
+    true = binary:match(FaultBin, <<"<faultcode>Server</faultcode>">>) =/= nomatch,
+    true = binary:match(FaultBin, <<"<faultstring>Internal error</faultstring>">>) =/= nomatch,
+
+    %% Test 5: Build SOAP fault with detail
+    FaultWithDetail = build_soap_fault(<<"Client">>, <<"Bad request">>, <<"Detailed error info">>),
+    DetailBin = iolist_to_binary(FaultWithDetail),
+    true = binary:match(DetailBin, <<"<detail>Detailed error info</detail>">>) =/= nomatch,
+
+    %% Test 6: Query string building
+    Query1 = build_query_string(#{a => 1, b => "test"}),
+    true = string:str(Query1, "a=1") > 0,
+    true = string:str(Query1, "b=test") > 0,
+    true = string:str(Query1, "&") > 0,
+
+    %% Test 7: Empty query string
+    "" = build_query_string(#{}),
+
+    %% Test 8: JSON encoding
+    Json1 = encode_json(#{key => <<"value">>}),
+    true = binary:match(Json1, <<"\"key\"">>) =/= nomatch,
+    true = binary:match(Json1, <<"\"value\"">>) =/= nomatch,
+
+    %% Test 9: Empty JSON object
+    <<"{}">> = encode_json(#{}),
+
+    %% Test 10: URL encoding
+    "test%20value" = urlencode(<<"test value">>),
+    "abc123-_.~" = urlencode(<<"abc123-_.~">>),
+
+    %% Test 11: Service ID generation
+    ServiceId = generate_id(<<"test">>),
+    true = is_binary(ServiceId),
+    true = byte_size(ServiceId) > 4,
+    <<"test_", _/binary>> = ServiceId,
+
+    %% Test 12: Coalesce function
+    default = coalesce(undefined, default),
+    value = coalesce(value, default),
+
+    %% Test 13: Format values
+    "123" = format_value(123),
+    <<"test">> = format_value(<<"test">>),
+    "string" = format_value("string"),
+    "true" = format_value(true),
+
+    %% Test 14: SOAP namespace
+    {<<"soap">>, _} = soap_namespace('1.1'),
+    {<<"soapenv">>, _} = soap_namespace('1.2'),
+
+    %% Test 15: Empty params XML
+    [] = build_params_xml(#{}),
+
+    ok.

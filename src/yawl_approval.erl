@@ -1289,6 +1289,69 @@ log_checkpoint_event(Checkpoint, EventType) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+%%--------------------------------------------------------------------
+%% @doc Doctest runner for moduledoc and function documentation.
+%% Tests examples embedded in documentation strings.
+%%--------------------------------------------------------------------
 doctest_test() ->
     doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%%--------------------------------------------------------------------
+%% @doc Test for checkpoint ID generation.
+%%--------------------------------------------------------------------
+checkpoint_id_format_test() ->
+    Id = generate_checkpoint_id(),
+    ?assert(is_binary(Id)),
+    ?assertEqual(<<"approval_">>, binary_part(Id, {0, 8})),
+    ?assertEqual(40, byte_size(Id)).  % "approval_" (8) + 32 hex chars
+
+%%--------------------------------------------------------------------
+%% @doc Test for valid approval status atoms.
+%%--------------------------------------------------------------------
+approval_status_values_test() ->
+    ValidStatuses = [pending, approved, denied, timeout, cancelled],
+    ?assertEqual(5, length(ValidStatuses)),
+    ?assert(lists:member(pending, ValidStatuses)),
+    ?assert(lists:member(approved, ValidStatuses)).
+
+%%--------------------------------------------------------------------
+%% @doc Test for valid approver types.
+%%--------------------------------------------------------------------
+approver_types_test() ->
+    ValidTypes = [human, simulated, auto],
+    ?assertEqual(3, length(ValidTypes)),
+    ?assert(lists:member(human, ValidTypes)),
+    ?assert(lists:member(simulated, ValidTypes)).
+
+%%--------------------------------------------------------------------
+%% @doc Test for approval_decision record structure.
+%%--------------------------------------------------------------------
+approval_decision_record_test() ->
+    Decision = #approval_decision{
+        checkpoint_id = <<"test_checkpoint">>,
+        approved = true,
+        decision_maker = test_approver,
+        reason = <<"Test reason">>,
+        metadata = #{key => value},
+        decided_at = 1234567890
+    },
+    ?assertEqual(<<"test_checkpoint">>, Decision#approval_decision.checkpoint_id),
+    ?assertEqual(true, Decision#approval_decision.approved),
+    ?assertEqual(<<"Test reason">>, Decision#approval_decision.reason).
+
+%%--------------------------------------------------------------------
+%% @doc Test for approval_checkpoint record structure.
+%%--------------------------------------------------------------------
+approval_checkpoint_record_test() ->
+    Checkpoint = #approval_checkpoint{
+        checkpoint_id = <<"test_id">>,
+        pattern_id = <<"test_pattern">>,
+        step_name = test_step,
+        context = #{data => <<"test">>},
+        required_approver = simulated,
+        timeout = 30000,
+        created_at = erlang:system_time(millisecond)
+    },
+    ?assertEqual(<<"test_id">>, Checkpoint#approval_checkpoint.checkpoint_id),
+    ?assertEqual(simulated, Checkpoint#approval_checkpoint.required_approver).
 -endif.

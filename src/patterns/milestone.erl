@@ -60,6 +60,42 @@
 -module(milestone).
 -behaviour(gen_yawl).
 
+-moduledoc """
+Milestone Pattern (WCP-18) for YAWL.
+
+This module implements the Milestone pattern as a gen_yawl behaviour.
+The Milestone pattern enables an activity only when a specific milestone
+state has been reached.
+
+## Example: Place List
+
+```erlang
+> milestone:place_lst().
+['p_start','p_milestone_guard','p_milestone_ready',
+ 'p_milestone_reached','p_activity_pending','p_activity_active',
+ 'p_activity_done','p_complete']
+```
+
+## Example: Transition List
+
+```erlang
+> milestone:trsn_lst().
+['t_start','t_check_milestone','t_reach_milestone',
+ 't_enable_activity','t_execute','t_complete']
+```
+
+## Example: Preset for Transitions
+
+```erlang
+> milestone:preset('t_start').
+['p_start']
+> milestone:preset('t_enable_activity').
+['p_milestone_reached']
+> milestone:preset('unknown').
+[]
+```
+""".
+
 %% gen_pnet callbacks
 -export([
     code_change/3,
@@ -256,6 +292,18 @@ set_milestone(Pid) ->
 %% @doc Returns the list of places for the Milestone Petri net.
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Returns the list of places for the Milestone Petri net.
+
+## Example
+
+```erlang
+> milestone:place_lst().
+['p_start','p_milestone_guard','p_milestone_ready',
+ 'p_milestone_reached','p_activity_pending','p_activity_active',
+ 'p_activity_done','p_complete']
+```
+""".
 -spec place_lst() -> [atom()].
 
 place_lst() ->
@@ -274,6 +322,17 @@ place_lst() ->
 %% @doc Returns the list of transitions for the Milestone Petri net.
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Returns the list of transitions for the Milestone Petri net.
+
+## Example
+
+```erlang
+> milestone:trsn_lst().
+['t_start','t_check_milestone','t_reach_milestone',
+ 't_enable_activity','t_execute','t_complete']
+```
+""".
 -spec trsn_lst() -> [atom()].
 
 trsn_lst() ->
@@ -304,6 +363,20 @@ init_marking(_, _UsrInfo) ->
 %% @doc Returns the preset (input places) for each transition.
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Returns the preset (input places) for each transition.
+
+## Example
+
+```erlang
+> milestone:preset('t_start').
+['p_start']
+> milestone:preset('t_enable_activity').
+['p_milestone_reached']
+> milestone:preset('unknown').
+[]
+```
+""".
 -spec preset(Trsn :: atom()) -> [atom()].
 
 preset('t_start') -> ['p_start'];
@@ -605,3 +678,14 @@ log_event(#milestone_state{log_id = LogId}, Concept, Lifecycle, Data) when LogId
     yawl_xes:log_event(LogId, Concept, Lifecycle, Data);
 log_event(_State, _Concept, _Lifecycle, _Data) ->
     ok.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

@@ -17,187 +17,120 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
--moduledoc """
-YAWL Exception Handling and Compensation Module.
-
-This module provides comprehensive exception handling and compensation
-patterns for YAWL workflows in the CRE runtime environment. It implements
-the workflow exception patterns (WHP-01 through WHP-05) from the YAWL
-patterns catalog.
-
-## Exception Types
-
-* **business_exception** - Expected business rule violations
-* **system_exception** - System-level failures
-* **timeout_exception** - Operation timeout
-* **resource_exception** - Resource unavailability
-* **data_exception** - Data validation failures
-* **communication_exception** - Network/service communication failures
-* **validation_exception** - Input validation errors
-* **security_exception** - Authentication/authorization failures
-* **workflow_exception** - Workflow-level errors
-* **compensation_exception** - Compensation operation failures
-
-## Compensation Patterns
-
-Compensation is the process of undoing effects from completed activities
-when a workflow cannot complete normally.
-
-### WHP-01: Error Handler Pattern
-
-```erlang
-> %% Create an error handler for business exceptions
-> Handler = cre_yawl_exception:new_error_handler(
->     business_handler,
->     [business_exception],
->     fun(Exception) ->
->         io:format("Handling business exception: ~p~n", [Exception]),
->         {handled, exception_#yawl_exception.message}
->     end
-> ).
-_
-> %% Register the handler
-> Handlers = #{business_exception => [Handler]}.
-_
-> %% Find handler for exception type
-> cre_yawl_exception:find_handler(Handlers, business_exception).
-[Handler]
-```
-
-### WHP-02: Retry Pattern with Backoff
-
-```erlang
-> %% Create a retry policy with exponential backoff
-> Policy = cre_yawl_exception:new_retry_policy(#{
->     max_attempts => 5,
->     backoff => exponential,
->     base_delay => 1000,
->     multiplier => 2.0,
->     jitter => true
-> }).
-_
-> %% Check if retry should be attempted
-> cre_yawl_exception:should_retry(Policy, 2).
-true
-> cre_yawl_exception:should_retry(Policy, 6).
-false
-> %% Calculate backoff delay
-> Delay = cre_yawl_exception:calculate_backoff(Policy, 3).
-is_integer(Delay), Delay > 0.
-true
-```
-
-### WHP-03: Compensation Pattern
-
-```erlang
-> %% Create a compensator for an activity
-> Compensator = cre_yawl_exception:new_compensator(
->     <<"activity_1">>,
->     fun(Input) ->
->         io:format("Compensating activity_1 with input: ~p~n", [Input]),
->         {compensated, success}
->     end,
->     immediate
-> ).
-_
-> %% Execute compensation
-> {ok, Result} = cre_yawl_exception:compensate(Compensator, undefined).
-_
-> %% Check compensation status
-> cre_yawl_exception:has_compensated(Result).
-true
-> cre_yawl_exception:get_compensation_state(Result).
-completed
-```
-
-### WHP-04: Triggered Compensation
-
-```erlang
-> %% Create a deferred compensator
-> CompHandler = fun(Input) ->
->     {undo, Input}
-> end,
-> Comp = cre_yawl_exception:new_compensator_with_metadata(
->     <<"payment_activity">>,
->     CompHandler,
->     deferred,
->     #{trigger_on => payment_failed, reason => refund_required}
-> ).
-_
-> %% Check dependencies
-> cre_yawl_exception:all_dependencies_completed(Comp, #{}).
-true
-```
-
-### WHP-05: Consecutive Compensation
-
-```erlang
-> %% Create chained compensators
-> C1 = cre_yawl_exception:new_compensator(
->     <<"step1">>, fun(_) -> {undone, step1} end, chained
-> ),
-> C2 = cre_yawl_exception:new_compensator_with_deps(
->     <<"step2">>,
->     fun(_) -> {undone, step2} end,
->     chained,
->     undefined,
->     [<<"step1">>]  % Depends on step1 completion
-> ).
-_
-> %% Verify compensation state
-> cre_yawl_exception:get_compensation_state(C1).
-pending
-> cre_yawl_exception:get_compensation_dependencies(C2).
-[<<"step1">>]
-```
-
-## Exception Creation and Accessors
-
-```erlang
-> %% Create a business exception
-> Exception = cre_yawl_exception:new_exception(
->     business_exception,
->     "Invalid order amount",
->     #{workflow_id => <<"order_wf_123">>, amount => -100},
->     []
-> ).
-_
-> %% Access exception properties
-> cre_yawl_exception:exception_type(Exception).
-business_exception
-> cre_yawl_exception:exception_severity(Exception).
-medium
-> cre_yawl_exception:exception_message(Exception).
-<<"Invalid order amount">>
-> cre_yawl_exception:exception_workflow_id(Exception).
-<<"order_wf_123">>
-> cre_yawl_exception:exception_is_resolved(Exception).
-false
-```
-
-## Circuit Breaker Pattern
-
-```erlang
-> %% Create handler with circuit breaker
-> CBHandler = cre_yawl_exception:register_handler_with_circuit_breaker(
->     #{},
->     cre_yawl_exception:new_error_handler(
->         api_handler,
->         [communication_exception],
->         fun(_) -> {error, timeout} end
->     ),
->     3,  % Threshold: 3 failures
->     60000  % Timeout: 60 seconds
-> ).
-_
-> %% Check circuit breaker status
-> maps:get(communication_exception, CBHandler, undefined) =/= undefined.
-true
-```
-""".
+%%
+%% YAWL Exception Handling and Compensation Module
+%%
+%% This module provides comprehensive exception handling and compensation
+%% patterns for YAWL workflows in the CRE runtime environment. It implements
+%% the workflow exception patterns (WHP-01 through WHP-05) from the YAWL
+%% patterns catalog.
+%%
+%% ## Exception Types
+%%
+%% * **business_exception** - Expected business rule violations
+%% * **system_exception** - System-level failures
+%% * **timeout_exception** - Operation timeout
+%% * **resource_exception** - Resource unavailability
+%% * **data_exception** - Data validation failures
+%% * **communication_exception** - Network/service communication failures
+%% * **validation_exception** - Input validation errors
+%% * **security_exception** - Authentication/authorization failures
+%% * **workflow_exception** - Workflow-level errors
+%% * **compensation_exception** - Compensation operation failures
+%%
+%% ## Compensation Patterns
+%%
+%% Compensation is the process of undoing effects from completed activities
+%% when a workflow cannot complete normally.
+%%
+%% ### WHP-01: Error Handler Pattern
+%%
+%% Create an error handler for business exceptions:
+%%
+%% ```erlang
+%% Handler = cre_yawl_exception:new_error_handler(
+%%     business_handler,
+%%     [business_exception],
+%%     fun(Exception) ->
+%%         io:format("Handling business exception: ~p~n", [Exception]),
+%%         {handled, exception_message(Exception)}
+%%     end
+%% ).
+%% %% Register the handler
+%% Handlers = #{business_exception => [Handler]}.
+%% %% Find handler for exception type
+%% cre_yawl_exception:find_handler(Handlers, business_exception).
+%% ```
+%%
+%% ### WHP-02: Retry Pattern with Backoff
+%%
+%% Create a retry policy with exponential backoff:
+%%
+%% ```erlang
+%% Policy = cre_yawl_exception:new_retry_policy(#{
+%%     max_attempts => 5,
+%%     backoff => exponential,
+%%     base_delay => 1000,
+%%     multiplier => 2.0,
+%%     jitter => true
+%% }).
+%% %% Check if retry should be attempted
+%% cre_yawl_exception:should_retry(Policy, 2).  %% true
+%% cre_yawl_exception:should_retry(Policy, 6).  %% false
+%% %% Calculate backoff delay
+%% Delay = cre_yawl_exception:calculate_backoff(Policy, 3).
+%% ```
+%%
+%% ### WHP-03: Compensation Pattern
+%%
+%% Create a compensator for an activity:
+%%
+%% ```erlang
+%% Compensator = cre_yawl_exception:new_compensator(
+%%     <<"activity_1">>,
+%%     fun(Input) -> {compensated, success} end,
+%%     immediate
+%% ).
+%% %% Execute compensation
+%% {ok, Result} = cre_yawl_exception:compensate(Compensator, undefined).
+%% %% Check compensation status
+%% cre_yawl_exception:has_compensated(Result).  %% true
+%% cre_yawl_exception:get_compensation_state(Result).  %% completed
+%% ```
+%%
+%% ### WHP-04: Triggered Compensation
+%%
+%% Create a deferred compensator:
+%%
+%% ```erlang
+%% Comp = cre_yawl_exception:new_compensator_with_metadata(
+%%     <<"payment_activity">>,
+%%     fun(Input) -> {undo, Input} end,
+%%     deferred,
+%%     #{trigger_on => payment_failed, reason => refund_required}
+%% ).
+%% ```
+%%
+%% ### WHP-05: Consecutive Compensation
+%%
+%% Create chained compensators:
+%%
+%% ```erlang
+%% C1 = cre_yawl_exception:new_compensator(
+%%     <<"step1">>, fun(_) -> {undone, step1} end, chained
+%% ),
+%% C2 = cre_yawl_exception:new_compensator_with_deps(
+%%     <<"step2">>,
+%%     fun(_) -> {undone, step2} end,
+%%     chained,
+%%     undefined,
+%%     [<<"step1">>]  % Depends on step1 completion
+%% ).
+%% ```
+%%
 %% -------------------------------------------------------------------
-
 -module(cre_yawl_exception).
+
 -behaviour(gen_pnet).
 
 %%====================================================================
@@ -1753,19 +1686,13 @@ trigger(_Place, _Token, _NetState) -> pass.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-
 %%--------------------------------------------------------------------
 %% @doc Runs doctests for the cre_yawl_exception module.
-///
-/// This function validates the exception handling, compensation,
-/// retry policy, and error handler functionality through direct testing.
-///
-/// Returns `ok' when all tests pass.
-///
-/// ```erlang
-/// 1> cre_yawl_exception:doctest_test().
-/// ok
-/// '''
+%%
+%% This function validates the exception handling, compensation,
+%% retry policy, and error handler functionality through direct testing.
+%%
+%% Returns `ok' when all tests pass.
 %%
 %% @end
 %%--------------------------------------------------------------------
