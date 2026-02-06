@@ -71,13 +71,23 @@
 %% Result analysis
 -export([get_simulation_stats/1,
          get_confidence_interval/2,
-         get_percentile/2]).
+         get_percentile/2,
+         simulate_approval_delay/1,
+         get_approval_delay_stats/1]).
 
 %%====================================================================
 %% Includes
 %%====================================================================
 
 -include_lib("kernel/include/logger.hrl").
+-include("yawl_simulation.hrl").
+
+%%====================================================================
+%% gen_server callbacks
+%%====================================================================
+
+-export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
+         terminate/2, code_change/3]).
 
 %%====================================================================
 %% Types
@@ -88,61 +98,23 @@
 -type resource_id() :: binary().
 -type task_id() :: binary().
 
--record(simulation_config, {
-    iterations :: pos_integer(),
-    case_data :: [case_data()],
-    resource_constraints :: #{resource_id() => number()},
-    time_constraints :: #{task_id() => number()},
-    random_seed :: undefined | {integer(), integer(), integer()}
-}).
-
--record(simulation_result, {
-    total_cases :: pos_integer(),
-    completed_cases :: pos_integer(),
-    failed_cases :: non_neg_integer(),
-    average_cycle_time :: number(),
-    min_cycle_time :: number(),
-    max_cycle_time :: number(),
-    cycle_time_stddev :: number(),
-    bottleneck_tasks :: [task_id()],
-    resource_utilization :: #{resource_id() => number()},
-    task_completion_rates :: #{task_id() => float()},
-    timestamps :: [integer()]
-}).
-
--record(monte_carlo_result, {
-    iterations :: pos_integer(),
-    mean_cycle_time :: number(),
-    median_cycle_time :: number(),
-    percentile_50 :: number(),
-    percentile_90 :: number(),
-    percentile_95 :: number(),
-    percentile_99 :: number(),
-    confidence_interval_95 :: {number(), number()},
-    probability_distribution :: [{number(), number()}],
-    risk_factors :: #{atom() => number()}
-}).
-
--record(scenario, {
-    name :: binary(),
-    workflow :: workflow(),
-    config :: #simulation_config{}
-}).
-
--record(bottleneck, {
-    task_id :: task_id(),
-    severity :: low | medium | high | critical,
-    avg_wait_time :: number(),
-    avg_processing_time :: number(),
-    utilization :: number(),
-    recommendations :: [binary()]
-}).
-
 -type simulation_config() :: #simulation_config{}.
 -type simulation_result() :: #simulation_result{}.
 -type monte_carlo_result() :: #monte_carlo_result{}.
 -type scenario() :: #scenario{}.
 -type bottleneck() :: #bottleneck{}.
+
+-export_type([
+    workflow/0,
+    case_data/0,
+    resource_id/0,
+    task_id/0,
+    simulation_config/0,
+    simulation_result/0,
+    monte_carlo_result/0,
+    scenario/0,
+    bottleneck/0
+]).
 
 %%====================================================================
 %% API Functions
@@ -196,6 +168,10 @@ run_simulation(Workflow, #simulation_config{iterations = N} = Config, Options) -
         _ -> lists:sum(CycleTimes) / length(CycleTimes)
     end,
 
+    %% Calculate approval delay statistics
+    ApprovalDelays = calculate_approval_delays(Results),
+    TotalApprovalWaitTime = calculate_total_approval_wait_time(ApprovalDelays),
+
     #{
         total_cases => N,
         completed_cases => CompletedCount,
@@ -207,7 +183,9 @@ run_simulation(Workflow, #simulation_config{iterations = N} = Config, Options) -
         bottleneck_tasks => identify_bottlenecks(Results),
         resource_utilization => calculate_utilization(Results),
         task_completion_rates => calculate_completion_rates(Results),
-        timestamps => [erlang:system_time(millisecond) || _ <- lists:seq(1, N)]
+        timestamps => [erlang:system_time(millisecond) || _ <- lists:seq(1, N)],
+        approval_delays => ApprovalDelays,
+        total_approval_wait_time => TotalApprovalWaitTime
     }.
 
 %%--------------------------------------------------------------------
@@ -290,11 +268,16 @@ what_if_analysis(Scenarios, Metric) ->
     %% Simulate each scenario
     Results = lists:map(
         fun(#scenario{name = Name, workflow = Workflow, config = Config}) ->
-            {ok, Result} = run_simulation(Workflow, Config),
+            Result = run_simulation(Workflow, Config),
             Value = case Metric of
-                cycle_time -> Result#simulation_result.average_cycle_time;
-                completion_rate -> Result#simulation_result.completed_cases /
-                                   Result#simulation_result.total_cases;
+                cycle_time -> maps:get(average_cycle_time, Result, 0);
+                completion_rate ->
+                    Total = maps:get(total_cases, Result, 1),
+                    Completed = maps:get(completed_cases, Result, 0),
+                    case Total of
+                        0 -> 0;
+                        _ -> Completed / Total
+                    end;
                 cost -> estimate_simulation_cost(Result);
                 _ -> 0
             end,
@@ -447,6 +430,8 @@ get_simulation_stats(Result) ->
 %%--------------------------------------------------------------------
 -spec get_confidence_interval([number()], float()) -> {number(), number()}.
 
+get_confidence_interval([], _ConfidenceLevel) ->
+    {0.0, 0.0};
 get_confidence_interval(Results, ConfidenceLevel) ->
     N = length(Results),
     Mean = lists:sum(Results) / N,
@@ -574,8 +559,17 @@ simulate_task(TaskId, TaskInfo, Config, _Options) ->
 
     Duration = BaseDuration * (1 + (rand:uniform() - 0.5) * 2 * Variation),
 
-    %% Simulate task execution
-    timer:sleep(max(0, trunc(Duration / 10))), %% Scale down for simulation
+    %% Check if task requires approval
+    RequiresApproval = requires_approval(TaskId, TaskInfo, Config),
+    ApprovalDelay = case RequiresApproval of
+        true -> simulate_approval_delay(Config);
+        false -> 0
+    end,
+
+    %% Simulate task execution (including approval delay)
+    TaskSleepTime = max(0, trunc(Duration / 10)), %% Scale down for simulation
+    ApprovalSleepTime = max(0, trunc(ApprovalDelay / 100)), %% Scale down for simulation
+    timer:sleep(TaskSleepTime + ApprovalSleepTime),
 
     %% Check resource constraints
     ResourceConstrained = check_resource_constraints(TaskId, Config),
@@ -587,6 +581,8 @@ simulate_task(TaskId, TaskInfo, Config, _Options) ->
             false -> ok
         end,
         duration => Duration,
+        approval_delay => ApprovalDelay,
+        required_approval => RequiresApproval,
         timestamp => erlang:system_time(millisecond)
     }.
 
@@ -642,7 +638,10 @@ extract_resources(Tasks) ->
 
 check_resource_constraints(TaskId, Config) ->
     Constraints = Config#simulation_config.resource_constraints,
-    ResourceId = list_to_binary([atom_to_list(TaskId), "_resource"]),
+    ResourceId = case is_atom(TaskId) of
+        true -> list_to_binary([atom_to_list(TaskId), "_resource"]);
+        false when is_binary(TaskId) -> <<TaskId/binary, "_resource">>
+    end,
 
     case maps:get(ResourceId, Constraints, undefined) of
         undefined -> false;
@@ -817,10 +816,16 @@ build_distribution(Values) ->
 -spec calculate_risk_factors([number()], [term()]) -> #{atom() => number()}.
 
 calculate_risk_factors(CycleTimes, Results) ->
-    Mean = lists:sum(CycleTimes) / length(CycleTimes),
+    Mean = case CycleTimes of
+        [] -> 0;
+        _ -> lists:sum(CycleTimes) / length(CycleTimes)
+    end,
 
     FailureCount = length([R || R <- Results, maps:get(status, R, ok) =:= error]),
-    FailureRate = FailureCount / length(Results),
+    FailureRate = case Results of
+        [] -> 0;
+        _ -> FailureCount / length(Results)
+    end,
 
     %% Coefficient of variation as risk indicator
     StdDev = calculate_stddev(CycleTimes, Mean),
@@ -1002,3 +1007,247 @@ generate_case_id() ->
     Unique = crypto:hash(md5, term_to_binary({self(), erlang:unique_integer()})),
     Hex = binary:encode_hex(Unique),
     <<"sim_case_", Hex/binary>>.
+
+%%====================================================================
+%% Approval Delay Simulation API
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Simulates approval delay based on configuration.
+%%
+%% @param Config The simulation configuration containing approval delay settings.
+%% @return Simulated delay in milliseconds.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec simulate_approval_delay(simulation_config()) -> number().
+
+simulate_approval_delay(Config) ->
+    ApprovalDelayConfig = Config#simulation_config.approval_delay_config,
+
+    case ApprovalDelayConfig of
+        undefined ->
+            %% Default configuration if not specified
+            simulate_approval_delay_default();
+        #approval_delay_config{enabled = false} ->
+            0;
+        #approval_delay_config{enabled = true,
+                              mean_delay = Mean,
+                              stddev_delay = StdDev,
+                              min_delay = MinDelay,
+                              max_delay = MaxDelay,
+                              approval_probability = Prob} ->
+            %% Only simulate approval delay if probability check passes
+            case rand:uniform() < Prob of
+                false ->
+                    0;
+                true ->
+                    %% Generate delay using normal distribution approximation
+                    %% Box-Muller transform for normal distribution
+                    U1 = rand:uniform(),
+                    U2 = rand:uniform(),
+                    Z = math:sqrt(-2.0 * math:log(U1)) * math:cos(2.0 * math:pi() * U2),
+                    Delay = Mean + Z * StdDev,
+
+                    %% Clamp to min/max bounds
+                    ClampedDelay = max(MinDelay, min(MaxDelay, Delay)),
+                    ClampedDelay
+            end
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Simulates approval delay with default configuration.
+%%
+%% @return Simulated delay in milliseconds.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec simulate_approval_delay_default() -> number().
+
+simulate_approval_delay_default() ->
+    %% Default: mean 5 minutes, stddev 2 minutes, 30% probability
+    Mean = 300000,   %% 5 minutes in milliseconds
+    StdDev = 120000, %% 2 minutes
+    MinDelay = 60000, %% 1 minute minimum
+    MaxDelay = 3600000, %% 1 hour maximum
+    Prob = 0.3,     %% 30% probability of requiring approval
+
+    case rand:uniform() < Prob of
+        false ->
+            0;
+        true ->
+            U1 = rand:uniform(),
+            U2 = rand:uniform(),
+            Z = math:sqrt(-2.0 * math:log(U1)) * math:cos(2.0 * math:pi() * U2),
+            Delay = Mean + Z * StdDev,
+            max(MinDelay, min(MaxDelay, Delay))
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Gets approval delay statistics from simulation results.
+%%
+%% @param Results The simulation results map.
+%% @return Approval delay statistics map.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_approval_delay_stats(map()) -> map().
+
+get_approval_delay_stats(Results) when is_map(Results) ->
+    ApprovalDelays = maps:get(approval_delays, Results, #{}),
+
+    Stats = maps:fold(
+        fun(TaskId, {AvgDelay, MaxDelay}, Acc) ->
+            Acc#{
+                TaskId => #{
+                    avg_delay => AvgDelay,
+                    max_delay => MaxDelay,
+                    avg_delay_seconds => AvgDelay / 1000,
+                    max_delay_seconds => MaxDelay / 1000
+                }
+            }
+        end,
+        #{},
+        ApprovalDelays
+    ),
+
+    TotalWaitTime = maps:get(total_approval_wait_time, Results, 0),
+
+    Stats#{
+        total_wait_time => TotalWaitTime,
+        total_wait_time_seconds => TotalWaitTime / 1000,
+        avg_wait_time_per_case => case maps:size(ApprovalDelays) of
+            0 -> 0;
+            N -> TotalWaitTime / N
+        end
+    };
+
+get_approval_delay_stats(_) ->
+    #{}.
+
+%%====================================================================
+%% Internal Functions - Approval Support
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Checks if a task requires approval based on config and task info.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec requires_approval(task_id(), map(), simulation_config()) -> boolean().
+
+requires_approval(_TaskId, TaskInfo, Config) ->
+    %% Check if task has explicit approval requirement
+    case maps:get(<<"requires_approval">>, TaskInfo,
+                 maps:get(requires_approval, TaskInfo, undefined)) of
+        true -> true;
+        false -> false;
+        undefined ->
+            %% Check approval delay config
+            ApprovalDelayConfig = Config#simulation_config.approval_delay_config,
+            case ApprovalDelayConfig of
+                undefined -> false;
+                #approval_delay_config{enabled = false} -> false;
+                #approval_delay_config{approval_probability = Prob} ->
+                    rand:uniform() < Prob
+            end
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Calculates approval delay statistics from simulation results.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec calculate_approval_delays([term()]) -> #{task_id() => {number(), number()}}.
+
+calculate_approval_delays(Results) ->
+    %% Aggregate approval delays by task
+    %% First pass: collect all delays and counts
+    TaskDelayLists = lists:foldl(
+        fun(Result, Acc) ->
+            TaskResults = maps:get(task_results, Result, []),
+            lists:foldl(
+                fun(Task, TaskAcc) ->
+                    TaskId = maps:get(task_id, Task, <<>>),
+                    ApprovalDelay = maps:get(approval_delay, Task, 0),
+                    RequiredApproval = maps:get(required_approval, Task, false),
+
+                    case RequiredApproval andalso ApprovalDelay > 0 of
+                        true ->
+                            maps:update_with(TaskId,
+                                fun({Delays, Max}) ->
+                                    {[ApprovalDelay | Delays], max(Max, ApprovalDelay)}
+                                end,
+                                {[ApprovalDelay], ApprovalDelay},
+                                TaskAcc);
+                        false ->
+                            TaskAcc
+                    end
+                end,
+                Acc,
+                TaskResults)
+        end,
+        #{},
+        Results
+    ),
+
+    %% Second pass: calculate averages
+    maps:map(
+        fun(_TaskId, {DelayList, MaxDelay}) ->
+            AvgDelay = lists:sum(DelayList) / length(DelayList),
+            {AvgDelay, MaxDelay}
+        end,
+        TaskDelayLists
+    ).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Calculates total approval wait time from delay statistics.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec calculate_total_approval_wait_time(#{task_id() => {number(), number()}}) -> number().
+
+calculate_total_approval_wait_time(ApprovalDelays) ->
+    maps:fold(
+        fun(_TaskId, {AvgDelay, _MaxDelay}, Acc) ->
+            Acc + AvgDelay
+        end,
+        0,
+        ApprovalDelays
+    ).
+
+%%====================================================================
+%% gen_server callbacks
+%%====================================================================
+
+%% @private
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+%% @private
+init([]) ->
+    {ok, #{}}.
+
+%% @private
+handle_call(_Request, _From, State) ->
+    {reply, {error, unknown_request}, State}.
+
+%% @private
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+%% @private
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+%% @private
+terminate(_Reason, _State) ->
+    ok.
+
+%% @private
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.

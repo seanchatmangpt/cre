@@ -530,7 +530,9 @@ mask_phone_number(Phone) ->
 
 get_end_of_day() ->
     {{Year, Month, Day}, _} = calendar:universal_time(),
-    NextDay = {Year, Month, Day + 1},
-    SecondsUntilMidnight = calendar:datetime_to_gregorian_seconds(NextDay) -
-                          calendar:datetime_to_gregorian_seconds({{Year, Month, Day}, {0, 0, 0}}),
+    %% Calculate seconds until next midnight
+    NextDayMidnight = {{Year, Month, Day + 1}, {0, 0, 0}},
+    CurrentMidnight = {{Year, Month, Day}, {0, 0, 0}},
+    SecondsUntilMidnight = calendar:datetime_to_gregorian_seconds(NextDayMidnight) -
+                          calendar:datetime_to_gregorian_seconds(CurrentMidnight),
     erlang:system_time(millisecond) + (SecondsUntilMidnight * 1000).

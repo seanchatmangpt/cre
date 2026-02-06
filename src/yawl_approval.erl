@@ -58,7 +58,8 @@
     simulate_approval/2,
     list_pending/0,
     list_all/0,
-    cancel_checkpoint/1
+    cancel_checkpoint/1,
+    get_checkpoint_context/1
 ]).
 
 %%====================================================================
@@ -92,6 +93,9 @@ start_link() ->
 
 init([]) ->
     logger:info("Starting YAWL Approval Server", [{module, ?MODULE}]),
+    %% Initialize ETS table for cross-process access to checkpoints and decisions
+    %% This allows external processes (like approval_worker.sh) to access state
+    ets:new(?MODULE, [named_table, public, {read_concurrency, true}]),
     {ok, #state{
         checkpoints = #{},
         decisions = #{},
@@ -300,21 +304,21 @@ simulate_approval(CheckpointId, PromptContext) ->
                             Approved = maps:get(<<"approved">>, Response, false),
                             Reason = maps:get(<<"reason">>, Response, <<>>),
                             DecisionMaker = simulated,
-                            record_decision(CheckpointId, Approved, DecisionMaker, Reason),
-                            notify_waiters(CheckpointId, #approval_decision{
-                                checkpoint_id = CheckpointId,
-                                approved = Approved,
-                                decision_maker = DecisionMaker,
-                                reason = Reason,
-                                metadata = maps:get(metadata, Response, #{}),
-                                decided_at = erlang:system_time(millisecond)
-                            }),
+                            %% Use approve/deny instead of record_decision to ensure
+                            %% proper ETS storage and waiter notification
+                            case Approved of
+                                true ->
+                                    approve(CheckpointId, DecisionMaker, Reason);
+                                false ->
+                                    deny(CheckpointId, DecisionMaker, Reason)
+                            end,
+                            %% Return the decision
                             {ok, #approval_decision{
                                 checkpoint_id = CheckpointId,
                                 approved = Approved,
                                 decision_maker = DecisionMaker,
                                 reason = Reason,
-                                metadata = #{},
+                                metadata = maps:get(metadata, Response, #{}),
                                 decided_at = erlang:system_time(millisecond)
                             }};
                         {error, Reason} ->
@@ -369,6 +373,46 @@ list_all() ->
 cancel_checkpoint(CheckpointId) ->
     gen_server:call(?MODULE, {cancel_checkpoint, CheckpointId}).
 
+%%--------------------------------------------------------------------
+%% @doc Gets the checkpoint context as a JSON string.
+%%
+%% This function is used by external processes (e.g., approval_worker.sh)
+%% to retrieve the context for approval decision-making.
+%%
+%% @param CheckpointId The checkpoint ID.
+%% @return JSON string representation of the checkpoint context.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_checkpoint_context(checkpoint_id()) -> binary().
+
+get_checkpoint_context(CheckpointId) ->
+    case gen_server:call(?MODULE, {check_status, CheckpointId}) of
+        {error, not_found} ->
+            <<"{}">>;
+        Status ->
+            %% Get checkpoint info from ETS for cross-process access
+            case ets:lookup(?MODULE, {checkpoint, CheckpointId}) of
+                [{{checkpoint, CheckpointId}, Checkpoint}] ->
+                    ContextMap = #{
+                        <<"checkpoint_id">> => Checkpoint#approval_checkpoint.checkpoint_id,
+                        <<"pattern_id">> => to_binary(Checkpoint#approval_checkpoint.pattern_id),
+                        <<"step_name">> => atom_to_binary(Checkpoint#approval_checkpoint.step_name, utf8),
+                        <<"context">> => Checkpoint#approval_checkpoint.context,
+                        <<"required_approver">> => atom_to_binary(Checkpoint#approval_checkpoint.required_approver, utf8),
+                        <<"status">> => atom_to_binary(element(2, Status), utf8),
+                        <<"created_at">> => Checkpoint#approval_checkpoint.created_at
+                    },
+                    FinalMap = case Checkpoint#approval_checkpoint.expires_at of
+                        undefined -> ContextMap;
+                        ExpiresAt -> ContextMap#{<<"expires_at">> => ExpiresAt}
+                    end,
+                    context_to_json(FinalMap);
+                [] ->
+                    <<"{}">>
+            end
+    end.
+
 %%====================================================================
 %% Internal Functions
 %%====================================================================
@@ -421,6 +465,9 @@ do_create_checkpoint(PatternId, StepName, Context, Options, State) ->
     %% Log checkpoint creation to XES
     log_checkpoint_event(Checkpoint, created),
 
+    %% Store in ETS for cross-process access
+    ets:insert(?MODULE, {{checkpoint, CheckpointId}, Checkpoint}),
+
     NewCheckpoints = maps:put(CheckpointId, Checkpoint, State#state.checkpoints),
     {{ok, CheckpointId}, State#state{checkpoints = NewCheckpoints}}.
 
@@ -447,7 +494,9 @@ do_request_approval(CheckpointId, State) ->
                         decided_at = erlang:system_time(millisecond)
                     },
                     NewDecisions = maps:put(CheckpointId, Decision, State#state.decisions),
-                    notify_waiters(CheckpointId, Decision),
+                    %% Store in ETS for cross-process access
+                    ets:insert(?MODULE, {{decision, CheckpointId}, Decision}),
+                    notify_waiters(CheckpointId, Decision, State#state.waiters),
                     log_checkpoint_event(Checkpoint, auto_approved),
                     {{ok, Decision}, State#state{decisions = NewDecisions}};
                 simulated ->
@@ -489,7 +538,9 @@ do_approve(CheckpointId, Approver, Reason, State) ->
                         decided_at = erlang:system_time(millisecond)
                     },
                     NewDecisions = maps:put(CheckpointId, Decision, State#state.decisions),
-                    notify_waiters(CheckpointId, Decision),
+                    %% Store in ETS for cross-process access
+                    ets:insert(?MODULE, {{decision, CheckpointId}, Decision}),
+                    notify_waiters(CheckpointId, Decision, State#state.waiters),
                     log_checkpoint_event(Checkpoint, approved),
                     {ok, State#state{decisions = NewDecisions}};
                 _Existing ->
@@ -519,7 +570,9 @@ do_deny(CheckpointId, Approver, Reason, State) ->
                         decided_at = erlang:system_time(millisecond)
                     },
                     NewDecisions = maps:put(CheckpointId, Decision, State#state.decisions),
-                    notify_waiters(CheckpointId, Decision),
+                    %% Store in ETS for cross-process access
+                    ets:insert(?MODULE, {{decision, CheckpointId}, Decision}),
+                    notify_waiters(CheckpointId, Decision, State#state.waiters),
                     log_checkpoint_event(Checkpoint, denied),
                     {ok, State#state{decisions = NewDecisions}};
                 _Existing ->
@@ -618,7 +671,9 @@ do_cancel_checkpoint(CheckpointId, State) ->
                         decided_at = erlang:system_time(millisecond)
                     },
                     NewDecisions = maps:put(CheckpointId, Decision, State#state.decisions),
-                    notify_waiters(CheckpointId, Decision),
+                    %% Store in ETS for cross-process access
+                    ets:insert(?MODULE, {{decision, CheckpointId}, Decision}),
+                    notify_waiters(CheckpointId, Decision, State#state.waiters),
                     log_checkpoint_event(Checkpoint, cancelled),
                     {ok, State#state{decisions = NewDecisions}};
                 _Existing ->
@@ -645,7 +700,11 @@ handle_timeout(CheckpointId, State) ->
                 decided_at = erlang:system_time(millisecond)
             },
             NewDecisions = maps:put(CheckpointId, Decision, State#state.decisions),
-            notify_waiters(CheckpointId, Decision),
+            %% Store in ETS for cross-process access
+            ets:insert(?MODULE, {{decision, CheckpointId}, Decision}),
+            %% Notify waiters of timeout
+            Waiters = maps:get(CheckpointId, State#state.waiters, []),
+            send_timeout_notifications(CheckpointId, Waiters),
             log_checkpoint_event(Checkpoint, timeout),
             State#state{decisions = NewDecisions};
         _Existing ->
@@ -672,11 +731,43 @@ add_waiter(CheckpointId, Pid, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-notify_waiters(_CheckpointId, _Decision) ->
-    %% This is called from within gen_server, so we can't access State directly
-    %% Instead, we'll send to registered waiters if they're still alive
-    %% In a real implementation, we'd track waiters in the state
-    ok.
+notify_waiters(CheckpointId, Decision, WaitersMap) ->
+    Waiters = maps:get(CheckpointId, WaitersMap, []),
+    send_decision_notifications(CheckpointId, Decision, Waiters).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Sends decision notifications to all waiting processes.
+%%
+%% @end
+%%--------------------------------------------------------------------
+send_decision_notifications(_CheckpointId, _Decision, []) ->
+    ok;
+send_decision_notifications(CheckpointId, Decision, [Pid | Rest]) ->
+    case erlang:is_process_alive(Pid) of
+        true ->
+            Pid ! {approval_decision, CheckpointId, Decision};
+        false ->
+            ok
+    end,
+    send_decision_notifications(CheckpointId, Decision, Rest).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Sends timeout notifications to all waiting processes.
+%%
+%% @end
+%%--------------------------------------------------------------------
+send_timeout_notifications(_CheckpointId, []) ->
+    ok;
+send_timeout_notifications(CheckpointId, [Pid | Rest]) ->
+    case erlang:is_process_alive(Pid) of
+        true ->
+            Pid ! {approval_timeout, CheckpointId};
+        false ->
+            ok
+    end,
+    send_timeout_notifications(CheckpointId, Rest).
 
 %%--------------------------------------------------------------------
 %% @private

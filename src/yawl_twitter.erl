@@ -166,7 +166,7 @@ post_tweet(Text, Options) ->
 -spec post_tweet_with_media(Text :: binary(), MediaUrl :: media_url()) ->
           {ok, tweet_id()} | {error, term()}.
 
-post_tweet_with_media(Text, MediaUrl) ->
+post_tweet_with_media(Text, _MediaUrl) ->
     case byte_size(Text) of
         N when N > 280 ->
             {error, text_too_long};

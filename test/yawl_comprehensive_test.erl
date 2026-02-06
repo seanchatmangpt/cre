@@ -50,6 +50,8 @@
 -author('joergen.brandt@cuneiform-lang.org').
 
 -include_lib("eunit/include/eunit.hrl").
+-include("cre_yawl.hrl").
+-include("cre_yawl_patterns.hrl").
 
 %%====================================================================
 %% Record Definitions

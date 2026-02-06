@@ -36,45 +36,19 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Setup for all tests - run once at beginning.
-%% @end
-%%--------------------------------------------------------------------
-setup_all() ->
-    %% Stop Mnesia if running and reset for clean state
-    case application:stop(mnesia) of
-        ok -> timer:sleep(200);  % Wait for mnesia to fully stop
-        {error, {not_started, _}} -> ok
-    end,
-    %% Delete schema
-    mnesia:delete_schema([node()]),
-    timer:sleep(200),
-    %% Initialize fresh schema
-    case yawl_persistence:init_schema() of
-        ok -> ok;
-        {error, {already_exists, _}} -> ok  % Schema already initialized
-    end,
-    %% Wait for tables to be ready - handle timeout
-    case mnesia:wait_for_tables([persistent_case, persistent_workitem], 5000) of
-        {ok, _} -> ok;
-        {timeout, _} -> ok;  % Tables may already be available
-        _ -> ok
-    end,
-    {ok, #{}}.
-
-%%--------------------------------------------------------------------
-%% @doc Cleanup for all tests - run once at end.
-%% @end
-%%--------------------------------------------------------------------
-cleanup_all(_TestData) ->
-    mnesia:stop(),
-    mnesia:delete_schema([node()]),
-    ok.
-
-%%--------------------------------------------------------------------
 %% @doc Setup for each test case.
+%% Clears tables between tests.
 %% @end
 %%--------------------------------------------------------------------
 setup_each() ->
+    %% Clear all tables if they exist
+    case mnesia:system_info(is_running) of
+        yes ->
+            try mnesia:clear_table(persistent_case), ok catch _:_ -> ok end,
+            try mnesia:clear_table(persistent_workitem), ok catch _:_ -> ok end;
+        no ->
+            ok
+    end,
     ok.
 
 %%--------------------------------------------------------------------
@@ -82,9 +56,7 @@ setup_each() ->
 %% @end
 %%--------------------------------------------------------------------
 cleanup_each(_TestData) ->
-    %% Clear all tables
-    mnesia:clear_table(persistent_case),
-    mnesia:clear_table(persistent_workitem),
+    %% Tables already cleared in setup
     ok.
 
 %%--------------------------------------------------------------------
@@ -136,6 +108,27 @@ test_case_map_with_data(TestCaseId, Data) ->
     maps:put(data, Data, test_case_map(TestCaseId)).
 
 %%====================================================================
+%% Global Setup - runs once before all tests
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Global setup that runs once before all tests.
+%% Initializes Mnesia and creates schema.
+%% @end
+%%--------------------------------------------------------------------
+setup_global() ->
+    %% Clean setup
+    application:stop(mnesia),
+    timer:sleep(100),
+    mnesia:delete_schema([node()]),
+    timer:sleep(100),
+    %% Initialize schema
+    ok = yawl_persistence:init_schema(),
+    %% Verify Mnesia is running
+    yes = mnesia:system_info(is_running),
+    ok.
+
+%%====================================================================
 %% Schema Initialization Tests
 %%====================================================================
 
@@ -145,11 +138,10 @@ test_case_map_with_data(TestCaseId, Data) ->
 %% @end
 %%--------------------------------------------------------------------
 test_init_schema_test_() ->
-    {setup,
-     fun setup_all/0,
-     fun cleanup_all/1,
-     fun(_TestData) ->
-         [?_test(begin
+    {foreach,
+     fun setup_each/0,
+     fun cleanup_each/1,
+     [?_test(begin
                     %% Verify tables exist
                     ?assertEqual(true, mnesia:table_info(persistent_case, is_a_table)),
                     ?assertEqual(true, mnesia:table_info(persistent_workitem, is_a_table)),
@@ -171,8 +163,7 @@ test_init_schema_test_() ->
 
                     WorkitemStorage = mnesia:table_info(persistent_workitem, storage_type),
                     ?assertEqual(disc_copies, element(1, WorkitemStorage))
-                end)]
-     end}.
+                end)]}.
 
 %%--------------------------------------------------------------------
 %% @doc Test calling init_schema when already initialized.
@@ -180,19 +171,17 @@ test_init_schema_test_() ->
 %% @end
 %%--------------------------------------------------------------------
 test_init_schema_idempotent_test_() ->
-    {setup,
-     fun setup_all/0,
-     fun cleanup_all/1,
-     fun(_TestData) ->
-         [?_test(begin
+    {foreach,
+     fun setup_each/0,
+     fun cleanup_each/1,
+     [?_test(begin
                     %% Call init_schema again
                     ?assertEqual(ok, yawl_persistence:init_schema()),
 
                     %% Tables should still exist and work
                     ?assertEqual(true, mnesia:table_info(persistent_case, is_a_table)),
                     ?assertEqual(true, mnesia:table_info(persistent_workitem, is_a_table))
-                end)]
-     end}.
+                end)]}.
 
 %%====================================================================
 %% Case Persistence Tests
@@ -632,3 +621,52 @@ test_full_lifecycle_test_() ->
                     ?assertMatch({error, not_found}, yawl_persistence:load_case(CaseId)),
                     {ok, []} = yawl_persistence:load_workitems(CaseId)
                 end)]}.
+
+%%====================================================================
+%% Main Test Generator with Global Setup
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Main test generator that sets up Mnesia once for all tests.
+%% All individual tests use setup_each/cleanup_each to clear tables.
+%% @end
+%%--------------------------------------------------------------------
+main_test_() ->
+    {setup,
+     fun setup_global/0,
+     fun(_TestData) ->
+         mnesia:stop(),
+         mnesia:delete_schema([node()]),
+         ok
+     end,
+     fun(_TestData) ->
+         [
+          %% Schema Tests
+          test_init_schema_test_(),
+          test_init_schema_idempotent_test_(),
+
+          %% Case Persistence Tests
+          test_save_case_map_test_(),
+          test_load_case_test_(),
+          test_load_case_not_found_test_(),
+          test_update_case_test_(),
+          test_delete_case_test_(),
+          test_delete_case_not_found_test_(),
+          test_case_statuses_test_(),
+
+          %% Workitem Persistence Tests
+          test_save_workitem_map_test_(),
+          test_load_workitems_test_(),
+          test_load_workitems_empty_test_(),
+          test_update_workitem_test_(),
+          test_delete_case_cascade_workitems_test_(),
+
+          %% Active Cases Tests
+          test_list_active_cases_test_(),
+          test_list_active_cases_empty_test_(),
+          test_get_case_count_test_(),
+
+          %% Integration Tests
+          test_full_lifecycle_test_()
+         ]
+     end}.

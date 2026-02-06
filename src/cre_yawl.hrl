@@ -272,3 +272,14 @@
     approval_config :: map(),
     middleware_chain :: [fun()]
 }).
+
+%%--------------------------------------------------------------------
+%% Claude Bridge Session Record
+%%--------------------------------------------------------------------
+-record(claude_session, {
+    session_id :: binary(),
+    started_at :: integer(),
+    last_activity :: integer(),
+    message_count :: non_neg_integer(),
+    context :: map()
+}).

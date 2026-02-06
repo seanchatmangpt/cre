@@ -68,20 +68,6 @@
 -type bridge_result() :: {ok, map()} | {error, term()}.
 -type session_result() :: {ok, session_id()} | {error, term()}.
 
--record(claude_session, {
-    session_id :: session_id(),
-    started_at :: integer(),
-    last_activity :: integer(),
-    message_count :: non_neg_integer(),
-    context :: map()
-}).
-
--record(bridge_state, {
-    claude_command :: binary(),
-    default_timeout :: non_neg_integer(),
-    max_retries :: non_neg_integer(),
-    sessions :: #{session_id() => #claude_session{}}
-}).
 
 -export_type([session_id/0, json_schema/0, prompt_context/0]).
 
@@ -167,7 +153,7 @@ prompt_claude(Prompt, Schema, Options) ->
 
     TokenArgs = ["--max-tokens", integer_to_list(MaxTokens)],
 
-    AllArgs = lists:flatten([BaseArgs, SchemaArgs, ToolArgs, ModelArgs, TokenArgs]),
+    AllArgs = lists:append([BaseArgs, SchemaArgs, ToolArgs, ModelArgs, TokenArgs]),
 
     %% Execute command
     FullCmd = string:join([binary_to_list(ClaudeCmd) | AllArgs], " "),
@@ -449,13 +435,10 @@ add_context_to_prompt(Prompt, Context) when is_map(Context) ->
 escape_prompt(Prompt) ->
     %% Simple escaping - wrap in single quotes and escape single quotes
     PromptStr = binary_to_list(Prompt),
-    lists:flatten([
-        "'",
-        lists:map(fun($') -> "'\\''";
-                     (C) -> C
-                  end, PromptStr),
-        "'"
-    ]).
+    Escaped = lists:map(fun($') -> "'\\''";
+                           (C) -> [C]
+                        end, PromptStr),
+    lists:flatten(["'" | Escaped] ++ ["'"]).
 
 %%--------------------------------------------------------------------
 %% @private

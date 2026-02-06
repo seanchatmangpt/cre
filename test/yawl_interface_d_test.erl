@@ -38,6 +38,7 @@
 -author('joergen.brandt@cuneiform-lang.org').
 
 -include_lib("eunit/include/eunit.hrl").
+-include("yawl_interface_d.hrl").
 
 %%====================================================================
 %% Test Setup and Teardown
@@ -299,7 +300,7 @@ test_launch_worklet_precondition_test_() ->
                     % Register worklet with precondition in yawl_worklet if available
                     case whereis(yawl_worklet) of
                         undefined -> ok;
-                        _Pid ->
+                        _WorkletPid ->
                             PreCond = fun(Ctx) ->
                                 maps:get(<<"can_handle">>, Ctx, false) =:= true
                             end,
@@ -494,7 +495,7 @@ test_check_preconditions_with_context_test_() ->
                     % Register worklet with precondition
                     case whereis(yawl_worklet) of
                         undefined -> ok;
-                        _Pid ->
+                        _WorkletPid ->
                             PreCond = fun(Ctx) ->
                                 maps:get(<<"ready">>, Ctx, false) =:= true
                             end,
@@ -555,7 +556,7 @@ test_check_postconditions_with_result_test_() ->
                     % Register worklet with postcondition
                     case whereis(yawl_worklet) of
                         undefined -> ok;
-                        _Pid ->
+                        _WorkletPid ->
                             PostCond = fun(Ctx) ->
                                 maps:get(<<"success">>, Ctx, false) =:= true
                             end,
@@ -895,12 +896,12 @@ test_get_active_worklets_test_() ->
                     CaseId = <<"case_active">>,
                     WorkletSpecId = <<"worklet_active">>,
 
-                    {ok, Exec1} = yawl_interface_d:launch_worklet(
+                    {ok, _Exec1} = yawl_interface_d:launch_worklet(
                         CaseId,
                         WorkletSpecId,
                         #{<<"task_id">> => <<"task_active_1">>}
                     ),
-                    {ok, Exec2} = yawl_interface_d:launch_worklet(
+                    {ok, _Exec2} = yawl_interface_d:launch_worklet(
                         CaseId,
                         WorkletSpecId,
                         #{<<"task_id">> => <<"task_active_2">>}
@@ -1121,7 +1122,7 @@ test_precondition_timeout_test_() ->
                     % Register worklet with slow precondition
                     case whereis(yawl_worklet) of
                         undefined -> ok;
-                        _Pid ->
+                        _WorkletPid ->
                             SlowPreCond = fun() ->
                                 timer:sleep(100),
                                 true
@@ -1153,7 +1154,7 @@ test_precondition_error_test_() ->
                     % Register worklet with error-throwing precondition
                     case whereis(yawl_worklet) of
                         undefined -> ok;
-                        _Pid ->
+                        _WorkletPid ->
                             ErrorPreCond = fun() -> error(bad_precondition) end,
                             {ok, SpecId} = yawl_worklet:register_worklet(
                                 <<"error_precond_worklet">>,
@@ -1268,7 +1269,7 @@ test_worklet_launch_performance_test_() ->
 
                     % Log performance metrics
                     logger:info("Worklet launch performance: ~pms total, ~p ops/sec, ~p% success rate",
-                                [Time, Throughput, SuccessRate * 100],
+                                [Time/1000, Throughput, SuccessRate * 100]),
 
                     % Performance assertions
                     ?assert(SuccessRate >= 0.95, "Success rate should be at least 95%"),
@@ -1315,7 +1316,7 @@ test_worklet_completion_performance_test_() ->
 
                     % Log performance metrics
                     logger:info("Worklet completion performance: ~pms total, ~pms avg, ~p% success rate",
-                                [Time, AvgTimePerCompletion, SuccessRate * 100],
+                                [Time/1000, AvgTimePerCompletion/1000, SuccessRate * 100]),
 
                     % Performance assertions
                     ?assert(SuccessRate >= 0.95, "Completion success rate should be at least 95%"),
@@ -1346,16 +1347,15 @@ test_memory_usage_test_() ->
 
                     % Launch and complete many worklets
                     N = 100,
-                    Operations = [],
-                    for I <- lists:seq(1, N) do
+                    {ExecIds, _} = lists:foldl(fun(_I, {IdsAcc, CountAcc}) ->
                         {ok, ExecId} = yawl_interface_d:launch_worklet(
                             CaseId, WorkletSpecId, LargeExceptionData
                         ),
                         Result = #{<<"status">> => <<"handled">>,
                                  <<"result_data">> => generate_large_metadata(2000)},
                         ok = yawl_interface_d:complete_worklet(ExecId, Result),
-                        Operations := [I | Operations]
-                    end,
+                        {[ExecId | IdsAcc], CountAcc + 1}
+                    end, {[], 0}, lists:seq(1, N)),
 
                     % Get final memory
                     FinalMemory = process_info(self(), memory),
@@ -1369,7 +1369,7 @@ test_memory_usage_test_() ->
 
                     % Memory assertions (should not grow excessively)
                     ?assert(MemoryIncrease < 10 * 1024 * 1024, "Memory increase should be < 10MB"),
-                    ?assert(MemoryIncrease / N < 100000, "Average memory per operation should be < 100KB")
+                    ?assert(MemoryIncrease / N < 100000, "Average memory per operation should be < 100KB"),
 
                     % Clean up
                     lists:foreach(fun(ExecId) ->
@@ -1378,7 +1378,7 @@ test_memory_usage_test_() ->
                             {ok, _Status} -> yawl_interface_d:abort_worklet(ExecId);
                             {error, not_found} -> ok
                         end
-                    end, Operations)
+                    end, ExecIds)
                 end)]
      end}.
 
@@ -1590,22 +1590,27 @@ test_sustained_load_test_() ->
 
                     % Perform sustained operations
                     StartTime = erlang:monotonic_time(millisecond),
-                    CurrentTime = StartTime,
-                    Operations = [],
-
-                    while(CurrentTime < StartTime + Duration, fun() ->
-                        BatchResults = [yawl_interface_d:handle_exception(
-                            ExceptionType,
-                            BaseExceptionData#{
-                                <<"case_id">> => list_to_binary(integer_to_list(CurrentTime, I)),
-                                <<"iteration">> => I
-                            })
-                            || I <- lists:seq(1, BatchSize)],
-
-                        Operations := [BatchResults | Operations],
-                        CurrentTime := erlang:monotonic_time(millisecond),
-                        timer:sleep(Interval)
-                    end),
+                    Operations = lists:foldl(
+                        fun(_I, AccOps) ->
+                            CurrentTime = erlang:monotonic_time(millisecond),
+                            case CurrentTime < StartTime + Duration of
+                                true ->
+                                    BatchResults = [yawl_interface_d:handle_exception(
+                                        ExceptionType,
+                                        BaseExceptionData#{
+                                            <<"case_id">> => list_to_binary(integer_to_list(CurrentTime, J)),
+                                            <<"iteration">> => J
+                                        })
+                                        || J <- lists:seq(1, BatchSize)],
+                                    timer:sleep(Interval),
+                                    [BatchResults | AccOps];
+                                false ->
+                                    AccOps
+                            end
+                        end,
+                        [],
+                        lists:seq(1, Duration div Interval)
+                    ),
 
                     % Complete all launched worklets
                     AllExecutionIds = lists:flatten([
@@ -1664,45 +1669,14 @@ test_stress_conditions_test_() ->
                     },
 
                     % Start concurrent stress processes
-                    StressProcesses = [],
-                    for I <- lists:seq(1, ConcurrentBatches) do
-                        ProcessPid = spawn_link(fun() ->
+                    StressProcesses = [spawn_link(fun() ->
                             ProcessStartTime = erlang:monotonic_time(millisecond),
-                            ProcessOps = [],
 
-                            while(erlang:monotonic_time(millisecond) < ProcessStartTime + StressDuration, fun() ->
-                                CaseId = list_to_binary(integer_to_list(I, erlang:unique_integer())),
-                                ExceptionData = BaseExceptionData#{
-                                    <<"case_id">> => CaseId,
-                                    <<"process_id">> => I,
-                                    <<"timestamp">> => erlang:system_time(millisecond)
-                                },
-
-                                case yawl_interface_d:handle_exception(ExceptionType, ExceptionData) of
-                                    {ok, ExecId} ->
-                                        % Complete immediately
-                                        Result = #{<<"status">> => <<"handled">>,
-                                                 <<"process_id">> => I,
-                                                 <<"timestamp">> => erlang:system_time(millisecond)},
-                                        yawl_interface_d:complete_worklet(ExecId, Result),
-                                        ProcessOps := [ok | ProcessOps];
-                                    {error, Reason} ->
-                                        ProcessOps := [{error, Reason} | ProcessOps]
-                                end,
-
-                                timer:sleep(HighFrequency)
-                            end),
-
-                            % Log process results
-                            ProcessCount = length(ProcessOps),
-                            SuccessCount = length([R || R <- ProcessOps, R =:= ok]),
-                            logger:info("Stress process ~p: ~p ops, ~p% success",
-                                        [I, ProcessCount, (SuccessCount / ProcessCount) * 100]),
+                            % Simple loop for stress test duration
+                            do_stress_loop(ProcessStartTime, StressDuration, HighFrequency, I, BaseExceptionData, ExceptionType),
 
                             exit(normal)
-                        end),
-                        StressProcesses := [ProcessPid | StressProcesses]
-                    end,
+                        end) || I <- lists:seq(1, ConcurrentBatches)],
 
                     % Wait for all stress processes to complete
                     lists:foreach(fun(Pid) ->
@@ -1732,7 +1706,7 @@ test_interface_d_workflow_pattern_integration_test_() ->
      fun setup/0,
      fun cleanup/1,
      fun(_Pid) ->
-         [?_test(begin
+         [{"Workflow pattern integration", fun() ->
                     % Register multiple exception services for different patterns
                     ServiceConfigs = [
                         {<<"pattern_service_1">>,
@@ -1756,8 +1730,8 @@ test_interface_d_workflow_pattern_integration_test_() ->
                         {merge_flow, runtime_exception, <<"merge_handler">>}
                     ],
 
-                    PatternResults = [],
-                    for {PatternName, ExceptionType, WorkletSpecId} <- Patterns do
+                    % Process each pattern
+                    PatternResults = lists:map(fun({PatternName, ExceptionType, WorkletSpecId}) ->
                         ExceptionData = #{
                             <<"pattern_name">> => PatternName,
                             <<"case_id">> => list_to_binary(atom_to_list(PatternName)),
@@ -1777,15 +1751,15 @@ test_interface_d_workflow_pattern_integration_test_() ->
                                 <<"timestamp">> => erlang:system_time(millisecond)
                             }),
 
-                        PatternResults := [{PatternName, ExecId} | PatternResults]
-                    end,
+                        {PatternName, ExecId}
+                    end, Patterns),
 
                     % Verify all patterns were handled
-                    ?assert(length(PatternResults) =:= 5, "All 5 patterns should be handled"),
+                    ?assertEqual(5, length(PatternResults)),
 
                     logger:info("Workflow pattern integration test: ~p patterns completed",
                                 [length(PatternResults)])
-                end)]
+                end}]
      end}.
 
 %%--------------------------------------------------------------------
@@ -1797,7 +1771,7 @@ test_interface_d_distributed_integration_test_() ->
      fun setup/0,
      fun cleanup/1,
      fun(_Pid) ->
-         [?_test(begin
+         [{"Distributed workflow integration", fun() ->
                     % Register both local and remote services
                     LocalService = [{endpoint, <<"http://localhost:8080/local">>},
                                    {service_type, local}, {priority, 5}],
@@ -1816,8 +1790,7 @@ test_interface_d_distributed_integration_test_() ->
                         {mixed_exception, LocalId}  % Should pick local due to higher priority
                     ],
 
-                    Results = [],
-                    for {ExceptionType, ExpectedServiceId} <- ExceptionTypes do
+                    Results = lists:map(fun({ExceptionType, ExpectedServiceId}) ->
                         ExceptionData = #{
                             <<"exception_type">> => ExceptionType,
                             <<"case_id">> => list_to_binary(atom_to_list(ExceptionType)),
@@ -1836,19 +1809,19 @@ test_interface_d_distributed_integration_test_() ->
                                          <<"service_id">> => ExpectedServiceId,
                                          <<"status">> => <<"distributed_handled">>},
                                 ok = yawl_interface_d:complete_worklet(ExecId, Result),
-                                Results := [{ExceptionType, ExecId, success} | Results];
+                                {ExceptionType, ExecId, success};
                             {error, Reason} ->
-                                Results := [{ExceptionType, undefined, Reason} | Results]
+                                {ExceptionType, undefined, Reason}
                         end
-                    end,
+                    end, ExceptionTypes),
 
                     % Verify results
                     SuccessCount = length([R || R <- Results, element(3, R) =:= success]),
-                    ?assert(SuccessCount >= 2, "Should handle at least 2/3 exceptions"),
+                    ?assert(SuccessCount >= 2),
 
                     logger:info("Distributed integration: ~p/~p exceptions handled",
                                 [SuccessCount, length(Results)])
-                end)]
+                end}]
      end}.
 
 %%====================================================================
@@ -1865,6 +1838,34 @@ while(Condition, Fun) when is_function(Fun, 0) ->
         true ->
             Fun(),
             while(Condition, Fun);
+        false ->
+            ok
+    end.
+
+%% @private
+do_stress_loop(StartTime, Duration, Interval, ProcessId, BaseExceptionData, ExceptionType) ->
+    CurrentTime = erlang:monotonic_time(millisecond),
+    case CurrentTime < StartTime + Duration of
+        true ->
+            CaseId = list_to_binary(integer_to_list(ProcessId, erlang:unique_integer())),
+            ExceptionData = BaseExceptionData#{
+                <<"case_id">> => CaseId,
+                <<"process_id">> => ProcessId,
+                <<"timestamp">> => erlang:system_time(millisecond)
+            },
+
+            case yawl_interface_d:handle_exception(ExceptionType, ExceptionData) of
+                {ok, ExecId} ->
+                    Result = #{<<"status">> => <<"handled">>,
+                             <<"process_id">> => ProcessId,
+                             <<"timestamp">> => erlang:system_time(millisecond)},
+                    yawl_interface_d:complete_worklet(ExecId, Result);
+                {error, _Reason} ->
+                    ok
+            end,
+
+            timer:sleep(Interval),
+            do_stress_loop(StartTime, Duration, Interval, ProcessId, BaseExceptionData, ExceptionType);
         false ->
             ok
     end.

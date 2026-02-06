@@ -1,0 +1,103 @@
+[0;35m===> Newly added dep cowlib is locked at a lower level. If you really want to unlock it, use 'rebar3 upgrade cowlib'
+[0m[0;35m===> Newly added dep ranch is locked at a lower level. If you really want to unlock it, use 'rebar3 upgrade ranch'
+[0m[0;32m===> Verifying dependencies...
+[0m[0;32m===> Analyzing applications...
+[0m[0;32m===> Compiling cre
+[0m     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 155 │  -[1;31mrecord[0m(sync_token, {[0m
+     │   [1;31m╰──[0m[0m Warning: record sync_token is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 161 │  -[1;31mrecord[0m(loop_state, {[0m
+     │   [1;31m╰──[0m[0m Warning: record loop_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 167 │  -[1;31mrecord[0m(recursion_token, {[0m
+     │   [1;31m╰──[0m[0m Warning: record recursion_token is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 173 │  -[1;31mrecord[0m(protocol_state, {[0m
+     │   [1;31m╰──[0m[0m Warning: record protocol_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 180 │  -[1;31mrecord[0m(catch_state, {[0m
+     │   [1;31m╰──[0m[0m Warning: record catch_state is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 1772 │       #{'p_active' := [[1;31mActive[0m], 'p_complete' := [Complete]},[0m
+      │                        [1;31m╰──[0m[0m Warning: variable 'Active' is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 1772 │       #{'p_active' := [Active], 'p_complete' := [[1;31mComplete[0m]},[0m
+      │                                                  [1;31m╰──[0m[0m Warning: variable 'Complete' is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 1797 │       #{'p_activity_running' := [[1;31mRunning[0m]},[0m
+      │                                  [1;31m╰──[0m[0m Warning: variable 'Running' is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 1813 │       #{'p_activity_running' := [[1;31mRunning[0m], 'p_completed' := [Done]},[0m
+      │                                  [1;31m╰──[0m[0m Warning: variable 'Running' is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 1813 │       #{'p_activity_running' := [Running], 'p_completed' := [[1;31mDone[0m]},[0m
+      │                                                              [1;31m╰──[0m[0m Warning: variable 'Done' is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 1838 │       #{'p_case_active' := [[1;31mCaseActive[0m]},[0m
+      │                             [1;31m╰──[0m[0m Warning: variable 'CaseActive' is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 1862 │       #{'p_case_active' := [[1;31mCaseActive[0m], 'p_completed' := [Done]},[0m
+      │                             [1;31m╰──[0m[0m Warning: variable 'CaseActive' is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 1862 │       #{'p_case_active' := [CaseActive], 'p_completed' := [[1;31mDone[0m]},[0m
+      │                                                            [1;31m╰──[0m[0m Warning: variable 'Done' is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 2698 │                  {'EXIT', [1;31mPid[0m, _Reason} ->[0m
+      │                           [1;31m╰──[0m[0m Warning: variable 'Pid' is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 2756 │          {Ref, [1;31mPid[0m, Result} ->[0m
+      │                [1;31m╰──[0m[0m Warning: variable 'Pid' is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 2766 │          {'EXIT', [1;31mPid[0m, _Reason} ->[0m
+      │                   [1;31m╰──[0m[0m Warning: variable 'Pid' is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 2830 │          {Ref, {option, [1;31mKey[0m}, {error, _}} ->[0m
+      │                         [1;31m╰──[0m[0m Warning: variable 'Key' is unused
+
+
+Erlang/OTP 28 [erts-16.2] [source] [64-bit] [smp:16:16] [ds:16:16:10] [async-threads:1] [jit]
+
+Eshell V16.2 (press Ctrl+G to abort, type help(). for help)
+1> [0;32m===> Booted cowlib
+[0m[0;32m===> Booted ranch
+[0m[0;32m===> Booted cowboy
+[0m[0;32m===> Booted jsx
+[0m[0;32m===> Booted cre
+[0m[0;32m===> Evaluating: "\n    % Start services\n    {ok, _} = yawl_otel_logger:start_link(),\n    {ok, _} = yawl_web_dashboard:start_link(),\n    \n    % Add some test events\n    yawl_otel_logger:log_workflow_start(<<\"case-demo\">>, <<\"demo-workflow\">>),\n    yawl_otel_logger:log_workitem_start(<<\"case-demo\">>, <<\"task-A\">>, <<\"Initialize\">>),\n    yawl_otel_logger:log_checkpoint(<<\"cp-A\">>, <<\"demo-workflow\">>, step1, <<admin\"."
+[0m[0;31m===> [1mUncaught error in rebar_core. Run with DIAGNOSTIC=1 to see stacktrace or consult rebar3.crashdump
+[0m[0m[0;32m===> When submitting a bug report, please include the output of `rebar3 report "your command"`
+[0m
