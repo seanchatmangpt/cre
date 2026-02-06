@@ -35,6 +35,42 @@
 %%   <li><b>Prometheus Export:</b> Metrics in Prometheus format</li>
 %% </ul>
 %%
+%% <h3>Doctests</h3>
+%%
+%% Generate trace IDs for distributed tracing:
+%% ```
+%% 1> TraceId = yawl_telemetry:generate_trace_id().
+%% <<16,256,...>>
+%% 2> byte_size(TraceId).
+%% 32
+%% ```
+%%
+%% Generate span IDs:
+%% ```
+%% 1> SpanId = yawl_telemetry:generate_span_id().
+%% <<16,256,...>>
+%% 2> byte_size(SpanId).
+%% 16
+%% ```
+%%
+%% Trace context injection and extraction:
+%% ```
+%% 1> Ctx = #{trace_id => <<"0123456789abcdef0123456789abcdef">>, span_id => <<"0123456789abcdef">>}.
+%% #{span_id => <<"0123456789abcdef">>,trace_id => <<"0123456789abcdef0123456789abcdef">>}
+%% 2> Headers = yawl_telemetry:inject_trace_context(Ctx, #{}).
+%% #{<<"traceparent">> => <<"00-0123456789abcdef0123456789abcdef-0123456789abcdef-01">>,...}
+%% 3> Extracted = yawl_telemetry:extract_trace_context(Headers).
+%% #{span_id => <<"0123456789abcdef">>,trace_id => <<"0123456789abcdef0123456789abcdef">>}
+%% ```
+%%
+%% List to map conversion helper:
+%% ```
+%% 1> yawl_telemetry:list_to_map([{a, 1}, {b, 2}]).
+%% #{a => 1,b => 2}
+%% 2> yawl_telemetry:list_to_map([]).
+%% #{}
+%% ```
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -81,6 +117,9 @@
 -export([log_event/3, log_state_change/3, query_audit/1]).
 -export([get_audit_log/1, export_audit_log/2]).
 -export([clear_audit_log/0, clear_audit_log/1]).
+
+%% Doctests and Helper Functions
+-export([doctest_test/0, list_to_map/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -194,30 +233,139 @@ update_config(Config) ->
 %% Span Management (OpenTelemetry-style)
 %%====================================================================
 
+%% @doc Start a new span with default empty attributes.
+%%
+%% Creates a new telemetry span for tracking pattern execution.
+%% Returns {ok, SpanId} where SpanId is a unique reference.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> {ok, SpanId} = yawl_telemetry:start_span(sequence, workflow_1).
+%% {ok, #Ref<0.0.0.123>}
+%% 2> is_reference(SpanId).
+%% true
+%% ```
+-spec start_span(pattern_type(), pattern_id()) -> {ok, span_id()} | {error, term()}.
 start_span(PatternType, PatternId) ->
     start_span(PatternType, PatternId, maps:new()).
 
+%% @doc Start a new span with custom attributes.
+%%
+%% Creates a new telemetry span with initial attributes for
+%% tracking pattern execution with metadata.
+%%
+%% Example:
+%% ```
+%% 1> Attrs = #{priority => high, source => api}.
+%% 2> {ok, SpanId} = yawl_telemetry:start_split(and_join, workflow_2, Attrs).
+%% {ok, #Ref<0.0.0.456>}
+%% ```
+-spec start_span(pattern_type(), pattern_id(), map()) -> {ok, span_id()} | {error, term()}.
 start_span(PatternType, PatternId, Attributes) ->
     gen_server:call(?MODULE, {start_span, PatternType, PatternId, Attributes}).
 
+%% @doc End a span with result and default `ok` status.
+%%
+%% Marks a span as complete with the given result value.
+%% Equivalent to `end_span(SpanId, Result, ok)`.
+%%
+%% Example:
+%% ```
+%% 1> yawl_telemetry:end_span(SpanId, {completed, success}).
+%% ok
+%% ```
+-spec end_span(span_id(), term()) -> ok.
 end_span(SpanId, Result) ->
     end_span(SpanId, Result, ok).
 
+%% @doc End a span with result and custom status.
+%%
+%% Marks a span as complete with the specified result and status.
+%% Status can be `ok`, `error`, or any other term indicating outcome.
+%%
+%% Example:
+%% ```
+%% 1> yawl_telemetry:end_span(SpanId, {data, Result}, ok).
+%% ok
+%% 2> yawl_telemetry:end_span(ErrorSpanId, {failed, timeout}, error).
+%% ok
+%% ```
+-spec end_span(span_id(), term(), atom()) -> ok.
 end_span(SpanId, Result, Status) ->
     gen_server:cast(?MODULE, {end_span, SpanId, Result, Status}).
 
+%% @doc Add a key-value attribute to an active span.
+%%
+%% Sets or updates an attribute on the span for additional context.
+%%
+%% Example:
+%% ```
+%% 1> yawl_telemetry:span_attribute(SpanId, user_id, 12345).
+%% ok
+%% 2> yawl_telemetry:span_attribute(SpanId, tags, [<<"important">>]).
+%% ok
+%% ```
+-spec span_attribute(span_id(), term(), term()) -> ok.
 span_attribute(SpanId, Key, Value) ->
     gen_server:cast(?MODULE, {span_attribute, SpanId, Key, Value}).
 
+%% @doc Record an event on an active span.
+%%
+%% Adds an event name to the span's event timeline for debugging.
+%%
+%% Example:
+%% ```
+%% 1> yawl_telemetry:span_event(SpanId, task_started).
+%% ok
+%% 2> yawl_telemetry:span_event(SpanId, checkpoint_reached).
+%% ok
+%% ```
+-spec span_event(span_id(), atom()) -> ok.
 span_event(SpanId, EventName) ->
     gen_server:cast(?MODULE, {span_event, SpanId, EventName}).
 
+%% @doc Set the status of an active span.
+%%
+%% Updates the span status to indicate the current state.
+%%
+%% Example:
+%% ```
+%% 1> yawl_telemetry:span_status(SpanId, ok).
+%% ok
+%% 2> yawl_telemetry:span_status(SpanId, error).
+%% ok
+%% ```
+-spec span_status(span_id(), atom()) -> ok.
 span_status(SpanId, Status) ->
     gen_server:cast(?MODULE, {span_status, SpanId, Status}).
 
+%% @doc Get list of all active spans.
+%%
+%% Returns a list of tuples containing {SpanId, PatternType, PatternId}
+%% for all currently active (non-completed) spans.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> yawl_telemetry:get_active_spans().
+%% [{#Ref<0.0.0.123>, sequence, workflow_1}]
+%% ```
+-spec get_active_spans() -> [{span_id(), pattern_type(), pattern_id()}].
 get_active_spans() ->
     gen_server:call(?MODULE, get_active_spans).
 
+%% @doc Get detailed information about a specific span.
+%%
+%% Returns a map with span details including id, trace_id, pattern_type,
+%% pattern_id, start_time, duration, status, attributes, and events.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> {ok, Info} = yawl_telemetry:get_span_info(SpanId).
+%% {ok, #{id => #Ref<0.0.0.123>, pattern_type => sequence, ...}}
+%% 2> maps:get(duration, Info).
+%% 1250
+%% ```
+-spec get_span_info(span_id()) -> {ok, map()} | {error, term()}.
 get_span_info(SpanId) ->
     gen_server:call(?MODULE, {get_span_info, SpanId}).
 
@@ -225,30 +373,84 @@ get_span_info(SpanId) ->
 %% Metrics Collection
 %%====================================================================
 
+%% @doc Record the start of a pattern execution.
+%%
+%% Creates a metric entry marking when a pattern began execution.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> yawl_telemetry:record_execution_start(sequence, workflow_1).
+%% ok
+%% ```
+-spec record_execution_start(pattern_type(), pattern_id()) -> ok.
 record_execution_start(PatternType, PatternId) ->
     gen_server:cast(?MODULE, {record_execution_start, PatternType, PatternId}).
 
 record_execution_complete(PatternType, PatternId, Duration) ->
     gen_server:cast(?MODULE, {record_execution_complete, PatternType, PatternId, Duration}).
 
+%% @doc Record a pattern execution error.
+%%
+%% Creates a metric entry for failed pattern executions with the reason.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> yawl_telemetry:record_execution_error(sequence, workflow_1, timeout).
+%% ok
+%% ```
+-spec record_execution_error(pattern_type(), pattern_id(), term()) -> ok.
 record_execution_error(PatternType, PatternId, Reason) ->
     gen_server:cast(?MODULE, {record_execution_error, PatternType, PatternId, Reason}).
 
 record_timing(PatternType, Stage, Duration) ->
     gen_server:cast(?MODULE, {record_timing, PatternType, Stage, Duration}).
 
+%% @doc Increment a named counter metric with tags.
+%%
+%% Records a counter increment with optional tags for categorization.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> yawl_telemetry:increment_counter(workflow_started, #{type => sequential}).
+%% ok
+%% ```
+-spec increment_counter(atom(), map()) -> ok.
 increment_counter(MetricName, Tags) ->
     gen_server:cast(?MODULE, {increment_counter, MetricName, Tags}).
 
 get_metrics(PatternType) ->
     gen_server:call(?MODULE, {get_metrics, PatternType}).
 
+%% @doc Get a summary of all metrics.
+%%
+%% Returns aggregated metrics including total_executions, completions,
+%% errors, avg_duration_ms, and counts.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> {ok, Summary} = yawl_telemetry:get_metrics_summary().
+%% {ok, #{total_executions => 10, completions => 8, errors => 1, ...}}
+%% ```
+-spec get_metrics_summary() -> {ok, map()}.
 get_metrics_summary() ->
     gen_server:call(?MODULE, get_metrics_summary).
 
 export_prometheus() ->
     export_prometheus(all).
 
+%% @doc Export metrics in Prometheus text format.
+%%
+%% Returns a binary containing metrics formatted for Prometheus scraping.
+%% Can filter by pattern type or use 'all' for complete export.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> {ok, PrometheusText} = yawl_telemetry:export_prometheus(sequence).
+%% {ok, <<"# HELP pattern_execution_start YAWL pattern metric\n# TYPE pattern_execution_start gauge\n...">>}
+%% 2> {ok, AllMetrics} = yawl_telemetry:export_prometheus().
+%% {ok, <<"# HELP ...">>}
+%% ```
+-spec export_prometheus(all | pattern_type()) -> {ok, binary()}.
 export_prometheus(PatternType) ->
     gen_server:call(?MODULE, {export_prometheus, PatternType}).
 
@@ -256,16 +458,60 @@ export_prometheus(PatternType) ->
 %% Distributed Tracing
 %%====================================================================
 
+%% @doc Get the current trace context from the process dictionary.
+%%
+%% Returns the trace context map containing `trace_id` and `span_id`
+%% if previously set, otherwise returns `undefined`.
+%%
+%% Example:
+%% ```
+%% 1> yawl_telemetry:get_trace_context().
+%% undefined
+%% 2> yawl_telemetry:set_trace_context(#{trace_id => <<"abc123">>}).
+%% ok
+%% 3> yawl_telemetry:get_trace_context().
+%% #{trace_id => <<"abc123">>}
+%% ```
+-spec get_trace_context() -> map() | undefined.
 get_trace_context() ->
     case get(yawl_trace_context) of
         undefined -> undefined;
         Context -> Context
     end.
 
+%% @doc Set the trace context in the process dictionary.
+%%
+%% Stores a trace context map for distributed tracing propagation.
+%% The map should contain `trace_id` and optionally `span_id`.
+%%
+%% Example:
+%% ```
+%% 1> yawl_telemetry:set_trace_context(#{trace_id => <<"mytrace">>, span_id => <<"myspan">>}).
+%% ok
+%% ```
+-spec set_trace_context(map()) -> ok.
 set_trace_context(Context) when is_map(Context) ->
     put(yawl_trace_context, Context),
     ok.
 
+%% @doc Inject trace context into HTTP headers map.
+%%
+%% Adds W3C traceparent format headers and YAWL-specific trace headers
+%% to the provided headers map. If no trace context exists, returns
+%% the headers unchanged.
+%%
+%% Example:
+%% ```
+%% 1> Ctx = #{trace_id => <<"0123456789abcdef0123456789abcdef">>, span_id => <<"0123456789abcdef">>}.
+%% 2> yawl_telemetry:set_trace_context(Ctx).
+%% ok
+%% 3> yawl_telemetry:inject_trace_context(#{<<"custom">> => <<"value">>}).
+%% #{<<"custom">> => <<"value">>,
+%%   <<"traceparent">> => <<"00-0123456789abcdef0123456789abcdef-0123456789abcdef-01">>,
+%%   <<"x-yawl-span-id">> => <<"0123456789abcdef">>,
+%%   <<"x-yawl-trace-id">> => <<"0123456789abcdef0123456789abcdef">>}
+%% ```
+-spec inject_trace_context(map()) -> map().
 inject_trace_context(Headers) ->
     case get_trace_context() of
         undefined ->
@@ -279,6 +525,20 @@ inject_trace_context(Headers) ->
                     maps:put(<<"x-yawl-span-id">>, SpanId, Headers)))
     end.
 
+%% @doc Extract trace context from HTTP headers map.
+%%
+%% Parses W3C traceparent format or YAWL-specific headers to extract
+%% trace and span IDs. Returns a map with `trace_id` and `span_id`.
+%%
+%% Example:
+%% ```
+%% 1> Headers = #{<<"traceparent">> => <<"00-0123456789abcdef0123456789abcdef-0123456789abcdef-01">>}.
+%% 2> yawl_telemetry:extract_trace_context(Headers).
+%% #{span_id => <<"0123456789abcdef">>,trace_id => <<"0123456789abcdef0123456789abcdef">>}
+%% 3> yawl_telemetry:extract_trace_context(#{}).
+%% #{}
+%% ```
+-spec extract_trace_context(map()) -> map().
 extract_trace_context(Headers) ->
     TraceParent = maps:get(<<"traceparent">>, Headers,
                   maps:get(<<"x-yawl-trace-id">>, Headers, undefined)),
@@ -296,10 +556,40 @@ extract_trace_context(Headers) ->
             end
     end.
 
+%% @doc Generate a unique 128-bit trace ID as hexadecimal string.
+%%
+%% Creates a cryptographically random 32-character hexadecimal string
+%% suitable for distributed tracing following W3C traceparent format.
+%%
+%% Example:
+%% ```
+%% 1> TraceId = yawl_telemetry:generate_trace_id().
+%% <<16,256,...>>
+%% 2> byte_size(TraceId).
+%% 32
+%% 3> is_binary(TraceId).
+%% true
+%% ```
+-spec generate_trace_id() -> trace_id().
 generate_trace_id() ->
     <<Id:128>> = crypto:strong_rand_bytes(16),
     binary:encode_hex(Id).
 
+%% @doc Generate a unique 64-bit span ID as hexadecimal string.
+%%
+%% Creates a cryptographically random 16-character hexadecimal string
+%% for identifying individual spans within a trace.
+%%
+%% Example:
+%% ```
+%% 1> SpanId = yawl_telemetry:generate_span_id().
+%% <<16,256,...>>
+%% 2> byte_size(SpanId).
+%% 16
+%% 3> is_binary(SpanId).
+%% true
+%% ```
+-spec generate_span_id() -> binary().
 generate_span_id() ->
     <<Id:64>> = crypto:strong_rand_bytes(8),
     binary:encode_hex(Id).
@@ -308,18 +598,68 @@ generate_span_id() ->
 %% Health Checks
 %%====================================================================
 
+%% @doc Check the health status of a specific pattern.
+%%
+%% Returns {Status, Info} where Status is healthy, degraded, or unhealthy.
+%% Info map contains details like active_spans, healthy_count, degraded_count.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> {Status, Info} = yawl_telemetry:check_pattern_health(workflow_1).
+%% {healthy, #{active_spans => 1, healthy_count => 1}}
+%% 2> Status.
+%% healthy
+%% ```
+-spec check_pattern_health(pattern_id()) -> {health_status(), map()} | {{not_found, map()}, term()}.
 check_pattern_health(PatternId) ->
     gen_server:call(?MODULE, {check_pattern_health, PatternId}).
 
 system_health() ->
     gen_server:call(?MODULE, system_health).
 
+%% @doc Get status of all YAWL components.
+%%
+%% Returns a map with component names as keys and their status
+%% (running or not_running) as values.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> Status = yawl_telemetry:component_status().
+%% #{telemetry => running, monitor => running, engine => running, ...}
+%% 2> maps:get(telemetry, Status).
+%% running
+%% ```
+-spec component_status() -> map().
 component_status() ->
     gen_server:call(?MODULE, component_status).
 
+%% @doc Register a custom health check function.
+%%
+%% Registers a zero-arity function that will be called during system health checks.
+%% Returns {ok, CheckRef} where CheckRef can be used to unregister the check.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> CheckFn = fun() -> case file:read_file_info("/tmp") of {ok, _} -> ok; _ -> error end end.
+%% 2> {ok, CheckRef} = yawl_telemetry:register_health_check(tmp_writable, CheckFn).
+%% {ok, #Ref<0.0.0.789>}
+%% ```
+-spec register_health_check(term(), function()) -> {ok, reference()}.
 register_health_check(Name, CheckFn) when is_function(CheckFn, 0) ->
     gen_server:call(?MODULE, {register_health_check, Name, CheckFn}).
 
+%% @doc Unregister a previously registered health check.
+%%
+%% Removes the health check function associated with the given reference.
+%%
+%% Example (requires telemetry server running):
+%% ```
+%% 1> {ok, CheckRef} = yawl_telemetry:register_health_check(my_check, fun() -> ok end).
+%% {ok, #Ref<0.0.0.789>}
+%% 2> yawl_telemetry:unregister_health_check(CheckRef).
+%% ok
+%% ```
+-spec unregister_health_check(reference()) -> ok.
 unregister_health_check(CheckRef) ->
     gen_server:cast(?MODULE, {unregister_health_check, CheckRef}).
 
@@ -1470,6 +1810,76 @@ format_uptime(Milliseconds) ->
 %% Helper Functions
 %%====================================================================
 
-%% Convert list to map
+%% @doc Convert a proplist list to a map.
+%%
+%% Converts a list of {Key, Value} tuples into a map.
+%% Useful for converting option lists to map format.
+%%
+%% Example:
+%% ```
+%% 1> yawl_telemetry:list_to_map([{a, 1}, {b, 2}, {c, 3}]).
+%% #{a => 1,b => 2,c => 3}
+%% 2> yawl_telemetry:list_to_map([]).
+%% #{}
+%% 3> yawl_telemetry:list_to_map([{key, <<"value">>}]).
+%% #{key => <<"value">>}
+%% ```
+-spec list_to_map([{term(), term()}]) -> map().
 list_to_map(List) ->
     lists:foldl(fun({K, V}, Acc) -> maps:put(K, V, Acc) end, maps:new(), List).
+
+%%-------------------------------------------------------------------
+%% @doc Run doctests for the yawl_telemetry module.
+%%
+%% Executes all doctest examples to verify documentation correctness.
+%%
+%% Example:
+%% ```
+%% 1> yawl_telemetry:doctest_test().
+%% ok
+%% ```
+%%-------------------------------------------------------------------
+-spec doctest_test() -> ok.
+doctest_test() ->
+    %% Test trace ID generation
+    TraceId = generate_trace_id(),
+    32 = byte_size(TraceId),
+    true = is_binary(TraceId),
+
+    %% Test span ID generation
+    SpanId = generate_span_id(),
+    16 = byte_size(SpanId),
+    true = is_binary(SpanId),
+
+    %% Test list_to_map conversion
+    Map1 = list_to_map([{a, 1}, {b, 2}]),
+    #{a := 1, b := 2} = Map1,
+
+    Map2 = list_to_map([]),
+    #{} = Map2,
+
+    %% Test trace context round-trip
+    Ctx = #{trace_id => TraceId, span_id => SpanId},
+    ok = set_trace_context(Ctx),
+    Ctx = get_trace_context(),
+
+    %% Test trace context injection/extraction
+    %% inject_trace_context/1 uses process dictionary context
+    Headers = inject_trace_context(#{}),
+    true = maps:is_key(<<"traceparent">>, Headers),
+    true = maps:is_key(<<"x-yawl-trace-id">>, Headers),
+
+    Extracted = extract_trace_context(Headers),
+    TraceId = maps:get(trace_id, Extracted),
+
+    %% Test with empty headers
+    EmptyResult = extract_trace_context(#{}),
+    #{} = EmptyResult,
+
+    %% Test inject with no trace context set
+    %% Clear trace context and verify headers unchanged
+    erase(yawl_trace_context),
+    HeadersNoCtx = inject_trace_context(#{<<"existing">> => <<"header">>}),
+    #{<<"existing">> := <<"header">>} = HeadersNoCtx,
+
+    ok.

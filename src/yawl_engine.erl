@@ -53,6 +53,55 @@
 %%   <li><b>Task (XOR join):</b> Transition firing on first available token</li>
 %% </ul>
 %%
+%% <h3>Case Lifecycle</h3>
+%%
+%% Workflow cases progress through the following states:
+%%
+%% ```
+%%    [initialized] -> [running] -> [completed]
+%%          |              |
+%%          v              v
+%%      [cancelled]    [suspended] -> [running]
+%%                          |
+%%                          v
+%%                      [cancelled]
+%% '''
+%%
+%% A case starts in `initialized` state, transitions to `running` when
+%% execution begins, and ends in `completed`, `cancelled`, or `failed`.
+%%
+%% <h3>Doctests</h3>
+%%
+%% Basic workflow lifecycle:
+%% ```
+%% 1> {ok, Pid} = yawl_engine:start_link().
+%% {ok, <0.123.0>}
+%% 2> Spec = #{id => <<"test_wf">>, tasks => #{<<"task1">> => #{}}}.
+%% #{id => <<"test_wf">>, tasks => #{<<"task1">> => #{}}}
+%% 3> {ok, CaseId} = yawl_engine:start_workflow(Pid, Spec).
+%% {ok, <<"case_", ...>>}
+%% 4> {ok, State} = yawl_engine:get_case_state(Pid).
+%% {ok, #{status := running, case_id := CaseId}}
+%% 5> ok = yawl_engine:suspend_case(Pid).
+%% ok
+%% 6> ok = yawl_engine:resume_case(Pid).
+%% ok
+%% 7> ok = yawl_engine:cancel_case(Pid).
+%% ok
+%% '''
+%%
+%% Marking operations:
+%% ```
+%% 1> Marking = pnet_marking:new([input, output, task1]).
+%% #marking{...}
+%% 2> {ok, Marking1} = pnet_marking:add(Marking, #{input => [start]}).
+%% {ok, #marking{...}}
+%% 3> {ok, Tokens} = pnet_marking:get(Marking1, input).
+%% {ok, [start]}
+%% 4> {ok, Marking2} = pnet_marking:take(Marking1, #{input => [start]}).
+%% {ok, #marking{...}}
+%% '''
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -90,7 +139,8 @@
          recover_active_cases/0,
          enable_persistence/0,
          disable_persistence/0,
-         is_persistence_enabled/0]).
+         is_persistence_enabled/0,
+         doctest_test/0]).
 
 %% Marking helper functions using pnet_marking
 -export([get_place_tokens/2,
@@ -198,6 +248,18 @@ start_link(EngineName) ->
 %% - A cre_yawl workflow record
 %%
 %% Returns `{ok, CaseId}' on success.
+%%
+%% Example:
+%% ```
+%% 1> {ok, Engine} = yawl_engine:start_link().
+%% {ok, <0.123.0>}
+%% 2> Spec = #{id => <<"my_workflow">>,
+%% 2>          tasks => #{<<"step1">> => #{type => atomic}}}.
+%% #{id => <<"my_workflow">>, tasks => #{<<"step1">> => #{type => atomic}}}
+%% 3> {ok, CaseId} = yawl_engine:start_workflow(Engine, Spec).
+%% {ok, <<"case_", ...>>}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec start_workflow(Engine :: atom() | pid(),
@@ -232,6 +294,15 @@ start_workflow(Engine, Spec, Options) ->
 %% All active work items are cancelled and resources are released.
 %%
 %% Returns `ok' on success.
+%%
+%% Example:
+%% ```
+%% 1> ok = yawl_engine:cancel_case(Engine).
+%% ok
+%% 2> {ok, State} = yawl_engine:get_case_state(Engine).
+%% {ok, #{status := cancelled, ...}}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec cancel_case(Engine :: atom() | pid()) ->
@@ -247,6 +318,15 @@ cancel_case(Engine) ->
 %% Active work items are allowed to complete.
 %%
 %% Returns `ok' on success.
+%%
+%% Example:
+%% ```
+%% 1> ok = yawl_engine:suspend_case(Engine).
+%% ok
+%% 2> {ok, State} = yawl_engine:get_case_state(Engine).
+%% {ok, #{status := suspended, ...}}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec suspend_case(Engine :: atom() | pid()) ->
@@ -259,6 +339,15 @@ suspend_case(Engine) ->
 %% @doc Resumes a suspended workflow case.
 %%
 %% Returns `ok' on success.
+%%
+%% Example:
+%% ```
+%% 1> ok = yawl_engine:resume_case(Engine).
+%% ok
+%% 2> {ok, State} = yawl_engine:get_case_state(Engine).
+%% {ok, #{status := running, ...}}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec resume_case(Engine :: atom() | pid()) ->
@@ -1436,3 +1525,109 @@ delete_completed_case(CaseId) ->
                            {reason, ErrorReason}, {stacktrace, Stack}]),
             {error, {Kind, ErrorReason}}
     end.
+
+%%====================================================================
+%% Doctest Support
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the yawl_engine module.
+%%
+%% This function validates the examples in the module documentation.
+%%
+%% Returns `ok' when all tests pass.
+%%
+%% Example:
+%% ```
+%% 1> yawl_engine:doctest_test().
+%% ok
+%% '''
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test basic case ID generation
+    CaseId1 = generate_case_id(1),
+    true = is_binary(CaseId1),
+    true = byte_size(CaseId1) > 4,
+    true = binary:match(CaseId1, <<"case_">>) =/= nomatch,
+
+    %% Test that case IDs are unique
+    CaseId2 = generate_case_id(2),
+    true = CaseId1 =/= CaseId2,
+
+    %% Test workitem ID generation
+    WorkitemId = generate_workitem_id(<<"case_123">>, <<"task_abc">>),
+    true = is_binary(WorkitemId),
+    true = binary:match(WorkitemId, <<"case_123">>) =/= nomatch,
+    true = binary:match(WorkitemId, <<"_wi_">>) =/= nomatch,
+
+    %% Test workflow case status transitions
+    Case = #workflow_case{
+        case_id = <<"test_case">>,
+        workflow_id = <<"test_wf">>,
+        spec = #{},
+        status = running,
+        created_at = erlang:system_time(millisecond)
+    },
+
+    %% Test suspend on running case
+    {ok, SuspendedCase} = suspend_workflow_case(Case),
+    suspended = SuspendedCase#workflow_case.status,
+
+    %% Test resume on suspended case
+    {ok, ResumedCase} = resume_workflow_case(SuspendedCase),
+    running = ResumedCase#workflow_case.status,
+
+    %% Test cancel workflow
+    {ok, CancelledCase} = cancel_workflow_case(ResumedCase),
+    cancelled = CancelledCase#workflow_case.status,
+
+    %% Test marking operations with pnet_marking
+    Marking = pnet_marking:new([input, output, task1]),
+    {ok, Marking1} = pnet_marking:add(Marking, #{input => [start]}),
+    {ok, [start]} = pnet_marking:get(Marking1, input),
+    {ok, Marking2} = pnet_marking:take(Marking1, #{input => [start]}),
+    {ok, []} = pnet_marking:get(Marking2, input),
+
+    %% Test net state hash
+    undefined = net_state_hash(undefined),
+    NetState = #net_state{marking = Marking1, places = [input, output], transitions = #{}},
+    Hash = net_state_hash(NetState),
+    true = is_binary(Hash),
+
+    %% Test workitem status transitions
+    Now = erlang:system_time(millisecond),
+    Workitem = #workitem{
+        id = <<"wi_1">>,
+        case_id = <<"case_1">>,
+        task_id = <<"task_1">>,
+        status = enabled,
+        enabled_at = Now
+    },
+
+    %% Test start enabled workitem
+    {ok, StartedWi} = do_start_workitem(Workitem),
+    started = StartedWi#workitem.status,
+    true = StartedWi#workitem.started_at =/= undefined,
+
+    %% Test complete started workitem
+    {ok, CompletedWi} = do_complete_workitem(StartedWi, #{result => ok}),
+    completed = CompletedWi#workitem.status,
+    true = CompletedWi#workitem.completed_at =/= undefined,
+
+    %% Test fail started workitem
+    {ok, FailedWi} = do_fail_workitem(StartedWi, #{error => test_failure}),
+    failed = FailedWi#workitem.status,
+    true = maps:is_key(error, FailedWi#workitem.data),
+
+    %% Test workitem_to_map conversion
+    WiMap = workitem_to_map(CompletedWi),
+    true = is_map(WiMap),
+    true = maps:is_key(id, WiMap),
+    true = maps:is_key(status, WiMap),
+    CompletedWi#workitem.id =:= maps:get(id, WiMap),
+
+    ok.

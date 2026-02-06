@@ -1,51 +1,128 @@
 # New Files Overview - CRE Architecture Refactoring
 
-This document provides a comprehensive overview of all new files created in the architectural refactoring commit.
+This document provides a comprehensive overview of the new CRE source directory organization following Joe Armstrong's design principle: **one real OTP runner (`gen_pnet`), everything else pure helpers/utilities + message contracts**.
 
 ## Architecture Summary
 
-The refactoring implements Joe Armstrong's design principle: **one real OTP runner (`gen_pnet`), everything else pure helpers/utilities + message contracts**.
+The refactoring implements Joe Armstrong's design principle with a clean separation of concerns:
+- **Core**: The single OTP behavior wrapper (`gen_yawl`)
+- **Pure Utilities**: Stateless helper modules organized by domain
+- **Legacy**: Old OTP processes remain in `src/` for backward compatibility
 
-### Core Architecture Components
+### New Directory Structure
 
 ```
-gen_pnet (single OTP process)
-├── pnet_types (pure utility) - Type definitions and validation
-├── pnet_marking (pure utility) - Multiset marking algebra
-├── pnet_mode (pure utility) - Mode enumeration for transitions
-├── pnet_choice (pure utility) - Deterministic nondeterminism
-├── pnet_receipt (pure utility) - Receipt tracking and audit trails
-├── wf_timerq (pure utility) - Deadline queue for token injection
-├── wf_task (pure utility) - External task token constructors
-└── wf_scope (pure utility) - Scope boundary mapping for hierarchical workflows
+src/
+├── core/                   # Core OTP behaviors
+│   └── gen_yawl.erl        # YAWL behavior wrapper (the OTP runner)
+│
+├── pnet/                   # Pure Petri net utilities (stateless)
+│   ├── pnet_types.erl      # Type validators
+│   ├── pnet_marking.erl    # Multiset marking algebra
+│   ├── pnet_mode.erl       # Mode enumeration
+│   ├── pnet_choice.erl     # Deterministic choice
+│   └── pnet_receipt.erl    # Receipt tracking
+│
+├── wf/                     # Pure workflow utilities (stateless)
+│   ├── wf_timerq.erl       # Deadline queue
+│   ├── wf_task.erl         # Task token constructors
+│   └── wf_scope.erl        # Boundary mapping
+│
+├── yawl/                   # YAWL-specific pure utilities (stateless)
+│   ├── yawl_schema.erl     # Schema validation
+│   ├── yawl_elements.erl   # Element definitions
+│   ├── yawl_marshal.erl    # Data marshaling
+│   ├── yawl_util.erl       # General utilities
+│   └── yawl_patterns.erl   # Pattern utilities
+│
+├── patterns/               # YAWL workflow patterns
+│   ├── parallel_split.erl  # Parallel split pattern
+│   ├── exclusive_choice.erl
+│   ├── simple_merge.erl
+│   ├── multiple_merge.erl
+│   ├── deferred_choice.erl
+│   ├── interleaved_routing.erl
+│   ├── discriminator.erl
+│   ├── n_out_of_m.erl
+│   ├── milestone.erl
+│   └── implicit_merge.erl
+│
+├── api/                    # Client API modules
+│   ├── cre_client.erl      # Main client API
+│   └── cre_yawl_client.erl # YAWL client API
+│
+├── integration/            # External system integrations (stateless)
+│   ├── telemetry.erl       # Telemetry utilities
+│   ├── gen_smtp_client.erl # SMTP client
+│   └── yawl_claude_bridge.erl # Claude AI bridge
+│
+├── http/                   # HTTP handlers
+│   ├── cre_status_handler.erl    # Status endpoint
+│   ├── cre_history_handler.erl   # History endpoint
+│   └── yawl_interface_d.erl      # Interface handler
+│
+├── app/                    # Application entry points
+│   ├── cre.erl             # Application module
+│   └── cre_sup.erl         # Application supervisor
+│
+└── [legacy files]          # Old OTP processes stay in src/ root
+    ├── cre_master.erl
+    ├── cre_worker.erl
+    ├── yawl_engine.erl
+    └── ... (20+ more)
 ```
 
 ## File Categories
 
-### 1. Core Utility Modules (8 files)
-- **Location**: `/src/`
+### 1. Core (1 file)
+- **Location**: `/src/core/`
+- **Purpose**: OTP behavior wrapper for YAWL workflows
+- **Key Features**: Single stateful OTP process
+
+### 2. Petri Net Utilities (5 files)
+- **Location**: `/src/pnet/`
 - **Purpose**: Pure-functional building blocks for Petri net execution
 - **Key Features**: Stateless, total functions, immutable operations
 
-### 2. YAWL Pattern Modules (10 files)
-- **Location**: `/src/yawl_patterns/`
+### 3. Workflow Utilities (3 files)
+- **Location**: `/src/wf/`
+- **Purpose**: Pure workflow utilities
+- **Key Features**: Stateless helper functions
+
+### 4. YAWL Pure Utilities (5 files)
+- **Location**: `/src/yawl/`
+- **Purpose**: YAWL-specific pure utilities
+- **Key Features**: Stateless helper functions for YAWL
+
+### 5. Pattern Modules (10 files)
+- **Location**: `/src/patterns/` (renamed from `yawl_patterns/`)
 - **Purpose**: Workflow pattern implementations
 - **Key Features**: Standard YAWL patterns with consistent interfaces
 
-### 3. Documentation (11 files)
-- **Location**: `/docs/`
-- **Purpose**: Comprehensive guides and references
-- **Key Features**: Diataxis architecture, tutorials, migration guides
+### 6. API (2 files)
+- **Location**: `/src/api/`
+- **Purpose**: Client API modules
+- **Key Features**: Main client interfaces
 
-### 4. Examples (2 files)
-- **Location**: `/examples/`
-- **Purpose**: Demonstrative implementations
-- **Key Features**: Working examples with execution scripts
+### 7. Integration (3 files)
+- **Location**: `/src/integration/`
+- **Purpose**: External system integrations
+- **Key Features**: Telemetry, SMTP, AI bridge
 
-### 5. Specifications (2 files)
-- **Location**: `/docs/yawl_patterns/`
-- **Purpose**: Formal specifications and integration guides
-- **Key Features**: Technical specifications for advanced users
+### 8. HTTP (3 files)
+- **Location**: `/src/http/`
+- **Purpose**: HTTP endpoint handlers
+- **Key Features**: REST API endpoints
+
+### 9. App (2 files)
+- **Location**: `/src/app/`
+- **Purpose**: Application entry points
+- **Key Features**: Application module and supervisor
+
+### 10. Legacy (25+ files)
+- **Location**: `/src/` (root)
+- **Purpose**: Old OTP processes for backward compatibility
+- **Key Features**: Remain in place, not moved
 
 ---
 
@@ -53,7 +130,7 @@ gen_pnet (single OTP process)
 
 ### Core Utility Modules
 
-#### 1. `src/pnet_types.erl` - Type System and Validation
+#### 1. `src/pnet/pnet_types.erl` - Type System and Validation
 
 **Purpose**: Defines all type definitions and validation functions for the Petri net framework.
 
@@ -92,7 +169,7 @@ gen_pnet (single OTP process)
 
 **Usage**: All validation functions are total - they return boolean() and never crash.
 
-#### 2. `src/pnet_marking.erl` - Multiset Marking Algebra
+#### 2. `src/pnet/pnet_marking.erl` - Multiset Marking Algebra
 
 **Purpose**: Implements multiset operations for token state management with total functions.
 
@@ -119,7 +196,7 @@ snapshot(Marking) -> marking()             % Immutable copy
 - Immutable operations
 - Consistent hashing for state comparison
 
-#### 3. `src/pnet_choice.erl` - Deterministic Nondeterminism
+#### 3. `src/pnet/pnet_choice.erl` - Deterministic Nondeterminism
 
 **Purpose**: Provides reproducible random selection for workflow execution.
 
@@ -141,7 +218,7 @@ pick_weighted(Items, RngState) -> {Element, NewRngState}
 - Support for weighted random choice
 - Returns updated state with each operation
 
-#### 4. `src/pnet_mode.erl` - Mode Enumeration
+#### 4. `src/pnet/pnet_mode.erl` - Mode Enumeration
 
 **Purpose**: Enumerates all possible firing modes for transitions.
 
@@ -161,7 +238,7 @@ enum_cmodes(Trsn, Marking, Ctx, NetMod) -> [cmode()]
 - Falls back to basic enumeration for uncolored nets
 - Handles empty token lists gracefully
 
-#### 5. `src/pnet_receipt.erl` - Receipt Tracking
+#### 5. `src/pnet/pnet_receipt.erl` - Receipt Tracking
 
 **Purpose**: Creates audit trails for all state transitions.
 
@@ -181,7 +258,7 @@ effects(Receipt) -> {Type, Details}        % Extract transition effects
 - Before/after state hashing
 - Transition effect extraction
 
-#### 6. `src/wf_timerq.erl` - Deadline Queue
+#### 6. `src/wf/wf_timerq.erl` - Deadline Queue
 
 **Purpose**: Manages time-based token injection for deadlines and timeouts.
 
@@ -205,7 +282,7 @@ peek(TimerQ) -> {Deadline, Event} | undefined
 - Key-based disarming
 - Efficient polling for ready events
 
-#### 7. `src/wf_task.erl` - Task Lifecycle Constructors
+#### 7. `src/wf/wf_task.erl` - Task Lifecycle Constructors
 
 **Purpose**: Creates produce maps for external task state transitions.
 
@@ -225,7 +302,7 @@ cancelled(TaskId, Payload, Place) -> {produce, ProduceMap}
 - Integration with external work systems
 - Audit trail support via receipts
 
-#### 8. `src/wf_scope.erl` - Scope Boundary Mapping
+#### 8. `src/wf/wf_scope.erl` - Scope Boundary Mapping
 
 **Purpose**: Handles place namespace translation between parent and child workflows.
 
@@ -255,27 +332,27 @@ All pattern modules implement the `pnet_net` behavior:
          init_marking/2, modes/2, fire/3]).
 ```
 
-#### 1. `src/yawl_patterns/parallel_split.erl` - WCP-2
+#### 1. `src/patterns/parallel_split.erl` - WCP-2
 **Purpose**: Implements Parallel Split pattern (one input, multiple outputs).
 **Use Case**: Forking work to multiple parallel branches.
 
-#### 2. `src/yawl_patterns/exclusive_choice.erl` - WCP-4
+#### 2. `src/patterns/exclusive_choice.erl` - WCP-4
 **Purpose**: Implements Exclusive Choice pattern (conditional branching).
 **Use Case**: Routing based on conditions or data.
 
-#### 3. `src/yawl_patterns/simple_merge.erl` - WCP-5
+#### 3. `src/patterns/simple_merge.erl` - WCP-5
 **Purpose**: Implements Simple Merge pattern (multiple inputs, one output).
 **Use Case**: Converging parallel branches.
 
-#### 4. `src/yawl_patterns/n_out_of_m.erl`
+#### 4. `src/patterns/n_out_of_m.erl`
 **Purpose**: Implements N-out-of-M pattern (partial synchronization).
 **Use Case**: Majority voting or threshold-based convergence.
 
-#### 5. `src/yawl_patterns/interleaved_routing.erl`
+#### 5. `src/patterns/interleaved_routing.erl`
 **Purpose**: Implements Interleaved Routing pattern (complex branching).
 **Use Case**: Complex workflow routing with multiple paths.
 
-#### 6. `src/yawl_patterns/implicit_merge.erl`
+#### 6. `src/patterns/implicit_merge.erl`
 **Purpose**: Implements Implicit Merge pattern (synchronization).
 **Use Case**: Waiting for multiple conditions to be met.
 

@@ -33,7 +33,61 @@
 %%   <li><b>Task Lifecycle:</b> Uses wf_task constructors for task events</li>
 %% </ul>
 %%
+%% <h3>Examples</h3>
+%%
+%% ```erlang
+%% %% Start a named CRE master instance
+%% {ok, MasterPid} = cre_master:start_link(my_cre),
+%%
+%% %% Get status of the CRE instance
+%% Status = cre_master:get_status(my_cre),
+%% #{cre_info := #{load := Load, n_wrk := WorkerCount}} = Status.
+%% ```
+%%
+%% ```erlang
+%% %% Start anonymous CRE master
+%% {ok, Pid} = cre_master:start_link(),
+%%
+%% %% Stop the instance
+%% cre_master:stop(Pid).
+%% ```
+%%
 %% @end
+-moduledoc("""
+CRE Master Process with Petri Net Worker Pool Management.
+
+This module is the central coordinator for worker pools and task
+distribution in CRE. It uses Petri net marking algebra for tracking
+worker availability and task lifecycle tokens.
+
+## Key Features
+
+- **Marking-Based Pool**: Uses `pnet_marking` for worker state tracking
+- **Deterministic Choice**: Uses `pnet_choice` for reproducible worker selection
+- **Task Lifecycle**: Uses `wf_task` constructors for task event tokens
+
+## Examples
+
+Start a named CRE master instance and check status:
+
+```erlang
+1> {ok, Pid} = cre_master:start_link(my_cre).
+{ok,<0.123.0>}
+2> Status = cre_master:get_status(my_cre).
+#{...}
+3> Status#{cre_info => #{n_wrk => 0}}.
+#{cre_info => #{load => 0.0, n_wrk => 0}, ...}
+```
+
+Start an anonymous CRE master:
+
+```erlang
+1> {ok, Pid} = cre_master:start_link().
+{ok,<0.456.0>}
+2> cre_master:stop(Pid).
+ok
+```
+""").
 %% -------------------------------------------------------------------
 
 -module(cre_master).
@@ -50,7 +104,8 @@
          cre_request/4,
          stop/1,
          get_status/1,
-         get_history/1]).
+         get_history/1,
+         doctest_test/0]).
 
 %% gen_server callback functions
 -export([code_change/3,
@@ -89,6 +144,21 @@
 %%
 %% @see start_link/1
 %%
+-doc("""
+Starts an anonymous CRE instance.
+
+Returns `{ok, Pid}' on success where `Pid' is the process id of the
+newly created process. The master is started with an empty worker pool.
+
+## Example
+
+```erlang
+1> {ok, Pid} = cre_master:start_link().
+{ok,<0.123.0>}
+2> Status = cre_master:get_status(Pid).
+#{cre_info := #{load := 0.0, n_wrk := 0}, ...}.
+```
+""").
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
@@ -100,18 +170,66 @@ start_link() ->
 %%
 %% @see start_link/0
 %%
+-doc("""
+Starts a named CRE instance.
+
+Returns `{ok, Pid}' on success where `Pid' is the process id of the
+newly created process. The instance is registered locally under `CreName`.
+
+## Example
+
+```erlang
+1> {ok, Pid} = cre_master:start_link(my_cre).
+{ok,<0.456.0>}
+2> Status = cre_master:get_status(my_cre).
+#{...}.
+```
+""").
 start_link(CreName) ->
     gen_server:start_link(CreName, ?MODULE, [], []).
 
 
 %% @doc Registers a worker process with a given CRE instance.
 %%
-%%      Takes the name of a CRE instance `CreName' and the name of a worker
-%%      instance `WorkerName' and adds the worker to the worker pool of the CRE.
-%%      The presence of workers is a precondition for the CRE to send out demand
-%%      or perform work. A CRE without workers, thus, can accept clients but can
-%%      never make progress.
+%% Takes the name of a CRE instance `CreName' and the name of a worker
+%% instance `WorkerName' and adds the worker to the worker pool of the CRE.
+%% The presence of workers is a precondition for the CRE to send out demand
+%% or perform work. A CRE without workers, thus, can accept clients but can
+%% never make progress.
 %%
+%% The worker is added to the idle worker pool using Petri net marking algebra.
+%% The master links to the worker process to detect failures.
+%%
+%% ```erlang
+%% 1> {ok, Master} = cre_master:start_link(my_cre).
+%% {ok,<0.123.0>}
+%% 2> {ok, Worker} = cre_worker:start_link(my_worker).
+%% {ok,<0.456.0>}
+%% 3> cre_master:add_worker(my_cre, my_worker).
+%% ok
+%% 4> Status = cre_master:get_status(my_cre).
+%% #{cre_info := #{n_wrk := 1}} = Status.
+%% ```
+%%
+-doc("""
+Registers a worker process with a given CRE instance.
+
+The worker is added to the idle worker pool using Petri net marking algebra.
+Workers are required for task execution - a CRE without workers cannot make progress.
+
+## Example
+
+```erlang
+1> {ok, Master} = cre_master:start_link(my_cre).
+{ok,<0.123.0>}
+2> {ok, Worker} = cre_worker:start_link(my_worker).
+{ok,<0.456.0>}
+3> cre_master:add_worker(my_cre, my_worker).
+ok
+4> Status = cre_master:get_status(my_cre).
+#{cre_info := #{n_wrk := 1}} = Status.
+```
+""").
 add_worker(CreName, WorkerName) ->
     gen_server:cast(CreName, {add_worker, WorkerName}).
 
@@ -122,6 +240,32 @@ add_worker(CreName, WorkerName) ->
 %%      previously been requested from it the worker sends the result back to
 %%      the CRE using this function.
 %%
+%% The worker is transitioned from busy to idle in the Petri net marking.
+%% Subscribers to the application are notified with the result.
+%%
+%% ```erlang
+%% 1> App = #{app_id => <<"test_app">>, lambda => #{lambda_name => <<"test_lambda">>}}.
+%% 2> Delta = #{result => ok, stdout => <<"done">>}.
+%% 3> cre_master:worker_result(my_cre, my_worker, App, Delta).
+%% ok
+%% ```
+%%
+-doc("""
+Sends the result of a previously computed application to the CRE.
+
+The worker is transitioned from busy to idle in the Petri net marking.
+Subscribers to the application are notified with the result.
+
+## Example
+
+```erlang
+1> App = #{app_id => <<"test_app">>,
+            lambda => #{lambda_name => <<"test_lambda">>}}.
+2> Delta = #{result => ok, stdout => <<"done">>}.
+3> cre_master:worker_result(my_cre, my_worker, App, Delta).
+ok
+```
+""").
 worker_result(CreName, WorkerName, A, Delta) ->
     gen_server:cast(CreName, {worker_result, WorkerName, A, Delta}).
 
@@ -133,16 +277,73 @@ worker_result(CreName, WorkerName, A, Delta) ->
 %%      identifier `I' it uses this function to send the application to the CRE
 %%      instance with the name `CreName'.
 %%
+%% The request is queued if no workers are available, or dispatched immediately
+%% if idle workers exist. Cached results are returned immediately.
+%%
+%% ```erlang
+%% 1> App = #{app_id => <<"my_app">>, lambda => #{lambda_name => <<"my_lambda">>}}.
+%% 2> cre_master:cre_request(my_cre, my_client, prog_id, App).
+%% ok
+%% ```
+%%
+-doc("""
+Requests the computation of an application from a given CRE instance.
+
+The request is queued if no workers are available, or dispatched immediately
+if idle workers exist. Cached results are returned immediately without queuing.
+
+## Example
+
+```erlang
+1> App = #{app_id => <<"my_app">>,
+            lambda => #{lambda_name => <<"my_lambda">>}}.
+2> cre_master:cre_request(my_cre, my_client, prog_id, App).
+ok
+```
+""").
 cre_request(CreName, ClientName, I, A) ->
     gen_server:cast(CreName, {cre_request, ClientName, I, A}).
 
 
 %% @doc Stops the CRE instance.
 %%
+-doc("""
+Stops the CRE instance.
+
+Terminates the gen_server and unlinks all workers.
+""").
 stop(CreName) ->
     gen_server:stop(CreName).
 
 
+%% @doc Gets the current status of the CRE instance.
+%%
+%% Returns a map containing CRE info, node info, and app info.
+%%
+%% ```erlang
+%% 1> Status = cre_master:get_status(my_cre).
+%% #{cre_info := #{load := Load, n_wrk := N},
+%%   node_info := NodeInfo,
+%%   app_info := #{queued := Queued, active := Active, complete := Complete}}.
+%% '''
+%%
+-doc("""
+Gets the current status of the CRE instance.
+
+Returns a map containing:
+- `cre_info`: Overall load and worker count
+- `node_info`: Per-node worker distribution and load
+- `app_info`: Queued, active, and completed applications
+
+## Example
+
+```erlang
+1> Status = cre_master:get_status(my_cre).
+#{cre_info := #{load := 0.0, n_wrk := 2},
+  node_info := [#{node := <<\"nonode@nohost\">>, n_wrk := 2, load := 0.0}],
+  app_info := #{queued := [], active := [], complete := []}}.
+```
+""").
 -spec get_status(CreName :: _) ->
           #{
             cre_info => #{
@@ -178,6 +379,29 @@ get_status(CreName) ->
     Info.
 
 
+%% @doc Gets the execution history of completed applications.
+%%
+%% Returns a map containing the history of all completed applications.
+%%
+%% ```erlang
+%% 1> History = cre_master:get_history(my_cre).
+%% #{history := [#{app := App1, delta := Delta1}, ...]}.
+%% '''
+%%
+-doc("""
+Gets the execution history of completed applications.
+
+Returns a map with a `history` key containing a list of completed applications
+and their results.
+
+## Example
+
+```erlang
+1> History = cre_master:get_history(my_cre).
+#{history := [#{app := #{app_id := <<\"app1\">>},
+                delta := #{result := ok}}]}.
+```
+""").
 -spec get_history(CreName :: _) ->
           #{history => [#{app => _, delta => _}]}.
 
@@ -580,6 +804,19 @@ handle_call(_Request, _From, CreState) ->
 %% and tasks from pending to active. Worker selection uses deterministic
 %% choice for reproducible behavior.
 %%
+-doc("""
+Attempts to make progress by matching pending tasks with idle workers.
+
+This is the core internal function that coordinates task dispatch:
+- Takes a worker from the idle pool (pnet_marking:take)
+- Adds the worker to the busy pool (pnet_marking:add)
+- Removes the task from pending queue
+- Dispatches the task to the worker (cre_worker:worker_request)
+- Emits a task running token (wf_task:running)
+
+Worker selection is deterministic using pnet_choice:pick/2 to ensure
+reproducible behavior across runs with the same RNG seed.
+""").
 -spec attempt_progress(CreState :: #cre_state{}) -> #cre_state{}.
 
 attempt_progress(CreState) ->
@@ -632,3 +869,75 @@ attempt_progress(CreState) ->
             end
 
     end.
+
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+%% @doc Run doctests for the cre_master module.
+%%
+%% This function provides a simple test entry point that verifies
+%% basic master/worker pool management functionality.
+%%
+%% ```erlang
+%% 1> cre_master:doctest_test().
+%% ok
+%% '''
+%%
+-doc("""
+Run doctests for the cre_master module.
+
+This function provides a simple test entry point that verifies
+basic master/worker pool management functionality including:
+- Starting and stopping anonymous and named CRE instances
+- Getting status and checking initial state (empty worker pool)
+- Getting history (initially empty)
+
+## Example
+
+```erlang
+1> cre_master:doctest_test().
+ok
+```
+""").
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Start anonymous CRE master
+    {ok, _Pid} = start_link(),
+
+    %% Test 2: Start named CRE master
+    CreName = doctest_cre_master,
+    case whereis(CreName) of
+        undefined -> ok;
+        _ -> unregister(CreName)
+    end,
+    {ok, _NamedPid} = start_link(CreName),
+
+    %% Test 3: Get status of empty CRE instance
+    Status = get_status(CreName),
+    #{cre_info := #{load := Load, n_wrk := NWrk},
+      node_info := NodeInfo,
+      app_info := #{queued := Queued, active := Active, complete := Complete}} = Status,
+    0.0 = Load,
+    0 = NWrk,
+    [] = NodeInfo,
+    [] = Queued,
+    [] = Active,
+    [] = Complete,
+
+    %% Test 4: Get history (should be empty)
+    History = get_history(CreName),
+    #{history := []} = History,
+
+    %% Test 5: Stop named CRE instance
+    ok = stop(CreName),
+
+    %% Clean up any remaining processes
+    case whereis(CreName) of
+        undefined -> ok;
+        _ -> unregister(CreName)
+    end,
+
+    ok.

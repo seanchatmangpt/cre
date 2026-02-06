@@ -80,6 +80,7 @@ CRE was originally developed as the Cuneiform runtime environment. Starting with
 Complete documentation is available in the `docs/` directory:
 
 - **[README.md](docs/README.md)** - Documentation landing page and navigation
+- **[NEW_FILES_OVERVIEW.md](docs/NEW_FILES_OVERVIEW.md)** - New source directory structure
 - **[Quick Start Guide](docs/QUICK_START.md)** - 5-minute getting started tutorial
 - **[API Reference](docs/API_REFERENCE.md)** - Complete function documentation
 - **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and internals

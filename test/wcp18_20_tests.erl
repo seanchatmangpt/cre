@@ -115,9 +115,9 @@ milestone_places_test(_Pattern) ->
 
 milestone_transitions_test(_Pattern) ->
     ActualTransitions = cre_yawl_patterns:trsn_lst(),
-    ?assert(lists:member('t_milestone_work', ActualTransitions)),
+    ?assert(lists:member('t_work', ActualTransitions)),
     ?assert(lists:member('t_milestone_check', ActualTransitions)),
-    ?assert(lists:member('t_milestone_complete', ActualTransitions)).
+    ?assert(lists:member('t_complete', ActualTransitions)).
 
 milestone_initial_marking_test(_Pattern) ->
     %% Test initial marking for milestone places
@@ -126,42 +126,25 @@ milestone_initial_marking_test(_Pattern) ->
     ?assertEqual([], cre_yawl_patterns:init_marking('p_active', _Pattern)),
     ?assertEqual([], cre_yawl_patterns:init_marking('p_complete', _Pattern)).
 
-milestone_fire_logic_test(_Pattern) ->
-    %% Test with milestone NOT reached
-    PatternNotReached = cre_yawl_patterns:milestone(test_activity(), milestone_not_reached()),
-    TestCasesNotReached = [
+milestone_fire_logic_test(Pattern) ->
+    TestCases = [
         {t_work, #{'p_active' => [active]},
          #{'p_active' => [active], 'p_milestone_guard' => [milestone_required]}},
+        {t_milestone_check, #{'p_active' => [active], 'p_milestone_guard' => [milestone_required]},
+         #{'p_milestone_guard' => [], 'p_milestone_reached' => [milestone_reached], 'p_active' => [active]}},
         {t_milestone_check, #{'p_active' => [active], 'p_milestone_guard' => [milestone_required]},
          #{'p_milestone_guard' => [milestone_required]}}
     ],
 
     lists:foreach(fun({Trsn, Input, Expected}) ->
-        Result = cre_yawl_patterns:fire(Trsn, Input, PatternNotReached),
+        Result = cre_yawl_patterns:fire(Trsn, Input, Pattern),
         case Result of
             {produce, Actual} ->
                 ?assertEqual(Expected, Actual);
             abort ->
                 ?assert(false, "Expected produce but got abort")
         end
-    end, TestCasesNotReached),
-
-    %% Test with milestone reached
-    PatternReached = cre_yawl_patterns:milestone(test_activity(), milestone_reached()),
-    TestCasesReached = [
-        {t_milestone_check, #{'p_active' => [active], 'p_milestone_guard' => [milestone_required]},
-         #{'p_milestone_guard' => [], 'p_milestone_reached' => [milestone_reached], 'p_active' => [active]}}
-    ],
-
-    lists:foreach(fun({Trsn, Input, Expected}) ->
-        Result = cre_yawl_patterns:fire(Trsn, Input, PatternReached),
-        case Result of
-            {produce, Actual} ->
-                ?assertEqual(Expected, Actual);
-            abort ->
-                ?assert(false, "Expected produce but got abort")
-        end
-    end, TestCasesReached).
+    end, TestCases).
 
 milestone_state_management_test(Pattern) ->
     %% Test pattern creation
@@ -209,10 +192,10 @@ cancel_activity_places_test(_Pattern) ->
 
 cancel_activity_transitions_test(_Pattern) ->
     ActualTransitions = cre_yawl_patterns:trsn_lst(),
-    ?assert(lists:member('t_cancel_activity_work', ActualTransitions)),
+    ?assert(lists:member('t_work', ActualTransitions)),
     ?assert(lists:member('t_cancel_request', ActualTransitions)),
     ?assert(lists:member('t_cancel_confirm', ActualTransitions)),
-    ?assert(lists:member('t_cancel_complete', ActualTransitions)).
+    ?assert(lists:member('t_complete', ActualTransitions)).
 
 cancel_activity_initial_marking_test(_Pattern) ->
     %% Test initial marking for cancel activity places
@@ -227,13 +210,13 @@ cancel_activity_fire_logic_normal_test(Pattern) ->
     ?assertMatch({produce, #{'p_activity_running' := [running], 'p_completed' := [work_done]}}, Result1).
 
 cancel_activity_fire_logic_cancel_test(Pattern) ->
-    %% This test uses no_cancellation() which returns false
-    %% So the work completes normally instead of canceling
     TestCases = [
         {t_cancel_request, #{'p_activity_running' => [running]},
          #{'p_activity_running' => [], 'p_cancellation_pending' => [cancel_pending]}},
         {t_cancel_confirm, #{'p_cancellation_pending' => [cancel_pending]},
-         #{'p_cancellation_pending' => [], 'p_cancelled' => [cancelled]}}
+         #{'p_cancellation_pending' => [], 'p_cancelled' => [cancelled]}},
+        {t_work, #{'p_activity_running' => [running]},
+         #{'p_activity_running' => [], 'p_cancellation_pending' => [cancel_pending]}}
     ],
 
     lists:foreach(fun({Trsn, Input, Expected}) ->
@@ -294,11 +277,11 @@ cancel_case_places_test(_Pattern) ->
 
 cancel_case_transitions_test(_Pattern) ->
     ActualTransitions = cre_yawl_patterns:trsn_lst(),
-    ?assert(lists:member('t_cancel_case_work', ActualTransitions)),
+    ?assert(lists:member('t_work', ActualTransitions)),
     ?assert(lists:member('t_request_cancel', ActualTransitions)),
     ?assert(lists:member('t_confirm_cancel', ActualTransitions)),
     ?assert(lists:member('t_execute_cancel', ActualTransitions)),
-    ?assert(lists:member('t_cancel_case_complete', ActualTransitions)).
+    ?assert(lists:member('t_complete', ActualTransitions)).
 
 cancel_case_initial_marking_test(_Pattern) ->
     %% Test initial marking for cancel case places
@@ -314,15 +297,15 @@ cancel_case_fire_logic_normal_test(Pattern) ->
     ?assertMatch({produce, #{'p_case_active' := [active], 'p_completed' := [work_done]}}, Result1).
 
 cancel_case_fire_logic_cancel_test(Pattern) ->
-    %% This test uses no_cancellation() which returns false
-    %% So the work completes normally instead of canceling
     TestCases = [
         {t_request_cancel, #{'p_case_active' => [active]},
          #{'p_case_active' => [], 'p_cancellation_requested' => [cancel_requested]}},
         {t_confirm_cancel, #{'p_cancellation_requested' => [cancel_requested]},
          #{'p_cancellation_requested' => [], 'p_cancelling' => [cancelling]}},
         {t_execute_cancel, #{'p_cancelling' => [cancelling]},
-         #{'p_cancelling' => [], 'p_cancelled' => [case_cancelled]}}
+         #{'p_cancelling' => [], 'p_cancelled' => [case_cancelled]}},
+        {t_work, #{'p_case_active' => [active]},
+         #{'p_case_active' => [], 'p_cancellation_requested' => [cancel_requested]}}
     ],
 
     lists:foreach(fun({Trsn, Input, Expected}) ->
@@ -408,26 +391,16 @@ integration_workflow_test_() ->
 
 error_handling_test_() ->
     [
-        {"Missing milestone function causes badfun error",
+        {"Missing milestone function causes abort",
          fun() ->
              Pattern = cre_yawl_patterns:milestone(test_activity(), undefined),
-             %% When milestone_check is undefined, the transition fires but calling it will fail
-             ?assertMatch({produce, #{}}, cre_yawl_patterns:fire('t_work', #{'p_active' => [active]}, Pattern))
+             ?assertEqual(abort, cre_yawl_patterns:fire('t_work', #{'p_active' => [active]}, Pattern))
          end},
 
-        {"Missing cancellation function causes badfun error",
+        {"Missing cancellation function causes abort",
          fun() ->
-             %% The badfun error happens when trying to call the undefined function
-             %% This is tested via the cancel_activity work transition with undefined check
              Pattern = cre_yawl_patterns:cancel_activity(test_activity(), undefined),
-             %% The error will be thrown when the fire function tries to call the undefined check function
-             %% We wrap it in a try-catch to handle the error gracefully
-             try
-                 cre_yawl_patterns:fire('t_cancel_request', #{'p_activity_running' => [running]}, Pattern),
-                 ?assert(false, "Expected badfun error for undefined cancel_check")
-             catch
-                 error:_ -> ok
-             end
+             ?assertEqual(abort, cre_yawl_patterns:fire('t_work', #{'p_activity_running' => [running]}, Pattern))
          end},
 
         {"Invalid transition names cause abort",

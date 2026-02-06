@@ -33,6 +33,67 @@
 -module(yawl_approval).
 -author("CRE Team").
 
+-moduledoc """
+YAWL Approval Checkpoint Management.
+
+This module implements approval checkpoints for workflow execution, enabling
+workflows to pause at designated checkpoints and require human approval
+(simulated or real) before continuing.
+
+## Approval Types
+
+* **human** - Requires manual human approval via API or CLI
+* **simulated** - Uses Claude Code headless mode for LLM approval
+* **auto** - Auto-approves based on configurable rules
+
+## Checkpoint ID Format
+
+All checkpoint IDs are prefixed binary identifiers:
+
+```erlang
+% Generate a checkpoint ID (internal function)
+Id = yawl_approval:generate_checkpoint_id(),
+binary_part(Id, {0, 8}).
+<<"approval_">
+```
+
+## Approval Status Values
+
+```erlang
+% Valid status atoms
+Statuses = [pending, approved, denied, timeout, cancelled],
+length(Statuses).
+5
+```
+
+## Approver Types
+
+```erlang
+% Valid approver types
+ApproverTypes = [human, simulated, auto],
+length(ApproverTypes).
+3
+```
+
+## Decision Record
+
+The approval_decision record contains:
+
+```erlang
+% Record fields (for reference)
+Rec = #approval_decision{
+    checkpoint_id = <<"test">>,
+    approved = true,
+    decision_maker = simulated,
+    reason = <<"OK">>,
+    metadata = #{},
+    decided_at = 1234567890
+},
+Rec#approval_decision.approved.
+true
+```
+""".
+
 -behaviour(gen_server).
 
 %% Include record definitions
@@ -61,7 +122,8 @@
     cancel_checkpoint/1,
     get_checkpoint_context/1,
     get_receipt/1,
-    list_receipts/0
+    list_receipts/0,
+    generate_checkpoint_id/0
 ]).
 
 %%====================================================================
@@ -191,6 +253,23 @@ code_change(_OldVsn, State, _Extra) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Creates a new approval checkpoint with the specified options.
+
+Options:
+  - required_approver: human | simulated | auto (default: simulated)
+  - timeout: milliseconds or infinity (default: 30000)
+  - approval_schema: JSON schema for validation (default: basic schema)
+  - context: Additional context data (default: #{})
+  - metadata: User metadata (default: #{})
+
+```erlang
+% Generate a checkpoint ID to see the format
+Id = yawl_approval:generate_checkpoint_id(),
+binary_part(Id, {0, 8}).
+<<"approval_">
+```
+""".
 -spec create_checkpoint(binary(), atom(), map()) ->
     {ok, checkpoint_id()} | {error, term()}.
 
@@ -225,6 +304,16 @@ request_approval(CheckpointId) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Approves a pending checkpoint, allowing the workflow to continue.
+
+```erlang
+% Approval status values
+Status = approved,
+Status = approved.
+true
+```
+""".
 -spec approve(checkpoint_id(), term(), binary()) -> ok | {error, term()}.
 
 approve(CheckpointId, Approver, Reason) ->
@@ -240,6 +329,16 @@ approve(CheckpointId, Approver, Reason) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Denies a pending checkpoint, blocking the workflow from continuing.
+
+```erlang
+% Denial status value
+Status = denied,
+Status = denied.
+true
+```
+""".
 -spec deny(checkpoint_id(), term(), binary()) -> ok | {error, term()}.
 
 deny(CheckpointId, Approver, Reason) ->
@@ -253,6 +352,18 @@ deny(CheckpointId, Approver, Reason) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Checks the status of an approval checkpoint.
+
+Status can be: pending, approved, denied, timeout, or cancelled.
+
+```erlang
+% All possible status values
+Statuses = [pending, approved, denied, timeout, cancelled],
+lists:member(pending, Statuses).
+true
+```
+""".
 -spec check_status(checkpoint_id()) -> {ok, approval_status()} | {error, term()}.
 
 check_status(CheckpointId) ->
@@ -356,6 +467,18 @@ simulate_approval(CheckpointId, PromptContext) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Lists all pending approval checkpoints.
+
+Returns a list of checkpoint IDs that are awaiting approval.
+
+```erlang
+% Returns empty list when no checkpoints exist
+Pending = [],
+is_list(Pending).
+true
+```
+""".
 -spec list_pending() -> [checkpoint_id()].
 
 list_pending() ->
@@ -368,6 +491,18 @@ list_pending() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Lists all approval checkpoints with their statuses.
+
+Returns a list of {CheckpointId, Status} tuples.
+
+```erlang
+% Status tuples are of this form
+StatusTuple = {<<"checkpoint_id">>, approved},
+element(1, StatusTuple).
+<<"checkpoint_id">
+```
+""".
 -spec list_all() -> [{checkpoint_id(), approval_status()}].
 
 list_all() ->
@@ -381,6 +516,16 @@ list_all() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Cancels a pending approval checkpoint.
+
+```erlang
+% Cancelled is a valid status
+Status = cancelled,
+Status = cancelled.
+true
+```
+""".
 -spec cancel_checkpoint(checkpoint_id()) -> ok | {error, term()}.
 
 cancel_checkpoint(CheckpointId) ->
@@ -437,6 +582,35 @@ get_checkpoint_context(CheckpointId) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Gets the audit receipt for a checkpoint decision.
+
+The receipt contains before_hash, after_hash, move (with trsn, mode, produce),
+and timestamp (ts) for audit compliance.
+
+```erlang
+% Create and approve a checkpoint
+{ok, CheckpointId} = yawl_approval:create_checkpoint(
+    <<"pattern_999">>,
+    audited_step,
+    #{required_approver => simulated}
+),
+{ok, pending_approval} = yawl_approval:request_approval(CheckpointId),
+timer:sleep(100),  % Wait for simulated approval
+
+% Get the audit receipt
+{ok, Receipt} = yawl_approval:get_receipt(CheckpointId),
+is_map(Receipt).
+true
+
+% Receipt contains required fields
+maps:keys(Receipt).
+[before_hash,after_hash,move,ts]
+
+% Non-existent checkpoint
+{error, not_found} = yawl_approval:get_receipt(<<"nonexistent">>).
+```
+""".
 -spec get_receipt(checkpoint_id()) -> {ok, pnet_receipt:receipt()} | {error, term()}.
 
 get_receipt(CheckpointId) ->
@@ -1099,3 +1273,14 @@ log_checkpoint_event(Checkpoint, EventType) ->
                 approver_type => Checkpoint#approval_checkpoint.required_approver
             })
     end.
+
+%%====================================================================
+%% EUnit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

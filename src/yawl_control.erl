@@ -19,33 +19,84 @@
 %% -------------------------------------------------------------------
 %% @author Jörgen Brandt <joergen@cuneiform-lang.org>
 %% @copyright 2015
-%%
-%% @doc YAWL Control Panel / Runtime Management for CRE.
-%%
-%% This module implements the control interface for managing YAWL workflow
-%% execution, similar to the YAWL control panel in the Java reference
-%% implementation.
-%%
-%% <h3>Features</h3>
-%%
-%% <ul>
-%%   <li><b>Case Management:</b> Start, cancel, suspend, resume workflow cases</li>
-%%   <li><b>Monitoring:</b> Get running cases and their status</li>
-%%   <li><b>Statistics:</b> Execution metrics and engine status</li>
-%%   <li><b>Configuration:</b> Runtime parameter tuning</li>
-%% </ul>
-%%
-%% <h3>Helper Integration</h3>
-%%
-%% This module integrates pure helper modules for control flow:
-%% <ul>
-%%   <li><b>pnet_marking:</b> Control state tracking as Petri net markings</li>
-%%   <li><b>pnet_choice:</b> Deterministic choice for control flow decisions</li>
-%%   <li><b>wf_task:</b> Control token lifecycle for task events</li>
-%% </ul>
-%%
-%% @end
 %% -------------------------------------------------------------------
+
+-moduledoc """
+YAWL Control Panel / Runtime Management for CRE.
+
+This module implements the control interface for managing YAWL workflow
+execution, similar to the YAWL control panel in the Java reference
+implementation.
+
+## Features
+
+- **Case Management:** Start, cancel, suspend, resume workflow cases
+- **Monitoring:** Get running cases and their status
+- **Statistics:** Execution metrics and engine status
+- **Configuration:** Runtime parameter tuning
+
+## Helper Integration
+
+This module integrates pure helper modules for control flow:
+
+- **pnet_marking:** Control state tracking as Petri net markings
+- **pnet_choice:** Deterministic choice for control flow decisions
+- **wf_task:** Control token lifecycle for task events
+
+## Control State Management
+
+The control state of workflow cases follows a Petri net marking model with
+the following places:
+
+- `ctrl_running`: Cases currently executing
+- `ctrl_suspended`: Cases paused awaiting resumption
+- `ctrl_completed`: Cases finished successfully
+- `ctrl_cancelled`: Cases terminated by user request
+- `ctrl_failed`: Cases terminated due to errors
+
+## Examples
+
+Starting the control panel:
+
+```erlang
+1> {ok, Pid} = yawl_control:start_control().
+{ok, <0.123.0>}
+```
+
+Suspending and resuming a case:
+
+```erlang
+2> {ok, Pid} = yawl_control:start_control(yawl_control_test).
+{ok, <0.124.0>}
+3> yawl_control:register_case(yawl_control_test, <<"case_001">>, <<"my_workflow">>).
+ok
+4> yawl_control:suspend_case(yawl_control_test, <<"case_001">>, <<"Maintenance">>).
+ok
+5> gen_server:call(yawl_control_test, {get_case_status, <<"case_001">>}).
+#{case_id => <<"case_001">>, status => suspended, ...}
+6> yawl_control:resume_case(yawl_control_test, <<"case_001">>, <<"Maintenance complete">>).
+ok
+7> gen_server:call(yawl_control_test, {get_case_status, <<"case_001">>}).
+#{case_id => <<"case_001">>, status => running, ...}
+8> gen_server:stop(yawl_control_test).
+ok
+```
+
+Cancelling a case:
+
+```erlang
+9> {ok, Pid} = yawl_control:start_control(yawl_control_test2).
+{ok, <0.125.0>}
+10> yawl_control:register_case(yawl_control_test2, <<"case_002">>, <<"my_workflow">>).
+ok
+11> yawl_control:cancel_case(yawl_control_test2, <<"case_002">>, <<"User request">>).
+ok
+12> gen_server:call(yawl_control_test2, {get_case_status, <<"case_002">>}).
+#{case_id => <<"case_002">>, status => cancelled, ...}
+13> gen_server:stop(yawl_control_test2).
+ok
+```
+""".
 
 -module(yawl_control).
 -behaviour(gen_server).
@@ -61,6 +112,9 @@
 -export([get_case_statistics/0, get_engine_status/0, set_engine_parameter/2]).
 -export([list_all_cases/0, get_case_history/1]).
 -export([register_case/2, unregister_case/1, update_case_status/2]).
+
+%% Doctests
+-export([doctest_test/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -192,12 +246,50 @@ get_case_status(CaseId) when is_binary(CaseId) ->
 %% Uses wf_task:cancelled/3 to produce control tokens for the cancelled
 %% task lifecycle event.
 %%
+%% The cancellation performs an atomic transition on the control marking:
+%% <ul>
+%%   <li>Consumes a token from the current status place (running/suspended)</li>
+%%   <li>Produces a token to the <code>ctrl_cancelled</code> place</li>
+%%   <li>Updates the case's end_time and status</li>
+%%   <li>Notifies all subscribers of the cancellation event</li>
+%% </ul>
+%%
+%% <h4>Examples</h4>
+%%
+%% Cancel a running case:
+%% ```
+%% 1> yawl_control:cancel_case(<<"case_001">>, <<"User requested">>).
+%% ok
+%% ```
+%%
+%% Attempting to cancel an already cancelled case:
+%% ```
+%% 2> yawl_control:cancel_case(<<"case_001">>, <<"Duplicate">>).
+%% {error, already_cancelled}
+%% ```
+%%
+%% Attempting to cancel a completed case:
+%% ```
+%% 3> yawl_control:cancel_case(<<"case_002">>, <<"Too late">>).
+%% {error, already_completed}
+%% ```
+%%
 %% @param CaseId The case identifier.
 %% @param Reason Reason for cancellation.
 %% @return ok or {error, term()}.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("Cancels a running workflow case.\n\n"
+     "Performs an atomic transition on the control marking, moving the case\n"
+     "from its current status place to the ctrl_cancelled place.\n\n"
+     "Examples:\n"
+     "  1> yawl_control:cancel_case(<<\"case_001\">>, <<\"User requested\">>).\n"
+     "  ok\n\n"
+     "  2> yawl_control:cancel_case(<<\"case_001\">>, <<\"Duplicate\">>).\n"
+     "  {error, already_cancelled}\n\n"
+     "  3> yawl_control:cancel_case(<<\"case_002\">>, <<\"Too late\">>).\n"
+     "  {error, already_completed}\n").
 -spec cancel_case(binary(), binary()) -> ok | {error, term()}.
 
 cancel_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
@@ -206,12 +298,43 @@ cancel_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
 %%--------------------------------------------------------------------
 %% @doc Suspends a running workflow case.
 %%
+%% <h4>Examples</h4>
+%%
+%% Suspend a running case:
+%% ```
+%% 1> yawl_control:suspend_case(<<"case_001">>, <<"Maintenance">>).
+%% ok
+%% ```
+%%
+%% Attempting to suspend an already suspended case:
+%% ```
+%% 2> yawl_control:suspend_case(<<"case_001">>, <<"Again">>).
+%% {error, already_suspended}
+%% ```
+%%
+%% Attempting to suspend a non-running case:
+%% ```
+%% 3> yawl_control:suspend_case(<<"case_002">>, <<"Cannot">>).
+%% {error, not_running}
+%% ```
+%%
 %% @param CaseId The case identifier.
 %% @param Reason Reason for suspension.
 %% @return ok or {error, term()}.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("Suspends a running workflow case.\n\n"
+     "Moves the case from the ctrl_running place to the ctrl_suspended place\n"
+     "in the control marking. A suspended case stops processing tasks but retains\n"
+     "its state and can be resumed.\n\n"
+     "Examples:\n"
+     "  1> yawl_control:suspend_case(<<\"case_001\">>, <<\"Maintenance\">>).\n"
+     "  ok\n\n"
+     "  2> yawl_control:suspend_case(<<\"case_001\">>, <<\"Again\">>).\n"
+     "  {error, already_suspended}\n\n"
+     "  3> yawl_control:suspend_case(<<\"case_002\">>, <<\"Cannot\">>).\n"
+     "  {error, not_running}\n").
 -spec suspend_case(binary(), binary()) -> ok | {error, term()}.
 
 suspend_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
@@ -223,12 +346,51 @@ suspend_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
 %% Uses wf_task:running/3 to produce control tokens for the resumed
 %% (running) task lifecycle event.
 %%
+%% <h4>Examples</h4>
+%%
+%% Resume a suspended case:
+%% ```
+%% 1> yawl_control:resume_case(<<"case_001">>, <<"Maintenance complete">>).
+%% ok
+%% ```
+%%
+%% Attempting to resume a running case:
+%% ```
+%% 2> yawl_control:resume_case(<<"case_002">>, <<"Already running">>).
+%% {error, not_suspended}
+%% ```
+%%
+%% Attempting to resume a cancelled case:
+%% ```
+%% 3> yawl_control:resume_case(<<"case_003">>, <<"Cannot resume">>).
+%% {error, invalid_state}
+%% ```
+%%
 %% @param CaseId The case identifier.
 %% @param Reason Reason for resumption.
 %% @return ok or {error, term()}.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """Resumes a suspended workflow case.
+
+Moves the case from the `ctrl_suspended` place back to the `ctrl_running`
+place in the control marking. The case continues processing tasks from
+where it was suspended.
+
+### Examples
+
+```erlang
+1> yawl_control:resume_case(<<"case_001">>, <<"Maintenance complete">>).
+ok
+
+2> yawl_control:resume_case(<<"case_002">>, <<"Already running">>).
+{error, not_suspended}
+
+3> yawl_control:resume_case(<<"case_003">>, <<"Cannot resume">>).
+{error, invalid_state}
+```
+""".
 -spec resume_case(binary(), binary()) -> ok | {error, term()}.
 
 resume_case(CaseId, Reason) when is_binary(CaseId), is_binary(Reason) ->
@@ -869,3 +1031,141 @@ notify_subscribers(Event, CaseId, Subscribers) ->
         Subscribers
     ),
     ok.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the yawl_control module.
+%%
+%% This function validates the documentation examples by testing the
+%% control state management transitions. It creates a test control panel
+%% and verifies suspend/resume/cancel operations work correctly.
+%%
+%% <h4>Examples</h4>
+%%
+%% Running the doctest:
+%% ```
+%% 1> yawl_control:doctest_test().
+%% ok
+%% ```
+%%
+%% The test performs:
+%% <ul>
+%%   <li>Starts a control panel with a registered name</li>
+%%   <li>Registers a test workflow case</li>
+%%   <li>Suspends the case (running -> suspended transition)</li>
+%%   <li>Resumes the case (suspended -> running transition)</li>
+%%   <li>Verifies the case is running again</li>
+%%   <li>Stops the control panel</li>
+%% </ul>
+%%
+%% @end
+%%--------------------------------------------------------------------
+-doc """Runs doctests for control state management.
+
+### Example
+
+```erlang
+1> yawl_control:doctest_test().
+ok
+```
+
+The test validates the complete suspend/resume lifecycle:
+1. Start control panel
+2. Register a test case
+3. Suspend the case
+4. Resume the case
+5. Verify status transitions
+6. Stop control panel
+""".
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    TestName = yawl_control_doctest,
+    CaseId = <<"doctest_case_001">>,
+    SpecId = <<"doctest_workflow">>,
+
+    try
+        %% Step 1: Start the control panel
+        {ok, _Pid} = start_control(TestName),
+
+        %% Step 2: Register a test case
+        register_case(TestName, CaseId, SpecId),
+
+        %% Step 3: Verify the case is running
+        {ok, running} = get_status_sync(TestName, CaseId),
+
+        %% Step 4: Suspend the case
+        ok = suspend_case_sync(TestName, CaseId, <<"Doctest suspension">>),
+
+        %% Step 5: Verify the case is suspended
+        {ok, suspended} = get_status_sync(TestName, CaseId),
+
+        %% Step 6: Resume the case
+        ok = resume_case_sync(TestName, CaseId, <<"Doctest resumption">>),
+
+        %% Step 7: Verify the case is running again
+        {ok, running} = get_status_sync(TestName, CaseId),
+
+        %% Step 8: Clean up
+        stop_sync(TestName),
+        ok
+    catch
+        _:Reason ->
+            %% Ensure cleanup even on failure
+            catch stop_sync(TestName),
+            error({doctest_failed, Reason})
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Synchronous wrapper for getting case status from named control.
+%%
+%% Extracts the status atom from the case info map returned by the server.
+%%--------------------------------------------------------------------
+-spec get_status_sync(atom(), binary()) -> {ok, case_status()} | {error, term()}.
+
+get_status_sync(ControlName, CaseId) ->
+    case gen_server:call(ControlName, {get_case_status, CaseId}) of
+        {error, not_found} -> {error, not_found};
+        CaseMap when is_map(CaseMap) -> {ok, maps:get(status, CaseMap)}
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Synchronous wrapper for suspending a case in named control.
+%%--------------------------------------------------------------------
+-spec suspend_case_sync(atom(), binary(), binary()) -> ok | {error, term()}.
+
+suspend_case_sync(ControlName, CaseId, Reason) ->
+    gen_server:call(ControlName, {suspend_case, CaseId, Reason}).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Synchronous wrapper for resuming a case in named control.
+%%--------------------------------------------------------------------
+-spec resume_case_sync(atom(), binary(), binary()) -> ok | {error, term()}.
+
+resume_case_sync(ControlName, CaseId, Reason) ->
+    gen_server:call(ControlName, {resume_case, CaseId, Reason}).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Synchronous wrapper for registering a case in named control.
+%%--------------------------------------------------------------------
+-spec register_case(atom(), binary(), binary()) -> ok.
+
+register_case(ControlName, CaseId, SpecId) ->
+    gen_server:cast(ControlName, {register_case, CaseId, SpecId}),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Synchronous wrapper for stopping the named control panel.
+%%--------------------------------------------------------------------
+-spec stop_sync(atom()) -> ok.
+
+stop_sync(ControlName) ->
+    gen_server:stop(ControlName).

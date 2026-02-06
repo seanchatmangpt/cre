@@ -20,7 +20,17 @@
 %% @doc YAWL Workflow Persistence Wrapper Module
 %%
 %% This module provides persistence wrapper functions for YAWL workflows,
-%% delegating to yawl_persistence for Mnesia-based storage.
+%% delegating to yawl_persistence for Mnesia-based storage. It enables
+%% workflow state to survive system restarts and supports recovery of
+%% long-running business processes.
+%%
+%% <h3>Overview</h3>
+%%
+%% The persistence layer provides:
+%% - Atomic state snapshots for checkpoint/recovery
+%% - Mnesia-based distributed storage
+%% - Workflow specification preservation
+%% - Active workflow tracking and listing
 %%
 %% <h3>Functions</h3>
 %% <ul>
@@ -29,6 +39,34 @@
 %%   <li><b>delete_state/1</b> - Delete a saved workflow state</li>
 %%   <li><b>list_states/0</b> - List all active workflow states</li>
 %% </ul>
+%%
+%% <h3>Doctests</h3>
+%%
+%% ```erlang
+%% %% Create a simple workflow for persistence testing
+%% %% Note: These doctests assume Mnesia is initialized
+%% 1> Workflow = cre_yawl:new_workflow(<<"test_wf">>),
+%% 2> Task1 = cre_yawl:add_task(Workflow, <<"step1">>, [{type, atomic}]),
+%% 3> {ok, <<"test_wf">>} = cre_yawl_persistence:save_state(Task1).
+%% ok
+%%
+%% %% Load the workflow back
+%% 4> {ok, LoadedWF} = cre_yawl_persistence:load_state(<<"test_wf">>).
+%% {ok, {workflow, <<"test_wf">>, _, _, _, _, _, _}}
+%%
+%% %% List active states includes our workflow
+%% 5> {ok, States} = cre_yawl_persistence:list_states(),
+%% 6> true = lists:member(<<"test_wf">>, States).
+%% true
+%%
+%% %% Clean up - delete the state
+%% 7> ok = cre_yawl_persistence:delete_state(<<"test_wf">>).
+%% ok
+%%
+%% %% Verify deletion
+%% 8> {error, not_found} = cre_yawl_persistence:load_state(<<"test_wf">>).
+%% {error, not_found}
+%% '''
 %%
 %% @end
 %% -------------------------------------------------------------------
@@ -51,8 +89,34 @@
 %% Converts the workflow record to a case map and delegates to
 %% yawl_persistence:save_case/1. Returns {ok, CaseId} on success.
 %%
+%% The saved state includes:
+%% - Workflow specification (tasks, conditions, connections)
+%% - Workflow metadata (name, IDs)
+%% - Timestamps for tracking
+%%
+%% ```erlang
+%% 1> Workflow = cre_yawl:new_workflow(<<"my_wf">>),
+%% 2> Workflow1 = cre_yawl:add_task(Workflow, <<"task1">>, [{type, atomic}]),
+%% 3> {ok, <<"my_wf">>} = cre_yawl_persistence:save_state(Workflow1).
+%% {ok, <<"my_wf">>}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Saves a workflow state to persistent storage.
+
+Converts the workflow record to a case map and delegates to
+yawl_persistence:save_case/1.
+
+### Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(<<"my_wf">>),
+Workflow1 = cre_yawl:add_task(Workflow, <<"task1">>, [{type, atomic}]),
+{ok, <<"my_wf">>} = cre_yawl_persistence:save_state(Workflow1).
+```
+""".
 -spec save_state(Workflow :: cre_yawl:workflow()) -> {ok, binary()} | {error, term()}.
 save_state(Workflow) when element(1, Workflow) =:= workflow ->
     case ensure_mnesia_running() of
@@ -75,8 +139,29 @@ save_state(Workflow) when element(1, Workflow) =:= workflow ->
 %% Delegates to yawl_persistence:load_case/1 and converts the
 %% case map back to a workflow record.
 %%
+%% ```erlang
+%% 1> {ok, Workflow} = cre_yawl_persistence:load_state(<<"my_wf">>).
+%% {ok, {workflow, <<"my_wf">>, _, _, _, _, _, _}}
+%%
+%% %% Non-existent workflow returns error
+%% 2> {error, not_found} = cre_yawl_persistence:load_state(<<"nonexistent">>).
+%% {error, not_found}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Loads a workflow state from persistent storage.
+
+Delegates to yawl_persistence:load_case/1 and converts the
+case map back to a workflow record.
+
+### Example
+
+```erlang
+{ok, Workflow} = cre_yawl_persistence:load_state(<<"my_wf">>).
+```
+""".
 -spec load_state(CaseId :: binary()) -> {ok, cre_yawl:workflow()} | {error, not_found | term()}.
 load_state(CaseId) when is_binary(CaseId) ->
     case ensure_mnesia_running() of
@@ -102,8 +187,28 @@ load_state(CaseId) when is_binary(CaseId) ->
 %%
 %% Delegates to yawl_persistence:delete_case/1. Returns ok on success.
 %%
+%% ```erlang
+%% 1> ok = cre_yawl_persistence:delete_state(<<"my_wf">>).
+%% ok
+%%
+%% %% Subsequent load fails
+%% 2> {error, not_found} = cre_yawl_persistence:load_state(<<"my_wf">>).
+%% {error, not_found}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Deletes a saved workflow state.
+
+Delegates to yawl_persistence:delete_case/1.
+
+### Example
+
+```erlang
+ok = cre_yawl_persistence:delete_state(<<"my_wf">>).
+```
+""".
 -spec delete_state(CaseId :: binary()) -> ok | {error, term()}.
 delete_state(CaseId) when is_binary(CaseId) ->
     case ensure_mnesia_running() of
@@ -119,8 +224,28 @@ delete_state(CaseId) when is_binary(CaseId) ->
 %% Delegates to yawl_persistence:list_active_cases/0.
 %% Returns a list of case IDs for running/suspended workflows.
 %%
+%% ```erlang
+%% 1> {ok, States} = cre_yawl_persistence:list_states().
+%% {ok, [<<"wf1">>, <<"wf2">>, <<"wf3">>]}
+%%
+%% %% Empty when no active workflows
+%% 2> {ok, []} = cre_yawl_persistence:list_states().
+%% {ok, []}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Lists all active workflow states.
+
+Returns a list of case IDs for running/suspended workflows.
+
+### Example
+
+```erlang
+{ok, States} = cre_yawl_persistence:list_states().
+```
+""".
 -spec list_states() -> {ok, [binary()]} | {error, term()}.
 list_states() ->
     case ensure_mnesia_running() of
