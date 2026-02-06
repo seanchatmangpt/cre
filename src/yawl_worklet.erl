@@ -570,7 +570,7 @@ terminate(_Reason, _State) ->
 -spec check_precondition_safe(#worklet_spec{}, map()) -> boolean().
 check_precondition_safe(#worklet_spec{pre_condition = undefined}, _Context) ->
     true;
-check_precondition_safe(#worklet_spec{pre_condition = PreCondFun}, Context)
+check_precondition_safe(#worklet_spec{pre_condition = PreCondFun}, _Context)
   when is_function(PreCondFun, 0) ->
     try PreCondFun() of
         Result when is_boolean(Result) -> Result;

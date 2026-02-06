@@ -165,9 +165,8 @@
 -type pattern_type() :: atom().
 -type pattern_id() :: term().
 -type health_status() :: healthy | degraded | unhealthy.
--type alert_id() :: reference().
 
--export_type([span_id/0, trace_id/0, pattern_type/0, health_status/0]).
+-export_type([span_id/0, trace_id/0, pattern_type/0, pattern_id/0, health_status/0]).
 
 %%====================================================================
 %% Telemetry Management

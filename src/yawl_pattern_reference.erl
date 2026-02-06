@@ -686,7 +686,7 @@ deferred_choice(Options, ConditionFun, InitialData) when length(Options) >= 2 ->
 -spec interleaved_routing([fun((term()) -> term())], term()) -> #wcp_pattern{}.
 
 interleaved_routing(Branches, InitialData) when length(Branches) >= 2 ->
-    BranchCount = length(Branches),
+    _BranchCount = length(Branches),
     Places = [p_start, p_pool, p_next, p_active, p_done, p_all_done, p_end],
 
     Transitions = [t_distribute, t_pick, t_execute, t_return, t_complete],
@@ -748,7 +748,7 @@ interleaved_routing(Branches, InitialData) when length(Branches) >= 2 ->
 %%--------------------------------------------------------------------
 -spec milestone(fun((term()) -> term()), fun((term()) -> boolean()), term()) -> #wcp_pattern{}.
 
-milestone(Activity, MilestoneFun, InitialData) ->
+milestone(Activity, _MilestoneFun, InitialData) ->
     Places = [p_start, p_milestone_guard, p_milestone_reached, p_activity, p_complete, p_end],
 
     Transitions = [t_check_milestone, t_reach_milestone, t_execute, t_complete],
@@ -808,7 +808,7 @@ milestone(Activity, MilestoneFun, InitialData) ->
 %%--------------------------------------------------------------------
 -spec cancel_activity(fun((term()) -> term()), fun((term()) -> boolean())) -> #wcp_pattern{}.
 
-cancel_activity(Activity, CancelFun) ->
+cancel_activity(Activity, _CancelFun) ->
     Places = [p_start, p_running, p_cancel_signal, p_cancelled, p_completed, p_end],
 
     Transitions = [t_start, t_cancel, t_complete, t_handle_cancel],
@@ -868,7 +868,7 @@ cancel_activity(Activity, CancelFun) ->
 %%--------------------------------------------------------------------
 -spec cancel_case([fun((term()) -> term())], fun((term()) -> boolean())) -> #wcp_pattern{}.
 
-cancel_case(Activities, CancelFun) when length(Activities) >= 1 ->
+cancel_case(Activities, _CancelFun) when length(Activities) >= 1 ->
     ActivityCount = length(Activities),
     Places = [p_start, p_cancel_req | [list_to_atom("p_activity_" ++ integer_to_list(I))
                                         || I <- lists:seq(1, ActivityCount)]] ++
@@ -928,7 +928,7 @@ cancel_case(Activities, CancelFun) when length(Activities) >= 1 ->
 %%--------------------------------------------------------------------
 -spec cancel_region([fun((term()) -> term())], fun((term()) -> boolean()), [atom()]) -> #wcp_pattern{}.
 
-cancel_region(RegionActivities, CancelFun, RegionIds) when length(RegionActivities) >= 1 ->
+cancel_region(RegionActivities, _CancelFun, RegionIds) when length(RegionActivities) >= 1 ->
     RegionCount = length(RegionActivities),
     Places = [p_start, p_region_boundary | [list_to_atom("p_region_" ++ integer_to_list(I))
                                               || I <- lists:seq(1, RegionCount)]] ++
@@ -1352,7 +1352,7 @@ critical_section_enabled(_, _) -> false.
 
 sequence_fire(t_start, #{p_start := [_]} = Marking) ->
     {produce, maps:remove(p_start, Marking#{p_task_1 => [token]})};
-sequence_fire(t_end, #{p_end := [Token]} = Marking) ->
+sequence_fire(t_end, #{p_end := [_Token]} = Marking) ->
     {produce, Marking};
 sequence_fire(Trans, Marking) when is_integer(Trans) ->
     Place = list_to_atom("p_task_" ++ integer_to_list(Trans)),
@@ -1411,7 +1411,7 @@ structured_sync_merge_fire(t_sync_merge, Marking) ->
 
 discriminator_fire(t_discriminate, #{p_trigger := [_]} = Marking) ->
     {produce, maps:remove(p_trigger, Marking#{p_end => [triggered]})};
-discriminator_fire(t_consume, #{p_waiting := Waiting} = Marking) ->
+discriminator_fire(t_consume, #{p_waiting := _Waiting} = Marking) ->
     {produce, maps:remove(p_waiting, Marking#{p_reset => [reset_req]})};
 discriminator_fire(t_reset, #{p_reset := [_]} = Marking) ->
     {produce, maps:remove(p_reset, Marking#{p_trigger => [ready]})}.
@@ -1439,7 +1439,7 @@ multi_instance_static_fire(t_join, #{p_end := [_]} = Marking, _InstanceCount, _I
 multi_instance_static_fire(_, Marking, _, _) ->
     {produce, Marking}.
 
-multi_instance_dynamic_fire(t_fetch, Marking, InstanceFun) ->
+multi_instance_dynamic_fire(t_fetch, Marking, _InstanceFun) ->
     case maps:get(p_source, Marking, []) of
         [DataFun] ->
             case DataFun() of
@@ -1451,9 +1451,9 @@ multi_instance_dynamic_fire(t_fetch, Marking, InstanceFun) ->
         _ ->
             {produce, Marking}
     end;
-multi_instance_dynamic_fire(t_spawn, Marking, InstanceFun) ->
+multi_instance_dynamic_fire(t_spawn, Marking, _InstanceFun) ->
     case maps:get(p_pool, Marking, []) of
-        [Data] ->
+        [_Data] ->
             {produce, maps:remove(p_pool, Marking#{p_running => [executing]})};
         _ ->
             {produce, Marking}
@@ -1496,7 +1496,7 @@ deferred_choice_fire(t_complete, #{p_discarded := [_]} = Marking, _ConditionFun)
 deferred_choice_fire(_, Marking, _) ->
     {produce, Marking}.
 
-interleaved_routing_fire(t_distribute, #{p_start := [Data]} = Marking) ->
+interleaved_routing_fire(t_distribute, #{p_start := [_Data]} = Marking) ->
     %% Create branch tokens
     {produce, maps:remove(p_start, Marking#{p_pool => [branch1, branch2]})};
 interleaved_routing_fire(t_pick, #{p_pool := [Branch | Rest], p_next := [_]} = Marking) ->
@@ -1536,7 +1536,7 @@ cancel_activity_fire(_, Marking, _) ->
 
 cancel_case_fire(t_start, #{p_start := [_]} = Marking, _Activities) ->
     {produce, maps:remove(p_start, Marking#{p_activity_1 => [running]})};
-cancel_case_fire(I, Marking, Activities) when is_integer(I), I > 1 ->
+cancel_case_fire(I, Marking, _Activities) when is_integer(I), I > 1 ->
     case maps:get(list_to_atom("p_activity_" ++ integer_to_list(I - 1)), Marking, []) of
         [_] ->
             Place = list_to_atom("p_activity_" ++ integer_to_list(I)),
@@ -1672,4 +1672,4 @@ generate_id(Prefix) ->
     Hex = binary:encode_hex(Unique),
     <<Prefix/binary, "_", Hex/binary>>.
 
-test_input() -> test_input.
+%% test_input() -> test_input.
