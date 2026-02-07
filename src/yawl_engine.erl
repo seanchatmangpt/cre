@@ -704,7 +704,7 @@ handle_call(resume_case, _From, #engine_state{cases = Cases, persistence_enabled
             {reply, {error, no_cases}, State}
     end;
 
-handle_call(get_case_state, _From, #engine_state{cases = Cases}) ->
+handle_call(get_case_state, _From, #engine_state{cases = Cases} = State) ->
     case maps:keys(Cases) of
         [CaseId | _] ->
             Case = maps:get(CaseId, Cases),
@@ -722,20 +722,20 @@ handle_call(get_case_state, _From, #engine_state{cases = Cases}) ->
                 completed_at => Case#workflow_case.completed_at
               }
              },
-            {reply, {ok, StateMap}, #engine_state{cases = Cases}};
+            {reply, {ok, StateMap}, State};
         [] ->
-            {reply, {error, no_cases}, #engine_state{cases = Cases}}
+            {reply, {error, no_cases}, State}
     end;
 
-handle_call(get_available_workitems, _From, #engine_state{cases = Cases}) ->
+handle_call(get_available_workitems, _From, #engine_state{cases = Cases} = State) ->
     case maps:keys(Cases) of
         [CaseId | _] ->
             Case = maps:get(CaseId, Cases),
             Available = [W || W <- maps:values(Case#workflow_case.workitems),
                             W#workitem.status =:= enabled],
-            {reply, {ok, Available}, #engine_state{cases = Cases}};
+            {reply, {ok, Available}, State};
         [] ->
-            {reply, {error, no_cases}, #engine_state{cases = Cases}}
+            {reply, {error, no_cases}, State}
     end;
 
 handle_call({start_workitem, WorkItemId}, _From, #engine_state{cases = Cases, persistence_enabled = PersistEnabled} = State) ->
@@ -910,8 +910,8 @@ handle_call(disable_persistence, _From, State) ->
     logger:info("Persistence disabled", [{module, ?MODULE}, {action, persistence_disabled}]),
     {reply, ok, State1};
 
-handle_call(is_persistence_enabled, _From, #engine_state{persistence_enabled = Enabled}) ->
-    {reply, Enabled, #engine_state{persistence_enabled = Enabled}};
+handle_call(is_persistence_enabled, _From, #engine_state{persistence_enabled = Enabled} = State) ->
+    {reply, Enabled, State};
 
 handle_call(_Request, _From, State) ->
     {reply, {error, bad_msg}, State}.

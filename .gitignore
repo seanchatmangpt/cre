@@ -12,6 +12,9 @@ rel/example_project
 doc
 _build
 rebar.lock
+.claude-flow/
+.hive-mind/
+.mcp.json
 
 # Wreckit local config (may contain secrets)
 .wreckit/config.local.json

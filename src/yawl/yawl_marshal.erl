@@ -134,7 +134,7 @@ marshal_to_xml(_Term) ->
 %% Type can be: map, proplist, record.
 %% @end
 %%--------------------------------------------------------------------
--spec unmarshal_from_xml(binary(), map | proplist) -> unmarshal_result().
+-spec unmarshal_from_xml(binary(), map | proplist | {record, module(), atom()}) -> unmarshal_result().
 unmarshal_from_xml(Xml, TargetType) when is_binary(Xml) ->
     try
         Parsed = parse_xml(Xml),

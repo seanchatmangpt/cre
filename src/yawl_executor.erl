@@ -403,6 +403,7 @@ pattern_category(Pattern) when is_record(Pattern, resource_create);
 pattern_category(PatternType) when is_atom(PatternType) ->
     case PatternType of
         %% Basic patterns (WCP-01 to WCP-10)
+        workflow -> basic;
         sequence -> basic;
         parallel_split -> basic;
         synchronization -> basic;
@@ -700,8 +701,8 @@ context_merge(Context, Updates) ->
 %%--------------------------------------------------------------------
 -spec context_to_map(execution_context()) -> map().
 
-context_to_map(Context) ->
-    maps:to_list(Context).
+context_to_map(Context) when is_map(Context) ->
+    Context.
 
 %%--------------------------------------------------------------------
 %% @doc Gets global execution statistics.
@@ -804,6 +805,20 @@ get_pattern_stats(PatternType) ->
 -spec execute_basic_pattern(atom(), pattern(), input(), execution_context()) ->
     execution_result().
 
+execute_basic_pattern(workflow, #workflow{
+        id = Id,
+        name = Name,
+        tasks = Tasks,
+        start_task_id = StartTaskId,
+        end_task_ids = EndTaskIds}, _Input, _Context) ->
+    {ok, #{
+        workflow_id => Id,
+        workflow_name => Name,
+        task_count => maps:size(Tasks),
+        start_task => StartTaskId,
+        end_tasks => EndTaskIds,
+        status => workflow_complete
+    }};
 execute_basic_pattern(sequence, #sequence{task_ids = TaskIds}, _Input, _Context) ->
     case TaskIds of
         [] -> {ok, #{sequence_complete => true, tasks => []}};
@@ -1408,12 +1423,7 @@ get_heir_process() ->
 -spec get_stats_table() -> ets:tid().
 
 get_stats_table() ->
-    TableName = try
-        list_to_existing_atom(atom_to_list(?MODULE) ++ "_stats")
-    catch
-        error:badarg ->
-            list_to_atom(atom_to_list(?MODULE) ++ "_stats")
-    end,
+    TableName = list_to_atom(atom_to_list(?MODULE) ++ "_stats"),
     case ets:whereis(TableName) of
         undefined ->
             Heir = case get_heir_process() of
