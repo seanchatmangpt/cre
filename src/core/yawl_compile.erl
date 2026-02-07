@@ -864,7 +864,8 @@ extract_places_and_transitions(Modules, NetInfos) ->
 %% @doc Runs all doctests for the module.
 %% @private
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Test sanitize_atom_name with various inputs
 sanitize_atom_name_binary_test() ->

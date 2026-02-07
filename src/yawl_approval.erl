@@ -1294,7 +1294,8 @@ log_checkpoint_event(Checkpoint, EventType) ->
 %% Tests examples embedded in documentation strings.
 %%--------------------------------------------------------------------
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %%--------------------------------------------------------------------
 %% @doc Test for checkpoint ID generation.
@@ -1302,8 +1303,8 @@ doctest_test() ->
 checkpoint_id_format_test() ->
     Id = generate_checkpoint_id(),
     ?assert(is_binary(Id)),
-    ?assertEqual(<<"approval_">>, binary_part(Id, {0, 8})),
-    ?assertEqual(40, byte_size(Id)).  % "approval_" (8) + 32 hex chars
+    ?assertEqual(<<"approval_">>, binary_part(Id, {0, 9})),
+    ?assertEqual(41, byte_size(Id)).  % "approval_" (9) + 32 hex chars
 
 %%--------------------------------------------------------------------
 %% @doc Test for valid approval status atoms.

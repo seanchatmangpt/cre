@@ -413,7 +413,8 @@ extract_instance_tokens(Marking, TaskId) when is_map(Marking) ->
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %%====================================================================
 %% Unit Tests

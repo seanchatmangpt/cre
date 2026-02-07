@@ -514,24 +514,19 @@ to_petrinet(#yawl_task{id = Id, type = Type, split_type = Split, join_type = Joi
 -spec validate(yawl_element()) -> ok | {error, [binary()]}.
 
 validate(#yawl_task{type = Type, split_type = Split, join_type = Join}) ->
-    Errors = lists:filtermap(
-        fun
-            (undefined) -> false;
-            (_) -> {true, ok}
+    Checks = [
+        case Type of
+            multiple_instance when Split =/= undefined, Split =/= 'and' ->
+                {true, <<"Multiple instance tasks must use AND split">>};
+            _ -> false
         end,
-        [
-            case Type of
-                multiple_instance when Split =/= undefined, Split =/= 'and' ->
-                    {true, <<"Multiple instance tasks must use AND split">>};
-                _ -> false
-            end,
-            case Join of
-                'xor' when Split =/= undefined, Split =/= 'xor' ->
-                    {true, <<"XOR join requires XOR split for consistency">>};
-                _ -> false
-            end
-        ]
-    ),
+        case Join of
+            'xor' when Split =/= undefined, Split =/= 'xor' ->
+                {true, <<"XOR join requires XOR split for consistency">>};
+            _ -> false
+        end
+    ],
+    Errors = [Msg || {true, Msg} <- Checks],
     case Errors of
         [] -> ok;
         _ -> {error, Errors}

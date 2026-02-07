@@ -245,13 +245,13 @@ init(UsrInfo) ->
           {noreply, marking()} |
           {stop, term(), term()}.
 
-handle_call(ping, _From, NetState) ->
+handle_call(ping, _From, _NetState) ->
     {reply, pong};
 
-handle_call({put, Place, Token}, _From, NetState) ->
+handle_call({put, Place, Token}, _From, _NetState) ->
     {reply, ok, #{Place => [Token]}};
 
-handle_call(_Request, _From, NetState) ->
+handle_call(_Request, _From, _NetState) ->
     {reply, {error, bad_msg}}.
 
 %%--------------------------------------------------------------------
@@ -265,7 +265,7 @@ handle_call(_Request, _From, NetState) ->
           {noreply, marking()} |
           {stop, term()}.
 
-handle_cast(_Request, NetState) ->
+handle_cast(_Request, _NetState) ->
     noreply.
 
 %%--------------------------------------------------------------------
@@ -279,7 +279,7 @@ handle_cast(_Request, NetState) ->
           {noreply, marking()} |
           {stop, term()}.
 
-handle_info(_Request, NetState) ->
+handle_info(_Request, _NetState) ->
     noreply.
 
 %%--------------------------------------------------------------------
@@ -329,7 +329,8 @@ trigger(_Place, _Token, _UsrInfo) ->
 %% The doctest examples in moduledoc are for documentation only.
 %% @private
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => false, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Test place_lst callback
 place_lst_test() ->

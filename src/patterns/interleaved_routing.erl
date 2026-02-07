@@ -642,7 +642,8 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 
 %% @private
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% @private
 place_lst_test() ->

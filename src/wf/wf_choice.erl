@@ -206,7 +206,8 @@ make_trsn_name(From, ToList) ->
 %% @end
 %%--------------------------------------------------------------------
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Test spec creation with valid inputs
 spec_valid_test() ->

@@ -1,4 +1,4 @@
--module(yawl_telemetry).
+-module(wf_yawl_telemetry).
 -behaviour(gen_server).
 
 %%====================================================================
@@ -106,14 +106,14 @@ start_link() ->
 %%
 %% Example:
 %% ```
-%% {ok, SpanCtx} = yawl_telemetry:start_span(
+%% {ok, SpanCtx} = wf_yawl_telemetry:start_span(
 %%     <<"order_fulfillment">>,
 %%     <<"case-123">>,
 %%     <<"payment_task">>,
 %%     <<"Execute Payment">
 %% ),
 %% % ... do work ...
-%% yawl_telemetry:end_span(SpanCtx, success).
+%% wf_yawl_telemetry:end_span(SpanCtx, success).
 %% ```
 -spec start_span(SpecId, CaseId, TaskId, SpanName) ->
     {ok, span_ctx()} | {error, reason()} when
@@ -136,7 +136,7 @@ start_span(SpecId, CaseId, TaskId, SpanName) ->
 %%
 %% Example:
 %% ```
-%% yawl_telemetry:end_span(SpanCtx, success).
+%% wf_yawl_telemetry:end_span(SpanCtx, success).
 %% ```
 -spec end_span(SpanCtx, Status) -> ok when
     SpanCtx :: span_ctx(),
@@ -160,7 +160,7 @@ end_span(SpanCtx, Status) ->
 %%
 %% Example:
 %% ```
-%% yawl_telemetry:emit_event(
+%% wf_yawl_telemetry:emit_event(
 %%     <<"order_fulfillment">>,
 %%     <<"case-123">>,
 %%     task_start,
@@ -186,7 +186,7 @@ emit_event(SpecId, CaseId, EventType, Attributes) ->
 %%
 %% Example:
 %% ```
-%% yawl_telemetry:track_task(
+%% wf_yawl_telemetry:track_task(
 %%     <<"order_fulfillment">>,
 %%     <<"case-123">>,
 %%     <<"payment_task">>,
@@ -213,7 +213,7 @@ track_task(SpecId, CaseId, TaskId, Status) ->
 %%
 %% Example:
 %% ```
-%% {ok, Metrics} = yawl_telemetry:get_metrics(
+%% {ok, Metrics} = wf_yawl_telemetry:get_metrics(
 %%     <<"order_fulfillment">>,
 %%     <<"case-123">>
 %% ),
@@ -239,7 +239,7 @@ get_metrics(SpecId, CaseId) ->
 %%
 %% Example:
 %% ```
-%% yawl_telemetry:set_verbosity(debug).
+%% wf_yawl_telemetry:set_verbosity(debug).
 %% ```
 -spec set_verbosity(Verbosity) -> ok when
     Verbosity :: verbosity().
@@ -253,7 +253,7 @@ set_verbosity(Verbosity) ->
 %%
 %% Example:
 %% ```
-%% yawl_telemetry:flush().
+%% wf_yawl_telemetry:flush().
 %% ```
 -spec flush() -> ok.
 flush() ->
@@ -265,7 +265,7 @@ flush() ->
 %%
 %% Example:
 %% ```
-%% SpanId = yawl_telemetry:get_span_context(SpanCtx).
+%% SpanId = wf_yawl_telemetry:get_span_context(SpanCtx).
 %% ```
 -spec get_span_context(SpanCtx) -> binary() when
     SpanCtx :: span_ctx().

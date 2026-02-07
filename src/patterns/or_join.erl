@@ -81,10 +81,10 @@ Transitions:
 ]).
 
 -export([
-    place_lst/1,
-    trsn_lst/1,
+    place_lst/0,
+    trsn_lst/0,
     init_marking/2,
-    preset/2,
+    preset/1,
     is_enabled/3,
     fire/3
 ]).
@@ -266,7 +266,10 @@ The place list is dynamically generated based on the number of branches.
  'p_consume_pool','p_reset_pending','p_output']
 ```
 """.
--spec place_lst(BranchCount :: pos_integer()) -> [atom()].
+-spec place_lst() -> [atom()].
+
+place_lst() ->
+    place_lst(10).  %% Default max branches
 
 place_lst(BranchCount) when BranchCount >= 2 ->
     InputPlaces = [list_to_atom("p_input_" ++ integer_to_list(I)) || I <- lists:seq(1, BranchCount)],
@@ -284,7 +287,10 @@ The transition list is dynamically generated based on the number of branches.
 ['t_complete_1','t_complete_2','t_trigger','t_consume','t_reset','t_output']
 ```
 """.
--spec trsn_lst(BranchCount :: pos_integer()) -> [atom()].
+-spec trsn_lst() -> [atom()].
+
+trsn_lst() ->
+    trsn_lst(10).  %% Default max branches
 
 trsn_lst(BranchCount) when BranchCount >= 2 ->
     CompleteTrans = [list_to_atom("t_complete_" ++ integer_to_list(I)) || I <- lists:seq(1, BranchCount)],
@@ -307,23 +313,20 @@ Returns the preset (input places) for each transition.
 
 The preset is dynamically generated based on the branch count stored in UsrInfo.
 """.
--spec preset(Trsn :: atom(), UsrInfo :: or_join_state()) -> [atom()].
+-spec preset(Trsn :: atom()) -> [atom()].
 
-preset('t_trigger', _UsrInfo) ->
+preset('t_trigger') ->
     ['p_trigger_ready'];
-preset('t_consume', _UsrInfo) ->
+preset('t_consume') ->
     ['p_consume_pool'];
-preset('t_reset', _UsrInfo) ->
+preset('t_reset') ->
     ['p_reset_pending'];
-preset('t_output', _UsrInfo) ->
+preset('t_output') ->
     ['p_triggered'];
-preset(Trsn, _UsrInfo) when is_atom(Trsn) ->
-    %% Check if this is a t_complete_N transition
+preset(Trsn) when is_atom(Trsn) ->
     Str = atom_to_list(Trsn),
-    _PrefixLen = length("t_complete_"),
     case Str of
         "t_complete_" ++ Rest ->
-            %% This is a t_complete_N transition
             [list_to_atom("p_input_" ++ Rest)];
         _ ->
             []
@@ -495,15 +498,16 @@ fire(Trsn, Mode, #or_join_state{branch_count = Count} = State) ->
                 't_consume' ->
                     ConsumePool = maps:get('p_consume_pool', Mode, []),
                     NewState = State#or_join_state{completed = [I || {complete, I} <- ConsumePool] ++ State#or_join_state.completed},
-                    case length(NewState#or_join_state.completed) of
-                        Count when Count >= Count ->
+                    CompletedCount = length(NewState#or_join_state.completed),
+                    case CompletedCount >= Count of
+                        true ->
                             %% All branches consumed, request reset
                             log_event(State, <<"ORJoin">>, <<"AllConsumed">>, #{<<"count">> => Count}),
                             {produce, #{
                                 'p_consume_pool' => [],
                                 'p_reset_pending' => [reset_req]
                             }, NewState};
-                        _ ->
+                        false ->
                             {produce, #{
                                 'p_consume_pool' => []
                             }, NewState}
@@ -551,17 +555,16 @@ trigger(_Place, _Token, _UsrInfo) ->
 %% @doc Initializes the gen_yawl.
 %% @end
 %%--------------------------------------------------------------------
--spec init(UsrInfo :: or_join_state()) ->
-          {ok, or_join_state()}.
+-spec init(UsrInfo :: or_join_state()) -> or_join_state().
 
 init(OrJoinState) ->
-    case yawl_xes:new_log(#{<<"process">> => <<"ORJoin">>}) of
+    case catch yawl_xes:new_log(#{<<"process">> => <<"ORJoin">>}) of
         {ok, LogId} ->
             State1 = OrJoinState#or_join_state{log_id = LogId},
-            yawl_xes:log_case_start(LogId, generate_case_id()),
-            {ok, State1};
+            catch yawl_xes:log_case_start(LogId, generate_case_id()),
+            State1;
         _ ->
-            {ok, OrJoinState}
+            OrJoinState
     end.
 
 %%--------------------------------------------------------------------
@@ -569,13 +572,13 @@ init(OrJoinState) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_call(Request :: term(), From :: {pid(), term()}, NetState :: term()) ->
-          {reply, term(), term()}.
+          {reply, term()} | noreply.
 
 handle_call(get_state, _From, NetState) ->
     UsrInfo = gen_yawl:get_usr_info(NetState),
-    {reply, {ok, UsrInfo}, NetState};
-handle_call(_Request, _From, NetState) ->
-    {reply, {error, bad_msg}, NetState}.
+    {reply, {ok, UsrInfo}};
+handle_call(_Request, _From, _NetState) ->
+    {reply, {error, bad_msg}}.
 
 %%--------------------------------------------------------------------
 %% @doc Handles asynchronous casts.
@@ -584,32 +587,17 @@ handle_call(_Request, _From, NetState) ->
 -spec handle_cast(Request :: term(), NetState :: term()) ->
           {noreply, term()}.
 
-handle_cast(reset_or_join, NetState) ->
-    UsrInfo = gen_yawl:get_usr_info(NetState),
-    case UsrInfo of
-        #or_join_state{} = State ->
-            NewState = State#or_join_state{
-                completed = [],
-                triggered_by = undefined,
-                cycle_count = State#or_join_state.cycle_count + 1
-            },
-            NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
-            {noreply, NewUsrInfo};
-        _ ->
-            {noreply, NetState}
-    end;
-handle_cast(_Request, NetState) ->
-    {noreply, NetState}.
+handle_cast(_Request, _NetState) ->
+    noreply.
 
 %%--------------------------------------------------------------------
 %% @doc Handles non-gen_yawl messages.
 %% @end
 %%--------------------------------------------------------------------
--spec handle_info(Request :: term(), NetState :: term()) ->
-          {noreply, term()}.
+-spec handle_info(Request :: term(), NetState :: term()) -> noreply.
 
-handle_info(_Request, NetState) ->
-    {noreply, NetState}.
+handle_info(_Request, _NetState) ->
+    noreply.
 
 %%--------------------------------------------------------------------
 %% @doc Handles code changes.
@@ -778,20 +766,16 @@ trsn_lst_test() ->
                  trsn_lst(3)).
 
 preset_t_complete_1_test() ->
-    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
-    ?assertEqual(['p_input_1'], preset('t_complete_1', State)).
+    ?assertEqual(['p_input_1'], preset('t_complete_1')).
 
 preset_t_trigger_test() ->
-    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
-    ?assertEqual(['p_trigger_ready'], preset('t_trigger', State)).
+    ?assertEqual(['p_trigger_ready'], preset('t_trigger')).
 
 preset_t_output_test() ->
-    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
-    ?assertEqual(['p_triggered'], preset('t_output', State)).
+    ?assertEqual(['p_triggered'], preset('t_output')).
 
 preset_unknown_test() ->
-    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
-    ?assertEqual([], preset(unknown, State)).
+    ?assertEqual([], preset(unknown)).
 
 new_state_test() ->
     Fun1 = fun(X) -> X * 2 end,

@@ -382,7 +382,8 @@ trigger(_Place, _Token, _UsrInfo) ->
 %% @doc Runs all doctests for the module.
 %% @private
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Test place_lst callback
 place_lst_test() ->

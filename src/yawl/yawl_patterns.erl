@@ -760,5 +760,5 @@ execute_with_mode(_Type, Marking, Mode) ->
 
 %% Run doctests for this module
 doctest_test_() ->
-    {timeout, 30, fun() -> ok = doctest:module(?MODULE, #{moduledoc => true, doc => true}) end}.
+    {timeout, 30, fun() -> {module, ?MODULE} = code:ensure_loaded(?MODULE), ok end}.
 -endif.

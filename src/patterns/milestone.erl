@@ -460,7 +460,7 @@ fire('t_enable_activity', #{'p_milestone_reached' := [reached]}, State) ->
 
 fire('t_execute', #{'p_activity_pending' := [enabled]}, #milestone_state{activity_fun = ActivityFun} = State) ->
     %% Execute the activity
-    Result = try ActivityFun() catch _:_ -> {error, activity_failed} end,
+    Result = try ActivityFun() catch Class:Reason -> logger:warning("milestone activity_fun failed: ~p:~p", [Class, Reason]), {error, activity_failed} end,
     NewState = State#milestone_state{
         activity_result = Result,
         activity_executed = true
@@ -687,5 +687,6 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 -endif.

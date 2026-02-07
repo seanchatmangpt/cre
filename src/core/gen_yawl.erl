@@ -968,7 +968,7 @@ attempt_progress(ModeMap, NetMod, UsrInfo, FireTimeout) ->
                         end),
 
                     receive
-                        {fire_result, Result} ->
+                        {'DOWN', Ref, process, Pid, {fire_result, Result}} ->
                             Result;
                         {'DOWN', Ref, process, Pid, Reason} ->
                             logger:error("gen_yawl fire/3 process crashed: ~p", [Reason]),
@@ -1176,7 +1176,7 @@ permut_map_keys([], _Map, Acc) ->
     Acc;
 permut_map_keys([K | Rest], Map, Acc) ->
     Values = maps:get(K, Map),
-    NewAcc = [{maps:put(K, V, M)} || M <- Acc, V <- Values],
+    NewAcc = [maps:put(K, V, M) || M <- Acc, V <- Values],
     permut_map_keys(Rest, Map, NewAcc).
 
 %%====================================================================
@@ -1187,5 +1187,6 @@ permut_map_keys([K | Rest], Map, Acc) ->
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 -endif.

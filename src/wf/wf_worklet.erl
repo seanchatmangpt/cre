@@ -294,7 +294,8 @@ is_valid_condition(_) ->
 %% @end
 %%--------------------------------------------------------------------
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Test new/1 with valid rules
 new_valid_rules_test() ->

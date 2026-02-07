@@ -164,6 +164,6 @@ doctest_test() ->
 
     %% Test 7: Verify module behavior declaration
     Behaviors = proplists:get_value(attributes, cre_status_handler:module_info()),
-    {behavior, cowboy_handler} = lists:keyfind(behavior, 1, Behaviors),
+    {behavior, [cowboy_handler]} = lists:keyfind(behavior, 1, Behaviors),
 
     ok.

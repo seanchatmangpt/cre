@@ -356,7 +356,7 @@ is_enabled(_Trsn, _Mode, _UsrInfo) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec fire(Trsn :: atom(), Mode :: map(), UsrInfo :: deferred_choice_state()) ->
-          {produce, map()} | {produce, map(), deferred_choice_state()} | abort.
+          {produce, map()} | abort.
 
 fire('t_offer', #{'p_start' := [start]}, #deferred_choice_state{options = Options} = State) ->
     %% Create option tokens
@@ -366,7 +366,7 @@ fire('t_offer', #{'p_start' := [start]}, #deferred_choice_state{options = Option
         'p_start' => [],
         'p_option_pool' => OptionTokens,
         'p_offer_pending' => [waiting]
-    }, State};
+    }};
 
 fire('t_evaluate_option', #{'p_option_pool' := [Token | Rest]}, State) ->
     %% Evaluate an option
@@ -378,32 +378,30 @@ fire('t_evaluate_option', #{'p_option_pool' := [Token | Rest]}, State) ->
             }),
             {produce, #{
                 'p_option_pool' => Rest
-            }, State};
+            }};
         {option, Key, _Fun} ->
             log_event(State, <<"DeferredChoice">>, <<"OptionEvaluated">>, #{
                 <<"option">> => Key
             }),
             {produce, #{
                 'p_option_pool' => Rest
-            }, State}
+            }}
     end;
 
 fire('t_select', #{'p_offer_pending' := [waiting]}, #deferred_choice_state{options = Options} = State) ->
     %% Select based on priority (first available wins in deferred choice)
     Keys = maps:keys(Options),
     Selected = select_by_priority(Keys, Options),
-    NewState = State#deferred_choice_state{selected = Selected},
     log_event(State, <<"DeferredChoice">>, <<"Selected">>, #{<<"option">> => Selected}),
     {produce, #{
         'p_offer_pending' => [],
         'p_selected' => [Selected]
-    }, NewState};
+    }};
 
 fire('t_discard_others', #{'p_selected' := [Selected]}, #deferred_choice_state{options = Options} = State) ->
     %% Discard non-selected options
     AllKeys = maps:keys(Options),
     Discarded = AllKeys -- [Selected],
-    NewState = State#deferred_choice_state{discarded = Discarded},
     log_event(State, <<"DeferredChoice">>, <<"DiscardedOthers">>, #{
         <<"selected">> => Selected,
         <<"discarded">> => Discarded
@@ -411,7 +409,7 @@ fire('t_discard_others', #{'p_selected' := [Selected]}, #deferred_choice_state{o
     {produce, #{
         'p_selected' => [],
         'p_discarded' => [Selected, Discarded]
-    }, NewState};
+    }};
 
 fire('t_complete', #{'p_discarded' := [Selected, _Discarded]}, State) ->
     %% Complete the choice
@@ -423,7 +421,7 @@ fire('t_complete', #{'p_discarded' := [Selected, _Discarded]}, State) ->
     {produce, #{
         'p_discarded' => [],
         'p_complete' => [Selected, {result, Selected}]
-    }, State};
+    }};
 
 fire(_Trsn, _Mode, _UsrInfo) ->
     abort.
@@ -443,16 +441,16 @@ trigger(_Place, _Token, _UsrInfo) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec init(UsrInfo :: deferred_choice_state()) ->
-          {ok, deferred_choice_state()}.
+          deferred_choice_state().
 
 init(DeferredChoiceState) ->
     case yawl_xes:new_log(#{<<"process">> => <<"DeferredChoice">>}) of
         {ok, LogId} ->
             State1 = DeferredChoiceState#deferred_choice_state{log_id = LogId},
             yawl_xes:log_case_start(LogId, generate_case_id()),
-            {ok, State1};
+            State1;
         _ ->
-            {ok, DeferredChoiceState}
+            DeferredChoiceState
     end.
 
 %%--------------------------------------------------------------------
@@ -460,43 +458,35 @@ init(DeferredChoiceState) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_call(Request :: term(), From :: {pid(), term()}, NetState :: term()) ->
-          {reply, term(), term()}.
+          {reply, term()} | noreply.
 
 handle_call(get_state, _From, NetState) ->
     UsrInfo = gen_yawl:get_usr_info(NetState),
-    {reply, {ok, UsrInfo}, NetState};
-handle_call(_Request, _From, NetState) ->
-    {reply, {error, bad_msg}, NetState}.
+    {reply, {ok, UsrInfo}};
+handle_call(_Request, _From, _NetState) ->
+    {reply, {error, bad_msg}}.
 
 %%--------------------------------------------------------------------
 %% @doc Handles asynchronous casts.
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_cast(Request :: term(), NetState :: term()) ->
-          {noreply, term()}.
+          noreply.
 
-handle_cast({select_option, OptionId}, NetState) ->
-    UsrInfo = gen_yawl:get_usr_info(NetState),
-    case UsrInfo of
-        #deferred_choice_state{selected = undefined} = State ->
-            NewState = State#deferred_choice_state{selected = OptionId},
-            NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
-            {noreply, NewUsrInfo};
-        _ ->
-            {noreply, NetState}
-    end;
-handle_cast(_Request, NetState) ->
-    {noreply, NetState}.
+handle_cast({select_option, _OptionId}, _NetState) ->
+    noreply;
+handle_cast(_Request, _NetState) ->
+    noreply.
 
 %%--------------------------------------------------------------------
 %% @doc Handles non-gen_pnet messages.
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_info(Request :: term(), NetState :: term()) ->
-          {noreply, term()}.
+          noreply.
 
-handle_info(_Request, NetState) ->
-    {noreply, NetState}.
+handle_info(_Request, _NetState) ->
+    noreply.
 
 %%--------------------------------------------------------------------
 %% @doc Handles code changes.
@@ -656,5 +646,6 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 -endif.

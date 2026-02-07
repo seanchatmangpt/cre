@@ -559,6 +559,7 @@ process_cancellation_basic_test() ->
     },
     CancelToken = {cancel, [pending_appointment]},
     Expected = #{
+        cancel_trigger => [CancelToken],
         pending_appointment => [],
         carrier_confirmed => [confirmed],
         shipping_scheduled => []

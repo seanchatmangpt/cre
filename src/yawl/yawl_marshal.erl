@@ -421,8 +421,7 @@ term_to_map(Value) -> #{value => Value}.
 %%--------------------------------------------------------------------
 -spec xmerl_to_simple(term()) -> xml_element().
 xmerl_to_simple(XmlEl) ->
-    % Access xmlElement record fields directly instead of using deprecated xmerl_lib functions
-    Name = list_to_binary(XmlEl#xmlElement.name),
+    Name = atom_to_binary(XmlEl#xmlElement.name, utf8),
     Attrs = convert_xmerl_attrs(XmlEl#xmlElement.attributes),
     Content = [xmerl_content_to_simple(C) || C <- XmlEl#xmlElement.content],
     {Name, Attrs, Content}.
@@ -433,8 +432,8 @@ xmerl_to_simple(XmlEl) ->
 %%--------------------------------------------------------------------
 -spec convert_xmerl_attrs([term()]) -> [{binary(), binary()}].
 convert_xmerl_attrs(AttrList) ->
-    lists:map(fun({K, V}) ->
-        {list_to_binary(K), list_to_binary(format_xmerl_attr(V))}
+    lists:map(fun(#xmlAttribute{name = K, value = V}) ->
+        {atom_to_binary(K, utf8), list_to_binary(format_xmerl_attr(V))}
     end, AttrList).
 
 %%--------------------------------------------------------------------
@@ -464,14 +463,19 @@ xmerl_content_to_simple(Content) ->
 %%--------------------------------------------------------------------
 -spec simple_parse_xml(binary()) -> xml_element().
 simple_parse_xml(Xml) ->
-    % Very basic XML parsing for fallback
-    % Extract root element
+    %% Basic XML parsing fallback when xmerl is not available
     case binary:split(Xml, <<"<">>) of
         [_, Rest1] ->
             case binary:split(Rest1, <<">">>) of
-                [Name, Rest2] ->
-                    {Attrs, _} = parse_attributes(Name),
-                    {list_to_binary(Name), Attrs, [Rest2]}
+                [TagWithAttrs, Rest2] ->
+                    {Attrs, TagName} = parse_attributes(TagWithAttrs),
+                    %% Strip closing tag content
+                    CloseTag = <<"</", TagName/binary, ">">>,
+                    Content = case binary:split(Rest2, CloseTag) of
+                        [Inner, _] -> [Inner];
+                        [Inner] -> [Inner]
+                    end,
+                    {TagName, Attrs, Content}
             end
     end.
 
@@ -706,9 +710,11 @@ minify_content_item(El) -> minify_xml_element(El).
 %% @end
 %%--------------------------------------------------------------------
 -spec validate_against_schema(xml_element(), xml_element()) -> boolean().
-validate_against_schema(_Xml, _Schema) ->
-    % For production, use proper XSD validation
-    true.
+validate_against_schema({_, _, _}, {_, _, _}) ->
+    %% Both parse as valid XML elements - basic structural validation passes
+    true;
+validate_against_schema(_, _) ->
+    false.
 
 %%--------------------------------------------------------------------
 %% @private Validates with rule list.
@@ -728,13 +734,13 @@ validate_with_rules(Xml, [Rule | Rest]) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec apply_rule(xml_element(), term()) -> boolean().
-apply_rule(_Xml, {required_element, _Name}) ->
-    % Check if element exists
-    true;
-apply_rule(_Xml, {attribute, _Name, _Value}) ->
-    % Check attribute value
-    true;
-apply_rule(_Xml, _) ->
+apply_rule({_, _, Content}, {required_element, Name}) ->
+    lists:any(fun({N, _, _}) -> N =:= Name;
+                 (_) -> false
+              end, Content);
+apply_rule({_, Attrs, _}, {attribute, Name, Value}) ->
+    lists:any(fun({N, V}) -> N =:= Name andalso V =:= Value end, Attrs);
+apply_rule(_, _) ->
     true.
 
 %%--------------------------------------------------------------------
