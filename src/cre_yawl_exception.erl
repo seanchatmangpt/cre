@@ -17,27 +17,120 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc YAWL Exception Handling and Compensation Module
 %%
-%% This module provides exception handling and compensation patterns
-%% for YAWL workflows in the CRE runtime environment.
+%% YAWL Exception Handling and Compensation Module
 %%
-%% <h3>Exception Types</h3>
-%% <ul>
-%%   <li><code>business_exception</code> - Expected business rule violations</li>
-%%   <li><code>system_exception</code> - System-level failures</li>
-%%   <li><code>timeout_exception</code> - Operation timeout</li>
-%%   <li><code>resource_exception</code> - Resource unavailability</li>
-%% </ul>
+%% This module provides comprehensive exception handling and compensation
+%% patterns for YAWL workflows in the CRE runtime environment. It implements
+%% the workflow exception patterns (WHP-01 through WHP-05) from the YAWL
+%% patterns catalog.
 %%
-%% <h3>Compensation</h3>
-%% Compensation is the process of undoing effects from completed
-%% activities when a workflow cannot complete normally.
+%% ## Exception Types
 %%
-%% @end
+%% * **business_exception** - Expected business rule violations
+%% * **system_exception** - System-level failures
+%% * **timeout_exception** - Operation timeout
+%% * **resource_exception** - Resource unavailability
+%% * **data_exception** - Data validation failures
+%% * **communication_exception** - Network/service communication failures
+%% * **validation_exception** - Input validation errors
+%% * **security_exception** - Authentication/authorization failures
+%% * **workflow_exception** - Workflow-level errors
+%% * **compensation_exception** - Compensation operation failures
+%%
+%% ## Compensation Patterns
+%%
+%% Compensation is the process of undoing effects from completed activities
+%% when a workflow cannot complete normally.
+%%
+%% ### WHP-01: Error Handler Pattern
+%%
+%% Create an error handler for business exceptions:
+%%
+%% ```erlang
+%% Handler = cre_yawl_exception:new_error_handler(
+%%     business_handler,
+%%     [business_exception],
+%%     fun(Exception) ->
+%%         io:format("Handling business exception: ~p~n", [Exception]),
+%%         {handled, exception_message(Exception)}
+%%     end
+%% ).
+%% %% Register the handler
+%% Handlers = #{business_exception => [Handler]}.
+%% %% Find handler for exception type
+%% cre_yawl_exception:find_handler(Handlers, business_exception).
+%% ```
+%%
+%% ### WHP-02: Retry Pattern with Backoff
+%%
+%% Create a retry policy with exponential backoff:
+%%
+%% ```erlang
+%% Policy = cre_yawl_exception:new_retry_policy(#{
+%%     max_attempts => 5,
+%%     backoff => exponential,
+%%     base_delay => 1000,
+%%     multiplier => 2.0,
+%%     jitter => true
+%% }).
+%% %% Check if retry should be attempted
+%% cre_yawl_exception:should_retry(Policy, 2).  %% true
+%% cre_yawl_exception:should_retry(Policy, 6).  %% false
+%% %% Calculate backoff delay
+%% Delay = cre_yawl_exception:calculate_backoff(Policy, 3).
+%% ```
+%%
+%% ### WHP-03: Compensation Pattern
+%%
+%% Create a compensator for an activity:
+%%
+%% ```erlang
+%% Compensator = cre_yawl_exception:new_compensator(
+%%     <<"activity_1">>,
+%%     fun(Input) -> {compensated, success} end,
+%%     immediate
+%% ).
+%% %% Execute compensation
+%% {ok, Result} = cre_yawl_exception:compensate(Compensator, undefined).
+%% %% Check compensation status
+%% cre_yawl_exception:has_compensated(Result).  %% true
+%% cre_yawl_exception:get_compensation_state(Result).  %% completed
+%% ```
+%%
+%% ### WHP-04: Triggered Compensation
+%%
+%% Create a deferred compensator:
+%%
+%% ```erlang
+%% Comp = cre_yawl_exception:new_compensator_with_metadata(
+%%     <<"payment_activity">>,
+%%     fun(Input) -> {undo, Input} end,
+%%     deferred,
+%%     #{trigger_on => payment_failed, reason => refund_required}
+%% ).
+%% ```
+%%
+%% ### WHP-05: Consecutive Compensation
+%%
+%% Create chained compensators:
+%%
+%% ```erlang
+%% C1 = cre_yawl_exception:new_compensator(
+%%     <<"step1">>, fun(_) -> {undone, step1} end, chained
+%% ),
+%% C2 = cre_yawl_exception:new_compensator_with_deps(
+%%     <<"step2">>,
+%%     fun(_) -> {undone, step2} end,
+%%     chained,
+%%     undefined,
+%%     [<<"step1">>]  % Depends on step1 completion
+%% ).
+%% ```
+%%
 %% -------------------------------------------------------------------
-
 -module(cre_yawl_exception).
+
 -behaviour(gen_pnet).
 
 %%====================================================================
@@ -235,9 +328,30 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Creates a new exception record.
-%%
-%% @end
+-doc """
+Creates a new exception record with automatic ID generation and severity
+determination.
+
+The exception ID is automatically generated using a cryptographic hash
+of the process ID and a unique integer. Severity is determined based on
+the exception type and context.
+
+```erlang
+> Exc = cre_yawl_exception:new_exception(
+>     business_exception,
+>     "Order amount exceeds limit",
+>     #{workflow_id => <<"wf_123">>, amount => 10000},
+>     []
+> ).
+_
+> is_binary(cre_yawl_exception:exception_id(Exc)).
+true
+> cre_yawl_exception:exception_type(Exc).
+business_exception
+> cre_yawl_exception:exception_severity(Exc).
+medium
+```
+""".
 %%--------------------------------------------------------------------
 -spec new_exception(Type, Message, Context, Stacktrace) -> exception()
     when Type :: exception_type(),
@@ -394,9 +508,33 @@ exception_is_resolved(#yawl_exception{resolved = Resolved}) -> Resolved.
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Creates a new compensator for an activity.
-%%
-%% @end
+-doc """
+Creates a new compensator for undoing the effects of a completed activity.
+
+Compensators are used to implement the compensation pattern (WHP-03)
+for handling workflow exceptions. The compensation strategy determines
+when and how the compensation is executed.
+
+```erlang
+> %% Create an immediate compensator
+> Comp = cre_yawl_exception:new_compensator(
+>     <<"reserve_inventory">>,
+>     fun(ReservationId) -> {release, ReservationId} end,
+>     immediate
+> ).
+_
+> cre_yawl_exception:get_compensation_state(Comp).
+pending
+> cre_yawl_exception:get_compensation_dependencies(Comp).
+[]
+```
+
+**Strategies:**
+* `immediate` - Execute compensation as soon as exception occurs
+* `deferred` - Queue compensation for later execution
+* `chained` - Execute in reverse order of dependencies
+* `parallel` - Execute concurrently with other compensators
+""".
 %%--------------------------------------------------------------------
 -spec new_compensator(ActivityId, HandlerFun, Strategy) -> compensator()
     when ActivityId :: binary(),
@@ -447,9 +585,34 @@ new_compensator_with_deps(ActivityId, HandlerFun, Strategy,
      }.
 
 %%--------------------------------------------------------------------
-%% @doc Executes compensation for an activity.
-%%
-%% @end
+-doc """
+Executes compensation for an activity.
+
+Returns a tuple with the updated compensator record. If the compensation
+has already been completed, is in progress, or was cancelled, an error
+is returned instead.
+
+```erlang
+> Comp = cre_yawl_exception:new_compensator(
+>     <<"charge_payment">>,
+>     fun(PaymentId) -> {refund, PaymentId} end,
+>     immediate
+> ).
+_
+> %% Execute compensation
+> {ok, Result} = cre_yawl_exception:compensate(Comp, <<"pay_123">>).
+_
+> %% Check result
+> cre_yawl_exception:has_compensated(Result).
+true
+> cre_yawl_exception:get_compensation_execution_time(Result) > 0.
+true
+>
+> %% Attempting to compensate again returns error
+> cre_yawl_exception:compensate(Result, <<"pay_123">>).
+{error, already_compensated}
+```
+""".
 %%--------------------------------------------------------------------
 -spec compensate(Compensator :: compensator(), Input :: term()) ->
     {ok, compensator()} | {error, Reason :: term()}.
@@ -579,8 +742,24 @@ new_compensator_with_metadata(ActivityId, HandlerFun, Strategy, Metadata) ->
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Creates a default retry policy.
-%% @end
+-doc """
+Creates a default retry policy with sensible defaults.
+
+The default policy allows 3 attempts with exponential backoff starting at
+1 second and doubling each time, with jitter enabled to prevent thundering
+herd problems.
+
+```erlang
+> Policy = cre_yawl_exception:new_retry_policy().
+_
+> cre_yawl_exception:retry_policy_max_attempts(Policy).
+3
+> cre_yawl_exception:retry_policy_backoff(Policy).
+exponential
+> cre_yawl_exception:retry_policy_jitter(Policy).
+true
+```
+""".
 %%--------------------------------------------------------------------
 -spec new_retry_policy() -> retry_policy().
 
@@ -588,18 +767,43 @@ new_retry_policy() ->
     #retry_policy{}.
 
 %%--------------------------------------------------------------------
-%% @doc Creates a retry policy with options.
-%%
-%% Options:
-%% - max_attempts: Maximum number of retry attempts (default: 3)
-%% - backoff: exponential | linear | constant (default: exponential)
-%% - base_delay: Base delay in milliseconds (default: 1000)
-%% - max_delay: Maximum delay in milliseconds (default: 60000)
-%% - multiplier: Multiplier for exponential backoff (default: 2.0)
-%% - jitter: Enable jitter (default: true)
-%% - jitter_factor: Jitter factor (default: 0.1)
-%%
-%% @end
+-doc """
+Creates a retry policy with custom options.
+
+**Options:**
+* `max_attempts` - Maximum retry attempts (default: 3)
+* `backoff` - Strategy: exponential | linear | constant | fibonacci | adaptive
+* `base_delay` - Base delay in milliseconds (default: 1000)
+* `max_delay` - Maximum delay cap in milliseconds (default: 60000)
+* `multiplier` - Exponential backoff multiplier (default: 2.0)
+* `jitter` - Enable random jitter (default: true)
+* `jitter_factor` - Jitter amount as fraction of delay (default: 0.1)
+
+```erlang
+> %% Custom retry policy for external API calls
+> Policy = cre_yawl_exception:new_retry_policy(#{
+>     max_attempts => 5,
+>     backoff => exponential,
+>     base_delay => 2000,
+>     max_delay => 30000,
+>     multiplier => 2.0,
+>     jitter => true
+> }).
+_
+> %% Check retry eligibility
+> cre_yawl_exception:should_retry(Policy, 3).
+true
+> cre_yawl_exception:should_retry(Policy, 6).
+false
+> %% Calculate delays
+> Delay1 = cre_yawl_exception:calculate_backoff(Policy, 1).
+Delay1 >= 2000, Delay1 =< 2200.  %% With jitter
+true
+> Delay3 = cre_yawl_exception:calculate_backoff(Policy, 3).
+Delay3 >= 8000.  %% 2000 * 2^2
+true
+```
+""".
 %%--------------------------------------------------------------------
 -spec new_retry_policy(Options :: map()) -> retry_policy().
 
@@ -626,7 +830,7 @@ retry_policy_max_attempts(#retry_policy{max_attempts = N}) -> N.
 %% @doc Gets the backoff strategy.
 %% @end
 %%--------------------------------------------------------------------
--spec retry_policy_backoff(Policy :: retry_policy()) -> exponential | linear | constant.
+-spec retry_policy_backoff(Policy :: retry_policy()) -> retry_strategy().
 
 retry_policy_backoff(#retry_policy{backoff_strategy = Strategy}) -> Strategy.
 
@@ -794,8 +998,28 @@ log_audit_event(Event, Data, #exception_state{audit_log = AuditLog} = State) ->
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Creates a new error handler.
-%% @end
+-doc """
+Creates a new error handler for specific exception types.
+
+The handler will be invoked when exceptions of the specified types
+occur. Multiple handlers can be registered for the same exception type,
+and they will be executed in priority order.
+
+```erlang
+> %% Create a handler for communication exceptions
+> Handler = cre_yawl_exception:new_error_handler(
+>     api_circuit_breaker,
+>     [communication_exception, timeout_exception],
+>     fun(Exception) ->
+>         io:format("API failure: ~p~n", [Exception]),
+>         {retry, exception_#yawl_exception.message}
+>     end
+> ).
+_
+> cre_yawl_exception:is_handler_enabled(Handler).
+true
+```
+""".
 %%--------------------------------------------------------------------
 -spec new_error_handler(HandlerId, ExceptionTypes, HandlerFun) -> error_handler()
     when HandlerId :: handler_id() | atom(),
@@ -826,10 +1050,8 @@ register_handler(Handlers, #error_handler{exception_types = Types} = Handler) ->
               HandlerId = Handler#error_handler.handler_id,
               %% Filter out existing handler with same id, then add new one
               FilteredList = lists:filter(
-                  fun(H) when is_record(H, error_handler) ->
-                      H#error_handler.handler_id =/= HandlerId;
-                     (_) ->
-                      true
+                  fun(#error_handler{handler_id = Hid}) -> Hid =/= HandlerId;
+                     (_) -> true
                   end, L),
               Acc#{Type => [Handler | FilteredList]}
       end,
@@ -898,8 +1120,36 @@ update_circuit_breaker_state(#error_handler{
     end.
 
 %%--------------------------------------------------------------------
-%% @doc Executes an error handler.
-%% @end
+-doc """
+Executes an error handler with the given exception.
+
+Catches any exceptions thrown by the handler function and returns
+them as error tuples for proper error propagation.
+
+```erlang
+> Handler = cre_yawl_exception:new_error_handler(
+>     test_handler,
+>     [business_exception],
+>     fun(Exc) -> {ok, exception_#yawl_exception.id} end
+> ),
+> Exception = cre_yawl_exception:new_exception(
+>     business_exception, "test", #{}, []
+> ).
+_
+> %% Successful handler execution
+> {ok, Result} = cre_yawl_exception:execute_handler(Handler, Exception).
+_
+> %% Handler that throws an error
+> BadHandler = cre_yawl_exception:new_error_handler(
+>     bad_handler,
+>     [system_exception],
+>     fun(_) -> error(bad) end
+> ).
+_
+> cre_yawl_exception:execute_handler(BadHandler, Exception).
+{error, {error, bad}}
+```
+""".
 %%--------------------------------------------------------------------
 -spec execute_handler(Handler :: error_handler(), Exception :: exception()) ->
     {ok, term()} | {error, term()}.
@@ -1219,8 +1469,8 @@ is_enabled(handle_compensation_timeout, _Marking, _UsrInfo) -> true;
 is_enabled(cancel_compensation, _Marking, _UsrInfo) -> true.
 
 %% Transition firing - Enhanced for WHP-01 to WHP-05 patterns
-fire(raise_exception, #{'Active' := [Exception]}, _UsrInfo) when is_record(Exception, yawl_exception) ->
-    ?LOG(warning, "Exception raised: ~p", [Exception#yawl_exception.type]),
+fire(raise_exception, #{'Active' := [#yawl_exception{type = Type} = Exception]}, _UsrInfo) ->
+    ?LOG(warning, "Exception raised: ~p", [Type]),
     {produce, #{
       'ExceptionRaised' => [Exception],
       'Active' => []
@@ -1429,3 +1679,256 @@ init(_Arg) ->
 terminate(_Reason, _NetState) -> ok.
 
 trigger(_Place, _Token, _NetState) -> pass.
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the cre_yawl_exception module.
+%%
+%% This function validates the exception handling, compensation,
+%% retry policy, and error handler functionality through direct testing.
+%%
+%% Returns `ok' when all tests pass.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test exception creation
+    Exc = new_exception(business_exception, "Test exception",
+                        #{workflow_id => <<"wf_123">>}, []),
+    true = is_binary(exception_id(Exc)),
+    business_exception = exception_type(Exc),
+    <<"Test exception">> = exception_message(Exc),
+    medium = exception_severity(Exc),
+    <<"wf_123">> = exception_workflow_id(Exc),
+    false = exception_is_resolved(Exc),
+    0 = exception_compensation_attempts(Exc),
+    0 = exception_retry_attempts(Exc),
+
+    %% Test exception with different severity
+    CriticalExc = new_exception(security_exception, "Security breach",
+                                #{}, []),
+    critical = exception_severity(CriticalExc),
+
+    %% Test exception creation with string message
+    StringExc = new_exception(system_exception, "System error",
+                              #{error_code => 2000}, []),
+    system_exception = exception_type(StringExc),
+    critical = exception_severity(StringExc),
+
+    %% Test compensator creation
+    Comp = new_compensator(<<"activity_1">>,
+                           fun(Input) -> {compensated, Input} end,
+                           immediate),
+    pending = get_compensation_state(Comp),
+    [] = get_compensation_dependencies(Comp),
+    false = has_compensated(Comp),
+    false = has_compensation_failed(Comp),
+    undefined = get_compensation_execution_time(Comp),
+
+    %% Test compensator execution
+    {ok, CompResult} = compensate(Comp, test_input),
+    completed = get_compensation_state(CompResult),
+    true = has_compensated(CompResult),
+    false = has_compensation_failed(CompResult),
+    true = get_compensation_execution_time(CompResult) > 0,
+
+    %% Test double compensation returns error
+    {error, already_compensated} = compensate(CompResult, test_input),
+
+    %% Test retry policy defaults
+    DefaultPolicy = new_retry_policy(),
+    3 = retry_policy_max_attempts(DefaultPolicy),
+    exponential = retry_policy_backoff(DefaultPolicy),
+    true = retry_policy_jitter(DefaultPolicy),
+
+    %% Test custom retry policy
+    CustomPolicy = new_retry_policy(#{
+        max_attempts => 5,
+        backoff => exponential,
+        base_delay => 2000,
+        multiplier => 2.0,
+        jitter => true
+    }),
+    5 = retry_policy_max_attempts(CustomPolicy),
+    exponential = retry_policy_backoff(CustomPolicy),
+
+    %% Test should_retry
+    true = should_retry(CustomPolicy, 3),
+    false = should_retry(CustomPolicy, 5),
+    false = should_retry(CustomPolicy, 10),
+
+    %% Test backoff calculation
+    Delay1 = calculate_backoff(CustomPolicy, 1),
+    true = Delay1 >= 2000,
+    true = Delay1 < 2500,  % Allow for jitter
+
+    Delay2 = calculate_backoff(CustomPolicy, 2),
+    true = Delay2 >= 4000,  % 2000 * 2
+
+    %% Test linear backoff
+    LinearPolicy = new_retry_policy(#{
+        backoff => linear,
+        base_delay => 1000,
+        jitter => false
+    }),
+    1000 = calculate_backoff(LinearPolicy, 1),
+    2000 = calculate_backoff(LinearPolicy, 2),
+    3000 = calculate_backoff(LinearPolicy, 3),
+
+    %% Test constant backoff
+    ConstantPolicy = new_retry_policy(#{
+        backoff => constant,
+        base_delay => 500,
+        jitter => false
+    }),
+    500 = calculate_backoff(ConstantPolicy, 1),
+    500 = calculate_backoff(ConstantPolicy, 10),
+
+    %% Test Fibonacci backoff
+    FibPolicy = new_retry_policy(#{
+        backoff => fibonacci,
+        base_delay => 1000,
+        jitter => false
+    }),
+    1000 = calculate_backoff(FibPolicy, 1),  % fib(1) = 1
+    1000 = calculate_backoff(FibPolicy, 2),  % fib(2) = 1
+    2000 = calculate_backoff(FibPolicy, 3),  % fib(3) = 2
+    3000 = calculate_backoff(FibPolicy, 4),  % fib(4) = 3
+    5000 = calculate_backoff(FibPolicy, 5),  % fib(5) = 5
+
+    %% Test error handler creation
+    Handler = new_error_handler(
+        test_handler,
+        [business_exception, system_exception],
+        fun(Exc) -> {handled, exception_message(Exc)} end
+    ),
+    test_handler = Handler#error_handler.handler_id,
+    true = is_handler_enabled(Handler),
+
+    %% Test error handler execution
+    TestExc = new_exception(business_exception, "Test", #{}, []),
+    {ok, _} = execute_handler(Handler, TestExc),
+
+    %% Test error handler that throws
+    BadHandler = new_error_handler(
+        bad_handler,
+        [system_exception],
+        fun(_) -> error(bad) end
+    ),
+    {error, _} = execute_handler(BadHandler, TestExc),
+
+    %% Test handler registration
+    EmptyHandlers = #{},
+    Handlers1 = register_handler(EmptyHandlers, Handler),
+    [Handler] = find_handler(Handlers1, business_exception),
+    [Handler] = find_handler(Handlers1, system_exception),
+    [] = find_handler(Handlers1, timeout_exception),
+
+    %% Test best handler selection
+    PriorityHandler = new_error_handler(
+        priority_handler,
+        [business_exception],
+        fun(_) -> {ok, priority} end
+    ),
+    HandlersWithPriority = register_handler(Handlers1, PriorityHandler#error_handler{priority = 10}),
+    BestHandler = find_best_handler(HandlersWithPriority, TestExc),
+    priority_handler = BestHandler#error_handler.handler_id,
+
+    %% Test handler enable/disable
+    DisabledHandler = set_handler_enabled(Handler, false),
+    false = is_handler_enabled(DisabledHandler),
+    ReEnabledHandler = set_handler_enabled(DisabledHandler, true),
+    true = is_handler_enabled(ReEnabledHandler),
+
+    %% Test compensator with dependencies
+    CompWithDeps = new_compensator_with_deps(
+        <<"activity_2">>,
+        fun(_) -> {undone, activity_2} end,
+        chained,
+        undefined,
+        [<<"activity_1">>]
+    ),
+    [<<"activity_1">>] = get_compensation_dependencies(CompWithDeps),
+    false = all_dependencies_completed(CompWithDeps, #{}),
+
+    %% Test compensator without dependencies
+    true = all_dependencies_completed(Comp, #{}),
+
+    %% Test compensator with metadata
+    MetaComp = new_compensator_with_metadata(
+        <<"payment_activity">>,
+        fun(_) -> {refund, payment} end,
+        deferred,
+        #{trigger_on => payment_failed, reason => refund_required}
+    ),
+    pending = get_compensation_state(MetaComp),
+    payment_failed = maps:get(trigger_on, MetaComp#compensator.metadata),
+
+    %% Test handler with compensation
+    HandlerWithComp = new_handler_with_compensation(
+        handler_with_comp,
+        [business_exception],
+        fun(_) -> {handled, ok} end,
+        fun(_) -> {compensated, ok} end
+    ),
+    handler_with_comp = HandlerWithComp#error_handler.handler_id,
+    undefined =/= HandlerWithComp#error_handler.compensation_handler,
+
+    %% Test circuit breaker registration
+    CBHandlers = register_handler_with_circuit_breaker(
+        #{},
+        Handler,
+        3,
+        60000
+    ),
+    [CBHandler] = find_handler(CBHandlers, business_exception),
+    #{state := closed, failures := 0, threshold := 3} =
+        CBHandler#error_handler.circuit_breaker_state,
+
+    %% Test circuit breaker state update
+    Now = erlang:system_time(millisecond),
+    {ok, UpdatedCB} = update_circuit_breaker_state(CBHandler, Now),
+    #{state := closed, failures := 1} =
+        UpdatedCB#error_handler.circuit_breaker_state,
+
+    %% Test circuit breaker opening
+    {ok, CB2} = update_circuit_breaker_state(UpdatedCB, Now),
+    {ok, CB3} = update_circuit_breaker_state(CB2, Now),
+    {circuit_open, CBOpen} = update_circuit_breaker_state(CB3, Now),
+    #{state := open} = CBOpen#error_handler.circuit_breaker_state,
+
+    %% Test exception state initialization
+    ExceptionState = init_exception_state(<<"wf_test">>, self()),
+    <<"wf_test">> = ExceptionState#exception_state.workflow_id,
+    false = ExceptionState#exception_state.is_compensating,
+    10 = ExceptionState#exception_state.max_parallel_compensations,
+
+    %% Test metrics update
+    UpdatedState = update_metrics(test_event, #{data => test}, ExceptionState),
+    Metrics = UpdatedState#exception_state.metrics,
+    true = maps:is_key(test_event, Metrics),
+
+    %% Test audit logging
+    AuditState = log_audit_event(exception_raised, #{exc_id => <<"exc_1">>},
+                                 ExceptionState),
+    AuditLog = AuditState#exception_state.audit_log,
+    true = length(AuditLog) > 0,
+
+    %% Test nth_fibonacci helper
+    1 = nth_fibonacci(1),
+    1 = nth_fibonacci(2),
+    2 = nth_fibonacci(3),
+    3 = nth_fibonacci(4),
+    5 = nth_fibonacci(5),
+    8 = nth_fibonacci(6),
+    13 = nth_fibonacci(7),
+
+    ok.
+-endif.

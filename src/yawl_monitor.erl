@@ -52,11 +52,48 @@
 %% yawl_monitor:export_prometheus().
 %% </pre>
 %%
+%% <h3>Doctests</h3>
+%%
+%% Test metric recording and retrieval:
+%% ```
+%% 1> {ok, Pid} = yawl_monitor:start_monitor().
+%% {ok, <0.123.0>}
+%% 2> ok = yawl_monitor:record_metric(<<"test_metric">>, 42, #{tag => <<"test">>}).
+%% ok
+%% 3> Summary = yawl_monitor:get_metric_summary().
+%% #{...}
+%% 4> ok = yawl_monitor:reset_metrics().
+%% ok
+%% 5> ok = yawl_monitor:stop_monitor().
+%% ok
+%% ```
+%%
+%% Test binary to atom conversion:
+%% ```
+%% 1> yawl_monitor:binary_to_existing_atom(<<"ok">>, utf8).
+%% ok
+%% 2> yawl_monitor:binary_to_existing_atom(<<"undefined_atom">>, utf8).
+%% undefined_atom
+%% ```
+%%
+%% Test metric query:
+%% ```
+%% 1> {ok, _} = yawl_monitor:start_monitor().
+%% {ok, <0.124.0>}
+%% 2> ok = yawl_monitor:record_metric(<<"query_test">>, 100, #{}).
+%% ok
+%% 3> Metrics = yawl_monitor:get_metrics(#{name => <<"query_test">>}, 10).
+%% [#metric{name = <<"query_test">>, value = 100, ...}]
+%% 4> ok = yawl_monitor:stop_monitor().
+%% ok
+%% ```
+%%
 %% @end
 %% -------------------------------------------------------------------
 
 -module(yawl_monitor).
 -behaviour(gen_server).
+-compile({no_auto_import,[binary_to_existing_atom/2]}).
 
 %%====================================================================
 %% Exports
@@ -81,7 +118,8 @@
          export_prometheus/1,
          get_metric_summary/0,
          reset_metrics/0,
-         binary_to_existing_atom/2]).
+         binary_to_existing_atom/2,
+         doctest_test/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -1024,8 +1062,15 @@ generate_dashboard_id() ->
     <<"dashboard_", Hex/binary>>.
 
 %%--------------------------------------------------------------------
-%% @private
 %% @doc Converts binary to existing atom, or creates new if needed.
+%%
+%% This is a helper function that safely converts binaries to atoms,
+%% falling back to creating a new atom if an existing one is not found.
+%% This is useful for handling dynamic metric names.
+%%
+%% @param Bin The binary to convert.
+%% @param Encoding The encoding to use (e.g., utf8).
+%% @return The corresponding atom.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -1039,3 +1084,92 @@ binary_to_existing_atom(Bin, Encoding) ->
             %% Fallback for metrics without existing atoms
             list_to_existing_atom(binary_to_list(Bin))
     end.
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the monitor module.
+%%
+%% Tests the following functionality:
+%% <ul>
+%%   <li>Starting and stopping the monitor</li>
+%%   <li>Recording metrics with labels</li>
+%%   <li>Querying metrics by name and filters</li>
+%%   <li>Getting metric summaries</li>
+%%   <li>Resetting metrics</li>
+%%   <li>Dashboard creation and retrieval</li>
+%%   <li>Binary to atom conversion</li>
+%% </ul>
+%%
+%% @return ok if all tests pass.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Start and stop monitor
+    {ok, _Pid} = start_monitor(),
+    ok = stop_monitor(),
+
+    %% Test 2: Metric recording and summary
+    {ok, _Pid2} = start_monitor(#{max_metrics => 100}),
+    ok = record_metric(<<"test_metric">>, 42, #{tag => <<"test">>}),
+    ok = record_metric(<<"test_metric">>, 100, #{}),
+    ok = record_metric(<<"another_metric">>, 3.14, #{<<"case_id">> => <<"case_123">>}),
+
+    Summary = get_metric_summary(),
+    true = maps:is_key(<<"test_metric">>, Summary),
+    #{count := 2, min := 42, max := 100, avg := Avg} = maps:get(<<"test_metric">>, Summary),
+    true = (Avg >= 42 andalso Avg =< 100),
+
+    %% Test 3: Query metrics
+    QueryResults = get_metrics(#{name => <<"test_metric">>}, 10),
+    true = length(QueryResults) >= 2,
+
+    %% Test 4: Case metrics
+    CaseMetrics = get_case_metrics(<<"case_123">>),
+    true = length(CaseMetrics) >= 1,
+
+    %% Test 5: Dashboard operations
+    {ok, DashId} = create_dashboard(#{
+        name => <<"Test Dashboard">>,
+        metric_names => [<<"test_metric">>]
+    }),
+    {ok, Dashboard} = get_dashboard(DashId),
+    <<"Test Dashboard">> = Dashboard#dashboard.name,
+
+    Dashboards = list_dashboards(),
+    true = length(Dashboards) >= 1,
+
+    ok = delete_dashboard(DashId),
+    {error, not_found} = get_dashboard(DashId),
+
+    %% Test 6: Reset metrics
+    ok = reset_metrics(),
+    EmptySummary = get_metric_summary(),
+    false = maps:is_key(<<"test_metric">>, EmptySummary),
+
+    %% Test 7: Engine metrics
+    EngineMetrics = get_engine_metrics(),
+    true = maps:is_key(uptime_ms, EngineMetrics),
+    true = maps:is_key(total_cases, EngineMetrics),
+
+    %% Test 8: Prometheus export
+    ok = record_metric(<<"prom_test">>, 123, #{}),
+    PrometheusExport = export_prometheus(),
+    true = is_binary(PrometheusExport),
+    true = byte_size(PrometheusExport) > 0,
+
+    %% Test 9: Binary to atom conversion
+    Atom1 = binary_to_existing_atom(<<"ok">>, utf8),
+    true = is_atom(Atom1),
+    ok = Atom1,
+
+    %% Test with a non-existing atom - should create it
+    UniqueAtom = binary_to_existing_atom(<<"doctest_unique_atom_12345">>, utf8),
+    true = is_atom(UniqueAtom),
+    doctest_unique_atom_12345 = UniqueAtom,
+
+    %% Test 10: Clean up
+    ok = stop_monitor(),
+
+    ok.

@@ -1,0 +1,120 @@
+@startuml CRE Worker State Machine
+!theme plain
+skinparam backgroundColor white
+skinparam handwritten false
+skinparam defaultFontName Arial
+
+title CRE Worker State Machine
+
+state "Idle" as idle
+state "Busy" as busy
+state "Processing" as processing
+state "Stagein" as stagein
+state "Running" as running
+state "Stageout" as stageout
+state "Error" as error
+state "Completed" as completed
+state "Shutdown" as shutdown
+
+state "idle" <<start>>
+state "shutdown" <<end>>
+
+idle --> busy : task_assigned()
+busy --> processing : task_received()
+processing --> stagein : prepare_stagein()
+stagein --> stagein : process_files() [*]
+stagein --> running : stagein_complete()
+stagein --> error : stagein_failed()
+
+running --> stageout : execution_complete()
+running --> error : execution_failed()
+
+stageout --> stageout : process_outputs() [*]
+stageout --> completed : stageout_complete()
+stageout --> error : stageout_failed()
+
+completed --> idle : result_returned()
+error --> idle : error_handled()
+error --> shutdown : fatal_error()
+
+idle --> shutdown : worker_stop()
+busy --> shutdown : emergency_stop()
+
+note right of idle
+ Worker available
+ In CRE master pool
+ Polling for tasks
+ Marked in pnet_marking
+end note
+
+note right of busy
+ Task assigned
+ Worker marked busy
+ Removed from idle pool
+ Transitioning to processing
+end note
+
+note right of processing
+ Task preparation
+ Initialize callbacks
+ Check dependencies
+ Prepare execution environment
+end note
+
+note right of stagein
+ Input file processing
+ Sequential file staging
+ Success/failure tracking
+ PreSync place updates
+end note
+
+note right of running
+ Task execution
+ Core computation
+ Output generation
+ Result production
+end note
+
+note right of stageout
+ Output file processing
+ Sequential file staging
+ Success/failure tracking
+ PostSync place updates
+end note
+
+note right of error
+ Error condition
+ Error expression created
+ Cleanup triggered
+ Recovery attempted
+end note
+
+note right of completed
+ Task completed successfully
+ Result ready for return
+ Worker cleanup triggered
+ Final result prepared
+end note
+
+note right of shutdown
+ Worker termination
+ Cleanup completed
+ Removed from pool
+ Final state
+end note
+
+legend right
+  Worker Lifecycle:
+  - Idle → Busy → Processing → Stagein → Running → Stageout → Completed → Idle
+  - Error handling at each stage
+  - Recovery paths from error states
+  - Emergency shutdown capabilities
+  
+  State Management:
+  - Petri net marking tracked
+  - Worker monitoring by CRE master
+  - Callback state maintained
+  - Resource allocation tracked
+end legend
+
+@enduml

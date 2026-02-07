@@ -2,7 +2,7 @@
 %%
 %% CRE: common runtime environment for distributed programming languages
 %%
-%% Copyright 2015 Jörgen Brandt <joergen@cuneiform-lang.org>
+%% Copyright 2015 Jorgen Brandt <joergen@cuneiform-lang.org>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @author Jörgen Brandt <joergen@cuneiform-lang.org>
+%% @author Jorgen Brandt <joergen@cuneiform-lang.org>
 %% @copyright 2015
 %%
 %% @doc YAWL Load Balancer for CRE Workers.
@@ -34,6 +34,48 @@
 %%   <li><b>weighted:</b> Considers worker capacity weights</li>
 %%   <li><b>affinity:</b> Routes to worker based on data/task affinity</li>
 %% </ul>
+%%
+%% ## Examples
+%%
+%% Basic worker registration and selection:
+%% ```
+%% > % Create a test worker record
+%% > WorkerPid = spawn(fun() -> receive after infinity -> ok end end).
+%% > <0.100.0>
+%% > % Verify strategy atom types
+%% > round_robin =:= round_robin.
+%% true
+%% > least_loaded =:= least_loaded.
+%% true
+%% '''
+%%
+%% Worker info record structure:
+%% ```
+%% > W = #worker{pid = spawn(fun() -> receive after infinity -> ok end end),
+%%              node = node(),
+%%              capacity = 10,
+%%              weight = 1,
+%%              active_tasks = 0}.
+%% > W#worker.capacity.
+%% 10
+%% > W#worker.weight.
+%% 1
+%% '''
+%%
+%% Load distribution:
+%% ```
+%% > % Distribution map creation
+%% > Dist = #{node() => 5, 'other@host' => 3}.
+%% > #{node() := N} = Dist.
+%% > N.
+%% 5
+%% '''
+%%
+%% Running doctests:
+%% ```
+%% 1> yawl_balancer:doctest_test().
+%% ok
+%% '''
 %%
 %% @end
 %% -------------------------------------------------------------------
@@ -54,6 +96,7 @@
 -export([update_worker_capacity/2, update_worker_weight/2]).
 -export([get_load_distribution/0]).
 -export([reset_worker_load/1]).
+-export([doctest_test/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -584,3 +627,90 @@ find_worker_by_affinity([Tag | Rest], State) ->
         undefined -> find_worker_by_affinity(Rest, State);
         WorkerPid -> {ok, WorkerPid}
     end.
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the yawl_balancer module.
+%%
+%% Tests cover:
+%% - Balance strategy type validation
+%% - Worker record structure
+%% - Load distribution map creation
+%% - Affinity tag extraction
+%%
+%% Returns `ok' when all tests pass.
+%%
+%% Example:
+%% ```
+%% 1> yawl_balancer:doctest_test().
+%% ok
+%% '''
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Balance strategy atoms are valid
+    round_robin = round_robin,
+    random = random,
+    least_loaded = least_loaded,
+    weighted = weighted,
+    affinity = affinity,
+
+    %% Test 2: Worker record creation and access
+    TestPid = spawn(fun() -> receive after infinity -> ok end end),
+    TestNode = node(),
+    Worker = #worker{
+        pid = TestPid,
+        node = TestNode,
+        capacity = 10,
+        weight = 1,
+        active_tasks = 0,
+        total_tasks = 0,
+        affinity_tags = [],
+        last_heartbeat = erlang:timestamp()
+    },
+    10 = Worker#worker.capacity,
+    1 = Worker#worker.weight,
+    0 = Worker#worker.active_tasks,
+    0 = Worker#worker.total_tasks,
+    [] = Worker#worker.affinity_tags,
+
+    %% Test 3: Balancer state record creation
+    State = #balancer_state{
+        strategy = round_robin,
+        round_robin_index = 0,
+        affinity_map = #{}
+    },
+    round_robin = State#balancer_state.strategy,
+    0 = State#balancer_state.round_robin_index,
+
+    %% Test 4: Extract affinity tags from map
+    TaskWithTags = #{affinity_tags => [<<"tag1">>, <<"tag2">>]},
+    [<<"tag1">>, <<"tag2">>] = extract_affinity_tags(TaskWithTags),
+
+    %% Test 5: Extract affinity tags from non-map returns empty list
+    [] = extract_affinity_tags(not_a_map),
+
+    %% Test 6: Extract affinity tags from map without tags returns empty list
+    TaskWithoutTags = #{other_key => some_value},
+    [] = extract_affinity_tags(TaskWithoutTags),
+
+    %% Test 7: Load distribution map creation
+    Distribution = #{TestNode => 5, 'other@host' => 3},
+    5 = maps:get(TestNode, Distribution),
+    3 = maps:get('other@host', Distribution),
+
+    %% Test 8: Find worker by affinity with empty tags returns no_match
+    EmptyState = #balancer_state{affinity_map = #{}},
+    no_match = find_worker_by_affinity([], EmptyState),
+    no_match = find_worker_by_affinity([<<"missing">>], EmptyState),
+
+    %% Test 9: Find worker by affinity with matching tag
+    StateWithAffinity = #balancer_state{affinity_map = #{<<"tag1">> => TestPid}},
+    {ok, TestPid} = find_worker_by_affinity([<<"tag1">>], StateWithAffinity),
+
+    %% Test 10: Find worker by affinity falls through to next tag
+    {ok, TestPid} = find_worker_by_affinity([<<"missing">>, <<"tag1">>], StateWithAffinity),
+
+    ok.

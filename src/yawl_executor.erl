@@ -47,6 +47,39 @@
 %% </ul>
 %%
 %% @end
+%%
+%% <h3>Doctests</h3>
+%%
+%% ```
+%% %% Execute a basic sequence pattern
+%% 1> Pattern = #sequence{task_ids = [<<"task1">>, <<"task2">>]}.
+%% 2> {ok, Result} = yawl_executor:execute_pattern(Pattern, #{}).
+%% 3> maps:get(status, Result).
+%% sequence_complete
+%%
+%% %% Execute with custom options
+%% 1> Options = #{timeout => 10000, persistent => true}.
+%% 2> {ok, _} = yawl_executor:execute_pattern(Pattern, #{data => test}, Options).
+%%
+%% %% Detect pattern type
+%% 1> yawl_executor:pattern_type(#sequence{}).
+%% sequence
+%%
+%% %% Get pattern category
+%% 1> yawl_executor:pattern_category(sequence).
+%% basic
+%%
+%% %% Create execution context
+%% 1> Ctx = yawl_executor:new_context(#{id => <<"my_exec">>}).
+%% 2> yawl_executor:context_get(Ctx, id).
+%% <<"my_exec">>
+%%
+%% %% Put value in context
+%% 1> Ctx2 = yawl_executor:context_put(Ctx, key, value).
+%% 2> yawl_executor:context_get(Ctx2, key).
+%% value
+%% '''
+%%
 %% -------------------------------------------------------------------
 
 -module(yawl_executor).
@@ -83,6 +116,9 @@
 
 %% Execution statistics
 -export([get_stats/0, reset_stats/0, get_pattern_stats/1]).
+
+%% Doctests
+-export([doctest_test/0]).
 
 %%====================================================================
 %% Types
@@ -744,6 +780,26 @@ get_pattern_stats(PatternType) ->
 %%--------------------------------------------------------------------
 %% @doc Executes basic control flow patterns (WCP-01 to WCP-10).
 %%
+%% Handles the ten basic workflow control patterns:
+%% - Sequence: Tasks execute in order
+%% - Parallel Split: Multiple branches execute concurrently
+%% - Synchronization: Wait for all branches to complete
+%% - Exclusive Choice: Select one branch based on condition
+%% - Simple Merge: Merge without synchronization
+%% - Multi Choice: Select multiple branches based on conditions
+%% - Synchronizing Merge: Merge with synchronization
+%% - Multi Merge: Merge multiple incoming flows
+%% - Discriminator: Wait for N of M branches
+%% - Arbitration: First M of N branches wins
+%%
+%% Example:
+%% ```
+%% 1> Pattern = #parallel_split{split_task_id = <<"s1">>, branch_task_ids = [<<"b1">>, <<"b2">>]}.
+%% 2> {ok, Result} = yawl_executor:execute_basic_pattern(parallel_split, Pattern, #{}, #{}).
+%% 3> maps:get(status, Result).
+%% parallel_split_complete
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec execute_basic_pattern(atom(), pattern(), input(), execution_context()) ->
@@ -1077,6 +1133,22 @@ execute_extended_control_pattern(PatternType, _Pattern, _Input, _Context) ->
 %%--------------------------------------------------------------------
 %% @doc Executes data flow patterns (WDP-01 to WDP-05).
 %%
+%% Handles data passing between workflow tasks:
+%% - Parameter Passing: Pass data from source to target task
+%% - Data Transformation: Apply transform function to input data
+%% - Data Distribution: Send data to multiple recipients
+%% - Data Accumulation: Aggregate data from multiple sources
+%% - Data Visibility: Control data scope access
+%%
+%% Example for data transformation:
+%% ```
+%% 1> TransformFun = fun(X) -> X * 2 end.
+%% 2> Pattern = #data_transform{input_task_id = <<"in">>, output_task_id = <<"out">>, transform_fn = TransformFun}.
+%% 3> {ok, Result} = yawl_executor:execute_data_flow_pattern(data_transform, Pattern, 5, #{}).
+%% 4> maps:get(output, Result).
+%% 10
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec execute_data_flow_pattern(atom(), pattern(), input(),
@@ -1320,9 +1392,26 @@ generate_exec_id() ->
 ensure_state_table() ->
     case ets:whereis(?MODULE) of
         undefined ->
-            ets:new(?MODULE, [named_table, public, {read_concurrency, true}]);
+            Heir = case get_heir_process() of
+                undefined -> none;
+                Pid -> {heir, Pid, []}
+            end,
+            ets:new(?MODULE, [named_table, public, {read_concurrency, true}, Heir]);
         Table ->
             Table
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Gets the heir process for ETS tables.
+%% @end
+%%--------------------------------------------------------------------
+-spec get_heir_process() -> pid() | undefined.
+
+get_heir_process() ->
+    case whereis(yawl_executor_sup) of
+        undefined -> case whereis(cre_sup) of undefined -> undefined; Pid -> Pid end;
+        Pid -> Pid
     end.
 
 %%--------------------------------------------------------------------
@@ -1337,7 +1426,11 @@ get_stats_table() ->
     TableName = list_to_atom(atom_to_list(?MODULE) ++ "_stats"),
     case ets:whereis(TableName) of
         undefined ->
-            ets:new(TableName, [named_table, public, {read_concurrency, true}]),
+            Heir = case get_heir_process() of
+                undefined -> none;
+                Pid -> {heir, Pid, []}
+            end,
+            ets:new(TableName, [named_table, public, {read_concurrency, true}, Heir]),
             TableName;
         Table ->
             Table
@@ -1513,3 +1606,113 @@ select_option(Options, ConditionFun, Input) ->
                 Acc
         end
     end, none, Options).
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the yawl_executor module.
+%%
+%% This function validates the examples in the module documentation
+%% by running them as test cases.
+%%
+%% @return ok if all doctests pass, or raises an error if any fail.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Execute a basic sequence pattern
+    Pattern = #sequence{task_ids = [<<"task1">>, <<"task2">>]},
+    {ok, Result1} = execute_pattern(Pattern, #{}),
+    sequence_complete = maps:get(status, Result1),
+
+    %% Test 2: Execute with custom options
+    Options = #{timeout => 10000, persistent => false},
+    {ok, _} = execute_pattern(Pattern, #{data => test}, Options),
+
+    %% Test 3: Detect pattern type
+    sequence = pattern_type(#sequence{}),
+    parallel_split = pattern_type(#parallel_split{}),
+    synchronization = pattern_type(#synchronization{}),
+
+    %% Test 4: Get pattern category
+    basic = pattern_category(sequence),
+    basic = pattern_category(parallel_split),
+    basic = pattern_category(exclusive_choice),
+
+    %% Test 5: Create execution context
+    Ctx = new_context(#{id => <<"my_exec">>}),
+    <<"my_exec">> = context_get(Ctx, id),
+
+    %% Test 6: Put value in context
+    Ctx2 = context_put(Ctx, key, value),
+    value = context_get(Ctx2, key),
+
+    %% Test 7: Context merge
+    Ctx3 = context_merge(Ctx2, #{new_key => new_value}),
+    new_value = context_get(Ctx3, new_key),
+    value = context_get(Ctx3, key),  %% Original key preserved
+
+    %% Test 8: Context to map
+    MapList = context_to_map(Ctx3),
+    true = is_list(MapList),
+
+    %% Test 9: Parallel split pattern execution
+    ParallelPattern = #parallel_split{
+        split_task_id = <<"split1">>,
+        branch_task_ids = [<<"branch1">>, <<"branch2">>]
+    },
+    {ok, ParallelResult} = execute_pattern(ParallelPattern, #{}),
+    parallel_split_complete = maps:get(status, ParallelResult),
+    <<"split1">> = maps:get(split_task, ParallelResult),
+
+    %% Test 10: Synchronization pattern execution
+    SyncPattern = #synchronization{
+        join_task_id = <<"join1">>,
+        incoming_task_ids = [<<"branch1">>, <<"branch2">>]
+    },
+    {ok, SyncResult} = execute_pattern(SyncPattern, #{}),
+    synchronization_complete = maps:get(status, SyncResult),
+
+    %% Test 11: Data transform pattern execution
+    TransformFun = fun(X) -> X * 2 end,
+    TransformPattern = #data_transform{
+        input_task_id = <<"input1">>,
+        output_task_id = <<"output1">>,
+        transform_fn = TransformFun
+    },
+    {ok, TransformResult} = execute_pattern(TransformPattern, 5),
+    10 = maps:get(output, TransformResult),
+
+    %% Test 12: State persistence
+    TestExecId = <<"test_exec_123">>,
+    TestState = #{
+        context => #{id => TestExecId},
+        current_step => testing,
+        completed_steps => [],
+        pending_steps => [],
+        data => #{test => true},
+        errors => []
+    },
+    ok = save_execution_state(TestExecId, TestState),
+    {ok, LoadedState} = load_execution_state(TestExecId),
+    testing = maps:get(current_step, LoadedState),
+    ok = delete_execution_state(TestExecId),
+
+    %% Test 13: Statistics tracking
+    reset_stats(),
+    Stats = get_stats(),
+    0 = maps:get(total_executions, Stats),
+
+    %% Test 14: Pattern-specific statistics
+    PatternStats = get_pattern_stats(sequence),
+    sequence = maps:get(pattern_type, PatternStats),
+
+    %% Test 15: Timeout execution
+    QuickPattern = #sequence{task_ids = []},
+    {ok, _} = execute_with_timeout(QuickPattern, #{}, 1000),
+
+    ok.

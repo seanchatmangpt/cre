@@ -1,9 +1,8 @@
-# cre
-###### Cuneiform runtime environment
+# CRE - YAWL Workflow Engine
 
 [![hex.pm](https://img.shields.io/hexpm/v/cre.svg?style=flat-square)](https://hex.pm/packages/cre)
 
-The Cuneiform runtime environment (cfl_re) is a distributed execution environment for programming languages implemented in [distributed Erlang](https://www.erlang.org) like Cuneiform. It manages communication with a client service running a Cuneiform interpreter and several distributed worker processes. Herein, the cfl_re performs scheduling, client and worker failure recovery, and caching. Principally, the cfl_re is language-independent, so it can be used to manage distributed languages other than Cuneiform. To do that, a distributed programming language must be implement certain Erlang behaviors.
+CRE is a **YAWL (Yet Another Workflow Language)** workflow engine implemented in Erlang/OTP. Starting from its origins as a Cuneiform runtime environment, CRE has evolved into a comprehensive workflow management system with 43 workflow patterns, human-in-the-loop approval flows, OpenTelemetry observability, and a web-based dashboard.
 
 
 ![cfl_re Petri net model](priv/cre_master_pnet.png)
@@ -13,32 +12,99 @@ The Cuneiform runtime environment (cfl_re) is a distributed execution environmen
 
 ## Features
 
-This section gives an overview of the features, the cfl_re covers. The primary features of the cfl_re are scheduling, fault tolerance, and caching.
+CRE provides a comprehensive workflow management platform with the following key features:
+
+### Core Features
+- **43 YAWL Patterns** - Complete workflow pattern library for complex process modeling
+- **Human-in-the-Loop Approval Workflows** - Integrate LLM-powered human decisions into your workflows
+- **OpenTelemetry Integration** - Comprehensive observability with structured logging and metrics
+- **Web Dashboard** - Real-time workflow visualization and monitoring interface
+- **XES Logging** - Standardized event logging for process mining and compliance
+- **OTP 25+ Support** - Modern Erlang/OTP with improved performance and reliability
+
+### Technical Features
+- **Distributed Execution** - Scale across Erlang clusters with automatic load balancing
+- **Fault Tolerance** - Automatic failure recovery and task rescheduling
+- **Caching System** - Memoize results to avoid redundant computations
+- **Timeout Management** - Configurable timeouts for all workflow components
+- **Telemetry Collection** - Detailed metrics and tracing for monitoring
+- **Pattern Validation** - Ensure workflows follow YAWL standards
 
 
-### Scheduling
+## Quick Start
 
-Scheduling associates a function application to be executed with a worker process. Once the match has been made, the application is sent to the worker and the application-worker pair is ear-marked as busy. Currently, the scheduler randomly matches applications and workers, thus, maximizing the average balance of load.
+Get started with CRE in minutes! For a detailed tutorial, see the [Quick Start Guide](docs/QUICK_START.md).
 
+### Installation
 
-### Fault Tolerance
+Add CRE to your rebar3 project:
 
-In general, the cfl_re serves multiple clients and feeds multiple workers. In large setups there is a realistic chance for one or more connected processes to fail. The cfl_re detects such failures and appropriately reacts to them. I.e., an application sent to a failed worker is rescheduled and an application from a failed client is cached so that it is ready when the client reconnects.
+```erlang
+{deps, [{cre, "0.2.1"}]}.
+```
 
+### Basic Usage
 
-### Caching
+```erlang
+% Create a workflow
+Workflow = cre_yawl:new_workflow(<<"my_workflow">>),
 
-Often in data analysis applications, the storage needed to cache an intermediate results is cheaper than the compute resources needed to recompute it. Accordingly, the cfl_re memoizes all application-result combinations it received from workers. I.e., a computation is scheduled only if it is presented to the cfl_re for the first time. Later requests for the same application are served from the cache.
+% Add tasks
+Task1 = cre_yawl:add_task(Workflow, <<"step1">>,
+                          [{type, atomic},
+                           {module, my_module},
+                           {function, my_function}]),
+Task2 = cre_yawl:add_task(Workflow, <<"step2">>,
+                          [{type, approval},
+                           {module, my_module},
+                           {function, approve}]),
 
+% Connect and execute
+cre_yawl:connect(Workflow, <<"step1">>, <<"step2">>),
+{ok, Result} = cre_yawl:execute(Workflow).
+```
 
-## Usage
+### What Happened to Cuneiform?
 
-Creating a distributed programming language using the cfl_re requires adding the cfl_re library to your project and implementing the callback functions for both a cfl_re client and a cfl_re worker. In this section we show, how this can be accomplished.
+CRE was originally developed as the Cuneiform runtime environment. Starting with v0.2.0, CRE has evolved into a YAWL workflow engine while maintaining backward compatibility with the original CRE client/worker APIs. All existing applications continue to work without changes.
 
+## Getting Started
 
-### Adding the cfl_re to a Project
+- **[Quick Start Guide](docs/QUICK_START.md)** - 5-minute tutorial to get running
+- **[API Reference](docs/API_REFERENCE.md)** - Complete function documentation
+- **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and internals
+- **[YAWL Patterns](docs/YAWL_PATTERNS_REFERENCE.md)** - Complete pattern library
 
-Although the cfl_re library can be imported also directly from GitHub, we recommend adding a dependency via [hex.pm](https://hex.pm). Here, we show how this can be done using the build tools [rebar3](https://www.rebar3.org) or mix.
+## Documentation
+
+Complete documentation is available in the `docs/` directory:
+
+- **[README.md](docs/README.md)** - Documentation landing page and navigation
+- **[NEW_FILES_OVERVIEW.md](docs/NEW_FILES_OVERVIEW.md)** - New source directory structure
+- **[Quick Start Guide](docs/QUICK_START.md)** - 5-minute getting started tutorial
+- **[API Reference](docs/API_REFERENCE.md)** - Complete function documentation
+- **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and internals
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production setup and scaling
+- **[Contributing Guide](docs/CONTRIBUTING.md)** - How to contribute code
+- **[YAWL Patterns Reference](docs/YAWL_PATTERNS_REFERENCE.md)** - Complete pattern library
+- **[Human-in-the-Loop](docs/HUMAN_IN_THE_LOOP.md)** - Approval workflows with examples
+- **[Telemetry Integration](docs/YAWL_TELEMETRY.md)** - Monitoring and observability
+- **[Timeout Configuration](docs/YAWL_TIMEOUT_REFERENCE.md)** - Timeout management
+
+## Examples
+
+See the `examples/` directory for working workflow examples:
+
+- **Basic Workflow** - Simple atomic task execution
+- **Approval Workflow** - Human-in-the-loop approval process
+- **Parallel Processing** - Multi-instance task execution
+- **Complex Patterns** - Advanced YAWL pattern usage
+
+## Legacy Client/Worker API
+
+For historical compatibility with the Cuneiform runtime environment, the original client/worker API is still available:
+
+### Adding CRE to a Project
 
 
 #### rebar3

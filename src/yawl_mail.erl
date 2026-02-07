@@ -31,6 +31,165 @@
 %%   <li>Attachment support</li>
 %% </ul>
 %%
+%% <h3>Configuration</h3>
+%%
+%% Create a mail configuration:
+%%
+%% ```erlang
+%% 1> Config = yawl_mail:mail_config(
+%%     <<"smtp.example.com">>, 587,
+%%     <<"user">>, <<"pass">>,
+%%     <<"from@example.com">>, true
+%% ).
+%% #mail_config{
+%%   smtp_server = <<"smtp.example.com">>,
+%%   smtp_port = 587,
+%%   username = <<"user">>,
+%%   password = <<"pass">>,
+%%   from = <<"from@example.com">>,
+%%   use_tls = true
+%% }
+%% ```
+%%
+%% Access mail configuration fields:
+%%
+%% ```erlang
+%% 2> yawl_mail:get_smtp_server(Config).
+%% <<"smtp.example.com">>
+%% 3> yawl_mail:get_smtp_port(Config).
+%% 587
+%% 4> yawl_mail:use_tls(Config).
+%% true
+%% ```
+%%
+%% <h3>Email Composition</h3>
+%%
+%% Create an email record:
+%%
+%% ```erlang
+%% 5> Email = yawl_mail:email(
+%%     [<<"to@example.com">>],
+%%     [<<"cc@example.com">>],
+%%     <<"Subject">>,
+%%     <<"Body">>
+%% ).
+%% #email{
+%%   to = [<<"to@example.com">>],
+%%   cc = [<<"cc@example.com">>],
+%%   subject = <<"Subject">>,
+%%   body = <<"Body">>,
+%%   attachments = []
+%% }
+%% ```
+%%
+%% Access email fields:
+%%
+%% ```erlang
+%% 6> yawl_mail:get_to(Email).
+%% [<<"to@example.com">>]
+%% 7> yawl_mail:get_cc(Email).
+%% [<<"cc@example.com">>]
+%% 8> yawl_mail:get_subject(Email).
+%% <<"Subject">>
+%% 9> yawl_mail:get_body(Email).
+%% <<"Body">>
+%% ```
+%%
+%% <h3>Email Validation</h3>
+%%
+%% Validate email addresses:
+%%
+%% ```erlang
+%% 10> yawl_mail:doctest_validate_email([
+%%     <<"test@example.com">>,
+%%     <<"user@domain.org">>
+%% ]).
+%% true
+%% 11> yawl_mail:doctest_validate_email([
+%%     <<"invalid">>,
+%%     <<"no-at-sign.com">>
+%% ]).
+%% false
+%% ```
+%%
+%% <h3>Address Formatting</h3>
+%%
+%% Join multiple email addresses:
+%%
+%% ```erlang
+%% 12> yawl_mail:doctest_join_addresses([
+%%     <<"a@b.com">>,
+%%     <<"c@d.com">>
+%% ]).
+%% <<"a@b.com, c@d.com">>
+%% ```
+%%
+%% <h3>Template Rendering</h3>
+%%
+%% Render templates with variable substitution:
+%%
+%% ```erlang
+%% 13> yawl_mail:doctest_render_vars(
+%%     <<"Hello {{name}}">>,
+%%     #{name => <<"Alice">>}
+%% ).
+%% <<"Hello Alice">>
+%% 14> yawl_mail:doctest_render_vars(
+%%     <<"Value: {{num}}">>,
+%%     #{num => 42}
+%% ).
+%% <<"Value: 42">>
+%% 15> yawl_mail:doctest_render_vars(
+%%     <<"{{greeting}} {{name}}, count is {{n}}">>,
+%%     #{greeting => <<"Hello">>, name => <<"Bob">>, n => 5}
+%% ).
+%% <<"Hello Bob, count is 5">>
+%% ```
+%%
+%% Format variables of different types:
+%%
+%% ```erlang
+%% 16> yawl_mail:doctest_format_var(<<"binary">>).
+%% <<"binary">>
+%% 17> yawl_mail:doctest_format_var(123).
+%% <<"123">>
+%% 18> yawl_mail:doctest_format_var('atom').
+%% <<"atom">>
+%% 19> yawl_mail:doctest_format_var(3.14).
+%% <<"3.14">>
+%% ```
+%%
+%% <h3>Message Building</h3>
+%%
+%% Build email message without CC:
+%%
+%% ```erlang
+%% 20> Msg = yawl_mail:doctest_build_message(
+%%     <<"from@test.com">>,
+%%     [<<"to@test.com">>],
+%%     [],
+%%     <<"Subj">>,
+%%     <<"Body">>
+%% ),
+%% iolist_to_binary(Msg).
+%% <<"From: from@test.com\r\nTo: to@test.com\r\nSubject: Subj\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nBody">>
+%% ```
+%%
+%% Build email message with CC:
+%%
+%% ```erlang
+%% 21> MsgWithCc = yawl_mail:doctest_build_message(
+%%     <<"from@test.com">>,
+%%     [<<"to@test.com">>],
+%%     [<<"cc@test.com">>],
+%%     <<"Subj">>,
+%%     <<"Body">>
+%% ),
+%% Binary = iolist_to_binary(MsgWithCc),
+%% binary:match(Binary, <<"Cc: cc@test.com\r\n">>) =/= nomatch.
+%% true
+%% ```
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -58,6 +217,10 @@
 -export([send_email/2, send_notification/3, send_task_notification/3]).
 -export([add_template/2, render_template/2]).
 -export([list_templates/0, remove_template/1]).
+
+%% Doctest Helpers (exported for testing)
+-export([doctest_test/0, doctest_validate_email/1, doctest_join_addresses/1,
+         doctest_render_vars/2, doctest_format_var/1, doctest_build_message/5]).
 
 %%====================================================================
 %% Type Definitions
@@ -205,7 +368,22 @@ remove_template(Name) when is_binary(Name) ->
 -spec mail_config() -> #mail_config{}.
 mail_config() -> #mail_config{}.
 
-%% @private
+%%--------------------------------------------------------------------
+%% @doc Creates a mail configuration record.
+%%
+%% Example:
+%%
+%% ```erlang
+%% 1> Config = yawl_mail:mail_config(
+%%     <<"smtp.example.com">>, 587,
+%%     <<"user">>, <<"pass">>,
+%%     <<"from@example.com">>, true
+%% ),
+%% yawl_mail:get_smtp_server(Config).
+%% <<"smtp.example.com">>
+%% ```
+%% @end
+%%--------------------------------------------------------------------
 -spec mail_config(binary(), pos_integer(), binary() | undefined,
                   binary() | undefined, binary(), boolean()) -> #mail_config{}.
 mail_config(SmtpServer, SmtpPort, Username, Password, From, UseTls) ->
@@ -222,7 +400,23 @@ mail_config(SmtpServer, SmtpPort, Username, Password, From, UseTls) ->
 -spec email() -> #email{}.
 email() -> #email{}.
 
-%% @private
+%%--------------------------------------------------------------------
+%% @doc Creates an email record.
+%%
+%% Example:
+%%
+%% ```erlang
+%% 1> Email = yawl_mail:email(
+%%     [<<"to@example.com">>],
+%%     [<<"cc@example.com">>],
+%%     <<"Subject">>,
+%%     <<"Body">>
+%% ),
+%% yawl_mail:get_subject(Email).
+%% <<"Subject">>
+%% ```
+%% @end
+%%--------------------------------------------------------------------
 -spec email([binary()], [binary()], binary(), binary()) -> #email{}.
 email(To, Cc, Subject, Body) ->
     #email{
@@ -379,6 +573,23 @@ do_send_email(#mail_config{from = From}, To, #email{cc = Cc, subject = Subject, 
 
 %%--------------------------------------------------------------------
 %% @private Validates email addresses.
+%%
+%% Checks that each address contains an @ symbol.
+%%
+%% Example:
+%%
+%% ```erlang
+%% 1> yawl_mail:doctest_validate_email([
+%%     <<"test@example.com">>,
+%%     <<"user@domain.org">>
+%% ]).
+%% true
+%% 2> yawl_mail:doctest_validate_email([
+%%     <<"invalid">>,
+%%     <<"no-at-sign">>
+%% ]).
+%% false
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec validate_email_addresses([binary()]) -> boolean().
@@ -447,6 +658,22 @@ send_via_gen_smtp(From, To, Cc, Subject, Message) ->
 
 %%--------------------------------------------------------------------
 %% @private Builds a complete email message.
+%%
+%% Creates a properly formatted RFC 5322 email message.
+%%
+%% Example:
+%%
+%% ```erlang
+%% 1> Msg = yawl_mail:doctest_build_message(
+%%     <<"from@test.com">>,
+%%     [<<"to@test.com">>],
+%%     [],
+%%     <<"Subj">>,
+%%     <<"Body">>
+%% ),
+%% iolist_to_binary(Msg).
+%% <<"From: from@test.com\r\nTo: to@test.com\r\nSubject: Subj\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nBody">>
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec build_email_message(binary(), [binary()], [binary()], binary(), binary()) -> iolist().
@@ -467,6 +694,22 @@ build_email_message(From, To, Cc, Subject, Body) ->
 
 %%--------------------------------------------------------------------
 %% @private Joins email addresses with commas.
+%%
+%% Example:
+%%
+%% ```erlang
+%% 1> yawl_mail:doctest_join_addresses([
+%%     <<"a@b.com">>,
+%%     <<"c@d.com">>
+%% ]).
+%% <<"a@b.com, c@d.com">>
+%% 2> yawl_mail:doctest_join_addresses([
+%%     <<"single@test.com">>
+%% ]).
+%% <<"single@test.com">>
+%% 3> yawl_mail:doctest_join_addresses([]).
+%% <<>>
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec join_email_addresses([binary()]) -> string().
@@ -479,7 +722,28 @@ join_email_addresses([Addr | Rest]) ->
 
 %%--------------------------------------------------------------------
 %% @private Renders template with variable substitution.
+%%
 %% Supports {{variable}} syntax.
+%%
+%% Example:
+%%
+%% ```erlang
+%% 1> yawl_mail:doctest_render_vars(
+%%     <<"Hello {{name}}">>,
+%%     #{name => <<"Alice">>}
+%% ).
+%% <<"Hello Alice">>
+%% 2> yawl_mail:doctest_render_vars(
+%%     <<"Value: {{num}}">>,
+%%     #{num => 42}
+%% ).
+%% <<"Value: 42">>
+%% 3> yawl_mail:doctest_render_vars(
+%%     <<"{{greeting}} {{name}}">>,
+%%     #{greeting => <<"Hello">>, name => <<"Bob">>}
+%% ).
+%% <<"Hello Bob">>
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec render_template_vars(binary(), template_vars()) -> binary().
@@ -502,6 +766,23 @@ render_template_vars(<<C, Rest/binary>>, Vars, Acc) ->
 
 %%--------------------------------------------------------------------
 %% @private Formats a template variable.
+%%
+%% Converts various Erlang types to binary for template rendering.
+%%
+%% Example:
+%%
+%% ```erlang
+%% 1> yawl_mail:doctest_format_var(<<"binary">>).
+%% <<"binary">>
+%% 2> yawl_mail:doctest_format_var(123).
+%% <<"123">>
+%% 3> yawl_mail:doctest_format_var('atom').
+%% <<"atom">>
+%% 4> yawl_mail:doctest_format_var(3.14).
+%% <<"3.14">>
+%% 5> yawl_mail:doctest_format_var("list").
+%% <<"list">>
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec format_template_var(term()) -> binary().
@@ -511,3 +792,49 @@ format_template_var(V) when is_integer(V) -> integer_to_binary(V);
 format_template_var(V) when is_float(V) -> list_to_binary(float_to_list(V));
 format_template_var(V) when is_atom(V) -> atom_to_binary(V, utf8);
 format_template_var(V) -> list_to_binary(io_lib:format("~p", [V])).
+
+%%====================================================================
+%% Doctest Functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the module.
+%%
+%% Tests examples embedded in moduledoc and function documentation.
+%%
+%% Example:
+%%
+%% ```erlang
+%% 1> yawl_mail:doctest_test().
+%% ok
+%% ```
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%% @private
+-spec doctest_validate_email([binary()]) -> boolean().
+doctest_validate_email(Addrs) ->
+    validate_email_addresses(Addrs).
+
+%% @private
+-spec doctest_join_addresses([binary()]) -> binary().
+doctest_join_addresses(Addrs) ->
+    list_to_binary(join_email_addresses(Addrs)).
+
+%% @private
+-spec doctest_render_vars(binary(), template_vars()) -> binary().
+doctest_render_vars(Template, Vars) ->
+    render_template_vars(Template, Vars).
+
+%% @private
+-spec doctest_format_var(term()) -> binary().
+doctest_format_var(V) ->
+    format_template_var(V).
+
+%% @private
+-spec doctest_build_message(binary(), [binary()], [binary()], binary(), binary()) -> iolist().
+doctest_build_message(From, To, Cc, Subject, Body) ->
+    build_email_message(From, To, Cc, Subject, Body).

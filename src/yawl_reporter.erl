@@ -35,18 +35,44 @@
 %%   <li><b>Scheduled Reports:</b> Automated report generation and delivery</li>
 %% </ul>
 %%
-%% <h3>Usage</h3>
+%% <h3>Doctests</h3>
 %%
-%% <pre>
-%% %% Generate a JSON report for a case
-%% {ok, Report} = yawl_reporter:generate_report(json, case_id, <<"case_123">>).
+%% Getting available report types:
 %%
-%% %% Export case data to CSV
-%% yawl_reporter:export_case_data(<<"case_123">>, csv).
+%% ```erlang
+%% 1> yawl_reporter:get_available_reports().
+%% [<<"case_execution_report">>, <<"period_summary_report">>,
+%%  <<"engine_performance_report">>, <<"resource_utilization_report">>,
+%%  <<"exception_report">>, <<"work_item_report">>]
+%% ```
 %%
-%% %% Schedule daily reports
-%% yawl_reporter:schedule_report(daily, #{format => json}, self()).
-%% </pre>
+%% Converting data to JSON format:
+%%
+%% ```erlang
+%% 2> yawl_reporter:to_json(#{test => <<"value">>, count => 42}).
+%% <<"{\"test\":\"value\",\"count\":42}">>
+%% ```
+%%
+%% Converting data to CSV format:
+%%
+%% ```erlang
+%% 3> yawl_reporter:to_csv(#{key => <<"value">>, number => 123}).
+%% <<"key,value\nnumber,123">>
+%% ```
+%%
+%% Status formatting for case states:
+%%
+%% ```erlang
+%% 4> yawl_reporter:to_string(running).
+%% <<"running">>
+%% '''
+%%
+%% Running the full doctest suite:
+%%
+%% ```erlang
+%% 5> yawl_reporter:doctest_test().
+%% ok
+%% '''
 %%
 %% @end
 %% -------------------------------------------------------------------
@@ -74,7 +100,8 @@
          schedule_report/3,
          cancel_schedule/1,
          get_available_reports/0,
-         list_schedules/0]).
+         list_schedules/0,
+         doctest_test/0]).
 
 %% Format-specific exports
 -export([to_json/1, to_xml/1, to_csv/1, to_html/1]).
@@ -1023,6 +1050,126 @@ generate_schedule_id() ->
     Unique = crypto:hash(md5, term_to_binary({self(), erlang:unique_integer()})),
     Hex = binary:encode_hex(Unique),
     <<"schedule_", Hex/binary>>.
+
+%%--------------------------------------------------------------------
+%% @doc Runs all doctests for the yawl_reporter module.
+%%
+%% This function executes minimal, fast tests that verify the core
+%% functionality of the reporting module without requiring external
+%% dependencies or starting servers.
+%%
+%% Returns `ok' when all tests pass.
+%%
+%% Example:
+%% ```
+%% 1> yawl_reporter:doctest_test().
+%% ok
+%% '''
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Available reports list
+    Reports = get_available_reports(),
+    true = is_list(Reports),
+    true = length(Reports) > 0,
+
+    %% Test 2: to_json with simple map
+    JsonOut = to_json(#{test => <<"value">>, count => 42}),
+    true = is_binary(JsonOut),
+    true = byte_size(JsonOut) > 0,
+
+    %% Test 3: to_json with empty map
+    EmptyJson = to_json(#{}),
+    true = is_binary(EmptyJson),
+
+    %% Test 4: to_csv with simple map
+    CsvOut = to_csv(#{key => <<"value">>, number => 123}),
+    true = is_binary(CsvOut),
+    true = binary:match(CsvOut, <<"key,value">>) =/= nomatch,
+
+    %% Test 5: to_csv with empty map
+    EmptyCsv = to_csv(#{}),
+    true = is_binary(EmptyCsv),
+
+    %% Test 6: to_csv with list of maps (events-style)
+    EventsCsv = to_csv([#{timestamp => 123, event_name => <<"test">>, event_value => 1}]),
+    true = is_binary(EventsCsv),
+
+    %% Test 7: to_string with various types
+    <<"running">> = to_string(running),
+    <<"binary">> = to_string(<<"binary">>),
+    <<"42">> = to_string(42),
+
+    %% Test 8: escape_json with special characters
+    Escaped = escape_json(<<"test\"value">>),
+    true = binary:match(Escaped, <<"\\\"">>) =/= nomatch,
+
+    %% Test 9: escape_csv with comma
+    EscapedCsv = escape_csv(<<"value,with,commas">>),
+    true = is_binary(EscapedCsv),
+
+    %% Test 10: encode_csv_row
+    Row = encode_csv_row([<<"a">>, <<"b">>, <<"c">>]),
+    <<"a,b,c">> = Row,
+
+    %% Test 11: encode_csv_event
+    EventMap = #{timestamp => 1000, event_name => <<"test_event">>, event_value => 5},
+    EventCsv = encode_csv_event(EventMap),
+    true = is_binary(EventCsv),
+    true = binary:match(EventCsv, <<"1000">>) =/= nomatch,
+
+    %% Test 12: to_xml output structure
+    XmlOut = to_xml(#{key => <<"value">>}),
+    true = is_binary(XmlOut),
+    true = binary:match(XmlOut, <<"<?xml">>) =/= nomatch,
+    true = binary:match(XmlOut, <<"yawl_report">>) =/= nomatch,
+
+    %% Test 13: to_html output structure
+    HtmlOut = to_html(#{exported_at => 1234567890000, events => [], case_id => <<"test_case">>}),
+    true = is_binary(HtmlOut),
+    true = binary:match(HtmlOut, <<"<!DOCTYPE html">>) =/= nomatch,
+    true = binary:match(HtmlOut, <<"test_case">>) =/= nomatch,
+
+    %% Test 14: find_metric_value with empty list
+    Default = find_metric_value(<<"nonexistent">>, [], default_value),
+    default_value = Default,
+
+    %% Test 15: find_metric_value with matching metric
+    Metric = #metric{name = <<"test_metric">>, value = 42, timestamp = 0, labels = #{}},
+    42 = find_metric_value(<<"test_metric">>, [Metric], 0),
+
+    %% Test 16: calculate_next_run intervals
+    Now = erlang:system_time(millisecond),
+    HourlyNext = calculate_next_run(hourly),
+    true = HourlyNext > Now,
+    true = (HourlyNext - Now) >= ?HOUR,
+    DailyNext = calculate_next_run(daily),
+    true = DailyNext > Now,
+    true = (DailyNext - Now) >= ?DAY,
+
+    %% Test 17: generate_schedule_id uniqueness
+    Id1 = generate_schedule_id(),
+    Id2 = generate_schedule_id(),
+    true = is_binary(Id1),
+    true = is_binary(Id2),
+    true = byte_size(Id1) > 8,
+    true = (Id1 =/= Id2),
+
+    %% Test 18: encode_json with nested map
+    NestedJson = encode_json(#{outer => #{inner => <<"value">>}}),
+    true = is_list(NestedJson),
+    true = lists:member(<<"outer">>, NestedJson) orelse
+            lists:member("\"outer\"", NestedJson),
+
+    %% Test 19: list_schedules when scheduler not running
+    %% Returns empty list when scheduler process is not available
+    Schedules = list_schedules(),
+    true = is_list(Schedules),
+
+    ok.
 
 %%====================================================================
 %% Internal Functions - End of File

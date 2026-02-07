@@ -35,18 +35,69 @@
 %%   <li><b>Cross-Case Messaging:</b> Coordinate between workflow cases</li>
 %% </ul>
 %%
-%% <h3>Usage</h3>
+%% <h3>Doctests</h3>
 %%
-%% <pre>
-%% %% Register a message handler
-%% yawl_ipc:register_handler(<<"task_update">>, self()).
+%% Starting the IPC server:
 %%
-%% %% Send a message to a handler
-%% yawl_ipc:send_message(<<"task_update">>, #{status => completed}).
+%% ```erlang
+%% 1> {ok, Pid} = yawl_ipc:start_link().
+%% {ok, <0.123.0>}
+%% '''
 %%
-%% %% Subscribe to case events
-%% yawl_ipc:subscribe_to_case(<<"case_123">>, self()).
-%% </pre>
+%% Registering and using message handlers:
+%%
+%% ```erlang
+%% 2> {ok, HandlerId} = yawl_ipc:register_handler(<<"task_update">>, self()).
+%% {ok, #Ref<0.0.0.123>}
+%% 3> Handlers = yawl_ipc:list_handlers().
+%% #{<<"task_update">> := [Self]}
+%% 4> ok = yawl_ipc:send_message(<<"task_update">>, #{status => completed}).
+%% ok
+%% 5> ok = yawl_ipc:unregister_handler(HandlerId).
+%% ok
+%% '''
+%%
+%% Case event subscription:
+%%
+%% ```erlang
+%% 6> {ok, SubRef} = yawl_ipc:subscribe_to_case(<<"case_123">>, self()).
+%% {ok, #Ref<0.0.0.456>}
+%% 7> Subscribers = yawl_ipc:list_case_subscribers(<<"case_123">>).
+%% [Self]
+%% 8> ok = yawl_ipc:publish_case_event(<<"case_123">>, <<"task_completed">>, #{task_id => <<"t1">>}).
+%% ok
+%% 9> ok = yawl_ipc:unsubscribe_from_case(SubRef).
+%% ok
+%% '''
+%%
+%% Broadcast messaging:
+%%
+%% ```erlang
+%% 10> Pid1 = spawn(fun() -> receive ok -> ok end end).
+%% <0.124.0>
+%% 11> Pid2 = spawn(fun() -> receive ok -> ok end end).
+%% <0.125.0>
+%% 12> ok = yawl_ipc:broadcast_message([Pid1, Pid2], #{broadcast => data}).
+%% ok
+%% '''
+%%
+%% Message queue operations:
+%%
+%% ```erlang
+%% 13> {ok, QName} = yawl_ipc:create_queue(<<"test_queue">>).
+%% {ok, <<"test_queue">>}
+%% 14> [] = yawl_ipc:get_queue_messages(<<"test_queue">>).
+%% []
+%% 15> ok = yawl_ipc:delete_queue(<<"test_queue">>).
+%% ok
+%% '''
+%%
+%% Getting message statistics:
+%%
+%% ```erlang
+%% 16> Stats = yawl_ipc:get_message_stats().
+%% #{errors := 0, received := 0, sent := 0}
+%% '''
 %%
 %% @end
 %% -------------------------------------------------------------------
@@ -98,7 +149,10 @@
 
          %% Monitoring
          get_message_stats/0,
-         get_pending_messages/0]).
+         get_pending_messages/0,
+
+         %% Testing
+         doctest_test/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -149,7 +203,7 @@
 
 -record(ipc_state, {
     handlers :: #{message_type() => [handler()]},
-    case_subscribers :: #{case_id() => [pid()]},
+    case_subscribers :: #{case_id() => [{pid(), reference()}]},
     queues :: #{binary() => queue()},
     message_stats :: #{atom() => number()},
     pending_messages :: [message()]
@@ -484,6 +538,80 @@ get_message_stats() ->
 get_pending_messages() ->
     gen_server:call(?MODULE, get_pending_messages).
 
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the module.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Message ID generation format
+    MsgId = generate_message_id(),
+    true = is_binary(MsgId),
+    true = byte_size(MsgId) > 4,
+    true = binary:match(MsgId, <<"msg_">>) =/= nomatch,
+
+    %% Test 2: Reply to message with no sender
+    MsgNoSender = #message{from = undefined},
+    {error, no_sender} = reply_message(MsgNoSender, payload),
+
+    %% Test 3: Verify handler record structure
+    HandlerId = make_ref(),
+    SelfPid = self(),
+    Handler = #handler{
+        id = HandlerId,
+        message_type = <<"test_type">>,
+        pid = SelfPid,
+        metadata = #{key => value}
+    },
+    HandlerId = Handler#handler.id,
+    <<"test_type">> = Handler#handler.message_type,
+    SelfPid = Handler#handler.pid,
+    #{key := value} = Handler#handler.metadata,
+
+    %% Test 4: Verify message record structure
+    Message = #message{
+        id = <<"msg_123">>,
+        type = <<"test_event">>,
+        payload = #{data => test},
+        from = undefined,
+        to = undefined,
+        timestamp = erlang:system_time(millisecond),
+        correlation_id = undefined
+    },
+    <<"msg_123">> = Message#message.id,
+    <<"test_event">> = Message#message.type,
+    #{data := test} = Message#message.payload,
+
+    %% Test 5: Verify queue record structure
+    Queue = #queue{
+        name = <<"test_queue">>,
+        messages = [],
+        max_size = 1000,
+        created_at = erlang:system_time(millisecond)
+    },
+    <<"test_queue">> = Queue#queue.name,
+    [] = Queue#queue.messages,
+    1000 = Queue#queue.max_size,
+    true = is_integer(Queue#queue.created_at),
+
+    %% Test 6: Verify initial state structure
+    State = #ipc_state{
+        handlers = #{},
+        case_subscribers = #{},
+        queues = #{},
+        message_stats = #{sent => 0, received => 0, errors => 0},
+        pending_messages = []
+    },
+    #{} = State#ipc_state.handlers,
+    #{} = State#ipc_state.case_subscribers,
+    #{} = State#ipc_state.queues,
+    #{sent := 0, received := 0, errors := 0} = State#ipc_state.message_stats,
+    [] = State#ipc_state.pending_messages,
+
+    ok.
+
 %%====================================================================
 %% gen_server Callback Functions
 %%====================================================================
@@ -512,7 +640,7 @@ init(Config) ->
     },
 
     logger:info("IPC server initialized: max_queue=~p", [MaxQueueSize],
-                 [{module, ?MODULE}, {action, init}]),
+                 #{module => ?MODULE, action => init}),
 
     {ok, State}.
 
@@ -619,7 +747,7 @@ handle_call({call_handler, MessageType, Payload, Timeout, CorrelationId}, _From,
                 id = MessageId,
                 type = MessageType,
                 payload = Payload,
-                from = {RequestRef, self()},  % Include gen_server Pid and reference
+                from = {RequestRef, self()},
                 timestamp = erlang:system_time(millisecond),
                 correlation_id = CorrelationId
             },

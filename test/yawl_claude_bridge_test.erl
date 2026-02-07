@@ -19,7 +19,7 @@
 -author("CRE Team").
 
 -include_lib("eunit/include/eunit.hrl").
--include("cre_yawl.hrl").
+-include("../src/cre_yawl.hrl").
 
 %%====================================================================
 %% Test Generators

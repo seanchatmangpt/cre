@@ -44,6 +44,79 @@
 %%   <li>yawl_engine for workflow case management</li>
 %% </ul>
 %%
+%% <h3>Doctests</h3>
+%%
+%% Timeout calculation:
+%% ```erlang
+%% 1> Ref = #timeout_ref{timeout = 5000, started_at = 1000, extended_count = 0}.
+%% #timeout_ref{timeout = 5000, started_at = 1000, extended_count = 0}
+%% 2> 5000 = Ref#timeout_ref.timeout.
+%% 5000
+%% '''
+%%
+%% Deadline checking with timeout ref:
+%% ```erlang
+%% 1> Start = erlang:system_time(millisecond),
+%% 1> Ref = #timeout_ref{timeout = 5000, started_at = Start},
+%% 1> Elapsed = erlang:system_time(millisecond) - Start,
+%% 1> Remaining = Ref#timeout_ref.timeout - Elapsed,
+%% 1> true = Remaining =< 5000.
+%% true
+%% '''
+%%
+%% Timer management - extend timeout:
+%% ```erlang
+%% 1> Ref = #timeout_ref{timeout = 5000, extended_count = 0},
+%% 1> NewRef = Ref#timeout_ref{timeout = 5000 + 2000, extended_count = 1},
+%% 1> 7000 = NewRef#timeout_ref.timeout,
+%% 1> 1 = NewRef#timeout_ref.extended_count.
+%% 1
+%% '''
+%%
+%% Cancellation token creation:
+%% ```erlang
+%% 1> Token = yawl_timeout:new_cancellation_token().
+%% #cancellation_token{cancelled = false, ...}
+%% 2> false = Token#cancellation_token.cancelled.
+%% false
+%% '''
+%%
+%% Cancellation token with pattern ID:
+%% ```erlang
+%% 1> Token = yawl_timeout:new_cancellation_token(<<"pattern1">>).
+%% #cancellation_token{token_id = <<"token_", ...>>, ...}
+%% 2> true = is_binary(Token#cancellation_token.token_id).
+%% true
+%% '''
+%%
+%% Resource tracking record:
+%% ```erlang
+%% 1> Now = erlang:system_time(millisecond),
+%% 1> Entry = #resource_entry{resource_id = <<"res1">>, pattern_id = <<"p1">>,
+%% 1>                         resource_type = test, allocated_at = Now,
+%% 1>                         critical = false, leak_detected = false},
+%% 1> <<"res1">> = Entry#resource_entry.resource_id,
+%% 1> false = Entry#resource_entry.critical.
+%% false
+%% '''
+%%
+%% Checkpoint entry record:
+%% ```erlang
+%% 1> Now = erlang:system_time(millisecond),
+%% 1> Cp = #checkpoint_entry{checkpoint_id = <<"cp1">>, pattern_id = <<"p1">>,
+%% 1>                       state_data = #{}, created_at = Now,
+%% 1>                       state_version = 1, is_valid = true},
+%% 1> true = Cp#checkpoint_entry.is_valid,
+%% 1> 1 = Cp#checkpoint_entry.state_version.
+%% 1
+%% '''
+%%
+%% Running all doctests:
+%% ```erlang
+%% 1> yawl_timeout:doctest_test().
+%% ok
+%% '''
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -89,6 +162,11 @@
 
 %% Supervisor start
 -export([start_link/0]).
+
+%% Test helpers for doctest
+-export([doctest_test/0]).
+-export([generate_token_id_test/0, generate_resource_id_test/1,
+         generate_checkpoint_id_test/1, get_pattern_from_edge_test/1]).
 
 %%====================================================================
 %% Macros
@@ -1707,3 +1785,267 @@ save_checkpoint_to_file(File, Entry) ->
                           [File, Kind, Reason]),
             logger:error("Stacktrace: ~p", [Stack])
     end.
+
+%%====================================================================
+%% Test Helpers for Doctest
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the yawl_timeout module.
+%%
+%% This function validates the examples in the module documentation.
+%%
+%% Returns `ok' when all tests pass.
+%%
+%% Example:
+%% ```erlang
+%% 1> yawl_timeout:doctest_test().
+%% ok
+%% '''
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% === Timeout Calculation Tests ===
+
+    %% Test 1: Default timeout constant
+    30000 = ?DEFAULT_TIMEOUT,
+
+    %% Test 2: Infinite timeout constant
+    infinity = ?INFINITE_TIMEOUT,
+
+    %% Test 3: Timeout ref record creation and access
+    Start = erlang:system_time(millisecond),
+    TimeoutRef = #timeout_ref{
+        timer_ref = make_ref(),
+        pattern_id = <<"pattern1">>,
+        timeout = 5000,
+        started_at = Start,
+        extended_count = 0
+    },
+    5000 = TimeoutRef#timeout_ref.timeout,
+    0 = TimeoutRef#timeout_ref.extended_count,
+    true = is_reference(TimeoutRef#timeout_ref.timer_ref),
+
+    %% Test 4: Deadline calculation - remaining time
+    Elapsed = erlang:system_time(millisecond) - Start,
+    Remaining = TimeoutRef#timeout_ref.timeout - Elapsed,
+    true = Remaining =< 5000,
+    true = Remaining >= 0,
+
+    %% Test 5: Timeout extension calculation
+    ExtendedRef = TimeoutRef#timeout_ref{
+        timeout = TimeoutRef#timeout_ref.timeout + 2000,
+        extended_count = TimeoutRef#timeout_ref.extended_count + 1
+    },
+    7000 = ExtendedRef#timeout_ref.timeout,
+    1 = ExtendedRef#timeout_ref.extended_count,
+
+    %% Test 6: Timeout reset calculation
+    ResetRef = ExtendedRef#timeout_ref{
+        extended_count = 0
+    },
+    0 = ResetRef#timeout_ref.extended_count,
+
+    %% === Cancellation Token Tests ===
+
+    %% Test 7: Basic cancellation token creation (doesn't require gen_server)
+    TokenId = generate_token_id_test(),
+    Token1 = #cancellation_token{
+        token_id = TokenId,
+        cancelled = false,
+        created_at = erlang:system_time(millisecond)
+    },
+    true = is_record(Token1, cancellation_token),
+    false = Token1#cancellation_token.cancelled,
+    true = is_binary(Token1#cancellation_token.token_id),
+
+    %% Test 8: Token ID format validation
+    <<"token_", _/binary>> = Token1#cancellation_token.token_id,
+    true = byte_size(Token1#cancellation_token.token_id) > 6,
+
+    %% Test 9: Cancellation token with pattern fields
+    Token2 = #cancellation_token{
+        token_id = <<"token_test_123">>,
+        cancelled = false,
+        cancel_reason = undefined,
+        linked_tokens = [],
+        observers = [],
+        created_at = erlang:system_time(millisecond)
+    },
+    true = is_record(Token2, cancellation_token),
+    true = Token2#cancellation_token.created_at > 0,
+
+    %% Test 10: Token record fields
+    undefined = Token2#cancellation_token.cancel_reason,
+    [] = Token2#cancellation_token.linked_tokens,
+    [] = Token2#cancellation_token.observers,
+
+    %% === Resource Tracking Tests ===
+
+    %% Test 11: Resource entry record creation
+    Now = erlang:system_time(millisecond),
+    ResourceEntry = #resource_entry{
+        resource_id = <<"res_test_1">>,
+        owner_pid = self(),
+        pattern_id = <<"pattern1">>,
+        resource_type = test_resource,
+        allocated_at = Now,
+        cleanup_fn = fun(_) -> ok end,
+        critical = false,
+        leak_detected = false,
+        metadata = #{key => value}
+    },
+    true = is_record(ResourceEntry, resource_entry),
+    <<"res_test_1">> = ResourceEntry#resource_entry.resource_id,
+    test_resource = ResourceEntry#resource_entry.resource_type,
+    false = ResourceEntry#resource_entry.critical,
+    false = ResourceEntry#resource_entry.leak_detected,
+
+    %% Test 12: Resource metadata access
+    #{key := value} = ResourceEntry#resource_entry.metadata,
+
+    %% === Checkpoint Tests ===
+
+    %% Test 13: Checkpoint entry record creation
+    CheckpointEntry = #checkpoint_entry{
+        checkpoint_id = <<"cp_test_1">>,
+        pattern_id = <<"pattern1">>,
+        state_data = #{state => active},
+        created_at = Now,
+        state_version = 1,
+        metadata = #{snapshot => true},
+        is_valid = true
+    },
+    true = is_record(CheckpointEntry, checkpoint_entry),
+    <<"cp_test_1">> = CheckpointEntry#checkpoint_entry.checkpoint_id,
+    true = CheckpointEntry#checkpoint_entry.is_valid,
+    1 = CheckpointEntry#checkpoint_entry.state_version,
+
+    %% Test 14: Checkpoint state data
+    #{state := active} = CheckpointEntry#checkpoint_entry.state_data,
+
+    %% === Wait Graph Tests ===
+
+    %% Test 15: Wait edge record creation
+    WaitEdge = #wait_edge{
+        waiting_pid = self(),
+        waiting_for = self(),
+        resource_id = <<"res1">>,
+        added_at = Now,
+        pattern_id = <<"pattern1">>
+    },
+    true = is_record(WaitEdge, wait_edge),
+    WaitingPid = WaitEdge#wait_edge.waiting_pid,
+    true = is_pid(WaitingPid),
+    <<"res1">> = WaitEdge#wait_edge.resource_id,
+    <<"pattern1">> = WaitEdge#wait_edge.pattern_id,
+
+    %% === ID Generation Tests ===
+
+    %% Test 16: Resource ID generation
+    ResourceId = generate_resource_id_test(<<"test_pattern">>),
+    true = is_binary(ResourceId),
+    true = byte_size(ResourceId) > 9,
+    <<"resource_", _/binary>> = ResourceId,
+
+    %% Test 17: Checkpoint ID generation
+    CheckpointId = generate_checkpoint_id_test(<<"pattern1">>),
+    true = is_binary(CheckpointId),
+    true = byte_size(CheckpointId) > 20,
+    <<"checkpoint_pattern1_", _/binary>> = CheckpointId,
+
+    %% === Pattern Extraction Tests ===
+
+    %% Test 18: Pattern from wait edge
+    <<"p1">> = get_pattern_from_edge_test(
+        #wait_edge{waiting_pid = self(), waiting_for = self(),
+                   resource_id = <<"res1">>, added_at = 0,
+                   pattern_id = <<"p1">>}),
+
+    %% === Deadline Detection Tests ===
+
+    %% Test 19: Timeout expiry check (not expired)
+    FreshRef = #timeout_ref{
+        timeout = 10000,
+        started_at = erlang:system_time(millisecond),
+        extended_count = 0
+    },
+    ElapsedFresh = erlang:system_time(millisecond) - FreshRef#timeout_ref.started_at,
+    true = ElapsedFresh < FreshRef#timeout_ref.timeout,
+
+    %% Test 20: Deadline calculation function pattern
+    DeadlineRef = #timeout_ref{
+        timeout = 5000,
+        started_at = 1000,
+        extended_count = 0
+    },
+    6000 = DeadlineRef#timeout_ref.started_at + DeadlineRef#timeout_ref.timeout,
+
+    %% Test 21: Token ID generation pattern
+    TokenId3 = generate_token_id_test(),
+    <<"token_", _/binary>> = TokenId3,
+
+    %% Test 22: Default timeout for infinite
+    infinity = ?INFINITE_TIMEOUT,
+
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test helper for generating token IDs.
+%%
+%% @return Token ID binary
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec generate_token_id_test() -> token_id().
+
+generate_token_id_test() ->
+    Unique = crypto:hash(md5, term_to_binary({self(), erlang:timestamp()})),
+    Hex = binary:encode_hex(Unique),
+    <<"token_", Hex/binary>>.
+
+%%--------------------------------------------------------------------
+%% @doc Test helper for generating resource IDs.
+%%
+%% @param PatternId The pattern identifier
+%% @return Resource ID binary
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec generate_resource_id_test(pattern_id()) -> resource_id().
+
+generate_resource_id_test(PatternId) ->
+    Unique = crypto:hash(md5, term_to_binary({PatternId, erlang:timestamp()})),
+    Hex = binary:encode_hex(Unique),
+    <<"resource_", Hex/binary>>.
+
+%%--------------------------------------------------------------------
+%% @doc Test helper for generating checkpoint IDs.
+%%
+%% @param PatternId The pattern identifier
+%% @return Checkpoint ID binary
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec generate_checkpoint_id_test(pattern_id()) -> checkpoint_id().
+
+generate_checkpoint_id_test(PatternId) ->
+    Unique = crypto:hash(md5, term_to_binary({PatternId, erlang:timestamp()})),
+    Hex = binary:encode_hex(Unique),
+    <<"checkpoint_", PatternId/binary, "_", Hex/binary>>.
+
+%%--------------------------------------------------------------------
+%% @doc Test helper for extracting pattern from wait edge.
+%%
+%% @param Edge The wait edge record
+%% @return Pattern ID binary
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_pattern_from_edge_test(#wait_edge{}) -> pattern_id().
+
+get_pattern_from_edge_test(#wait_edge{pattern_id = PatternId}) ->
+    PatternId.

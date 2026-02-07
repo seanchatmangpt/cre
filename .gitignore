@@ -15,3 +15,6 @@ rebar.lock
 .claude-flow/
 .hive-mind/
 .mcp.json
+
+# Wreckit local config (may contain secrets)
+.wreckit/config.local.json

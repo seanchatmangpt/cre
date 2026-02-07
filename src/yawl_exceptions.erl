@@ -80,7 +80,7 @@
          is_yawl_exception/1]).
 
 %% Exception handling
--export([raise/1]).
+-export([raise/1, doctest_test/0]).
 
 %%====================================================================
 %% Types
@@ -114,9 +114,26 @@
 %%--------------------------------------------------------------------
 %% @doc Creates a new YAWL exception.
 %%
-%% @param Type The exception type
-%% @param Message Human-readable error message
-%% @param Cause The underlying cause (exception, error, or term)
+%% ## Examples
+%%
+%% Create exception with binary message:
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_exception(yawl_runtime_exception, <<"task failed">>, timeout).
+%% #{type => yawl_runtime_exception, message => <<"task failed">>, ...}
+%% 2> yawl_exceptions:exception_type(Exc).
+%% yawl_runtime_exception
+%% ```
+%%
+%% Create exception with string message (auto-converted to binary):
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_exception(yawl_syntax_exception, "invalid XML", {error, parse}).
+%% #{type => yawl_syntax_exception, message => <<"invalid XML">>, ...}
+%% 2> is_map(Exc).
+%% true
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec new_exception(Type :: yawl_exception(),
@@ -140,6 +157,13 @@ new_exception(Type, Message, Cause) when is_binary(Message) ->
 %%
 %% Used for parsing errors in YAWL specifications.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_syntax_exception(<<"missing end tag">>, {line, 42}).
+%% #{type := yawl_syntax_exception, message := <<"missing end tag">>} = Exc
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec new_syntax_exception(Message :: binary() | string(),
@@ -152,6 +176,13 @@ new_syntax_exception(Message, Cause) ->
 %% @doc Creates a new validation exception.
 %%
 %% Used for specification validation failures.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_validation_exception(<<"invalid task reference">>, unknown_task).
+%% #{type := yawl_validation_exception} = Exc
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -166,6 +197,13 @@ new_validation_exception(Message, Cause) ->
 %%
 %% Used for general runtime errors during workflow execution.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_runtime_exception(<<"worker timeout">>, {timeout, 5000}).
+%% #{type := yawl_runtime_exception, cause := {timeout, 5000}} = Exc
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec new_runtime_exception(Message :: binary() | string(),
@@ -178,6 +216,13 @@ new_runtime_exception(Message, Cause) ->
 %% @doc Creates a new state exception.
 %%
 %% Used for invalid state transitions in workflow cases.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_state_exception(<<"invalid transition: running to paused">>, invalid_state).
+%% #{type := yawl_state_exception} = Exc
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -192,6 +237,13 @@ new_state_exception(Message, Cause) ->
 %%
 %% Used for authentication failures.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_authentication_exception(<<"invalid credentials">>, bad_password).
+%% #{type := yawl_authentication_exception} = Exc
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec new_authentication_exception(Message :: binary() | string(),
@@ -204,6 +256,13 @@ new_authentication_exception(Message, Cause) ->
 %% @doc Creates a new authorization exception.
 %%
 %% Used for authorization/permission failures.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_authorization_exception(<<"access denied">>, forbidden).
+%% #{type := yawl_authorization_exception} = Exc
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -218,6 +277,13 @@ new_authorization_exception(Message, Cause) ->
 %%
 %% Used for resource allocation failures.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_resourcing_exception(<<"no available workers">>, resource_exhausted).
+%% #{type := yawl_resourcing_exception} = Exc
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec new_resourcing_exception(Message :: binary() | string(),
@@ -230,6 +296,13 @@ new_resourcing_exception(Message, Cause) ->
 %% @doc Creates a new communication exception.
 %%
 %% Used for communication errors between components.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_communication_exception(<<"node not responding">>, nodedown).
+%% #{type := yawl_communication_exception} = Exc
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -246,6 +319,14 @@ new_communication_exception(Message, Cause) ->
 %%--------------------------------------------------------------------
 %% @doc Gets the exception type.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_runtime_exception(<<"error">>, cause).
+%% 2> yawl_exceptions:exception_type(Exc).
+%% yawl_runtime_exception
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec exception_type(exception_record()) -> yawl_exception().
@@ -255,6 +336,14 @@ exception_type(#{type := Type}) ->
 
 %%--------------------------------------------------------------------
 %% @doc Gets the exception message.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_runtime_exception(<<"task failed">>, cause).
+%% 2> yawl_exceptions:exception_message(Exc).
+%% <<"task failed">>
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -266,6 +355,14 @@ exception_message(#{message := Message}) ->
 %%--------------------------------------------------------------------
 %% @doc Gets the underlying cause of the exception.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_runtime_exception(<<"error">>, {timeout, 5000}).
+%% 2> yawl_exceptions:exception_cause(Exc).
+%% {timeout, 5000}
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec exception_cause(exception_record()) -> term().
@@ -275,6 +372,14 @@ exception_cause(#{cause := Cause}) ->
 
 %%--------------------------------------------------------------------
 %% @doc Gets the stacktrace if available.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_runtime_exception(<<"error">>, cause).
+%% 2> yawl_exceptions:exception_stacktrace(Exc).
+%% undefined
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -288,6 +393,15 @@ exception_stacktrace(#{stacktrace := Stacktrace}) ->
 %%
 %% Context contains additional debugging information.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_runtime_exception(<<"error">>, cause).
+%% 2> Context = yawl_exceptions:exception_context(Exc).
+%% 3> is_map(Context).
+%% true
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec exception_context(exception_record()) -> map().
@@ -299,6 +413,17 @@ exception_context(#{context := Context}) ->
 %% @doc Formats an exception for logging/display.
 %%
 %% Returns a human-readable formatted string.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_runtime_exception(<<"task failed">>, timeout).
+%% 2> Formatted = yawl_exceptions:format_exception(Exc).
+%% 3> is_binary(Formatted).
+%% true
+%% 4> binary:match(Formatted, <<"yawl_runtime_exception">>) =/= nomatch.
+%% true
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -361,6 +486,17 @@ format_stack_entry(Entry) ->
 %%--------------------------------------------------------------------
 %% @doc Tests if an exception is a syntax exception.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_syntax_exception(<<"parse error">>, bad_xml).
+%% 2> yawl_exceptions:is_syntax_exception(Exc).
+%% true
+%% 3> Exc2 = yawl_exceptions:new_runtime_exception(<<"error">>, cause).
+%% 4> yawl_exceptions:is_syntax_exception(Exc2).
+%% false
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec is_syntax_exception(exception_record()) -> boolean().
@@ -370,6 +506,16 @@ is_syntax_exception(_) -> false.
 
 %%--------------------------------------------------------------------
 %% @doc Tests if an exception is a validation exception.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_validation_exception(<<"invalid">>, reason).
+%% 2> yawl_exceptions:is_validation_exception(Exc).
+%% true
+%% 3> yawl_exceptions:is_syntax_exception(Exc).
+%% false
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -381,6 +527,16 @@ is_validation_exception(_) -> false.
 %%--------------------------------------------------------------------
 %% @doc Tests if an exception is a runtime exception.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_runtime_exception(<<"error">>, cause).
+%% 2> yawl_exceptions:is_runtime_exception(Exc).
+%% true
+%% 3> yawl_exceptions:is_validation_exception(Exc).
+%% false
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec is_runtime_exception(exception_record()) -> boolean().
@@ -390,6 +546,16 @@ is_runtime_exception(_) -> false.
 
 %%--------------------------------------------------------------------
 %% @doc Tests if an exception is a state exception.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_state_exception(<<"bad transition">>, reason).
+%% 2> yawl_exceptions:is_state_exception(Exc).
+%% true
+%% 3> yawl_exceptions:is_runtime_exception(Exc).
+%% false
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -401,6 +567,16 @@ is_state_exception(_) -> false.
 %%--------------------------------------------------------------------
 %% @doc Tests if an exception is an authentication exception.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_authentication_exception(<<"bad auth">>, reason).
+%% 2> yawl_exceptions:is_authentication_exception(Exc).
+%% true
+%% 3> yawl_exceptions:is_state_exception(Exc).
+%% false
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec is_authentication_exception(exception_record()) -> boolean().
@@ -410,6 +586,16 @@ is_authentication_exception(_) -> false.
 
 %%--------------------------------------------------------------------
 %% @doc Tests if an exception is an authorization exception.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_authorization_exception(<<"forbidden">>, reason).
+%% 2> yawl_exceptions:is_authorization_exception(Exc).
+%% true
+%% 3> yawl_exceptions:is_authentication_exception(Exc).
+%% false
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -421,6 +607,16 @@ is_authorization_exception(_) -> false.
 %%--------------------------------------------------------------------
 %% @doc Tests if an exception is a resourcing exception.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_resourcing_exception(<<"no workers">>, reason).
+%% 2> yawl_exceptions:is_resourcing_exception(Exc).
+%% true
+%% 3> yawl_exceptions:is_authorization_exception(Exc).
+%% false
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec is_resourcing_exception(exception_record()) -> boolean().
@@ -431,6 +627,16 @@ is_resourcing_exception(_) -> false.
 %%--------------------------------------------------------------------
 %% @doc Tests if an exception is a communication exception.
 %%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_communication_exception(<<"node down">>, reason).
+%% 2> yawl_exceptions:is_communication_exception(Exc).
+%% true
+%% 3> yawl_exceptions:is_resourcing_exception(Exc).
+%% false
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec is_communication_exception(exception_record()) -> boolean().
@@ -440,6 +646,18 @@ is_communication_exception(_) -> false.
 
 %%--------------------------------------------------------------------
 %% @doc Tests if a record is any YAWL exception.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_runtime_exception(<<"error">>, cause).
+%% 2> yawl_exceptions:is_yawl_exception(Exc).
+%% true
+%% 3> yawl_exceptions:is_yawl_exception(#{not => => an_exception}).
+%% false
+%% 4> yawl_exceptions:is_yawl_exception(not_a_map).
+%% false
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -464,7 +682,15 @@ is_yawl_exception(_) ->
 %%--------------------------------------------------------------------
 %% @doc Raises a YAWL exception with current stacktrace.
 %%
-%% Usage: throw(yawl_exceptions:raise(ExcRec))
+%% The function throws an error exception that can be caught with try/catch.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> Exc = yawl_exceptions:new_runtime_exception(<<"error">>, cause).
+%% 2> try yawl_exceptions:raise(Exc) catch error:{yawl_exception, T, M, C} -> {T, M, C} end.
+%% {yawl_runtime_exception, <<"error">>, cause}
+%% ```
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -479,3 +705,83 @@ raise(ExcRec = #{type := Type, message := Message, cause := Cause}) ->
     },
     %% Exported for use by exception handling modules
     erlang:error({yawl_exception, Type, Message, Cause}, [ExcRec1]).
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the module.
+%%
+%% Validates exception creation, classification, and formatting.
+%%
+%% ## Examples
+%%
+%% ```erlang
+%% 1> yawl_exceptions:doctest_test().
+%% ok
+%% ```
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Create exceptions with binary message
+    Exc1 = new_exception(yawl_runtime_exception, <<"task failed">>, timeout),
+    yawl_runtime_exception = exception_type(Exc1),
+    <<"task failed">> = exception_message(Exc1),
+    timeout = exception_cause(Exc1),
+
+    %% Test 2: Create exceptions with string message (auto-converted)
+    Exc2 = new_syntax_exception("missing tag", {line, 42}),
+    yawl_syntax_exception = exception_type(Exc2),
+    <<"missing tag">> = exception_message(Exc2),
+
+    %% Test 3: Exception type-specific constructors
+    Exc3 = new_validation_exception(<<"invalid ref">>, unknown_task),
+    true = is_validation_exception(Exc3),
+    false = is_syntax_exception(Exc3),
+
+    Exc4 = new_runtime_exception(<<"worker timeout">>, {timeout, 5000}),
+    true = is_runtime_exception(Exc4),
+    false = is_validation_exception(Exc4),
+
+    Exc5 = new_state_exception(<<"bad transition">>, invalid_state),
+    true = is_state_exception(Exc5),
+
+    Exc6 = new_authentication_exception(<<"bad creds">>, bad_password),
+    true = is_authentication_exception(Exc6),
+
+    Exc7 = new_authorization_exception(<<"access denied">>, forbidden),
+    true = is_authorization_exception(Exc7),
+
+    Exc8 = new_resourcing_exception(<<"no workers">>, exhausted),
+    true = is_resourcing_exception(Exc8),
+
+    Exc9 = new_communication_exception(<<"node down">>, nodedown),
+    true = is_communication_exception(Exc9),
+
+    %% Test 4: is_yawl_exception
+    true = is_yawl_exception(Exc1),
+    false = is_yawl_exception(#{not_an_exception => true}),
+    false = is_yawl_exception(not_a_map),
+
+    %% Test 5: Format exception
+    Formatted = format_exception(Exc1),
+    true = is_binary(Formatted),
+    true = binary:match(Formatted, <<"yawl_runtime_exception">>) =/= nomatch,
+    true = binary:match(Formatted, <<"task failed">>) =/= nomatch,
+
+    %% Test 6: Exception accessors
+    undefined = exception_stacktrace(Exc1),
+    Context = exception_context(Exc1),
+    true = is_map(Context),
+
+    %% Test 7: Raise and catch exception
+    Exc10 = new_runtime_exception(<<"test error">>, test_cause),
+    try raise(Exc10)
+    catch
+        error:{yawl_exception, Type, Msg, Cause} ->
+            yawl_runtime_exception = Type,
+            <<"test error">> = Msg,
+            test_cause = Cause
+    end,
+
+    ok.

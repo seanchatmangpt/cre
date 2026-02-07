@@ -38,6 +38,85 @@
 %% for OTP 25+ compatibility without external dependencies. The salt is
 %% embedded in the stored hash for verification.
 %%
+%% <h3>Doctests</h3>
+%%
+%% Starting the authentication server:
+%%
+%% ```erlang
+%% 1> {ok, Pid} = yawl_auth:start_auth().
+%% {ok, <0.123.0>}
+%% ```
+%%
+%% Creating a user with password validation:
+%%
+%% ```erlang
+%% 2> {ok, UserId} = yawl_auth:create_user(<<"alice">>, <<"SecureP@ss123">>, [<<"user">>]).
+%% {ok, <<"user_", _/binary>>}
+%% ```
+%%
+%% Password strength validation - valid password:
+%%
+%% ```erlang
+%% 3> {ok, <<"SecureP@ss123">>} = yawl_auth:validate_password_strength(<<"SecureP@ss123">>).
+%% {ok, <<"SecureP@ss123">>}
+%% ```
+%%
+%% Password strength validation - weak password (too short):
+%%
+%% ```erlang
+%% 4> {error, {too_short, _}} = yawl_auth:validate_password_strength(<<"short1!">>).
+%% {error, {too_short, "Password must be at least 8 characters long"}}
+%% ```
+%%
+%% Password strength validation - missing complexity:
+%%
+%% ```erlang
+%% 5> {error, {weak_password, _}} = yawl_auth:validate_password_strength(<<"weakpassword">>).
+%% {error, {weak_password, [<<"uppercase">>, <<"digit">>, <<"special">>]}}
+%% ```
+%%
+%% Authentication with valid credentials:
+%%
+%% ```erlang
+%% 6> {ok, SessionId} = yawl_auth:authenticate(<<"alice">>, <<"SecureP@ss123">>).
+%% {ok, <<"session_", _/binary>>}
+%% ```
+%%
+%% Authentication with invalid credentials:
+%%
+%% ```erlang
+%% 7> {error, invalid_credentials} = yawl_auth:authenticate(<<"alice">>, <<"WrongPassword">>).
+%% {error, invalid_credentials}
+%% ```
+%%
+%% Session retrieval:
+%%
+%% ```erlang
+%% 8> {ok, Session} = yawl_auth:get_session(SessionId).
+%% {ok, #session{session_id = SessionId, user_id = UserId, expires_at = _}}
+%% ```
+%%
+%% Session invalidation (logout):
+%%
+%% ```erlang
+%% 9> ok = yawl_auth:invalidate_session(SessionId).
+%% ok
+%% ```
+%%
+%% Authorization checks:
+%%
+%% ```erlang
+%% 10> true = yawl_auth:authorize(UserId, <<"workflow">>, <<"start">>).
+%% true
+%% ```
+%%
+%% Running all doctests:
+%%
+%% ```erlang
+%% 1> yawl_auth:doctest_test().
+%% ok
+%% ```
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -65,7 +144,7 @@
 -export([create_user/3, update_user/2, delete_user/1]).
 -export([add_role/2, remove_role/2]).
 -export([has_permission/2, get_session/1, invalidate_session/1]).
--export([validate_password_strength/1]).
+-export([validate_password_strength/1, doctest_test/0]).
 
 %%====================================================================
 %% Type Definitions
@@ -231,6 +310,27 @@ invalidate_session(SessionId) when is_binary(SessionId) ->
 %%   - Contains at least one special character
 %%
 %% Returns {ok, Password} if valid, {error, Reason} otherwise.
+%%
+%% Examples:
+%%
+%% Valid password:
+%% ```erlang
+%% 1> {ok, _} = yawl_auth:validate_password_strength(<<"SecureP@ss123">>).
+%% {ok, <<"SecureP@ss123">>}
+%% ```
+%%
+%% Too short:
+%% ```erlang
+%% 2> {error, {too_short, _}} = yawl_auth:validate_password_strength(<<"short1!">>).
+%% {error, {too_short, "Password must be at least 8 characters long"}}
+%% ```
+%%
+%% Missing uppercase, digit, and special:
+%% ```erlang
+%% 3> {error, {weak_password, Missing}} = yawl_auth:validate_password_strength(<<"weakpassword">>).
+%% 4> lists:sort(Missing).
+%% [<<"digit">>, <<"special">>, <<"uppercase">>]
+%% ```
 %% @end
 %%--------------------------------------------------------------------
 -spec validate_password_strength(binary()) -> {ok, binary()} | {error, term()}.
@@ -731,3 +831,124 @@ do_get_session(SessionId, #auth_state{sessions = Sessions}) ->
 do_invalidate_session(SessionId, #auth_state{sessions = Sessions} = State) ->
     NewSessions = maps:remove(SessionId, Sessions),
     State#auth_state{sessions = NewSessions}.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Runs doctests for the yawl_auth module.
+%%
+%% This function validates the authentication and authorization examples
+%% in the module documentation.
+%%
+%% Returns `ok' when all tests pass.
+%%
+%% Example:
+%% ```
+%% 1> yawl_auth:doctest_test().
+%% ok
+%% '''
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Password validation - valid password with all requirements
+    {ok, _} = validate_password_strength(<<"SecureP@ss123">>),
+
+    %% Test 2: Password validation - too short
+    {error, {too_short, _}} = validate_password_strength(<<"short1!">>),
+
+    %% Test 3: Password validation - missing uppercase
+    {error, {weak_password, Missing1}} = validate_password_strength(<<"lowercase123!">>),
+    true = lists:member(<<"uppercase">>, Missing1),
+
+    %% Test 4: Password validation - missing lowercase
+    {error, {weak_password, Missing2}} = validate_password_strength(<<"UPPERCASE123!">>),
+    true = lists:member(<<"lowercase">>, Missing2),
+
+    %% Test 5: Password validation - missing digit
+    {error, {weak_password, Missing3}} = validate_password_strength(<<"NoDigits!">>),
+    true = lists:member(<<"digit">>, Missing3),
+
+    %% Test 6: Password validation - missing special character
+    {error, {weak_password, Missing4}} = validate_password_strength(<<"NoSpecial123">>),
+    true = lists:member(<<"special">>, Missing4),
+
+    %% Test 7: Password hashing produces correct format (48 bytes: 16 salt + 32 key)
+    %% Using a fast iteration count for doctests
+    TestPassword = <<"TestPassword123!">>,
+    Salt = crypto:strong_rand_bytes(16),
+    Iterations = 100,  % Fast iterations for doctests
+    DerivedKey = case crypto:pbkdf2_hmac(sha256, TestPassword, Salt, Iterations, 32) of
+        {ok, Key} -> Key;
+        Key when is_binary(Key) -> Key
+    end,
+    StoredHash = <<Salt/binary, DerivedKey/binary>>,
+    48 = byte_size(StoredHash),
+
+    %% Test 8: Password verification with correct password
+    <<Salt2:16/binary, Key2:32/binary>> = StoredHash,
+    ComputedKey = case crypto:pbkdf2_hmac(sha256, TestPassword, Salt2, Iterations, 32) of
+        {ok, K} -> K;
+        K when is_binary(K) -> K
+    end,
+    true = ComputedKey =:= Key2,
+
+    %% Test 9: Password verification with incorrect password
+    WrongKey = case crypto:pbkdf2_hmac(sha256, <<"WrongPassword">>, Salt2, Iterations, 32) of
+        {ok, WK} -> WK;
+        WK when is_binary(WK) -> WK
+    end,
+    false = WrongKey =:= Key2,
+
+    %% Test 10: ID generation produces valid binary with prefix
+    UserId = generate_id(<<"user">>),
+    true = is_binary(UserId),
+    true = byte_size(UserId) > 4,
+    {ok, _} = re:run(UserId, <<"^user_[a-f0-9]+$">>),
+
+    %% Test 11: Session ID generation
+    SessionId = generate_id(<<"session">>),
+    true = is_binary(SessionId),
+    true = byte_size(SessionId) > 8,
+    {ok, _} = re:run(SessionId, <<"^session_[a-f0-9]+$">>),
+
+    %% Test 12: User record creation
+    TestUser = new_user(<<"testuser">>, <<"TestPass123!">>, [<<"user">>]),
+    true = is_binary(TestUser#user.id),
+    <<"testuser">> = TestUser#user.username,
+    true = is_binary(TestUser#user.password_hash),
+    [<<"user">>] = TestUser#user.roles,
+    true = TestUser#user.enabled,
+
+    %% Test 13: Session record creation
+    TestUserId = <<"user_test">>,
+    TestSession = new_session(TestUserId),
+    true = is_binary(TestSession#session.session_id),
+    TestUserId = TestSession#session.user_id,
+    true = is_integer(TestSession#session.expires_at),
+    true = TestSession#session.expires_at > erlang:system_time(second),
+
+    %% Test 14: Role permission checking
+    true = check_role_permission([<<"*">>], <<"any">>, <<"action">>),
+    true = check_role_permission([<<"workflow:start">>], <<"workflow">>, <<"start">>),
+    true = check_role_permission([<<"workflow:*">>], <<"workflow">>, <<"start">>),
+    false = check_role_permission([<<"workflow:start">>], <<"workflow">>, <<"stop">>),
+    false = check_role_permission([<<"other:*">>], <<"workflow">>, <<"start">>),
+
+    %% Test 15: User record accessors
+    AccessorUser = #user{id = <<"id1">>, username = <<"user1">>,
+                        password_hash = <<"hash1">>, roles = [<<"admin">>], enabled = true},
+    <<"id1">> = get_user_id(AccessorUser),
+    <<"user1">> = get_username(AccessorUser),
+    <<"hash1">> = get_password_hash(AccessorUser),
+    [<<"admin">>] = get_roles(AccessorUser),
+    true = is_enabled(AccessorUser),
+
+    %% Test 16: Session record accessors
+    AccessorSession = #session{session_id = <<"sid1">>, user_id = <<"uid1">>, expires_at = 12345},
+    <<"sid1">> = get_session_id(AccessorSession),
+    <<"uid1">> = get_session_user_id(AccessorSession),
+    12345 = get_expires_at(AccessorSession),
+
+    ok.

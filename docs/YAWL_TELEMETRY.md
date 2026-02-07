@@ -2,17 +2,36 @@
 
 ## Overview
 
-The `yawl_telemetry` module provides comprehensive monitoring, observability, and distributed tracing capabilities for YAWL workflow pattern execution in the CRE runtime environment.
+CRE provides comprehensive telemetry and observability capabilities through two main modules:
+
+1. **`yawl_telemetry`** - Legacy telemetry module for monitoring and distributed tracing
+2. **`yawl_otel_logger`** - **NEW in v0.2.1** - OpenTelemetry-compliant logger with structured events and trace management
+
+The OpenTelemetry logger provides standardized observability with structured event logging, distributed tracing, and performance monitoring capabilities for modern YAWL workflow deployments.
 
 ## Features
 
-### 1. Telemetry Management
+### 1. OpenTelemetry Logger (v0.2.1+)
+
+#### Key Features:
+- **Structured Event Logging**: High-performance event logging with automatic cleanup
+- **Distributed Tracing**: W3C trace context compliant tracing
+- **Workflow Traces**: End-to-end workflow execution tracing
+- **Checkpoint Logging**: Human-in-the-loop approval tracking
+- **Performance Metrics**: Built-in statistics and monitoring
+
+#### Service Lifecycle
+- **Start/Stop**: Initialize with configurable retention and event limits
+- **Runtime Configuration**: Dynamic configuration updates
+- **Automatic Cleanup**: Event retention and lifecycle management
+
+### 2. Legacy Telemetry Management
 
 - **Service Lifecycle**: Start and stop telemetry service with custom configuration
 - **Dynamic Configuration**: Update configuration at runtime
 - **Configurable Retention**: Set retention periods for metrics and audit logs
 
-### 2. OpenTelemetry-Style Span Management
+### 3. OpenTelemetry-Style Span Management
 
 ```erlang
 % Start a span for pattern execution
@@ -164,7 +183,81 @@ ok = yawl_telemetry:clear_audit_log(),
 ok = yawl_telemetry:clear_audit_log(<<"case_123">>),
 ```
 
-### 9. Prometheus Export
+### 9. OpenTelemetry Logger API (v0.2.1+)
+
+#### Service Management
+```erlang
+% Start with default configuration
+{ok, Pid} = yawl_otel_logger:start_link(),
+
+% Start with custom configuration
+{ok, Pid} = yawl_otel_logger:start_link(#{
+    max_events => 10000,
+    retention_ms => 24 * 60 * 60 * 1000  % 24 hours
+}).
+```
+
+#### Workflow Event Logging
+```erlang
+% Log workflow start
+yawl_otel_logger:log_workflow_start(CaseId, PatternId),
+
+% Log workflow completion
+yawl_otel_logger:log_workflow_complete(CaseId, completed),
+
+% Log workitem events
+yawl_otel_logger:log_workitem_start(CaseId, TaskId, TaskName),
+yawl_otel_logger:log_workitem_complete(CaseId, TaskId, success),
+
+% Generic event logging
+yawl_otel_logger:log_event(pattern_execute, <<"Pattern execution started">>,
+                          #{pattern_id => PatternId, case_id => CaseId}),
+yawl_otel_logger:log_event(pattern_execute, <<"Pattern execution started">>,
+                          #{pattern_id => PatternId, case_id => CaseId}, debug).
+```
+
+#### Human-in-the-Loop Logging
+```erlang
+% Log checkpoint creation
+yawl_otel_logger:log_checkpoint(CheckpointId, PatternId, StepName,
+                              Approver, Context, #{priority => high}),
+
+% Log approval decisions
+yawl_otel_logger:log_approval(CheckpointId, Approver, true,
+                             #{comments => "Approved"}),
+
+% Log approval denial
+yawl_otel_logger:log_approval(CheckpointId, Approver, false,
+                             #{comments => "Insufficient permissions"}).
+```
+
+#### Event Query and Management
+```erlang
+% Get all events
+Events = yawl_otel_logger:get_events(),
+
+% Get events by type
+PatternEvents = yawl_otel_logger:get_events(pattern_execute),
+
+% Get events by trace ID
+TraceEvents = yawl_otel_logger:get_events_by_trace(TraceId),
+
+% Get recent events
+RecentEvents = yawl_otel_logger:get_recent_events(100, info),
+RecentAll = yawl_otel_logger:get_recent_events(50, all),
+
+% Get traces
+Traces = yawl_otel_logger:get_traces(),
+
+% Clear events
+yawl_otel_logger:clear_events(),
+
+% Get statistics
+Stats = yawl_otel_logger:get_stats(),
+% #{event_count => 125, trace_count => 15, max_events => 10000, retention_ms => 86400000}
+```
+
+### 10. Prometheus Export (Legacy)
 
 ```erlang
 % Export all metrics

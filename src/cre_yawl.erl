@@ -60,8 +60,57 @@
 %%
 %% @end
 %% -------------------------------------------------------------------
-
 -module(cre_yawl).
+
+-moduledoc """
+YAWL (Yet Another Workflow Language) pattern support for CRE.
+
+This module implements YAWL workflow patterns as Petri net structures
+compatible with the CRE runtime environment. It provides comprehensive
+support for control flow, data flow, and resource patterns.
+
+## Examples
+
+### Creating a Simple Workflow
+
+```erlang
+%% Create a new workflow
+Workflow = cre_yawl:new_workflow(<<"my_workflow">>),
+
+%% Add tasks
+Task1 = cre_yawl:add_task(Workflow, <<"step1">>, [{name, <<"First Step">>}, {type, atomic}]),
+Task2 = cre_yawl:add_task(Task1, <<"step2">>, [{name, <<"Second Step">>}, {type, atomic}]),
+
+%% Connect tasks
+Workflow3 = cre_yawl:connect(Task2, <<"step1">>, <<"step2">>),
+
+%% Set boundaries
+Workflow4 = cre_yawl:set_workflow_boundaries(Workflow3, <<"step1">>, [<<"step2">>]),
+
+%% Validate
+ok = cre_yawl:validate(Workflow4).
+```
+
+### Using Data Flow Patterns
+
+```erlang
+%% Create a parameter passing pattern
+ParamPass = cre_yawl:param_pass(<<"source_task">>, <<"target_task">>),
+
+%% Create a data transformation pattern
+Transform = cre_yawl:data_transform(<<"input_task">>, <<"output_task">>,
+                                   fun(X) -> X * 2 end),
+
+%% Execute parameter passing
+{ok, Result} = cre_yawl:execute_param_pass(
+    ParamPass,
+    #{<<"source_task">> => 42},
+    #{}
+).
+```
+""".
+
+-include("yawl_otel_logger.hrl").
 
 %%====================================================================
 %% Exports
@@ -87,6 +136,14 @@
 -export([resource_create/1, role_allocate/2, resource_start/1, role_distribute/2, capability_allocate/2]).
 -export([execute_resource_create/2, execute_role_allocate/3, execute_resource_start/2,
          execute_role_distribute/3, execute_capability_allocate/3]).
+
+%% Human-in-the-loop wrappers that delegate to yawl_approval
+-export([request_approval/3, approve_task/3, reject_task/3,
+         get_approval_status/2, cancel_approval/2]).
+
+%% Telemetry wrappers that delegate to yawl_otel_logger
+-export([enable_telemetry/0, enable_telemetry/1, disable_telemetry/0,
+         get_workflow_metrics/1, log_workflow_event/3, log_workflow_event/4]).
 
 %%====================================================================
 %% Types
@@ -174,15 +231,53 @@
 %% API
 %%====================================================================
 
+-doc """
+Creates a new workflow with an auto-generated ID.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+{ok, Id} = cre_yawl:get_workflow_id(Workflow),
+is_binary(Id) andalso size(Id) > 0.
+```
+""".
 -spec new_workflow() -> #workflow{}.
 new_workflow() ->
     WorkflowId = generate_id(<<"workflow">>),
     new_workflow(WorkflowId).
 
+-doc """
+Creates a new workflow with the specified ID.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(<<"my_custom_workflow">>),
+{ok, Id} = cre_yawl:get_workflow_id(Workflow),
+Id =:= <<"my_custom_workflow">>.
+```
+""".
 -spec new_workflow(Id :: element_id()) -> #workflow{}.
 new_workflow(Id) when is_binary(Id) ->
     #workflow{id = Id, name = <<"Untitled Workflow">>}.
 
+-doc """
+Adds a task to the workflow.
+
+The task can be specified as a task record or a property list.
+Property list options: name, type, split_type, join_type, metadata.
+
+## Examples
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+%% Add task using property list
+W1 = cre_yawl:add_task(Workflow, <<"task1">>, [{name, <<"My Task">>}, {type, atomic}]),
+{ok, Tasks} = cre_yawl:get_tasks(W1),
+maps:is_key(<<"task1">>, Tasks).
+```
+""".
 -spec add_task(Workflow :: #workflow{}, TaskId :: element_id(),
                Task :: #task{} | [{atom(), term()}]) -> #workflow{}.
 add_task(#workflow{tasks = Tasks} = Workflow, TaskId, TaskRec)
@@ -192,6 +287,21 @@ add_task(Workflow, TaskId, PropList) when is_list(PropList) ->
     Task = make_task(TaskId, PropList),
     add_task(Workflow, TaskId, Task).
 
+-doc """
+Adds a condition to the workflow.
+
+Conditions are used for branching logic in exclusive and multi-choice patterns.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+%% Add a boolean condition
+W1 = cre_yawl:add_condition(Workflow, <<"cond1">>, fun() -> true end),
+{ok, Conds} = cre_yawl:get_conditions(W1),
+maps:is_key(<<"cond1">>, Conds).
+```
+""".
 -spec add_condition(Workflow :: #workflow{}, ConditionId :: element_id(),
                     Condition :: #yawl_condition{} | condition()) -> #workflow{}.
 add_condition(#workflow{conditions = Conds} = Workflow, ConditionId, CondRec)
@@ -201,6 +311,24 @@ add_condition(Workflow, ConditionId, Expression) ->
     CondRec = #yawl_condition{id = ConditionId, expression = Expression},
     add_condition(Workflow, ConditionId, CondRec).
 
+-doc """
+Sets the split type for a task.
+
+Split types determine how a task divides control flow to multiple outgoing branches:
+- `and_split`: All outgoing branches execute concurrently
+- `or_split`: One or more outgoing branches may execute
+- `xor_split`: Exactly one outgoing branch executes
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_task(Workflow, <<"split">>, [{name, <<"Split Task">>}]),
+W2 = cre_yawl:set_split_type(W1, <<"split">>, and_split),
+{ok, Tasks} = cre_yawl:get_tasks(W2),
+#{<<"split">> := #task{split_type = and_split}} = Tasks.
+```
+""".
 -spec set_split_type(Workflow :: #workflow{}, TaskId :: element_id(),
                      SplitType :: split_type()) -> #workflow{}.
 set_split_type(#workflow{tasks = Tasks} = Workflow, TaskId, SplitType)
@@ -212,6 +340,24 @@ set_split_type(#workflow{tasks = Tasks} = Workflow, TaskId, SplitType)
         Task -> Workflow#workflow{tasks = Tasks#{TaskId => Task#task{split_type = SplitType}}}
     end.
 
+-doc """
+Sets the join type for a task.
+
+Join types determine how a task merges control flow from multiple incoming branches:
+- `and_join`: Waits for all incoming branches to complete
+- `or_join`: Waits for one or more incoming branches to complete
+- `xor_join`: Waits for exactly one incoming branch to complete
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_task(Workflow, <<"join">>, [{name, <<"Join Task">>}]),
+W2 = cre_yawl:set_join_type(W1, <<"join">>, and_join),
+{ok, Tasks} = cre_yawl:get_tasks(W2),
+#{<<"join">> := #task{join_type = and_join}} = Tasks.
+```
+""".
 -spec set_join_type(Workflow :: #workflow{}, TaskId :: element_id(),
                     JoinType :: join_type()) -> #workflow{}.
 set_join_type(#workflow{tasks = Tasks} = Workflow, TaskId, JoinType)
@@ -223,6 +369,22 @@ set_join_type(#workflow{tasks = Tasks} = Workflow, TaskId, JoinType)
         Task -> Workflow#workflow{tasks = Tasks#{TaskId => Task#task{join_type = JoinType}}}
     end.
 
+-doc """
+Creates a connection between two tasks in the workflow.
+
+Connections define the flow of control from one task to another.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_task(Workflow, <<"task1">>, [{name, <<"First">>}]),
+W2 = cre_yawl:add_task(W1, <<"task2">>, [{name, <<"Second">>}]),
+W3 = cre_yawl:connect(W2, <<"task1">>, <<"task2">>),
+{ok, Conns} = cre_yawl:get_connections(W3),
+length(Conns) > 0.
+```
+""".
 -spec connect(Workflow :: #workflow{}, FromId :: element_id(),
               ToId :: element_id()) -> #workflow{}.
 connect(#workflow{connections = Conns} = Workflow, FromId, ToId)
@@ -230,6 +392,29 @@ connect(#workflow{connections = Conns} = Workflow, FromId, ToId)
     Conn = #connection{from_id = FromId, to_id = ToId},
     Workflow#workflow{connections = [Conn | Conns]}.
 
+-doc """
+Validates a workflow.
+
+Checks for structural errors including:
+- Missing tasks referenced in connections
+- Invalid start/end task references
+- Cycles in the workflow graph
+- Inconsistent split/join configurations
+
+## Examples
+
+```erlang
+%% Valid workflow
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_task(Workflow, <<"task1">>, [{name, <<"First">>}]),
+W2 = cre_yawl:set_workflow_boundaries(W1, <<"task1">>, [<<"task1">>]),
+ok = cre_yawl:validate(W2).
+
+%% Invalid workflow (no tasks)
+Empty = cre_yawl:new_workflow(),
+{error, _Errors} = cre_yawl:validate(Empty).
+```
+""".
 -spec validate(Workflow :: #workflow{}) -> ok | {error, [binary()]}.
 validate(#workflow{} = Workflow) ->
     case validate_workflow(Workflow) of
@@ -237,53 +422,114 @@ validate(#workflow{} = Workflow) ->
         Errors -> {error, Errors}
     end.
 
+-doc """
+Returns a list of validation errors for a workflow.
+
+Unlike `validate/1`, this returns the error list directly without wrapping.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+Errors = cre_yawl:get_errors(Workflow),
+is_list(Errors).
+```
+""".
 -spec get_errors(Workflow :: #workflow{}) -> [binary()].
 get_errors(#workflow{} = Workflow) ->
     validate_workflow(Workflow).
 
-%%--------------------------------------------------------------------
-%% @doc Gets the workflow ID from a workflow record.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Gets the workflow ID from a workflow record.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(<<"my_workflow">>),
+{ok, Id} = cre_yawl:get_workflow_id(Workflow),
+Id =:= <<"my_workflow">>.
+```
+""".
 -spec get_workflow_id(#workflow{}) -> {ok, element_id()}.
 get_workflow_id(#workflow{id = Id}) -> {ok, Id}.
 
-%%--------------------------------------------------------------------
-%% @doc Gets the workflow name from a workflow record.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Gets the workflow name from a workflow record.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(<<"my_workflow">>),
+{ok, Name} = cre_yawl:get_workflow_name(Workflow),
+Name =:= <<"Untitled Workflow">>.
+```
+""".
 -spec get_workflow_name(#workflow{}) -> {ok, binary()}.
 get_workflow_name(#workflow{name = Name}) -> {ok, Name}.
 
-%%--------------------------------------------------------------------
-%% @doc Gets the tasks map from a workflow record.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Gets the tasks map from a workflow record.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_task(Workflow, <<"task1">>, [{name, <<"My Task">>}]),
+{ok, Tasks} = cre_yawl:get_tasks(W1),
+maps:is_key(<<"task1">>, Tasks).
+```
+""".
 -spec get_tasks(#workflow{}) -> {ok, #{element_id() => #task{}}}.
 get_tasks(#workflow{tasks = Tasks}) -> {ok, Tasks}.
 
-%%--------------------------------------------------------------------
-%% @doc Gets the connections list from a workflow record.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Gets the connections list from a workflow record.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_task(Workflow, <<"t1">>, []),
+W2 = cre_yawl:add_task(W1, <<"t2">>, []),
+W3 = cre_yawl:connect(W2, <<"t1">>, <<"t2">>),
+{ok, Conns} = cre_yawl:get_connections(W3),
+length(Conns) > 0.
+```
+""".
 -spec get_connections(#workflow{}) -> {ok, [#connection{}]}.
 get_connections(#workflow{connections = Conns}) -> {ok, Conns}.
 
-%%--------------------------------------------------------------------
-%% @doc Gets the conditions map from a workflow record.
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Gets the conditions map from a workflow record.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_condition(Workflow, <<"cond1">>, fun() -> true end),
+{ok, Conds} = cre_yawl:get_conditions(W1),
+maps:is_key(<<"cond1">>, Conds).
+```
+""".
 -spec get_conditions(#workflow{}) -> {ok, #{element_id() => #yawl_condition{}}}.
 get_conditions(#workflow{conditions = Conds}) -> {ok, Conds}.
 
-%%--------------------------------------------------------------------
-%% @doc Sets the start and end task boundaries for a workflow.
-%%
-%% Validates that the specified start and end tasks exist in the workflow
-%% before setting them. Returns an error if any task is not found.
-%%
-%% @end
-%%--------------------------------------------------------------------
+-doc """
+Sets the start and end task boundaries for a workflow.
+
+Validates that the specified start and end tasks exist in the workflow
+before setting them. Returns an error if any task is not found.
+
+## Example
+
+```erlang
+Workflow = cre_yawl:new_workflow(),
+W1 = cre_yawl:add_task(Workflow, <<"start">>, [{name, <<"Start">>}]),
+W2 = cre_yawl:add_task(W1, <<"finish">>, [{name, <<"Finish">>}]),
+W3 = cre_yawl:set_workflow_boundaries(W2, <<"start">>, [<<"finish">>]),
+ok = cre_yawl:validate(W3).
+```
+""".
 -spec set_workflow_boundaries(Workflow :: #workflow{},
                               StartTaskId :: element_id(),
                               EndTaskIds :: [element_id()]) ->
@@ -313,98 +559,406 @@ set_workflow_boundaries(#workflow{tasks = Tasks} = Workflow, StartTaskId, EndTas
     end.
 
 %% Pattern constructors
+-doc """
+Creates a sequence pattern (WCP-1).
+
+This pattern represents a sequential execution of tasks where each task
+completes before the next one begins.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:sequence(),
+#sequence{task_ids = []} = Pattern.
+```
+""".
 -spec sequence() -> #sequence{}.
 sequence() -> #sequence{task_ids = []}.
 
+-doc """
+Creates a parallel split pattern (WCP-2).
+
+This pattern splits execution into multiple concurrent branches.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:parallel_split(),
+#parallel_split{split_task_id = <<>>, branch_task_ids = []} = Pattern.
+```
+""".
 -spec parallel_split() -> #parallel_split{}.
 parallel_split() -> #parallel_split{split_task_id = <<>>, branch_task_ids = []}.
 
+-doc """
+Creates a synchronization pattern (WCP-3).
+
+This pattern synchronizes multiple concurrent branches into a single flow.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:synchronization(),
+#synchronization{join_task_id = <<>>, incoming_task_ids = []} = Pattern.
+```
+""".
 -spec synchronization() -> #synchronization{}.
 synchronization() -> #synchronization{join_task_id = <<>>, incoming_task_ids = []}.
 
+-doc """
+Creates an exclusive choice pattern (WCP-4).
+
+This pattern selects exactly one branch based on conditions.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:exclusive_choice(),
+#exclusive_choice{choice_task_id = <<>>, branches = []} = Pattern.
+```
+""".
 -spec exclusive_choice() -> #exclusive_choice{}.
 exclusive_choice() -> #exclusive_choice{choice_task_id = <<>>, branches = []}.
 
+-doc """
+Creates a simple merge pattern (WCP-5).
+
+This pattern merges multiple incoming branches without synchronization.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:simple_merge(),
+#simple_merge{merge_task_id = <<>>, incoming_task_ids = []} = Pattern.
+```
+""".
 -spec simple_merge() -> #simple_merge{}.
 simple_merge() -> #simple_merge{merge_task_id = <<>>, incoming_task_ids = []}.
 
+-doc """
+Creates a multi-choice pattern (WCP-6).
+
+This pattern allows multiple branches to be selected for execution.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:multi_choice(),
+#multi_merge{choice_task_id = <<>>, branches = []} = Pattern.
+```
+""".
 -spec multi_choice() -> #multi_choice{}.
 multi_choice() -> #multi_choice{choice_task_id = <<>>, branches = []}.
 
+-doc """
+Creates a synchronizing merge pattern (WCP-7).
+
+This pattern merges multiple branches with n-out-of-m synchronization.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:synchronizing_merge(),
+#synchronizing_merge{merge_task_id = <<>>, incoming_task_ids = []} = Pattern.
+```
+""".
 -spec synchronizing_merge() -> #synchronizing_merge{}.
 synchronizing_merge() -> #synchronizing_merge{merge_task_id = <<>>, incoming_task_ids = []}.
 
+-doc """
+Creates a multi-merge pattern (WCP-8).
+
+This pattern merges multiple branches without synchronization.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:multi_merge(),
+#multi_merge{merge_task_id = <<>>, incoming_task_ids = []} = Pattern.
+```
+""".
 -spec multi_merge() -> #multi_merge{}.
 multi_merge() -> #multi_merge{merge_task_id = <<>>, incoming_task_ids = []}.
 
+-doc """
+Creates a discriminator pattern (WCP-9).
+
+This pattern passes control through after the first incoming branch completes.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:discriminator(),
+#discriminator{merge_task_id = <<>>, incoming_task_ids = []} = Pattern.
+```
+""".
 -spec discriminator() -> #discriminator{}.
 discriminator() -> #discriminator{merge_task_id = <<>>, incoming_task_ids = []}.
 
+-doc """
+Creates an arbitration pattern (WCP-10).
+
+This pattern activates after a specified number of incoming branches complete.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:arbitration(),
+#arbitration{merge_task_id = <<>>, incoming_task_ids = [], required_count = 1} = Pattern.
+```
+""".
 -spec arbitration() -> #arbitration{}.
 arbitration() -> #arbitration{merge_task_id = <<>>, incoming_task_ids = [], required_count = 1}.
 
 %% Data Flow Pattern constructors (WDP-1 to WDP-5)
+-doc """
+Creates a parameter passing pattern (WDP-1).
+
+This pattern passes parameters from a source task to a target task.
+
+## Example
+
+```erlang
+%% Create a parameter passing pattern
+Pattern = cre_yawl:param_pass(<<"source">>, <<"target">>),
+#param_pass{source_task_id = <<"source">>, target_task_id = <<"target">>} = Pattern.
+```
+""".
 -spec param_pass(element_id(), element_id()) -> #param_pass{}.
 param_pass(SourceId, TargetId) ->
     #param_pass{source_task_id = SourceId, target_task_id = TargetId, param_name = undefined, transform_fn = undefined}.
 
+-doc """
+Creates a parameter passing pattern with a transformation function or named parameter (WDP-1).
+
+## Examples
+
+```erlang
+%% With a transform function
+Pattern1 = cre_yawl:param_pass(<<"source">>, <<"target">>, fun(X) -> X * 2 end),
+#param_pass{transform_fn = Fn} = Pattern1,
+is_function(Fn, 1).
+
+%% With a named parameter
+Pattern2 = cre_yawl:param_pass(<<"source">>, <<"target">>, {my_param, 0}),
+#param_pass{param_name = my_param} = Pattern2.
+```
+""".
 -spec param_pass(element_id(), element_id(), function() | {atom(), term()}) -> #param_pass{}.
 param_pass(SourceId, TargetId, TransformFn) when is_function(TransformFn, 1) ->
     #param_pass{source_task_id = SourceId, target_task_id = TargetId, param_name = undefined, transform_fn = TransformFn};
 param_pass(SourceId, TargetId, {ParamName, _Default}) when is_atom(ParamName) ->
     #param_pass{source_task_id = SourceId, target_task_id = TargetId, param_name = ParamName, transform_fn = undefined}.
 
+-doc """
+Creates a data transformation pattern (WDP-2).
+
+This pattern transforms data between tasks using an identity function.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:data_transform(<<"input">>, <<"output">>),
+#data_transform{input_task_id = <<"input">>, output_task_id = <<"output">>} = Pattern.
+```
+""".
 -spec data_transform(element_id(), element_id()) -> #data_transform{}.
 data_transform(InputId, OutputId) ->
     TransformFn = fun(X) -> X end,
     #data_transform{input_task_id = InputId, output_task_id = OutputId, transform_fn = TransformFn, output_schema = undefined}.
 
+-doc """
+Creates a data transformation pattern with a custom transform function (WDP-2).
+
+## Example
+
+```erlang
+%% Create a transformation that doubles the value
+Pattern = cre_yawl:data_transform(<<"input">>, <<"output">>, fun(X) -> X * 2 end),
+#data_transform{transform_fn = Fn} = Pattern,
+is_function(Fn, 1).
+```
+""".
 -spec data_transform(element_id(), element_id(), function()) -> #data_transform{}.
 data_transform(InputId, OutputId, TransformFn) when is_function(TransformFn, 1) ->
     #data_transform{input_task_id = InputId, output_task_id = OutputId, transform_fn = TransformFn, output_schema = undefined}.
 
+-doc """
+Creates a data distribution pattern (WDP-3).
+
+This pattern distributes data to multiple recipient tasks using broadcast by default.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:data_distribute([<<"task1">>, <<"task2">>, <<"task3">>]),
+#data_distribute{recipient_task_ids = Recipients} = Pattern,
+length(Recipients) =:= 3.
+```
+""".
 -spec data_distribute([element_id()]) -> #data_distribute{}.
 data_distribute(RecipientIds) ->
     #data_distribute{source_task_id = <<>>, recipient_task_ids = RecipientIds, distribution_type = broadcast}.
 
+-doc """
+Creates a data distribution pattern with source and type (WDP-3).
+
+## Example
+
+```erlang
+Pattern = cre_yawl:data_distribute(<<"source">>, [<<"t1">>, <<"t2">>], round_robin, #{}),
+#data_distribute{source_task_id = <<"source">>, distribution_type = round_robin} = Pattern.
+```
+""".
 -spec data_distribute(element_id(), [element_id()], broadcast | round_robin | partitioned, term()) -> #data_distribute{}.
 data_distribute(SourceId, RecipientIds, DistributionType, _Options) ->
     #data_distribute{source_task_id = SourceId, recipient_task_ids = RecipientIds, distribution_type = DistributionType}.
 
+-doc """
+Creates a data accumulation pattern (WDP-4).
+
+This pattern accumulates data from multiple source tasks using a list aggregator.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:data_accumulate([<<"s1">>, <<"s2">>]),
+#data_accumulate{source_task_ids = [<<"s1">>, <<"s2">>]} = Pattern.
+```
+""".
 -spec data_accumulate([element_id()]) -> #data_accumulate{}.
 data_accumulate(SourceIds) ->
     AggFn = fun(Acc, X) -> [X | Acc] end,
     #data_accumulate{source_task_ids = SourceIds, target_task_id = <<>>, aggregation_fn = AggFn, initial_value = []}.
 
+-doc """
+Creates a data accumulation pattern with custom aggregator (WDP-4).
+
+## Example
+
+```erlang
+%% Sum accumulation
+AggFn = fun(Acc, X) -> Acc + X end,
+Pattern = cre_yawl:data_accumulate([<<"s1">>], <<"target">>, AggFn, 0),
+#data_accumulate{initial_value = 0} = Pattern.
+```
+""".
 -spec data_accumulate([element_id()], element_id(), function(), term()) -> #data_accumulate{}.
 data_accumulate(SourceIds, TargetId, AggFn, InitialValue) when is_function(AggFn, 2) ->
     #data_accumulate{source_task_ids = SourceIds, target_task_id = TargetId, aggregation_fn = AggFn, initial_value = InitialValue}.
 
+-doc """
+Creates a data visibility pattern (WDP-5).
+
+This pattern controls the visibility scope of data within the workflow.
+
+## Example
+
+```erlang
+%% Local scope visibility
+Pattern = cre_yawl:data_visibility(<<"data1">>, local),
+#data_visibility{scope = local} = Pattern.
+```
+""".
 -spec data_visibility(element_id(), local | branch | global) -> #data_visibility{}.
 data_visibility(DataId, Scope) ->
     #data_visibility{data_task_id = DataId, scope = Scope, access_list = undefined}.
 
+-doc """
+Creates a data visibility pattern with access list (WDP-5).
+
+## Example
+
+```erlang
+%% Branch scope with specific access list
+Pattern = cre_yawl:data_visibility(<<"data1">>, branch, [<<"task1">>, <<"task2">>]),
+#data_visibility{scope = branch, access_list = [<<"task1">>, <<"task2">>]} = Pattern.
+```
+""".
 -spec data_visibility(element_id(), local | branch | global, [element_id()]) -> #data_visibility{}.
 data_visibility(DataId, Scope, AccessList) when is_list(AccessList) ->
     #data_visibility{data_task_id = DataId, scope = Scope, access_list = AccessList}.
 
 %% Resource Pattern constructors (WRP-1 to WRP-5)
+-doc """
+Creates a resource creation pattern (WRP-1).
+
+This pattern defines the creation of a new workflow resource.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:resource_create(database_connection),
+#resource_create{resource_type = database_connection} = Pattern.
+```
+""".
 -spec resource_create(atom()) -> #resource_create{}.
 resource_create(ResourceType) ->
     #resource_create{resource_id = <<>>, resource_type = ResourceType, init_params = #{}}.
 
+-doc """
+Creates a role allocation pattern (WRP-2).
+
+This pattern defines how resources are allocated based on roles.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:role_allocate(admin, root_access),
+#role_allocate{role_id = admin, allocation_strategy = first_fit} = Pattern.
+```
+""".
 -spec role_allocate(atom(), term()) -> #role_allocate{}.
 role_allocate(RoleId, Capability) ->
     #role_allocate{role_id = RoleId, required_capability = Capability, allocation_strategy = first_fit}.
 
+-doc """
+Creates a resource start pattern (WRP-3).
+
+This pattern defines the startup parameters for a resource.
+
+## Example
+
+```erlang
+Pattern = cre_yawl:resource_start(<<"my_resource">>),
+#resource_start{resource_id = <<"my_resource">>} = Pattern.
+```
+""".
 -spec resource_start(element_id()) -> #resource_start{}.
 resource_start(ResourceId) ->
     #resource_start{resource_id = ResourceId, start_params = #{}}.
 
+-doc """
+Creates a role distribution pattern (WRP-4).
+
+This pattern distributes work items based on role assignments.
+
+## Example
+
+```erlang
+Assignments = #{admin => [<<"task1">>], user => [<<"task2">>]},
+Pattern = cre_yawl:role_distribute([<<"task1">>, <<"task2">>], Assignments),
+#role_distribute{distribution_policy = round_robin} = Pattern.
+```
+""".
 -spec role_distribute([element_id()], map()) -> #role_distribute{}.
 role_distribute(WorkItemIds, RoleAssignments) ->
     #role_distribute{work_item_ids = WorkItemIds, role_assignments = RoleAssignments, distribution_policy = round_robin}.
 
+-doc """
+Creates a capability allocation pattern (WRP-5).
+
+This pattern allocates resources based on capability requirements.
+
+## Example
+
+```erlang
+Caps = #{cpu => 4, memory => 8192},
+Registry = [node1, node2, node3],
+Pattern = cre_yawl:capability_allocate(Caps, Registry),
+#capability_allocate{matching_strategy = exact_match} = Pattern.
+```
+""".
 -spec capability_allocate(map(), [term()]) -> #capability_allocate{}.
 capability_allocate(Capabilities, Registry) ->
     #capability_allocate{required_capabilities = Capabilities, resource_registry = Registry, matching_strategy = exact_match}.
@@ -1737,3 +2291,338 @@ check_scope_visibility(branch, _DataId, _RequestingTaskId, _Input) ->
     ok;
 check_scope_visibility(global, _DataId, _RequestingTaskId, _Input) ->
     ok.
+
+%%====================================================================
+%% Human-in-the-Loop Wrapper Functions (Delegates to yawl_approval)
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Requests approval for a workflow task.
+%%
+%% Creates an approval checkpoint and requests approval from the specified
+%% approver. Delegates to yawl_approval:create_checkpoint.
+%%
+%% @param Workflow The workflow record or workflow ID.
+%% @param TaskId The ID of the task requiring approval.
+%% @param Approver The approver identifier (pid, name, or role).
+%% @return {ok, CheckpointId} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec request_approval(Workflow :: #workflow{} | binary(), TaskId :: binary(),
+                      Approver :: term()) -> {ok, binary()} | {error, term()}.
+
+request_approval(#workflow{id = WorkflowId}, TaskId, Approver) ->
+    request_approval(WorkflowId, TaskId, Approver);
+request_approval(WorkflowId, TaskId, Approver) when is_binary(WorkflowId) ->
+    case whereis(yawl_approval) of
+        undefined ->
+            {error, {approval_not_started, yawl_approval}};
+        _Pid ->
+            StepName = binary_to_atom(TaskId, utf8),
+            Context = #{
+                workflow_id => WorkflowId,
+                task_id => TaskId,
+                approver => Approver
+            },
+            Options = #{
+                required_approver => human,
+                timeout => 300000,
+                context => Context
+            },
+            yawl_approval:create_checkpoint(WorkflowId, StepName, Options)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Approves a pending workflow task.
+%%
+%% Records approval for a task awaiting human approval.
+%% Delegates to yawl_approval:approve.
+%%
+%% @param Workflow The workflow record or workflow ID.
+%% @param TaskId The ID of the task to approve.
+%% @param Approver The approver identifier.
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec approve_task(Workflow :: #workflow{} | binary(), TaskId :: binary(),
+                  Approver :: term()) -> ok | {error, term()}.
+
+approve_task(#workflow{id = WorkflowId}, TaskId, Approver) ->
+    approve_task(WorkflowId, TaskId, Approver);
+approve_task(WorkflowId, TaskId, Approver) when is_binary(WorkflowId) ->
+    case whereis(yawl_approval) of
+        undefined ->
+            {error, {approval_not_started, yawl_approval}};
+        _Pid ->
+            CheckpointId = checkpoint_id_for_task(WorkflowId, TaskId),
+            Reason = <<"Task approved by ", (to_binary(Approver))/binary>>,
+            yawl_approval:approve(CheckpointId, Approver, Reason)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Rejects a pending workflow task.
+%%
+%% Records denial for a task awaiting human approval.
+%% Delegates to yawl_approval:deny.
+%%
+%% @param Workflow The workflow record or workflow ID.
+%% @param TaskId The ID of the task to reject.
+%% @param Rejector The rejector identifier.
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec reject_task(Workflow :: #workflow{} | binary(), TaskId :: binary(),
+                  Rejector :: term()) -> ok | {error, term()}.
+
+reject_task(#workflow{id = WorkflowId}, TaskId, Rejector) ->
+    reject_task(WorkflowId, TaskId, Rejector);
+reject_task(WorkflowId, TaskId, Rejector) when is_binary(WorkflowId) ->
+    case whereis(yawl_approval) of
+        undefined ->
+            {error, {approval_not_started, yawl_approval}};
+        _Pid ->
+            CheckpointId = checkpoint_id_for_task(WorkflowId, TaskId),
+            Reason = <<"Task rejected by ", (to_binary(Rejector))/binary>>,
+            yawl_approval:deny(CheckpointId, Rejector, Reason)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Gets the approval status for a workflow task.
+%%
+%% Returns the current approval status for a task.
+%% Delegates to yawl_approval:check_status.
+%%
+%% @param Workflow The workflow record or workflow ID.
+%% @param TaskId The ID of the task to check.
+%% @return {ok, Status} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_approval_status(Workflow :: #workflow{} | binary(), TaskId :: binary()) ->
+          {ok, yawl_approval:approval_status()} | {error, term()}.
+
+get_approval_status(#workflow{id = WorkflowId}, TaskId) ->
+    get_approval_status(WorkflowId, TaskId);
+get_approval_status(WorkflowId, TaskId) when is_binary(WorkflowId) ->
+    case whereis(yawl_approval) of
+        undefined ->
+            {error, {approval_not_started, yawl_approval}};
+        _Pid ->
+            CheckpointId = checkpoint_id_for_task(WorkflowId, TaskId),
+            yawl_approval:check_status(CheckpointId)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Cancels a pending approval for a workflow task.
+%%
+%% Cancels an approval checkpoint that is pending.
+%% Delegates to yawl_approval:cancel_checkpoint.
+%%
+%% @param Workflow The workflow record or workflow ID.
+%% @param TaskId The ID of the task to cancel approval for.
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec cancel_approval(Workflow :: #workflow{} | binary(), TaskId :: binary()) ->
+          ok | {error, term()}.
+
+cancel_approval(#workflow{id = WorkflowId}, TaskId) ->
+    cancel_approval(WorkflowId, TaskId);
+cancel_approval(WorkflowId, TaskId) when is_binary(WorkflowId) ->
+    case whereis(yawl_approval) of
+        undefined ->
+            {error, {approval_not_started, yawl_approval}};
+        _Pid ->
+            CheckpointId = checkpoint_id_for_task(WorkflowId, TaskId),
+            yawl_approval:cancel_checkpoint(CheckpointId)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Enables telemetry collection for YAWL workflows (no options).
+%%
+%% Starts the yawl_otel_logger gen_server if not already running.
+%%
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec enable_telemetry() -> ok | {error, term()}.
+
+enable_telemetry() ->
+    enable_telemetry(#{}).
+
+%%--------------------------------------------------------------------
+%% @doc Enables telemetry collection for YAWL workflows (with options).
+%%
+%% Starts the yawl_otel_logger gen_server if not already running.
+%%
+%% @param Options Optional parameters for telemetry configuration
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec enable_telemetry(Options :: map()) -> ok | {error, term()}.
+
+enable_telemetry(Options) when is_map(Options) ->
+    case whereis(yawl_otel_logger) of
+        undefined ->
+            %% Start the telemetry server
+            case yawl_otel_logger:start_link(Options) of
+                {ok, _Pid} -> ok;
+                {error, {already_started, _Pid}} -> ok;
+                Error -> Error
+            end;
+        _Pid ->
+            ok
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Disables telemetry collection for YAWL workflows.
+%%
+%% Stops the yawl_otel_logger gen_server.
+%%
+%% @return ok | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec disable_telemetry() -> ok | {error, term()}.
+
+disable_telemetry() ->
+    case whereis(yawl_otel_logger) of
+        undefined -> ok;
+        Pid -> gen_server:stop(Pid)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Gets workflow metrics from the telemetry system.
+%%
+%% @param Workflow The workflow record or workflow ID
+%% @return Map of workflow metrics or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_workflow_metrics(Workflow :: #workflow{} | binary()) ->
+          {ok, map()} | {error, term()}.
+
+get_workflow_metrics(#workflow{id = WorkflowId}) ->
+    get_workflow_metrics(WorkflowId);
+get_workflow_metrics(WorkflowId) when is_binary(WorkflowId) ->
+    case whereis(yawl_otel_logger) of
+        undefined ->
+            {error, telemetry_not_started};
+        _Pid ->
+            %% Get events for this workflow
+            AllEvents = yawl_otel_logger:get_events(),
+            WorkflowEvents = maps:filter(
+                fun(#otel_event{trace_id = Trace}) ->
+                    binary:match(WorkflowId, Trace) orelse
+                        (WorkflowId =:= Trace)
+                end,
+                AllEvents
+            ),
+            {ok, #{
+                event_count => maps:size(WorkflowEvents),
+                events => WorkflowEvents
+            }}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Logs a workflow event.
+%%
+%% @param Workflow The workflow record or workflow ID
+%% @param Event The event type (binary or atom)
+%% @param Message The event message
+%% @return ok
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec log_workflow_event(Workflow :: #workflow{} | binary(),
+                         Event :: binary() | atom(),
+                         Message :: binary()) -> ok.
+
+log_workflow_event(#workflow{id = WorkflowId}, Event, Message) ->
+    log_workflow_event(WorkflowId, Event, Message);
+log_workflow_event(WorkflowId, Event, Message) when is_binary(WorkflowId) ->
+    case whereis(yawl_otel_logger) of
+        undefined -> ok;
+        _Pid ->
+            Attributes = #{
+                workflow_id => WorkflowId,
+                event_type => Event,
+                message => Message,
+                timestamp => erlang:system_time(millisecond)
+            },
+            yawl_otel_logger:log_event(Event, Message, Attributes)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Logs a workflow event with attributes.
+%%
+%% @param Workflow The workflow record or workflow ID
+%% @param Event The event type (binary or atom)
+%% @param Message The event message
+%% @param Attributes Additional event attributes
+%% @return ok
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec log_workflow_event(Workflow :: #workflow{} | binary(),
+                         Event :: binary() | atom(),
+                         Message :: binary(),
+                         Attributes :: map()) -> ok.
+
+log_workflow_event(#workflow{id = WorkflowId}, Event, Message, Attributes) ->
+    log_workflow_event(WorkflowId, Event, Message, Attributes);
+log_workflow_event(WorkflowId, Event, Message, Attributes)
+  when is_binary(WorkflowId), is_map(Attributes) ->
+    case whereis(yawl_otel_logger) of
+        undefined -> ok;
+        _Pid ->
+            BaseAttrs = #{
+                workflow_id => WorkflowId,
+                event_type => Event,
+                message => Message,
+                timestamp => erlang:system_time(millisecond)
+            },
+            MergedAttrs = maps:merge(BaseAttrs, Attributes),
+            yawl_otel_logger:log_event(Event, Message, MergedAttrs)
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Generates a checkpoint ID for a workflow task.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec checkpoint_id_for_task(WorkflowId :: binary(), TaskId :: binary()) -> binary().
+checkpoint_id_for_task(WorkflowId, TaskId) ->
+    <<WorkflowId/binary, ":", TaskId/binary>>.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Converts a term to binary.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec to_binary(term()) -> binary().
+to_binary(B) when is_binary(B) -> B;
+to_binary(A) when is_atom(A) -> atom_to_binary(A, utf8);
+to_binary(I) when is_integer(I) -> integer_to_binary(I);
+to_binary(L) when is_list(L) -> list_to_binary(L);
+to_binary(T) -> list_to_binary(io_lib:format("~p", [T])).
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+%% @doc Runs doctests for the module
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+-endif.

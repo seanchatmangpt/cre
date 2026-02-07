@@ -1,0 +1,93 @@
+@startuml CRE Workflow Creation and Execution
+!theme plain
+title CRE Workflow Creation and Execution Sequence Diagram
+
+participant "Client" as client
+participant "cre_client" as cre_client
+participant "CRE Master" as master
+participant "gen_pnet" as gen_pnet
+participant "Worker" as worker
+participant "CRE Master" as master2
+participant "Client" as client2
+
+autonumber
+
+group "Workflow Submission"
+    client -> cre_client: start_link(CRE_Name, ClientMod, UsrInfo)
+    activate cre_client
+    cre_client -> master: get_status(cre_name)
+    activate master
+    master -> master: update_worker_pool()
+    master --> cre_client: #{status => ready, load => Load}
+    deactivate master
+    
+    client -> cre_client: eval(Workflow)
+    cre_client -> cre_client: generate_case_id()
+    cre_client -> cre_client: init_request_map(CaseId)
+end
+
+group "Case Creation & Task Distribution"
+    cre_client -> master: create_case(Workflow, CaseId)
+    activate master
+    master -> master: validate_workflow()
+    master -> gen_pnet: start_net(Workflow)
+    activate gen_pnet
+    gen_pnet -> gen_pnet: init_marking()
+    gen_pnet --> master: {ok, CaseState}
+    deactivate gen_pnet
+    
+    master -> master: identify_ready_tasks()
+    master -> master: select_worker(pnet_choice)
+    master -> worker: request_task(CaseId, TaskId)
+    activate worker
+    worker -> worker: accept_task()
+    worker --> master: {accepted, WorkerId}
+    deactivate worker
+    deactivate master
+    
+    master --> cre_client: {case_created, CaseId}
+    deactivate cre_client
+end
+
+group "Task Execution"
+    worker -> gen_pnet: execute_task(TaskId, WorkerId)
+    activate gen_pnet
+    gen_pnet -> gen_pnet: update_marking(TaskId)
+    gen_pnet -> gen_pnet: produce_output_tokens()
+    gen_pnet --> worker: {task_ready, Result}
+    deactivate gen_pnet
+end
+
+group "Result Collection"
+    worker -> master: complete_task(CaseId, TaskId, Result)
+    activate master
+    master -> gen_pnet: update_case_state(CaseId, TaskResult)
+    activate gen_pnet
+    gen_pnet -> gen_pnet: check_completion()
+    gen_pnet --> master: {status, Status}
+    deactivate gen_pnet
+    
+    master -> master: collect_all_results(CaseId)
+    master --> worker: {continue, NextTasks}
+    deactivate worker
+    
+    master --> cre_client: {results, Results}
+    deactivate master
+    deactivate cre_client
+end
+
+group "Completion Notification"
+    cre_client -> client: workflow_complete(Results)
+    activate client
+    client -> client: handle_results()
+    deactivate client
+end
+
+note right of gen_pnet
+    Petri Net State Management:
+    - Token consumption/production
+    - Marking algebra operations
+    - Transition firing logic
+end note
+
+@enduml

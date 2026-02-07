@@ -35,19 +35,6 @@
 %%   <li><b>Real-time Tracking:</b> Track costs as workflows execute</li>
 %% </ul>
 %%
-%% <h3>Usage</h3>
-%%
-%% <pre>
-%% %% Assign a cost to a task
-%% yawl_cost:assign_cost(<<"case_123">>, <<"task_456">>, execution_cost, 100).
-%%
-%% %% Get total cost for a case
-%% {ok, TotalCost} = yawl_cost:get_case_cost(<<"case_123">>).
-%%
-%% %% Generate cost report
-%% {ok, Report} = yawl_cost:generate_cost_report(<<"case_123">>, <<"USD">>).
-%% </pre>
-%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -102,7 +89,8 @@
          %% Management
          reset_costs/0,
          reset_case_costs/1,
-         archive_costs/1]).
+         archive_costs/1,
+         doctest_test/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -211,12 +199,6 @@ stop() ->
 
 %%--------------------------------------------------------------------
 %% @doc Assigns a cost to a case/task.
-%%
-%% @param CaseId The case identifier.
-%% @param TaskId The task identifier (optional).
-%% @param CostType The type of cost.
-%% @param Amount The cost amount.
-%% @return ok
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -530,6 +512,55 @@ reset_case_costs(CaseId) ->
 
 archive_costs(CaseId) ->
     gen_server:call(?MODULE, {archive_costs, CaseId}).
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the yawl_cost module.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Resource rate operations
+    {ok, _Pid} = start_link(),
+    ok = set_resource_rate(<<"worker_1">>, 50.0, <<"USD">>),
+    {ok, 50.0} = get_resource_rate(<<"worker_1">>),
+    {error, not_found} = get_resource_rate(<<"nonexistent">>),
+
+    %% Test 2: List and clear resource rates
+    Rates = list_resource_rates(),
+    true = is_map(Rates),
+    {50.0, <<"USD">>} = maps:get(<<"worker_1">>, Rates),
+    ok = clear_resource_rate(<<"worker_1">>),
+    {error, not_found} = get_resource_rate(<<"worker_1">>),
+
+    %% Test 3: Set multiple resource rates
+    ok = set_resource_rate(<<"server_a">>, 100.0, <<"USD">>),
+    ok = set_resource_rate(<<"server_b">>, 75.0, <<"EUR">>),
+    Rates2 = list_resource_rates(),
+    2 = map_size(Rates2),
+
+    %% Test 4: Exchange rate operations
+    ok = set_exchange_rate(<<"BTC">>, <<"USD">>, 45000.0),
+    {ok, 450000.0} = convert_currency(10.0, <<"BTC">>, <<"USD">>),
+
+    %% Test 5: Get supported currencies
+    Currencies = get_supported_currencies(),
+    true = is_list(Currencies),
+    true = lists:member(<<"USD">>, Currencies),
+    true = lists:member(<<"EUR">>, Currencies),
+
+    %% Test 6: Cost summary
+    Summary = get_cost_summary(),
+    true = is_map(Summary),
+    +0.0 = maps:get(total_cost, Summary),
+    0 = maps:get(total_entries, Summary),
+
+    %% Test 7: Reset costs
+    ok = reset_costs(),
+
+    %% Cleanup
+    ok = stop().
 
 %%====================================================================
 %% gen_server Callback Functions

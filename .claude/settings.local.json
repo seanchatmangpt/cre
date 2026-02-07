@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(~/ggen/ggen-binary sync:*)"
-    ]
-  }
-}

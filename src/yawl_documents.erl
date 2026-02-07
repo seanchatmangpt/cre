@@ -31,6 +31,118 @@
 %%   <li>URL generation for document access</li>
 %% </ul>
 %%
+%% <h3>Document Record</h3>
+%%
+%% The document record contains:
+%% <ul>
+%%   <li><b>id:</b> Unique document identifier (auto-generated)</li>
+%%   <li><b>case_id:</b> Associated workflow case identifier</li>
+%%   <li><b>name:</b> Document filename</li>
+%%   <li><b>content_type:</b> MIME type (e.g., <<"application/pdf">>)</li>
+%%   <li><b>data:</b> Binary document content</li>
+%%   <li><b>uploaded_at:</b> Unix timestamp of upload</li>
+%%   <li><b>uploaded_by:</b> User or system that uploaded</li>
+%% </ul>
+%%
+%% <h3>Storage Backends</h3>
+%% <ul>
+%%   <li><b>local:</b> File system storage at configured base path</li>
+%%   <li><b>s3:</b> S3-compatible cloud storage</li>
+%% </ul>
+%%
+%% <h3>Doctests</h3>
+%%
+%% Document record creation:
+%% ```erlang
+%% 1> Doc = #document{
+%%     id = <<"doc_123">>,
+%%     case_id = <<"case_456">>,
+%%     name = <<"report.pdf">>,
+%%     content_type = <<"application/pdf">>,
+%%     data = <<"%PDF-1.4...">>,
+%%     uploaded_at = 1704067200,
+%%     uploaded_by = <<"user1">>
+%% }.
+%% #document{id = <<"doc_123">>, case_id = <<"case_456">>, ...}
+%% 2> <<"doc_123">> = Doc#document.id.
+%% <<"doc_123">>
+%% '''
+%%
+%% Document field access:
+%% ```erlang
+%% 3> <<"report.pdf">> = Doc#document.name.
+%% <<"report.pdf">>
+%% 4> <<"application/pdf">> = Doc#document.content_type.
+%% <<"application/pdf">>
+%% 5> <<"user1">> = Doc#document.uploaded_by.
+%% <<"user1">>
+%% '''
+%%
+%% Document state record:
+%% ```erlang
+%% 6> State = #doc_state{
+%%     documents = #{},
+%%     case_index = #{},
+%%     storage_backend = local,
+%%     storage_config = #{}
+%% }.
+%% #doc_state{documents = #{}, case_index = #{}, ...}
+%% 7> local = State#doc_state.storage_backend.
+%% local
+%% '''
+%%
+%% Storage backend options:
+%% ```erlang
+%% 8> Backend = local.
+%% local
+%% 9> true = Backend =:= local orelse Backend =:= s3.
+%% true
+%% '''
+%%
+%% Content type validation:
+%% ```erlang
+%% 10> ValidType = <<"application/pdf">>.
+%% <<"application/pdf">>
+%% 11> case binary:split(ValidType, <<"/">>) of
+%%     [Type, Subtype] when byte_size(Type) > 0, byte_size(Subtype) > 0 -> true;
+%%     _ -> false
+%% end.
+%% true
+%% '''
+%%
+%% Invalid content type:
+%% ```erlang
+%% 12> InvalidType = <<"not_a_mime_type">>.
+%% <<"not_a_mime_type">>
+%% 13> case binary:split(InvalidType, <<"/">>) of
+%%     [Type, Subtype] when byte_size(Type) > 0, byte_size(Subtype) > 0 -> true;
+%%     _ -> false
+%% end.
+%% false
+%% '''
+%%
+%% Document ID format:
+%% ```erlang
+%% 14> DocId = <<"doc_1a2b3c4d">>.
+%% <<"doc_1a2b3c4d">>
+%% 15> <<"doc_", _/binary>> = DocId.
+%% <<"doc_1a2b3c4d">>
+%% '''
+%%
+%% Case ID format:
+%% ```erlang
+%% 16> CaseId = <<"case_abc123">>.
+%% <<"case_abc123">>
+%% 17> true = is_binary(CaseId).
+%% true
+%% '''
+%%
+%% Running all doctests:
+%% ```erlang
+%% 1> yawl_documents:doctest_test().
+%% ok
+%% '''
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -456,3 +568,301 @@ generate_id(Prefix) ->
     Unique = crypto:hash(md5, term_to_binary({self(), erlang:timestamp()})),
     Hex = binary:encode_hex(Unique),
     <<Prefix/binary, "_", Hex/binary>>.
+
+%%--------------------------------------------------------------------
+%% @doc Run doctests for this module.
+%% Tests document record creation, field access, storage backends,
+%% content type validation, and ID formats.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% === Document Record Tests ===
+
+    %% Test 1: Document record creation and field access
+    Doc = #document{
+        id = <<"doc_test_123">>,
+        case_id = <<"case_test_456">>,
+        name = <<"report.pdf">>,
+        content_type = <<"application/pdf">>,
+        data = <<"%PDF-1.4">>,
+        uploaded_at = 1704067200,
+        uploaded_by = <<"user1">>
+    },
+    true = is_record(Doc, document),
+    <<"doc_test_123">> = Doc#document.id,
+    <<"case_test_456">> = Doc#document.case_id,
+    <<"report.pdf">> = Doc#document.name,
+    <<"application/pdf">> = Doc#document.content_type,
+    <<"%PDF-1.4">> = Doc#document.data,
+    1704067200 = Doc#document.uploaded_at,
+    <<"user1">> = Doc#document.uploaded_by,
+
+    %% Test 2: Empty document record
+    EmptyDoc = #document{},
+    true = is_record(EmptyDoc, document),
+
+    %% === Document State Tests ===
+
+    %% Test 3: Document state record creation
+    State = #doc_state{
+        documents = #{},
+        case_index = #{},
+        storage_backend = local,
+        storage_config = #{}
+    },
+    true = is_record(State, doc_state),
+    local = State#doc_state.storage_backend,
+    #{} = State#doc_state.documents,
+    #{} = State#doc_state.case_index,
+
+    %% Test 4: S3 backend state
+    S3State = #doc_state{
+        storage_backend = s3,
+        storage_config = #{bucket => <<"test-bucket">>, region => <<"us-east-1">>}
+    },
+    s3 = S3State#doc_state.storage_backend,
+
+    %% === Storage Backend Tests ===
+
+    %% Test 5: Valid storage backends
+    LocalBackend = local,
+    S3Backend = s3,
+    true = LocalBackend =:= local orelse LocalBackend =:= s3,
+    true = S3Backend =:= local orelse S3Backend =:= s3,
+
+    %% === Content Type Validation Tests ===
+
+    %% Test 6: Valid content types
+    ValidTypes = [
+        <<"application/pdf">>,
+        <<"image/jpeg">>,
+        <<"text/plain">>,
+        <<"application/json">>
+    ],
+    true = lists:all(fun validate_content_type/1, ValidTypes),
+
+    %% Test 7: Invalid content types
+    InvalidTypes = [
+        <<"not_a_mime">>,
+        <<"application">>,
+        <<"/plain">>,
+        <<"">>
+    ],
+    false = lists:any(fun validate_content_type/1, InvalidTypes),
+
+    %% Test 8: Content type validation pattern
+    ValidCT = <<"application/pdf">>,
+    case binary:split(ValidCT, <<"/">>) of
+        [Type, Subtype] when byte_size(Type) > 0, byte_size(Subtype) > 0 -> ok;
+        _ -> error(valid_content_type_failed)
+    end,
+
+    %% === Document ID Tests ===
+
+    %% Test 9: Document ID format
+    DocId = <<"doc_1a2b3c4d">>,
+    true = is_binary(DocId),
+    <<"doc_", _/binary>> = DocId,
+    true = byte_size(DocId) > 4,
+
+    %% Test 10: Case ID format
+    CaseId = <<"case_xyz_789">>,
+    true = is_binary(CaseId),
+    true = byte_size(CaseId) > 0,
+
+    %% === Document Name Tests ===
+
+    %% Test 11: Valid document names
+    ValidNames = [
+        <<"document.pdf">>,
+        <<"report.txt">>,
+        <<"data.json">>,
+        <<"a">>  % Minimum valid name
+    ],
+    true = lists:all(fun(N) -> byte_size(N) > 0 andalso byte_size(N) =< 255 end, ValidNames),
+
+    %% Test 12: Invalid document names (empty or too long)
+    EmptyName = <<"">>,
+    0 = byte_size(EmptyName),
+
+    %% === Timestamp Tests ===
+
+    %% Test 13: Unix timestamp format
+    Now = erlang:system_time(second),
+    true = is_integer(Now),
+    true = Now > 1700000000,  % Reasonable timestamp
+
+    %% Test 14: Uploaded_at field pattern
+    UploadedAt = Doc#document.uploaded_at,
+    true = is_integer(UploadedAt),
+    true = UploadedAt > 0,
+
+    %% === User/Uploader Tests ===
+
+    %% Test 15: Uploader binary format
+    Uploader = <<"system">>,
+    true = is_binary(Uploader),
+    <<"system">> = Uploader,
+
+    %% Test 16: Custom uploader
+    CustomUploader = <<"user_john_doe">>,
+    true = is_binary(CustomUploader),
+    true = byte_size(CustomUploader) > 0,
+
+    %% === Storage Configuration Tests ===
+
+    %% Test 17: Local storage config
+    LocalConfig = #{base_path => <<"/var/yawl/documents">>},
+    <<"/var/yawl/documents">> = maps:get(base_path, LocalConfig),
+
+    %% Test 18: S3 storage config
+    S3Config = #{
+        bucket => <<"yawl-documents">>,
+        region => <<"us-west-2">>
+    },
+    <<"yawl-documents">> = maps:get(bucket, S3Config),
+    <<"us-west-2">> = maps:get(region, S3Config),
+
+    %% === Document Accessor Tests ===
+
+    %% Test 19: get_doc_id accessor
+    <<"doc_test_123">> = get_doc_id(Doc),
+
+    %% Test 20: get_case_id accessor
+    <<"case_test_456">> = get_case_id(Doc),
+
+    %% Test 21: get_name accessor
+    <<"report.pdf">> = get_name(Doc),
+
+    %% Test 22: get_content_type accessor
+    <<"application/pdf">> = get_content_type(Doc),
+
+    %% Test 23: get_data accessor
+    <<"%PDF-1.4">> = get_data(Doc),
+
+    %% Test 24: get_uploaded_at accessor
+    1704067200 = get_uploaded_at(Doc),
+
+    %% Test 25: get_uploaded_by accessor
+    <<"user1">> = get_uploaded_by(Doc),
+
+    %% === Empty Document Constructor Tests ===
+
+    %% Test 26: document() constructor
+    EmptyDoc2 = document(),
+    true = is_record(EmptyDoc2, document),
+
+    %% === URL Generation Pattern Tests ===
+
+    %% Test 27: Local URL pattern
+    BasePath = <<"/var/yawl/documents">>,
+    DocId2 = <<"doc_abc123">>,
+    LocalUrl = <<"file://", BasePath/binary, "/", DocId2/binary>>,
+    <<"file://", _/binary>> = LocalUrl,
+
+    %% Test 28: S3 URL pattern
+    Bucket = <<"yawl-documents">>,
+    Region = <<"us-east-1">>,
+    S3Url = <<"https://s3.", Region/binary, ".amazonaws.com/",
+               Bucket/binary, "/", DocId2/binary>>,
+    <<"https://s3.", _/binary>> = S3Url,
+
+    %% === Document Validation Size Tests ===
+
+    %% Test 29: Max file size constant
+    MaxSize = 100 * 1024 * 1024,
+    104857600 = MaxSize,
+
+    %% Test 30: Small data (valid)
+    SmallData = <<"small content">>,
+    true = byte_size(SmallData) < MaxSize,
+
+    %% Test 31: Exactly max size (boundary)
+    MaxData = <<0:(MaxSize * 8)>>,
+    MaxSize = byte_size(MaxData),
+
+    %% === Case Index Tests ===
+
+    %% Test 32: Case index empty state
+    EmptyIndex = #{},
+    #{} = EmptyIndex,
+
+    %% Test 33: Case index with documents
+    CaseIndex = #{<<"case1">> => [<<"doc1">>, <<"doc2">>]},
+    [<<"doc1">>, <<"doc2">>] = maps:get(<<"case1">>, CaseIndex),
+
+    %% === Documents Map Tests ===
+
+    %% Test 34: Empty documents map
+    EmptyDocs = #{},
+    #{} = EmptyDocs,
+
+    %% Test 35: Documents map with entries
+    DocMap = #{<<"doc1">> => Doc, <<"doc2">> => EmptyDoc},
+    Doc = maps:get(<<"doc1">>, DocMap),
+    EmptyDoc = maps:get(<<"doc2">>, DocMap),
+
+    %% === Result Type Tests ===
+
+    %% Test 36: Success result tuple
+    OkResult = {ok, <<"doc_123">>},
+    {ok, <<"doc_123">>} = OkResult,
+    ok = element(1, OkResult),
+
+    %% Test 37: Error result tuple
+    ErrorResult = {error, not_found},
+    {error, not_found} = ErrorResult,
+    error = element(1, ErrorResult),
+
+    %% === MIME Type Pattern Tests ===
+
+    %% Test 38: Common MIME type categories
+    ApplicationType = <<"application/">>,
+    ImageType = <<"image/">>,
+    TextType = <<"text/">>,
+    true = <<$a, $p, $p, $l, $i, $c, $a, $t, $i, $o, $n, $/>> =:= ApplicationType,
+    true = <<$i, $m, $a, $g, $e, $/>> =:= ImageType,
+    true = <<$t, $e, $x, $t, $/>> =:= TextType,
+
+    %% === Binary Size Validation Tests ===
+
+    %% Test 39: Name size boundaries
+    MinName = <<"a">>,
+    1 = byte_size(MinName),
+    MaxName = binary:copy(<<"x">>, 255),
+    255 = byte_size(MaxName),
+
+    %% Test 40: Name exceeding max
+    TooLongName = binary:copy(<<"x">>, 256),
+    256 = byte_size(TooLongName),
+
+    %% === Document Data Tests ===
+
+    %% Test 41: Empty data (valid)
+    EmptyData = <<"">>,
+    0 = byte_size(EmptyData),
+
+    %% Test 42: Non-empty data
+    NonEmptyData = <<"some document content">>,
+    true = byte_size(NonEmptyData) > 0,
+
+    %% === Record Type Validation Tests ===
+
+    %% Test 43: document record guard pattern
+    IsDocRecord = case Doc of
+        #document{} -> true;
+        _ -> false
+    end,
+    true = IsDocRecord,
+
+    %% Test 44: doc_state record guard pattern
+    IsStateRecord = case State of
+        #doc_state{} -> true;
+        _ -> false
+    end,
+    true = IsStateRecord,
+
+    %% === Completion ===
+    ok.

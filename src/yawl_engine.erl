@@ -30,13 +30,16 @@
 %%   <li>Support for YAWL net elements (InputCondition, OutputCondition, Task)</li>
 %%   <li>AND/OR/XOR split and join semantics</li>
 %%   <li>Integration with CRE master, client, and worker modules</li>
+%%   <li>Marking management via pnet_marking module</li>
 %% </ul>
 %%
 %% <h3>Architecture</h3>
 %%
 %% The engine is implemented as a gen_server that manages workflow cases.
 %% Each case is represented as a Petri net execution with places and
-%% transitions mapped from the YAWL specification.
+%% transitions mapped from the YAWL specification. Marking operations are
+%% handled by the pnet_marking module for consistency with the gen_pnet
+%% framework.
 %%
 %% <h4>YAWL Net Element Mapping:</h4>
 %% <ul>
@@ -49,6 +52,55 @@
 %%   <li><b>Task (OR join):</b> Transition requiring threshold tokens</li>
 %%   <li><b>Task (XOR join):</b> Transition firing on first available token</li>
 %% </ul>
+%%
+%% <h3>Case Lifecycle</h3>
+%%
+%% Workflow cases progress through the following states:
+%%
+%% ```
+%%    [initialized] -> [running] -> [completed]
+%%          |              |
+%%          v              v
+%%      [cancelled]    [suspended] -> [running]
+%%                          |
+%%                          v
+%%                      [cancelled]
+%% '''
+%%
+%% A case starts in `initialized` state, transitions to `running` when
+%% execution begins, and ends in `completed`, `cancelled`, or `failed`.
+%%
+%% <h3>Doctests</h3>
+%%
+%% Basic workflow lifecycle:
+%% ```
+%% 1> {ok, Pid} = yawl_engine:start_link().
+%% {ok, <0.123.0>}
+%% 2> Spec = #{id => <<"test_wf">>, tasks => #{<<"task1">> => #{}}}.
+%% #{id => <<"test_wf">>, tasks => #{<<"task1">> => #{}}}
+%% 3> {ok, CaseId} = yawl_engine:start_workflow(Pid, Spec).
+%% {ok, <<"case_", ...>>}
+%% 4> {ok, State} = yawl_engine:get_case_state(Pid).
+%% {ok, #{status := running, case_id := CaseId}}
+%% 5> ok = yawl_engine:suspend_case(Pid).
+%% ok
+%% 6> ok = yawl_engine:resume_case(Pid).
+%% ok
+%% 7> ok = yawl_engine:cancel_case(Pid).
+%% ok
+%% '''
+%%
+%% Marking operations:
+%% ```
+%% 1> Marking = pnet_marking:new([input, output, task1]).
+%% #marking{...}
+%% 2> {ok, Marking1} = pnet_marking:add(Marking, #{input => [start]}).
+%% {ok, #marking{...}}
+%% 3> {ok, Tokens} = pnet_marking:get(Marking1, input).
+%% {ok, [start]}
+%% 4> {ok, Marking2} = pnet_marking:take(Marking1, #{input => [start]}).
+%% {ok, #marking{...}}
+%% '''
 %%
 %% @end
 %% -------------------------------------------------------------------
@@ -87,11 +139,26 @@
          recover_active_cases/0,
          enable_persistence/0,
          disable_persistence/0,
-         is_persistence_enabled/0]).
+         is_persistence_enabled/0,
+         doctest_test/0]).
+
+%% Marking helper functions using pnet_marking
+-export([get_place_tokens/2,
+         set_place_tokens/3,
+         add_tokens/2,
+         take_tokens/2,
+         apply_transition/3,
+         net_state_hash/1,
+         snapshot_net_state/1]).
 
 %%====================================================================
 %% Types
 %%====================================================================
+
+%% Import types from pnet_marking for marking operations
+-type marking() :: pnet_marking:marking().
+-type place() :: pnet_marking:place().
+-type token() :: pnet_marking:token().
 
 -type case_id() :: binary().
 -type workitem_id() :: binary().
@@ -114,6 +181,13 @@
           assigned_to :: pid() | undefined
          }).
 
+%% Net state uses pnet_marking for marking management
+-record(net_state, {
+          marking :: marking(),
+          places :: [place()],
+          transitions :: map()
+         }).
+
 -record(workflow_case, {
           case_id :: case_id(),
           workflow_id :: workflow_id(),
@@ -124,7 +198,7 @@
           created_at :: integer(),
           started_at :: integer() | undefined,
           completed_at :: integer() | undefined,
-          net_state :: term() | undefined,
+          net_state :: #net_state{} | undefined,
           observers = [] :: [pid()]
          }).
 
@@ -174,6 +248,18 @@ start_link(EngineName) ->
 %% - A cre_yawl workflow record
 %%
 %% Returns `{ok, CaseId}' on success.
+%%
+%% Example:
+%% ```
+%% 1> {ok, Engine} = yawl_engine:start_link().
+%% {ok, <0.123.0>}
+%% 2> Spec = #{id => <<"my_workflow">>,
+%% 2>          tasks => #{<<"step1">> => #{type => atomic}}}.
+%% #{id => <<"my_workflow">>, tasks => #{<<"step1">> => #{type => atomic}}}
+%% 3> {ok, CaseId} = yawl_engine:start_workflow(Engine, Spec).
+%% {ok, <<"case_", ...>>}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec start_workflow(Engine :: atom() | pid(),
@@ -208,6 +294,15 @@ start_workflow(Engine, Spec, Options) ->
 %% All active work items are cancelled and resources are released.
 %%
 %% Returns `ok' on success.
+%%
+%% Example:
+%% ```
+%% 1> ok = yawl_engine:cancel_case(Engine).
+%% ok
+%% 2> {ok, State} = yawl_engine:get_case_state(Engine).
+%% {ok, #{status := cancelled, ...}}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec cancel_case(Engine :: atom() | pid()) ->
@@ -223,6 +318,15 @@ cancel_case(Engine) ->
 %% Active work items are allowed to complete.
 %%
 %% Returns `ok' on success.
+%%
+%% Example:
+%% ```
+%% 1> ok = yawl_engine:suspend_case(Engine).
+%% ok
+%% 2> {ok, State} = yawl_engine:get_case_state(Engine).
+%% {ok, #{status := suspended, ...}}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec suspend_case(Engine :: atom() | pid()) ->
@@ -235,6 +339,15 @@ suspend_case(Engine) ->
 %% @doc Resumes a suspended workflow case.
 %%
 %% Returns `ok' on success.
+%%
+%% Example:
+%% ```
+%% 1> ok = yawl_engine:resume_case(Engine).
+%% ok
+%% 2> {ok, State} = yawl_engine:get_case_state(Engine).
+%% {ok, #{status := running, ...}}
+%% '''
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec resume_case(Engine :: atom() | pid()) ->
@@ -602,6 +715,7 @@ handle_call(get_case_state, _From, #engine_state{cases = Cases} = State) ->
               workitems => maps:map(fun(_K, W) -> workitem_to_map(W) end,
                                     Case#workflow_case.workitems),
               data => Case#workflow_case.data,
+              net_state_hash => net_state_hash(Case#workflow_case.net_state),
               timestamps => #{
                 created_at => Case#workflow_case.created_at,
                 started_at => Case#workflow_case.started_at,
@@ -883,16 +997,34 @@ extract_workflow_id(_Spec) ->
 
 %% @private
 %% @doc Initializes the Petri net for a workflow case.
+%%
+%% Uses pnet_marking module for marking operations.
 -spec initialize_net(term(), #workflow_case{}, atom() | pid() | undefined) ->
           {ok, #workflow_case{}} | {error, term()}.
 
 initialize_net(Spec, Case, _CreMaster) ->
     try
-        %% Create initial marking for InputCondition
-        NetState = #{
-          places => #{input => [start], output => []},
-          transitions => #{},
-          markings => #{input => [start]}
+        %% Define places for this workflow
+        Places = extract_places_from_spec(Spec),
+
+        %% Create initial marking using pnet_marking
+        InitialMarking = pnet_marking:new(Places),
+
+        %% Add initial token to input place
+        MarkingWithToken = case pnet_marking:add(InitialMarking, #{input => [start]}) of
+            {error, _} ->
+                %% Input place not in places, add it
+                Marking0 = pnet_marking:new([input, output | Places]),
+                pnet_marking:add(Marking0, #{input => [start]});
+            UpdatedMarking ->
+                UpdatedMarking
+        end,
+
+        %% Create net state record with pnet_marking
+        NetState = #net_state{
+          marking = MarkingWithToken,
+          places = [input, output | Places],
+          transitions = maps:get(transitions, Spec, #{})
          },
 
         %% Create work items for initial tasks
@@ -906,6 +1038,93 @@ initialize_net(Spec, Case, _CreMaster) ->
         Kind:Reason:Stack ->
             {error, {Kind, Reason, Stack}}
     end.
+
+%% @private
+%% @doc Extracts place atoms from workflow specification.
+-spec extract_places_from_spec(term()) -> [place()].
+
+extract_places_from_spec(#{tasks := Tasks}) when is_map(Tasks) ->
+    %% Convert task IDs to place atoms
+    [binary_to_existing_atom(TaskId, utf8) || TaskId <- maps:keys(Tasks),
+                                               is_binary(TaskId)];
+extract_places_from_spec(_Spec) ->
+    [].
+
+%% @private
+%% @doc Gets tokens from a specific place in the net state marking.
+-spec get_place_tokens(#net_state{}, place()) ->
+          {ok, [token()]} | {error, bad_place}.
+
+get_place_tokens(#net_state{marking = Marking}, Place) ->
+    pnet_marking:get(Marking, Place).
+
+%% @private
+%% @doc Sets tokens at a specific place in the net state marking.
+-spec set_place_tokens(#net_state{}, place(), [token()]) ->
+          #net_state{} | {error, bad_place}.
+
+set_place_tokens(#net_state{marking = Marking} = NetState, Place, Tokens) ->
+    case pnet_marking:set(Marking, Place, Tokens) of
+        {error, _} = Error ->
+            Error;
+        UpdatedMarking ->
+            NetState#net_state{marking = UpdatedMarking}
+    end.
+
+%% @private
+%% @doc Adds tokens to places in the net state marking.
+-spec add_tokens(#net_state{}, #{place() => [token()]}) ->
+          #net_state{} | {error, bad_place}.
+
+add_tokens(#net_state{marking = Marking} = NetState, ProduceMap) ->
+    case pnet_marking:add(Marking, ProduceMap) of
+        {error, _} = Error ->
+            Error;
+        UpdatedMarking ->
+            NetState#net_state{marking = UpdatedMarking}
+    end.
+
+%% @private
+%% @doc Takes (consumes) tokens from places in the net state marking.
+-spec take_tokens(#net_state{}, #{place() => [token()]}) ->
+          {ok, #net_state{}} | {error, bad_place | insufficient}.
+
+take_tokens(#net_state{marking = Marking} = NetState, ConsumeMap) ->
+    case pnet_marking:take(Marking, ConsumeMap) of
+        {error, _} = Error ->
+            Error;
+        {ok, UpdatedMarking} ->
+            {ok, NetState#net_state{marking = UpdatedMarking}}
+    end.
+
+%% @private
+%% @doc Applies a transition (consume + produce) to the net state marking.
+-spec apply_transition(#net_state{}, #{place() => [token()]}, #{place() => [token()]}) ->
+          {ok, #net_state{}} | {error, bad_place | insufficient}.
+
+apply_transition(#net_state{marking = Marking} = NetState, ConsumeMap, ProduceMap) ->
+    case pnet_marking:apply(Marking, ConsumeMap, ProduceMap) of
+        {error, _} = Error ->
+            Error;
+        {ok, UpdatedMarking} ->
+            {ok, NetState#net_state{marking = UpdatedMarking}}
+    end.
+
+%% @private
+%% @doc Computes a hash of the net state marking for state comparison.
+-spec net_state_hash(#net_state{} | undefined) -> binary() | undefined.
+
+net_state_hash(undefined) ->
+    undefined;
+net_state_hash(#net_state{marking = Marking}) ->
+    pnet_marking:hash(Marking).
+
+%% @private
+%% @doc Creates a snapshot (deep copy) of the net state marking.
+-spec snapshot_net_state(#net_state{}) -> #net_state{}.
+
+snapshot_net_state(#net_state{marking = Marking} = NetState) ->
+    NetState#net_state{marking = pnet_marking:snapshot(Marking)}.
 
 %% @private
 %% @doc Initializes work items from workflow specification.
@@ -1244,6 +1463,16 @@ restore_case_from_map(CaseMap) ->
         end, #{}, WorkitemMaps),
 
         %% Reconstruct the workflow case
+        %% Reinitialize net state with pnet_marking
+        Places = extract_places_from_spec(maps:get(spec, CaseMap, #{})),
+        InitialMarking = pnet_marking:new([input, output | Places]),
+
+        RestoredNetState = #net_state{
+            marking = InitialMarking,
+            places = [input, output | Places],
+            transitions = #{}
+        },
+
         RestoredCase = #workflow_case{
             case_id = CaseId,
             workflow_id = maps:get(workflow_id, CaseMap),
@@ -1255,7 +1484,7 @@ restore_case_from_map(CaseMap) ->
             started_at = maps:get(started_at, CaseMap, undefined),
             completed_at = maps:get(completed_at, CaseMap, undefined),
             observers = [],
-            net_state = undefined  %% Net state not persisted, will be re-initialized
+            net_state = RestoredNetState
         },
 
         {ok, RestoredCase}
@@ -1296,3 +1525,109 @@ delete_completed_case(CaseId) ->
                            {reason, ErrorReason}, {stacktrace, Stack}]),
             {error, {Kind, ErrorReason}}
     end.
+
+%%====================================================================
+%% Doctest Support
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the yawl_engine module.
+%%
+%% This function validates the examples in the module documentation.
+%%
+%% Returns `ok' when all tests pass.
+%%
+%% Example:
+%% ```
+%% 1> yawl_engine:doctest_test().
+%% ok
+%% '''
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test basic case ID generation
+    CaseId1 = generate_case_id(1),
+    true = is_binary(CaseId1),
+    true = byte_size(CaseId1) > 4,
+    true = binary:match(CaseId1, <<"case_">>) =/= nomatch,
+
+    %% Test that case IDs are unique
+    CaseId2 = generate_case_id(2),
+    true = CaseId1 =/= CaseId2,
+
+    %% Test workitem ID generation
+    WorkitemId = generate_workitem_id(<<"case_123">>, <<"task_abc">>),
+    true = is_binary(WorkitemId),
+    true = binary:match(WorkitemId, <<"case_123">>) =/= nomatch,
+    true = binary:match(WorkitemId, <<"_wi_">>) =/= nomatch,
+
+    %% Test workflow case status transitions
+    Case = #workflow_case{
+        case_id = <<"test_case">>,
+        workflow_id = <<"test_wf">>,
+        spec = #{},
+        status = running,
+        created_at = erlang:system_time(millisecond)
+    },
+
+    %% Test suspend on running case
+    {ok, SuspendedCase} = suspend_workflow_case(Case),
+    suspended = SuspendedCase#workflow_case.status,
+
+    %% Test resume on suspended case
+    {ok, ResumedCase} = resume_workflow_case(SuspendedCase),
+    running = ResumedCase#workflow_case.status,
+
+    %% Test cancel workflow
+    {ok, CancelledCase} = cancel_workflow_case(ResumedCase),
+    cancelled = CancelledCase#workflow_case.status,
+
+    %% Test marking operations with pnet_marking
+    Marking = pnet_marking:new([input, output, task1]),
+    {ok, Marking1} = pnet_marking:add(Marking, #{input => [start]}),
+    {ok, [start]} = pnet_marking:get(Marking1, input),
+    {ok, Marking2} = pnet_marking:take(Marking1, #{input => [start]}),
+    {ok, []} = pnet_marking:get(Marking2, input),
+
+    %% Test net state hash
+    undefined = net_state_hash(undefined),
+    NetState = #net_state{marking = Marking1, places = [input, output], transitions = #{}},
+    Hash = net_state_hash(NetState),
+    true = is_binary(Hash),
+
+    %% Test workitem status transitions
+    Now = erlang:system_time(millisecond),
+    Workitem = #workitem{
+        id = <<"wi_1">>,
+        case_id = <<"case_1">>,
+        task_id = <<"task_1">>,
+        status = enabled,
+        enabled_at = Now
+    },
+
+    %% Test start enabled workitem
+    {ok, StartedWi} = do_start_workitem(Workitem),
+    started = StartedWi#workitem.status,
+    true = StartedWi#workitem.started_at =/= undefined,
+
+    %% Test complete started workitem
+    {ok, CompletedWi} = do_complete_workitem(StartedWi, #{result => ok}),
+    completed = CompletedWi#workitem.status,
+    true = CompletedWi#workitem.completed_at =/= undefined,
+
+    %% Test fail started workitem
+    {ok, FailedWi} = do_fail_workitem(StartedWi, #{error => test_failure}),
+    failed = FailedWi#workitem.status,
+    true = maps:is_key(error, FailedWi#workitem.data),
+
+    %% Test workitem_to_map conversion
+    WiMap = workitem_to_map(CompletedWi),
+    true = is_map(WiMap),
+    true = maps:is_key(id, WiMap),
+    true = maps:is_key(status, WiMap),
+    true = (CompletedWi#workitem.id =:= maps:get(id, WiMap)),
+
+    ok.

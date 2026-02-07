@@ -2,7 +2,7 @@
 %%
 %% CRE: common runtime environment for distributed programming languages
 %%
-%% Copyright 2015 Jörgen Brandt <joergen@cuneiform-lang.org>
+%% Copyright 2015 Jorgen Brandt <joergen.brandt@cuneiform-lang.org>
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -34,15 +34,164 @@
 %%   <li><b>Delivery Status:</b> Track message delivery</li>
 %% </ul>
 %%
-%% <h3>Usage</h3>
+%% <h3>SMS Sending</h3>
 %%
-%% <pre>
-%% %% Send a simple SMS
-%% yawl_sms:send_sms(<<"+1234567890">>, <<"Your order is ready!">>).
+%% Send a simple SMS with default provider:
 %%
-%% %% Send using a template
-%% yawl_sms:send_template(<<"+1234567890">>, order_ready, #{order_id => <<"12345">>}).
-%% </pre>
+%% ```erlang
+%% 1> yawl_sms:doctest_send_sms(<<"+1234567890">>, <<"Hello World">>).
+%% {ok, MessageId}
+%% 2> is_binary(MessageId), byte_size(MessageId) > 0.
+%% true
+%% ```
+%%
+%% Send SMS with specific provider:
+%%
+%% ```erlang
+%% 3> yawl_sms:doctest_send_sms_provider(<<"+1234567890">>, <<"Test">>, twilio).
+%% {ok, _}
+%% ```
+%%
+%% Invalid phone number returns error:
+%%
+%% ```erlang
+%% 4> yawl_sms:doctest_send_sms(<<"invalid">>, <<"Test">>).
+%% {error, invalid_phone_number}
+%% ```
+%%
+%% Message too long returns error:
+%%
+%% ```erlang
+%% 5> LongMsg = binary:copy(<<"a">>, 1601),
+%% yawl_sms:doctest_send_sms(<<"+1234567890">>, LongMsg).
+%% {error, message_too_long}
+%% ```
+%%
+%% <h3>Batch Sending</h3>
+%%
+%% Send SMS to multiple recipients:
+%%
+%% ```erlang
+%% 6> yawl_sms:doctest_send_batch(
+%%     [<<"+1111111111">>, <<"+2222222222">>, <<"+3333333333">>],
+%%     <<"Batch message">>
+%% ).
+%% {ok, Ids}
+%% 7> length(Ids).
+%% 3
+%% ```
+%%
+%% <h3>Template Sending</h3>
+%%
+%% Send using a template:
+%%
+%% ```erlang
+%% 8> yawl_sms:doctest_send_template(
+%%     <<"+1234567890">>,
+%%     verification_code,
+%%     #{code => <<"123456">>}
+%% ).
+%% {ok, _}
+%% ```
+%%
+%% <h3>Provider Management</h3>
+%%
+%% List available providers:
+%%
+%% ```erlang
+%% 9> yawl_sms:list_providers().
+%% [twilio, nexmo, sns, mock]
+%% ```
+%%
+%% Get default provider:
+%%
+%% ```erlang
+%% 10> yawl_sms:get_provider().
+%% mock
+%% ```
+%%
+%% <h3>Phone Number Validation</h3>
+%%
+%% Valid E.164 phone numbers:
+%%
+%% ```erlang
+%% 11> yawl_sms:doctest_validate_phone(<<"+1234567890">>).
+%% true
+%% 12> yawl_sms:doctest_validate_phone(<<"+1">>).
+%% false
+%% 13> yawl_sms:doctest_validate_phone(<<"1234567890">>).
+%% false
+%% ```
+%%
+%% <h3>Message Formatting</h3>
+%%
+%% Mask phone number for logging:
+%%
+%% ```erlang
+%% 14> yawl_sms:doctest_mask_phone(<<"+1234567890">>).
+%% <<"******7890">>
+%% 15> yawl_sms:doctest_mask_phone(<<"+12">>).
+%% <<"+12">>
+%% ```
+%%
+%% Convert various types to binary:
+%%
+%% ```erlang
+%% 16> yawl_sms:doctest_to_binary(<<"binary">>).
+%% <<"binary">>
+%% 17> yawl_sms:doctest_to_binary(42).
+%% <<"42">>
+%% 18> yawl_sms:doctest_to_binary(3.14).
+%% <<"3.14">>
+%% 19> yawl_sms:doctest_to_binary('atom').
+%% <<"atom">>
+%% ```
+%%
+%% <h3>Message Length Validation</h3>
+%%
+%% Standard SMS limit:
+%%
+%% ```erlang
+%% 20> yawl_sms:doctest_validate_length(<<"Hello">>).
+%% true
+%% 21> yawl_sms:doctest_validate_length(binary:copy(<<"a">>, 1600)).
+%% true
+%% 22> yawl_sms:doctest_validate_length(binary:copy(<<"a">>, 1601)).
+%% false
+%% ```
+%%
+%% <h3>Rate Limiting</h3>
+%%
+%% Get rate limit info:
+%%
+%% ```erlang
+%% 23> RateInfo = yawl_sms:get_rate_limit(),
+%% maps:is_key(limit, RateInfo), maps:is_key(remaining, RateInfo).
+%% true
+%% ```
+%%
+%% <h3>Delivery Status</h3>
+%%
+%% Get message status:
+%%
+%% ```erlang
+%% 24> yawl_sms:doctest_get_status(<<"msg_id">>).
+%% {ok, #sms_message{status = delivered}}
+%% ```
+%%
+%% Get delivery status:
+%%
+%% ```erlang
+%% 25> yawl_sms:doctest_get_delivery(<<"msg_id">>).
+%% {ok, delivered}
+%% ```
+%%
+%% <h3>Running Doctests</h3>
+%%
+%% ```erlang
+%% 26> yawl_sms:doctest_test().
+%% ok
+%% ```
 %%
 %% @end
 %% -------------------------------------------------------------------
@@ -80,6 +229,19 @@
          %% Rate limiting
          get_rate_limit/0,
          get_remaining_messages/0]).
+
+%% Doctest Helpers (exported for testing)
+-export([doctest_test/0,
+         doctest_send_sms/2,
+         doctest_send_sms_provider/3,
+         doctest_send_batch/2,
+         doctest_send_template/3,
+         doctest_validate_phone/1,
+         doctest_mask_phone/1,
+         doctest_to_binary/1,
+         doctest_validate_length/1,
+         doctest_get_status/1,
+         doctest_get_delivery/1]).
 
 %%====================================================================
 %% Types
@@ -390,6 +552,118 @@ get_rate_limit() ->
 get_remaining_messages() ->
     RateInfo = get_rate_limit(),
     maps:get(remaining, RateInfo, 0).
+
+%%====================================================================
+%% Doctest Helpers
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Runs all doctests for this module.
+%%
+%% ```erlang
+%% 1> yawl_sms:doctest_test().
+%% ok
+%% ```
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Doctest helper for send_sms/2.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_send_sms(phone_number(), binary()) ->
+          {ok, message_id()} | {error, term()}.
+doctest_send_sms(To, Body) ->
+    send_sms(To, Body).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Doctest helper for send_sms/3.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_send_sms_provider(phone_number(), binary(), provider()) ->
+          {ok, message_id()} | {error, term()}.
+doctest_send_sms_provider(To, Body, Provider) ->
+    send_sms(To, Body, Provider).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Doctest helper for send_batch/2.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_send_batch([phone_number()], binary()) ->
+          {ok, [message_id()]} | {error, term()}.
+doctest_send_batch(Recipients, Body) ->
+    send_batch(Recipients, Body).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Doctest helper for send_template/3.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_send_template(phone_number(), template_name(), template_vars()) ->
+          {ok, message_id()} | {error, term()}.
+doctest_send_template(To, TemplateName, Vars) ->
+    send_template(To, TemplateName, Vars).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Doctest helper for validate_phone_number/1.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_validate_phone(phone_number()) -> boolean().
+doctest_validate_phone(Phone) ->
+    validate_phone_number(Phone).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Doctest helper for mask_phone_number/1.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_mask_phone(phone_number()) -> binary().
+doctest_mask_phone(Phone) ->
+    mask_phone_number(Phone).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Doctest helper for to_binary/1.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_to_binary(term()) -> binary().
+doctest_to_binary(V) ->
+    to_binary(V).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Doctest helper for validate_message_length/1.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_validate_length(binary()) -> boolean().
+doctest_validate_length(Body) ->
+    validate_message_length(Body).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Doctest helper for get_message_status/1.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_get_status(message_id()) -> {ok, sms_message()} | {error, not_found}.
+doctest_get_status(MessageId) ->
+    get_message_status(MessageId).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Doctest helper for get_delivery_status/1.
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_get_delivery(message_id()) ->
+          {ok, delivered | failed | pending} | {error, term()}.
+doctest_get_delivery(MessageId) ->
+    get_delivery_status(MessageId).
 
 %%====================================================================
 %% Internal Functions

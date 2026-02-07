@@ -15,7 +15,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include("cre_yawl_patterns.hrl").
--include("cre_yawl.hrl").
+-include("../src/cre_yawl.hrl").
 
 %%====================================================================
 %% Test Generators

@@ -1,0 +1,229 @@
+@startuml CRE C4 Level 1 - Container Diagram
+
+!theme plain
+skinparam {
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+    stereotypeColor #eeeeee
+    shadowing false
+}
+
+title CRE YAWL Workflow Engine - C4 Level 1 (Container Diagram)
+
+legend right
+  <b>Legend</b>
+  ====
+  = **Container**: A deployable component that runs code
+  = **Interface**: How containers communicate
+  = **Technology**: Stack used by each container
+  = **External System**: Outside the CRE system
+endlegend
+
+rectangle "CRE System" as creSystem #EEF2FF {
+  rectangle "CRE Master" as creMaster #E8F4FD {
+    <b>CRE Master</b>
+    ==
+    Erlang/OTP gen_server
+    ==
+    <b>Responsibilities:</b>
+    • Worker pool management
+    • Task distribution & scheduling
+    • Load balancing
+    • State coordination
+    ==
+    <b>Technology:</b>
+    Erlang/OTP
+    persistent_term
+    gen_server
+  }
+
+  rectangle "YAWL Engine" as yawlEngine #E8F4FD {
+    <b>YAWL Engine</b>
+    ==
+    Workflow execution engine
+    ==
+    <b>Responsibilities:</b>
+    • YAWL pattern execution
+    • Petri net semantics
+    • State management
+    • Token processing
+    ==
+    <b>Technology:</b>
+    Erlang/OTP
+    gen_pnet (core)
+    pnet_types
+    pnet_marking
+    pnet_mode
+  }
+
+  rectangle "CRE Workers" as creWorkers #E8F4FD {
+    <b>CRE Workers</b>
+    ==
+    Worker pool (n instances)
+    ==
+    <b>Responsibilities:</b>
+    • Execute atomic tasks
+    • Process work items
+    • Return results
+    • Handle failures
+    ==
+    <b>Technology:</b>
+    Erlang/OTP
+    gen_server
+    task pools
+  }
+
+  rectangle "HTTP Interface" as httpInterface #E8F4FD {
+    <b>HTTP Interface</b>
+    ==
+    REST/JSON API Gateway
+    ==
+    <b>Responsibilities:</b>
+    • HTTP request handling
+    • JSON serialization
+    • API routing
+    • Status monitoring
+    ==
+    <b>Technology:</b>
+    Cowboy
+    JSON
+    HTTP/1.1
+    ==
+    <b>Endpoints:</b>
+    • /status.json
+    • /history.json
+    • /api/workflows/*
+  }
+
+  rectangle "Web Dashboard" as webDashboard #E8F4FD {
+    <b>Web Dashboard</b>
+    ==
+    Monitoring Interface
+    ==
+    <b>Responsibilities:</b>
+    • Real-time workflow visualization
+    • Performance monitoring
+    • User interaction
+    • Management interface
+    ==
+    <b>Technology:</b>
+    Cowboy
+    JavaScript/HTML
+    WebSocket
+    OpenTelemetry
+  }
+
+  rectangle "Human-in-the-Loop" as hilService #E8F4FD {
+    <b>HIL Service</b>
+    ==
+    Approval Management
+    ==
+    <b>Responsibilities:</b>
+    • Human approval workflows
+    • Deadline management
+    • Notification system
+    • LLM integration
+    ==
+    <b>Technology:</b>
+    Erlang/OTP
+    gen_server
+    notification queues
+  }
+
+  rectangle "Persistence Layer" as persistence #E8F4FD {
+    <b>Persistence Layer</b>
+    ==
+    Data Storage
+    ==
+    <b>Responsibilities:</b>
+    • Workflow state persistence
+    • Event logging
+    • Data backup
+    ==
+    <b>Technology:</b>
+    XES Logger
+    Event Store
+    Term Storage
+  }
+}
+
+rectangle "External Systems" as externalSystems #FFF2CC {
+  rectangle "YAWL Client" as yawlClient #FFF9E6 {
+    <b>YAWL Client</b>
+    ==
+    Erlang Client API
+  }
+  
+  rectangle "External Clients" as extClients #FFF9E6 {
+    <b>External Clients</b>
+    ==
+    Web Apps
+    CLI Tools
+    Other Systems
+  }
+  
+  rectangle "Monitoring" as monitoring #FFF9E6 {
+    <b>Monitoring</b>
+    ==
+    Prometheus
+    Grafana
+    Jaeger
+  }
+  
+  rectangle "LLM Services" as llmServices #FFF9E6 {
+    <b>LLM Services</b>
+    ==
+    Claude
+    GPT-4
+    Other LLMs
+  }
+  
+  rectangle "Notification Systems" as notification #FFF9E6 {
+    <b>Notification Systems</b>
+    ==
+    Email
+    Slack
+    Webhooks
+  }
+}
+
+' Container interfaces
+yawlClient -up- creMaster : <<RPC>> YAWL API calls
+extClients -up- httpInterface : <<HTTP/JSON>> REST API
+extClients -up- webDashboard : <<HTTP/JSON>> Web Interface
+
+creMaster -right- yawlEngine : <<gen_pnet>> Workflow execution
+yawlEngine -right- creWorkers : <<task distribution>> Work items
+creWorkers -down- persistence : <<state logging>> Event storage
+
+creMaster -down- hilService : <<approval requests>> Human workflow
+hilService -right- notification : <<notifications>> Alerts
+hilService -down- llmServices : <<API calls>> LLM decisions
+
+yawlEngine -down- monitoring : <<telemetry>> Metrics & traces
+webDashboard -down- monitoring : <<dashboard>> Visual metrics
+
+webDashboard -up- httpInterface : <<reverse proxy>> Static content
+httpInterface -up- creMaster : <<status requests>> System status
+
+' External system connections
+yawlClient -up- yawlEngine : <<workflow execution>> Direct calls
+monitoring -up- yawlEngine : <<distributed tracing>> OTLP
+monitoring -up- creMaster : <<metrics collection>> System metrics
+
+note top of creMaster
+  <b>Joe Armstrong Architecture:</b>
+  One real OTP runner (gen_pnet),
+  everything else pure utilities
+end note
+
+note bottom of yawlEngine
+  <b>Core Components:</b>
+  • pnet_types - Type system
+  • pnet_marking - Multiset algebra
+  • pnet_mode - Mode enumeration
+  • gen_pnet - Petri net runner
+end note
+
+@enduml

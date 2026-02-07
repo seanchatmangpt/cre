@@ -33,6 +33,67 @@
 -module(yawl_approval).
 -author("CRE Team").
 
+-moduledoc """
+YAWL Approval Checkpoint Management.
+
+This module implements approval checkpoints for workflow execution, enabling
+workflows to pause at designated checkpoints and require human approval
+(simulated or real) before continuing.
+
+## Approval Types
+
+* **human** - Requires manual human approval via API or CLI
+* **simulated** - Uses Claude Code headless mode for LLM approval
+* **auto** - Auto-approves based on configurable rules
+
+## Checkpoint ID Format
+
+All checkpoint IDs are prefixed binary identifiers:
+
+```erlang
+% Generate a checkpoint ID (internal function)
+Id = yawl_approval:generate_checkpoint_id(),
+binary_part(Id, {0, 8}).
+<<"approval_">
+```
+
+## Approval Status Values
+
+```erlang
+% Valid status atoms
+Statuses = [pending, approved, denied, timeout, cancelled],
+length(Statuses).
+5
+```
+
+## Approver Types
+
+```erlang
+% Valid approver types
+ApproverTypes = [human, simulated, auto],
+length(ApproverTypes).
+3
+```
+
+## Decision Record
+
+The approval_decision record contains:
+
+```erlang
+% Record fields (for reference)
+Rec = #approval_decision{
+    checkpoint_id = <<"test">>,
+    approved = true,
+    decision_maker = simulated,
+    reason = <<"OK">>,
+    metadata = #{},
+    decided_at = 1234567890
+},
+Rec#approval_decision.approved.
+true
+```
+""".
+
 -behaviour(gen_server).
 
 %% Include record definitions
@@ -59,7 +120,10 @@
     list_pending/0,
     list_all/0,
     cancel_checkpoint/1,
-    get_checkpoint_context/1
+    get_checkpoint_context/1,
+    get_receipt/1,
+    list_receipts/0,
+    generate_checkpoint_id/0
 ]).
 
 %%====================================================================
@@ -77,7 +141,8 @@
 -record(state, {
     checkpoints :: #{checkpoint_id() => #approval_checkpoint{}},
     decisions :: #{checkpoint_id() => #approval_decision{}},
-    waiters :: #{checkpoint_id() => [pid()]}
+    waiters :: #{checkpoint_id() => [pid()]},
+    receipts :: #{checkpoint_id() => pnet_receipt:receipt()}
 }).
 
 -type approval_result() :: {ok, #approval_decision{}} | {error, term()}.
@@ -96,10 +161,13 @@ init([]) ->
     %% Initialize ETS table for cross-process access to checkpoints and decisions
     %% This allows external processes (like approval_worker.sh) to access state
     ets:new(?MODULE, [named_table, public, {read_concurrency, true}]),
+    %% Initialize ETS table for audit receipts
+    ets:new(yawl_approval_receipts, [named_table, public, {read_concurrency, true}]),
     {ok, #state{
         checkpoints = #{},
         decisions = #{},
-        waiters = #{}
+        waiters = #{},
+        receipts = #{}
     }}.
 
 handle_call({create_checkpoint, PatternId, StepName, Context, Options}, _From, State) ->
@@ -134,6 +202,14 @@ handle_call({cancel_checkpoint, CheckpointId}, _From, State) ->
     {Reply, NewState} = do_cancel_checkpoint(CheckpointId, State),
     {reply, Reply, NewState};
 
+handle_call({get_receipt, CheckpointId}, _From, State) ->
+    Reply = do_get_receipt(CheckpointId, State),
+    {reply, Reply, State};
+
+handle_call(list_receipts, _From, State) ->
+    Reply = do_list_receipts(State),
+    {reply, Reply, State};
+
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_request}, State}.
 
@@ -145,8 +221,7 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({timeout, CheckpointId}, State) ->
-    {noreply, NewState} = handle_timeout(CheckpointId, State),
-    {noreply, NewState};
+    handle_timeout(CheckpointId, State);
 
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -178,6 +253,23 @@ code_change(_OldVsn, State, _Extra) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Creates a new approval checkpoint with the specified options.
+
+Options:
+  - required_approver: human | simulated | auto (default: simulated)
+  - timeout: milliseconds or infinity (default: 30000)
+  - approval_schema: JSON schema for validation (default: basic schema)
+  - context: Additional context data (default: #{})
+  - metadata: User metadata (default: #{})
+
+```erlang
+% Generate a checkpoint ID to see the format
+Id = yawl_approval:generate_checkpoint_id(),
+binary_part(Id, {0, 8}).
+<<"approval_">
+```
+""".
 -spec create_checkpoint(binary(), atom(), map()) ->
     {ok, checkpoint_id()} | {error, term()}.
 
@@ -212,6 +304,16 @@ request_approval(CheckpointId) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Approves a pending checkpoint, allowing the workflow to continue.
+
+```erlang
+% Approval status values
+Status = approved,
+Status = approved.
+true
+```
+""".
 -spec approve(checkpoint_id(), term(), binary()) -> ok | {error, term()}.
 
 approve(CheckpointId, Approver, Reason) ->
@@ -227,6 +329,16 @@ approve(CheckpointId, Approver, Reason) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Denies a pending checkpoint, blocking the workflow from continuing.
+
+```erlang
+% Denial status value
+Status = denied,
+Status = denied.
+true
+```
+""".
 -spec deny(checkpoint_id(), term(), binary()) -> ok | {error, term()}.
 
 deny(CheckpointId, Approver, Reason) ->
@@ -240,6 +352,18 @@ deny(CheckpointId, Approver, Reason) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Checks the status of an approval checkpoint.
+
+Status can be: pending, approved, denied, timeout, or cancelled.
+
+```erlang
+% All possible status values
+Statuses = [pending, approved, denied, timeout, cancelled],
+lists:member(pending, Statuses).
+true
+```
+""".
 -spec check_status(checkpoint_id()) -> {ok, approval_status()} | {error, term()}.
 
 check_status(CheckpointId) ->
@@ -343,6 +467,18 @@ simulate_approval(CheckpointId, PromptContext) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Lists all pending approval checkpoints.
+
+Returns a list of checkpoint IDs that are awaiting approval.
+
+```erlang
+% Returns empty list when no checkpoints exist
+Pending = [],
+is_list(Pending).
+true
+```
+""".
 -spec list_pending() -> [checkpoint_id()].
 
 list_pending() ->
@@ -355,6 +491,18 @@ list_pending() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Lists all approval checkpoints with their statuses.
+
+Returns a list of {CheckpointId, Status} tuples.
+
+```erlang
+% Status tuples are of this form
+StatusTuple = {<<"checkpoint_id">>, approved},
+element(1, StatusTuple).
+<<"checkpoint_id">
+```
+""".
 -spec list_all() -> [{checkpoint_id(), approval_status()}].
 
 list_all() ->
@@ -368,6 +516,16 @@ list_all() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Cancels a pending approval checkpoint.
+
+```erlang
+% Cancelled is a valid status
+Status = cancelled,
+Status = cancelled.
+true
+```
+""".
 -spec cancel_checkpoint(checkpoint_id()) -> ok | {error, term()}.
 
 cancel_checkpoint(CheckpointId) ->
@@ -412,6 +570,55 @@ get_checkpoint_context(CheckpointId) ->
                     <<"{}">>
             end
     end.
+
+%%--------------------------------------------------------------------
+%% @doc Gets the audit receipt for a checkpoint decision.
+%%
+%% This function retrieves the pnet_receipt for audit compliance,
+%% providing a verifiable record of the approval decision.
+%%
+%% @param CheckpointId The checkpoint ID.
+%% @return {ok, Receipt} or {error, not_found}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-doc """
+Gets the audit receipt for a checkpoint decision.
+
+The receipt contains before_hash, after_hash, move (with trsn, mode, produce),
+and timestamp (ts) for audit compliance.
+
+```erlang
+% Receipt structure
+Receipt = #{
+    before_hash => <<123, 456>>,
+    after_hash => <<789, 012>>,
+    move => #{trsn => test},
+    ts => 1234567890
+},
+is_map(Receipt).
+true
+```
+""".
+-spec get_receipt(checkpoint_id()) -> {ok, pnet_receipt:receipt()} | {error, term()}.
+
+get_receipt(CheckpointId) ->
+    gen_server:call(?MODULE, {get_receipt, CheckpointId}).
+
+%%--------------------------------------------------------------------
+%% @doc Lists all audit receipts for approval decisions.
+%%
+%% This function returns all stored receipts for audit compliance
+%% and verification purposes.
+%%
+%% @return List of {CheckpointId, Receipt} tuples.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec list_receipts() -> [{checkpoint_id(), pnet_receipt:receipt()}].
+
+list_receipts() ->
+    gen_server:call(?MODULE, list_receipts).
 
 %%====================================================================
 %% Internal Functions
@@ -475,6 +682,9 @@ do_create_checkpoint(PatternId, StepName, Context, Options, State) ->
 %% @private
 %% @doc Requests approval for a checkpoint.
 %%
+%% Creates an enabled task token using wf_task:enabled/3 when approval
+%% is requested, signaling the workflow is waiting for human decision.
+%%
 %% @end
 %%--------------------------------------------------------------------
 do_request_approval(CheckpointId, State) ->
@@ -496,10 +706,31 @@ do_request_approval(CheckpointId, State) ->
                     NewDecisions = maps:put(CheckpointId, Decision, State#state.decisions),
                     %% Store in ETS for cross-process access
                     ets:insert(?MODULE, {{decision, CheckpointId}, Decision}),
+
+                    %% Create done task token for auto-approval
+                    _DoneToken = wf_task:done(CheckpointId, Decision, 'p_approval_complete'),
+
+                    %% Create audit receipt for compliance
+                    BeforeHash = crypto:hash(sha256, term_to_binary({checkpoint, Checkpoint})),
+                    AfterHash = crypto:hash(sha256, term_to_binary({decision, Decision})),
+                    Move = #{
+                        trsn => auto_approve,
+                        mode => #{checkpoint => CheckpointId, approver => auto},
+                        produce => #{'p_approval_complete' => [{task, CheckpointId, done, Decision}]}
+                    },
+                    Receipt = pnet_receipt:make(BeforeHash, AfterHash, Move),
+                    ets:insert(yawl_approval_receipts, {{receipt, CheckpointId}, Receipt}),
+
                     notify_waiters(CheckpointId, Decision, State#state.waiters),
                     log_checkpoint_event(Checkpoint, auto_approved),
-                    {{ok, Decision}, State#state{decisions = NewDecisions}};
+                    NewState = State#state{decisions = NewDecisions,
+                                          receipts = maps:put(CheckpointId, Receipt, State#state.receipts)},
+                    {{ok, Decision}, NewState};
                 simulated ->
+                    %% Create enabled task token for approval workflow
+                    _Token = wf_task:enabled(CheckpointId,
+                                             Checkpoint#approval_checkpoint.context,
+                                             'p_approval_pending'),
                     %% Spawn async process to handle simulated approval
                     spawn(fun() ->
                         Result = simulate_approval(CheckpointId, #{}),
@@ -510,6 +741,10 @@ do_request_approval(CheckpointId, State) ->
                     end),
                     {{ok, pending_approval}, State};
                 human ->
+                    %% Create enabled task token for human approval
+                    _Token = wf_task:enabled(CheckpointId,
+                                             Checkpoint#approval_checkpoint.context,
+                                             'p_approval_pending'),
                     %% Just mark as pending, wait for external approve/deny call
                     log_checkpoint_event(Checkpoint, awaiting_human),
                     {{ok, awaiting_human}, State}
@@ -519,6 +754,9 @@ do_request_approval(CheckpointId, State) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc Approves a checkpoint.
+%%
+%% Creates a done task token using wf_task:done/3 when approved,
+%% and generates an audit receipt using pnet_receipt:make/3.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -540,9 +778,26 @@ do_approve(CheckpointId, Approver, Reason, State) ->
                     NewDecisions = maps:put(CheckpointId, Decision, State#state.decisions),
                     %% Store in ETS for cross-process access
                     ets:insert(?MODULE, {{decision, CheckpointId}, Decision}),
+
+                    %% Create done task token for approval workflow
+                    _DoneToken = wf_task:done(CheckpointId, Decision, 'p_approval_complete'),
+
+                    %% Create audit receipt for compliance
+                    BeforeHash = crypto:hash(sha256, term_to_binary({checkpoint, Checkpoint})),
+                    AfterHash = crypto:hash(sha256, term_to_binary({decision, Decision})),
+                    Move = #{
+                        trsn => approve,
+                        mode => #{checkpoint => CheckpointId, approver => Approver},
+                        produce => #{'p_approval_complete' => [{task, CheckpointId, done, Decision}]}
+                    },
+                    Receipt = pnet_receipt:make(BeforeHash, AfterHash, Move),
+                    ets:insert(yawl_approval_receipts, {{receipt, CheckpointId}, Receipt}),
+
                     notify_waiters(CheckpointId, Decision, State#state.waiters),
                     log_checkpoint_event(Checkpoint, approved),
-                    {ok, State#state{decisions = NewDecisions}};
+                    NewState = State#state{decisions = NewDecisions,
+                                          receipts = maps:put(CheckpointId, Receipt, State#state.receipts)},
+                    {ok, NewState};
                 _Existing ->
                     {{error, already_decided}, State}
             end
@@ -551,6 +806,9 @@ do_approve(CheckpointId, Approver, Reason, State) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc Denies a checkpoint.
+%%
+%% Creates a failed task token using wf_task:failed/3 when rejected,
+%% and generates an audit receipt using pnet_receipt:make/3.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -572,9 +830,26 @@ do_deny(CheckpointId, Approver, Reason, State) ->
                     NewDecisions = maps:put(CheckpointId, Decision, State#state.decisions),
                     %% Store in ETS for cross-process access
                     ets:insert(?MODULE, {{decision, CheckpointId}, Decision}),
+
+                    %% Create failed task token for approval workflow
+                    _FailedToken = wf_task:failed(CheckpointId, Reason, 'p_approval_failed'),
+
+                    %% Create audit receipt for compliance
+                    BeforeHash = crypto:hash(sha256, term_to_binary({checkpoint, Checkpoint})),
+                    AfterHash = crypto:hash(sha256, term_to_binary({decision, Decision})),
+                    Move = #{
+                        trsn => deny,
+                        mode => #{checkpoint => CheckpointId, approver => Approver},
+                        produce => #{'p_approval_failed' => [{task, CheckpointId, failed, Reason}]}
+                    },
+                    Receipt = pnet_receipt:make(BeforeHash, AfterHash, Move),
+                    ets:insert(yawl_approval_receipts, {{receipt, CheckpointId}, Receipt}),
+
                     notify_waiters(CheckpointId, Decision, State#state.waiters),
                     log_checkpoint_event(Checkpoint, denied),
-                    {ok, State#state{decisions = NewDecisions}};
+                    NewState = State#state{decisions = NewDecisions,
+                                          receipts = maps:put(CheckpointId, Receipt, State#state.receipts)},
+                    {ok, NewState};
                 _Existing ->
                     {{error, already_decided}, State}
             end
@@ -651,7 +926,41 @@ do_list_all(State) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @doc Gets the audit receipt for a checkpoint.
+%%
+%% @end
+%%--------------------------------------------------------------------
+do_get_receipt(CheckpointId, State) ->
+    case ets:whereis(yawl_approval_receipts) of
+        undefined -> {error, receipts_table_not_found};
+        _Table ->
+            case ets:lookup(yawl_approval_receipts, {receipt, CheckpointId}) of
+                [{{receipt, CheckpointId}, Receipt}] -> {ok, Receipt};
+                [] -> {error, not_found}
+            end
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Lists all audit receipts.
+%%
+%% @end
+%%--------------------------------------------------------------------
+do_list_receipts(State) ->
+    case ets:whereis(yawl_approval_receipts) of
+        undefined -> [];
+        _Table ->
+            ets:foldl(fun({{receipt, CheckpointId}, Receipt}, Acc) ->
+                [{CheckpointId, Receipt} | Acc]
+            end, [], yawl_approval_receipts)
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
 %% @doc Cancels a checkpoint.
+%%
+%% Creates a cancelled task token using wf_task:cancelled/3 and
+%% generates an audit receipt using pnet_receipt:make/3.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -673,9 +982,26 @@ do_cancel_checkpoint(CheckpointId, State) ->
                     NewDecisions = maps:put(CheckpointId, Decision, State#state.decisions),
                     %% Store in ETS for cross-process access
                     ets:insert(?MODULE, {{decision, CheckpointId}, Decision}),
+
+                    %% Create cancelled task token for approval workflow
+                    _CancelledToken = wf_task:cancelled(CheckpointId, cancelled, 'p_approval_cancelled'),
+
+                    %% Create audit receipt for compliance
+                    BeforeHash = crypto:hash(sha256, term_to_binary({checkpoint, Checkpoint})),
+                    AfterHash = crypto:hash(sha256, term_to_binary({decision, Decision})),
+                    Move = #{
+                        trsn => cancel,
+                        mode => #{checkpoint => CheckpointId},
+                        produce => #{'p_approval_cancelled' => [{task, CheckpointId, cancelled, cancelled}]}
+                    },
+                    Receipt = pnet_receipt:make(BeforeHash, AfterHash, Move),
+                    ets:insert(yawl_approval_receipts, {{receipt, CheckpointId}, Receipt}),
+
                     notify_waiters(CheckpointId, Decision, State#state.waiters),
                     log_checkpoint_event(Checkpoint, cancelled),
-                    {ok, State#state{decisions = NewDecisions}};
+                    NewState = State#state{decisions = NewDecisions,
+                                          receipts = maps:put(CheckpointId, Receipt, State#state.receipts)},
+                    {ok, NewState};
                 _Existing ->
                     {{error, already_decided}, State}
             end
@@ -685,12 +1011,15 @@ do_cancel_checkpoint(CheckpointId, State) ->
 %% @private
 %% @doc Handles checkpoint timeout.
 %%
+%% Creates a cancelled task token using wf_task:cancelled/3 and
+%% generates an audit receipt using pnet_receipt:make/3.
+%%
 %% @end
 %%--------------------------------------------------------------------
 handle_timeout(CheckpointId, State) ->
     Checkpoint = maps:get(CheckpointId, State#state.checkpoints, undefined),
     case maps:get(CheckpointId, State#state.decisions, undefined) of
-        undefined ->
+        undefined when Checkpoint =/= undefined ->
             Decision = #approval_decision{
                 checkpoint_id = CheckpointId,
                 approved = false,
@@ -702,13 +1031,30 @@ handle_timeout(CheckpointId, State) ->
             NewDecisions = maps:put(CheckpointId, Decision, State#state.decisions),
             %% Store in ETS for cross-process access
             ets:insert(?MODULE, {{decision, CheckpointId}, Decision}),
+
+            %% Create cancelled task token for approval workflow
+            _CancelledToken = wf_task:cancelled(CheckpointId, timeout, 'p_approval_cancelled'),
+
+            %% Create audit receipt for compliance
+            BeforeHash = crypto:hash(sha256, term_to_binary({checkpoint, Checkpoint})),
+            AfterHash = crypto:hash(sha256, term_to_binary({decision, Decision})),
+            Move = #{
+                trsn => timeout,
+                mode => #{checkpoint => CheckpointId},
+                produce => #{'p_approval_cancelled' => [{task, CheckpointId, cancelled, timeout}]}
+            },
+            Receipt = pnet_receipt:make(BeforeHash, AfterHash, Move),
+            ets:insert(yawl_approval_receipts, {{receipt, CheckpointId}, Receipt}),
+
             %% Notify waiters of timeout
             Waiters = maps:get(CheckpointId, State#state.waiters, []),
             send_timeout_notifications(CheckpointId, Waiters),
             log_checkpoint_event(Checkpoint, timeout),
-            State#state{decisions = NewDecisions};
-        _Existing ->
-            State
+            NewState = State#state{decisions = NewDecisions,
+                                  receipts = maps:put(CheckpointId, Receipt, State#state.receipts)},
+            {noreply, NewState};
+        _ ->
+            {noreply, State}
     end.
 
 %%--------------------------------------------------------------------
@@ -770,11 +1116,30 @@ send_timeout_notifications(CheckpointId, [Pid | Rest]) ->
     send_timeout_notifications(CheckpointId, Rest).
 
 %%--------------------------------------------------------------------
-%% @private
 %% @doc Generates a unique checkpoint ID.
+%%
+%% Used primarily for testing and validation. IDs are prefixed with
+%% <<"approval_">> followed by a hex-encoded MD5 hash.
+%%
+%% @return A unique binary checkpoint ID
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc """
+Generates a unique checkpoint ID.
+
+```erlang
+% Checkpoint IDs have a specific prefix
+Id = yawl_approval:generate_checkpoint_id(),
+binary_part(Id, {0, 8}).
+<<"approval_">
+
+% IDs are binary
+is_binary(Id).
+true
+```
+""".
+-spec generate_checkpoint_id() -> checkpoint_id().
 generate_checkpoint_id() ->
     Unique = crypto:hash(md5, term_to_binary({self(), erlang:timestamp()})),
     Hex = binary:encode_hex(Unique),
@@ -916,3 +1281,77 @@ log_checkpoint_event(Checkpoint, EventType) ->
                 approver_type => Checkpoint#approval_checkpoint.required_approver
             })
     end.
+
+%%====================================================================
+%% EUnit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+%%--------------------------------------------------------------------
+%% @doc Doctest runner for moduledoc and function documentation.
+%% Tests examples embedded in documentation strings.
+%%--------------------------------------------------------------------
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%%--------------------------------------------------------------------
+%% @doc Test for checkpoint ID generation.
+%%--------------------------------------------------------------------
+checkpoint_id_format_test() ->
+    Id = generate_checkpoint_id(),
+    ?assert(is_binary(Id)),
+    ?assertEqual(<<"approval_">>, binary_part(Id, {0, 8})),
+    ?assertEqual(40, byte_size(Id)).  % "approval_" (8) + 32 hex chars
+
+%%--------------------------------------------------------------------
+%% @doc Test for valid approval status atoms.
+%%--------------------------------------------------------------------
+approval_status_values_test() ->
+    ValidStatuses = [pending, approved, denied, timeout, cancelled],
+    ?assertEqual(5, length(ValidStatuses)),
+    ?assert(lists:member(pending, ValidStatuses)),
+    ?assert(lists:member(approved, ValidStatuses)).
+
+%%--------------------------------------------------------------------
+%% @doc Test for valid approver types.
+%%--------------------------------------------------------------------
+approver_types_test() ->
+    ValidTypes = [human, simulated, auto],
+    ?assertEqual(3, length(ValidTypes)),
+    ?assert(lists:member(human, ValidTypes)),
+    ?assert(lists:member(simulated, ValidTypes)).
+
+%%--------------------------------------------------------------------
+%% @doc Test for approval_decision record structure.
+%%--------------------------------------------------------------------
+approval_decision_record_test() ->
+    Decision = #approval_decision{
+        checkpoint_id = <<"test_checkpoint">>,
+        approved = true,
+        decision_maker = test_approver,
+        reason = <<"Test reason">>,
+        metadata = #{key => value},
+        decided_at = 1234567890
+    },
+    ?assertEqual(<<"test_checkpoint">>, Decision#approval_decision.checkpoint_id),
+    ?assertEqual(true, Decision#approval_decision.approved),
+    ?assertEqual(<<"Test reason">>, Decision#approval_decision.reason).
+
+%%--------------------------------------------------------------------
+%% @doc Test for approval_checkpoint record structure.
+%%--------------------------------------------------------------------
+approval_checkpoint_record_test() ->
+    Checkpoint = #approval_checkpoint{
+        checkpoint_id = <<"test_id">>,
+        pattern_id = <<"test_pattern">>,
+        step_name = test_step,
+        context = #{data => <<"test">>},
+        required_approver = simulated,
+        timeout = 30000,
+        created_at = erlang:system_time(millisecond)
+    },
+    ?assertEqual(<<"test_id">>, Checkpoint#approval_checkpoint.checkpoint_id),
+    ?assertEqual(simulated, Checkpoint#approval_checkpoint.required_approver).
+-endif.

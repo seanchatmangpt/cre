@@ -1,0 +1,74 @@
+# Multi-stage production Dockerfile for CRE YAWL
+# Stage 1: Build
+FROM erlang:28-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    git \
+    curl \
+    build-base \
+    openssl-dev
+
+# Install rebar3
+RUN git clone --depth 1 https://github.com/erlang/rebar3 /tmp/rebar3 && \
+    cd /tmp/rebar3 && \
+    ./bootstrap && \
+    mv rebar3 /usr/local/bin/ && \
+    rm -rf /tmp/rebar3
+
+# Set working directory
+WORKDIR /build
+
+# Copy project files
+COPY rebar.config ./
+COPY src ./src
+COPY include ./include
+
+# Install dependencies and compile
+RUN rebar3 get-deps && \
+    rebar3 compile && \
+    rebar3 as prod tar
+
+# Stage 2: Runtime
+FROM alpine:3.20
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    openssl \
+    ncurses-libs \
+    libstdc++ \
+    tzdata \
+    curl
+
+# Create non-root user
+RUN addgroup -g 1000 cre && \
+    adduser -D -u 1000 -G cre cre
+
+# Extract and install the release
+COPY --from=builder /build/_build/prod/rel/cre /opt/cre
+
+# Create directories for runtime data
+RUN mkdir -p /opt/cre/data /opt/cre/log /opt/cre/checkpoints && \
+    chown -R cre:cre /opt/cre
+
+# Switch to non-root user
+USER cre
+WORKDIR /opt/cre
+
+# Expose CRE default port
+EXPOSE 4142
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:4142/status.json || exit 1
+
+# Signal handling for graceful shutdown
+STOPSIGNAL SIGTERM
+
+# Default command
+ENTRYPOINT ["/opt/cre/bin/cre", "foreground"]
+
+# Metadata
+LABEL maintainer="CRE Team"
+LABEL version="0.2.0"
+LABEL description="CRE YAWL Workflow Engine - Production Build"

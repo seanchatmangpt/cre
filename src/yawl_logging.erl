@@ -54,6 +54,68 @@
 
 -module(yawl_logging).
 
+-moduledoc("""
+YAWL Logging and Audit Module.
+
+This module provides comprehensive logging and audit trail functionality
+for YAWL workflow execution in the CRE runtime environment.
+
+## Features
+
+- Event logging for cases, work items, and engine events
+- Audit trail compatible with YAWL logging format
+- Export to OpenXES format for process mining
+- Export to CSV for analysis
+- Configurable log levels and filtering
+
+## Examples
+
+Start the logger and log events:
+
+```erlang
+1> yawl_logging:start_logger().
+{ok, <0.123.0>}
+2> yawl_logging:log_event(info, <<"Engine started">>).
+ok
+3> yawl_logging:log_case_event(info, <<"case123">>, case_created).
+ok
+4> yawl_logging:get_log_level().
+info
+```
+
+Set log level and verify:
+
+```erlang
+1> yawl_logging:start_logger().
+{ok, <0.124.0>}
+2> yawl_logging:set_log_level(debug).
+ok
+3> yawl_logging:get_log_level().
+debug
+4> yawl_logging:set_log_level(warning).
+ok
+5> yawl_logging:get_log_level().
+warning
+```
+
+Format log entry as CSV:
+
+```erlang
+1> Entry = #log_entry{id = <<"evt1">>, timestamp = 0, level = info,
+1> type = case_created, case_id = <<"case123">>, workitem_id = undefined,
+1> message = <<"Case created">>, data = #{}}.
+2> Row = yawl_logging_test:format_csv_row_test(Entry).
+2> <<"0,info,case_created,case123,,\"Case created\"\n">>
+```
+
+Run doctests:
+
+```erlang
+1> yawl_logging:doctest_test().
+ok
+```
+""").
+
 %%====================================================================
 %% Exports
 %%====================================================================
@@ -85,6 +147,13 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          code_change/3, terminate/2]).
+
+%% Test exports
+-export([doctest_test/0,
+         format_csv_row_test/1,
+         level_ge_test/0,
+         escape_csv_test/0,
+         event_type_to_transition_test/0]).
 
 %%====================================================================
 %% Types
@@ -133,6 +202,23 @@
 %% Returns {ok, Pid} on success.
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Starts the YAWL logger with default configuration.
+
+Returns `{ok, Pid}` on success. Uses default settings: level=info,
+max_events=10000, no filters.
+
+## Examples
+
+```erlang
+1> yawl_logging:stop_logger().
+ok
+2> yawl_logging:start_logger().
+{ok, <0.125.0>}
+3> is_pid(whereis(yawl_logging)).
+true
+```
+""").
 -spec start_logger() -> {ok, pid()} | {error, term()}.
 
 start_logger() ->
@@ -152,6 +238,26 @@ start_logger() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Starts the YAWL logger with custom configuration.
+
+## Options
+
+- `level`: Minimum log level (default: `info`)
+- `max_events`: Maximum events to keep (default: `10000`)
+- `filters`: List of filter functions (default: `[]`)
+
+## Examples
+
+```erlang
+1> yawl_logging:stop_logger().
+ok
+2> yawl_logging:start_logger(#{level => debug, max_events => 100}).
+{ok, <0.126.0>}
+3> yawl_logging:get_log_level().
+debug
+```
+""").
 -spec start_logger(Options :: map()) -> {ok, pid()} | {error, term()}.
 
 start_logger(Options) ->
@@ -177,6 +283,20 @@ start_logger(Options) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Stops the YAWL logger.
+
+## Examples
+
+```erlang
+1> yawl_logging:start_logger().
+{ok, <0.127.0>}
+2> yawl_logging:stop_logger().
+ok
+3> whereis(yawl_logging).
+undefined
+```
+""").
 -spec stop_logger() -> ok.
 
 stop_logger() ->
@@ -192,6 +312,27 @@ stop_logger() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Sets the current log level.
+
+Events below this level will be filtered out. Valid levels are:
+`debug`, `info`, `warning`, `error`, `critical`.
+
+## Examples
+
+```erlang
+1> yawl_logging:start_logger().
+{ok, <0.128.0>}
+2> yawl_logging:set_log_level(warning).
+ok
+3> yawl_logging:get_log_level().
+warning
+4> yawl_logging:set_log_level(critical).
+ok
+5> yawl_logging:get_log_level().
+critical
+```
+""").
 -spec set_log_level(log_level()) -> ok.
 
 set_log_level(Level) ->
@@ -205,6 +346,25 @@ set_log_level(Level) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-doc("""
+Gets the current log level.
+
+Returns the current minimum log level. If logger is not started,
+returns `info` as default.
+
+## Examples
+
+```erlang
+1> yawl_logging:start_logger().
+{ok, <0.129.0>}
+2> yawl_logging:get_log_level().
+info
+3> yawl_logging:set_log_level(error).
+ok
+4> yawl_logging:get_log_level().
+error
+```
+""").
 -spec get_log_level() -> log_level().
 
 get_log_level() ->
@@ -466,6 +626,77 @@ export_to_json(Filename) ->
     end.
 
 %%====================================================================
+%% Doctest
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the yawl_logging module.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-doc("""
+Run doctests for the yawl_logging module.
+
+This function provides a simple test entry point that verifies
+basic logging functionality including:
+- Log level management
+- Log formatting functions
+- Level comparison functions
+- CSV escaping
+- Event type transitions
+
+## Examples
+
+```erlang
+1> yawl_logging:doctest_test().
+ok
+```
+""").
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: Logger lifecycle
+    ok = stop_logger(),
+    {ok, _Pid} = start_logger(),
+    true = is_pid(whereis(?MODULE)),
+
+    %% Test 2: Default log level
+    info = get_log_level(),
+
+    %% Test 3: Set and get log level
+    ok = set_log_level(debug),
+    debug = get_log_level(),
+    ok = set_log_level(warning),
+    warning = get_log_level(),
+    ok = set_log_level(error),
+    error = get_log_level(),
+    ok = set_log_level(critical),
+    critical = get_log_level(),
+    ok = set_log_level(info),
+
+    %% Test 4: Log events
+    ok = log_event(info, <<"Test message">>),
+    ok = log_event(debug, <<"Debug message">>),
+    ok = log_engine_event(warning, <<"Engine warning">>),
+
+    %% Test 5: Log case event
+    ok = log_case_event(info, <<"case001">>, case_created),
+    ok = log_case_event(info, <<"case002">>, case_started, <<"Case started">>),
+
+    %% Test 6: Log workitem event
+    ok = log_workitem_event(info, <<"case001">>, <<"wi001">>, workitem_started),
+    ok = log_workitem_event(info, <<"case001">>, <<"wi001">>, workitem_completed, <<"Done">>),
+
+    %% Test 7: Get engine log
+    EngineLog = get_engine_log(10),
+    true = is_list(EngineLog),
+
+    %% Test 8: Clean up
+    ok = stop_logger(),
+
+    ok.
+
+%%====================================================================
 %% gen_server Callbacks
 %%====================================================================
 
@@ -718,6 +949,17 @@ format_csv(Events) ->
     Rows = [format_csv_row(E) || E <- SortedEvents],
     iolist_to_binary([Header, Rows]).
 
+%%--------------------------------------------------------------------
+%% @doc Test helper for format_csv_row.
+%% Exposed for doctest testing of CSV formatting.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec format_csv_row_test(#log_entry{}) -> binary().
+
+format_csv_row_test(Entry) ->
+    format_csv_row(Entry).
+
 %% @private
 %% @doc Formats a single log entry as CSV.
 -spec format_csv_row(log_entry()) -> binary().
@@ -736,6 +978,32 @@ format_csv_row(#log_entry{timestamp = TS, level = Level, type = Type,
       CaseIdBin/binary, ",",
       WorkItemIdBin/binary, ",",
       MsgEscaped/binary, "\n">>.
+
+%%--------------------------------------------------------------------
+%% @doc Test helper for escape_csv.
+%% Exposed for doctest testing of CSV escaping.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec escape_csv_test() -> ok.
+
+escape_csv_test() ->
+    %% Test 1: No escaping needed
+    <<"simple">> = escape_csv(<<"simple">>),
+
+    %% Test 2: Comma requires escaping
+    <<"\"hello,world\"">> = escape_csv(<<"hello,world">>),
+
+    %% Test 3: Quote requires escaping and doubling
+    <<"\"hello\"\"world\"">> = escape_csv(<<"hello\"world">>),
+
+    %% Test 4: Newline requires escaping
+    <<"\"hello\nworld\"">> = escape_csv(<<"hello\nworld">>),
+
+    %% Test 5: Multiple special chars
+    <<"\"hello, \"\"world\"\n\"">> = escape_csv(<<"hello, \"world\"\n">>),
+
+    ok.
 
 %% @private
 %% @doc Escapes a value for CSV.
@@ -821,3 +1089,79 @@ format_json_event(#log_entry{timestamp = TS, level = Level, type = Type,
         <<"    \"data\": ">>, DataJson, <<"\n">>,
         <<"  }">>
     ].
+
+%%--------------------------------------------------------------------
+%% @doc Test helper for level_ge.
+%% Exposed for doctest testing of log level comparison.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec level_ge_test() -> ok.
+
+level_ge_test() ->
+    %% Test 1: debug >= everything
+    true = level_ge(debug, debug),
+    true = level_ge(debug, info),
+    true = level_ge(debug, warning),
+    true = level_ge(debug, error),
+    true = level_ge(debug, critical),
+
+    %% Test 2: info >= info and above
+    true = level_ge(info, info),
+    true = level_ge(info, warning),
+    true = level_ge(info, error),
+    true = level_ge(info, critical),
+    false = level_ge(info, debug),
+
+    %% Test 3: warning >= warning and above
+    true = level_ge(warning, warning),
+    true = level_ge(warning, error),
+    true = level_ge(warning, critical),
+    false = level_ge(warning, debug),
+    false = level_ge(warning, info),
+
+    %% Test 4: error >= error and above
+    true = level_ge(error, error),
+    true = level_ge(error, critical),
+    false = level_ge(error, debug),
+    false = level_ge(error, info),
+    false = level_ge(error, warning),
+
+    %% Test 5: critical >= critical only
+    true = level_ge(critical, critical),
+    false = level_ge(critical, debug),
+    false = level_ge(critical, info),
+    false = level_ge(critical, warning),
+    false = level_ge(critical, error),
+
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test helper for event_type_to_transition.
+%% Exposed for doctest testing of event type to transition mapping.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec event_type_to_transition_test() -> ok.
+
+event_type_to_transition_test() ->
+    %% Test case event types
+    <<"start">> = event_type_to_transition(case_created),
+    <<"start">> = event_type_to_transition(case_started),
+    <<"suspend">> = event_type_to_transition(case_suspended),
+    <<"resume">> = event_type_to_transition(case_resumed),
+    <<"complete">> = event_type_to_transition(case_completed),
+    <<"abort">> = event_type_to_transition(case_cancelled),
+    <<"fail">> = event_type_to_transition(case_failed),
+
+    %% Test workitem event types
+    <<"schedule">> = event_type_to_transition(workitem_enabled),
+    <<"start">> = event_type_to_transition(workitem_started),
+    <<"complete">> = event_type_to_transition(workitem_completed),
+    <<"fail">> = event_type_to_transition(workitem_failed),
+    <<"abort">> = event_type_to_transition(workitem_cancelled),
+
+    %% Test engine event type
+    <<"unknown">> = event_type_to_transition(engine_event),
+
+    ok.

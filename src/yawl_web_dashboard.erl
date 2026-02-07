@@ -7,8 +7,49 @@
 %% Provides HTTP interface to view YAWL workflow execution logs.
 %%
 %% @doc YAWL Web Dashboard
+%%
+%% A gen_server-based web dashboard for viewing YAWL workflow execution logs
+%% and OpenTelemetry traces. Uses Cowboy HTTP server to serve both the
+%% dashboard HTML page and JSON API endpoints.
+%%
+%% == Starting the Dashboard ==
+%%
+%% The dashboard can be started with default options (port 8081) or with
+%% a custom port:
+%%
+%% ```erlang
+%% > {ok, Pid} = yawl_web_dashboard:start_link().
+%% {ok,<0.123.0>}
+%%
+%% > {ok, Pid} = yawl_web_dashboard:start_link(#{port => 9090}).
+%% {ok,<0.124.0>}
+%% ```
+%%
+%% == HTTP Routes ==
+%%
+%% The dashboard provides the following routes:
+%% - `GET /` - Dashboard HTML page
+%% - `GET /api/events` - List recent events (supports `level` and `limit` query params)
+%% - `GET /api/events/:trace_id` - Get events for a specific trace
+%% - `GET /api/traces` - List all traces
+%% - `GET /api/stats` - Dashboard statistics
+%% - `DELETE /api/clear` - Clear all events
+%%
+%% == Stopping the Dashboard ==
+%%
+%% ```erlang
+%% > yawl_web_dashboard:stop().
+%% ok
+%% ```
+%%
+%% == Running Doctests ==
+%%
+%% ```erlang
+%% > yawl_web_dashboard:doctest_test().
+%% ok
+%% ```
+%%
 %% @end
-
 -module(yawl_web_dashboard).
 -author("CRE Team").
 
@@ -43,16 +84,34 @@
     delete_completed/2
 ]).
 
+%% Doctests
+-export([doctest_test/0]).
+
 %%====================================================================
 %% API Functions
 %%====================================================================
 
-%% @doc Start the dashboard web server.
+%% @doc Start the dashboard web server with default port 8081.
+%%
+%% ```erlang
+%% > {ok, Pid} = yawl_web_dashboard:start_link().
+%% {ok,<0.123.0>}
+%% ```
+%% @end
 -spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
     start_link(#{port => 8081}).
 
 %% @doc Start the dashboard web server with options.
+%%
+%% Options map:
+%% - `port` - HTTP port number (default: 8081)
+%%
+%% ```erlang
+%% > {ok, Pid} = yawl_web_dashboard:start_link(#{port => 9090}).
+%% {ok,<0.124.0>}
+%% ```
+%% @end
 -spec start_link(map()) -> {ok, pid()} | {error, term()}.
 start_link(Options) ->
     Port = maps:get(port, Options, 8081),
@@ -86,6 +145,12 @@ start_link(Options) ->
     end.
 
 %% @doc Stop the dashboard web server.
+%%
+%% ```erlang
+%% > yawl_web_dashboard:stop().
+%% ok
+%% ```
+%% @end
 -spec stop() -> ok.
 stop() ->
     cowboy:stop_listener(yawl_dashboard_http),
@@ -251,6 +316,17 @@ handle_delete_request(_Path, Req, State) ->
 %%====================================================================
 
 %% @private
+%% @doc Format an otel_event record as a map for JSON encoding.
+%%
+%% ```erlang
+%% > Event = #otel_event{id = <<"evt1">>, trace_id = <<"tr1">>, timestamp = 123456, event_type = workflow_start, level = info, message = <<"Test">>, user_id = undefined, case_id = undefined, task_id = undefined, attributes = #{}}.
+%% > Map = yawl_web_dashboard:format_event(Event).
+%% > is_map(Map).
+%% true
+%% > maps:get(<<"id">>, Map).
+%% <<"evt1">>
+%% '''
+%% @end
 format_event(#otel_event{
     id = Id,
     trace_id = TraceId,
@@ -348,6 +424,18 @@ to_binary(I) when is_integer(I) -> integer_to_binary(I);
 to_binary(_) -> <<"">>.
 
 %% @private
+%% @doc Build the dashboard HTML page.
+%%
+%% Returns a binary containing the complete HTML for the dashboard.
+%%
+%% ```erlang
+%% > Html = yawl_web_dashboard:build_dashboard_html().
+%% > is_binary(Html).
+%% true
+%% > byte_size(Html) > 1000.
+%% true
+%% '''
+%% @end
 build_dashboard_html() ->
     <<
         "<!DOCTYPE html>\n"
@@ -545,3 +633,54 @@ build_dashboard_html() ->
         "</body>\n"
         "</html>\n"
     >>.
+
+%%--------------------------------------------------------------------
+%% @doc Run doctests for the yawl_web_dashboard module.
+%%
+%% ```erlang
+%% > yawl_web_dashboard:doctest_test().
+%% ok
+%% ```
+%%
+%% Or via rebar3:
+%% ```bash
+%% rebar3 eunit --module=yawl_web_dashboard
+%% ```
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Test 1: format_maybe/1 handles undefined
+    <<>> = format_maybe(undefined),
+
+    %% Test 2: format_maybe/1 handles binary
+    <<"test">> = format_maybe(<<"test">>),
+
+    %% Test 3: format_maybe/1 handles atom
+    <<"test_atom">> = format_maybe(test_atom),
+
+    %% Test 4: to_binary/1 handles binary
+    <<"binary">> = to_binary(<<"binary">>),
+
+    %% Test 5: to_binary/1 handles list
+    <<"list">> = to_binary("list"),
+
+    %% Test 6: to_binary/1 handles atom
+    <<"atom">> = to_binary(atom),
+
+    %% Test 7: to_binary/1 handles integer
+    <<"123">> = to_binary(123),
+
+    %% Test 8: build_dashboard_html returns binary
+    Html = build_dashboard_html(),
+    true = is_binary(Html),
+    true = byte_size(Html) > 1000,
+
+    %% Test 9: HTML contains expected elements
+    true = binary:match(Html, <<"YAWL Workflow Dashboard">>) =/= nomatch,
+    true = binary:match(Html, <<"events-list">>) =/= nomatch,
+    true = binary:match(Html, <<"stats">>) =/= nomatch,
+
+    ok.
