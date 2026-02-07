@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 %% @author Jrgen Brandt <joergen@cuneiform-lang.org>
 %% @copyright 2015
-%% @version 0.2.0
+%% @version 0.3.0
 %%
 %% @doc Test suite for WCP-18 through WCP-20 patterns
 %%

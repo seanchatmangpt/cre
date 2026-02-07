@@ -1,6 +1,6 @@
 %% -*- erlang -*-
 %%%% @author CRE Team
-%% @version 0.2.0
+%% @version 0.3.0
 %% @doc YAWL Specification Validator
 %%
 %% This module provides comprehensive validation for YAWL 2.1 specifications.

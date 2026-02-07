@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 %% @author Jorgen Brandt <joergen.brandt@cuneiform-lang.org>
 %% @copyright 2015
-%% @version 0.2.0
+%% @version 0.3.0
 %%
 %% @doc Comprehensive Execution Tests for Extended Control Flow YAWL Patterns
 %%

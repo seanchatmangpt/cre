@@ -40,7 +40,7 @@ Get started with CRE in minutes! For a detailed tutorial, see the [Quick Start G
 Add CRE to your rebar3 project:
 
 ```erlang
-{deps, [{cre, "0.2.1"}]}.
+{deps, [{cre, "0.3.0"}]}.
 ```
 
 ### Basic Usage
@@ -109,10 +109,10 @@ For historical compatibility with the Cuneiform runtime environment, the origina
 
 #### rebar3
 
-To integrate the cfl_re into a rebar3 managed project change the `deps` entry in your application's `rebar.config` file to include the tuple `{cre, "0.2.0"}`.
+To integrate the cfl_re into a rebar3 managed project change the `deps` entry in your application's `rebar.config` file to include the tuple `{cre, "0.3.0"}`.
 
 ```erlang
-{deps, [{cre, "0.2.0"}]}.
+{deps, [{cre, "0.3.0"}]}.
 ```
 
 #### mix
@@ -120,7 +120,7 @@ To integrate the cfl_re into a rebar3 managed project change the `deps` entry in
 In an Elixir context, the cfl_re can be integrated into the project via mix.
 
 ```elixir
-{:cre, "~> 0.2.0"}
+{:cre, "~> 0.3.0"}
 ```
 
 ### Starting the cfl_re Master

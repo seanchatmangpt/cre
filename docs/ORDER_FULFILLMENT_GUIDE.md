@@ -840,5 +840,5 @@ payment_split_test() ->
 ---
 
 *Last Updated: February 2025*
-*CRE Version: 0.2.1*
+*CRE Version: 0.3.0*
 *YAWL Specification: 2.1*

@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 %% @author Jorgen Brandt <joergen@cuneiform-lang.org>
 %% @copyright 2015
-%% @version 0.2.0
+%% @version 0.3.0
 %%
 %% @doc YAWL Exception Handling Test Suite (WHP-01 through WHP-05)
 %%

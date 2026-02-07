@@ -70,5 +70,5 @@ ENTRYPOINT ["/opt/cre/bin/cre", "foreground"]
 
 # Metadata
 LABEL maintainer="CRE Team"
-LABEL version="0.2.0"
+LABEL version="0.3.0"
 LABEL description="CRE YAWL Workflow Engine - Production Build"

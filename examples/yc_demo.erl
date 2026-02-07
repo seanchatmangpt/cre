@@ -26,7 +26,7 @@ run_all_demos() ->
     io:format("~n~n"),
     io:format("╔════════════════════════════════════════════════════════════════╗~n"),
     io:format("║    CRE YAWL Workflow Engine - Y Combinator Demo               ║~n"),
-    io:format("║    Version 0.2.1 - OTP 28 Support                            ║~n"),
+    io:format("║    Version 0.3.0 - OTP 28 Support                            ║~n"),
     io:format("╚════════════════════════════════════════════════════════════════╝~n~n"),
 
     %% Start all required services
