@@ -21,7 +21,7 @@ This document summarizes the consolidation of multiple remote branches into the 
 | Test Files (.erl) | 71 test suites |
 | Documentation Files | 101 markdown files |
 | Lines of Code | ~116,000 LOC |
-| YAWL Patterns Implemented | 26 of 43 pattern modules (60.5%) |
+| YAWL Patterns Implemented | 40 of 43 pattern modules (93.0%) |
 | OTP Support | 25.0, 26, 27, 28 |
 | Compilation Status | Clean (4 minor unused record warnings) |
 | Test Status | Passing with known integration test issues |

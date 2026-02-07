@@ -8,7 +8,7 @@ This document provides detailed documentation for all 43 YAWL (Yet Another Workf
 
 - **CRE Version**: v0.3.0
 - **OTP Support**: 25.0 - 28.x
-- **Patterns Count**: 26 of 43 YAWL patterns implemented (60.5%)
+- **Patterns Count**: 40 of 43 YAWL patterns implemented (93.0%)
 - **Last Updated**: December 2024
 
 ## Quick Links

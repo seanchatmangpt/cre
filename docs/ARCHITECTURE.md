@@ -177,7 +177,7 @@ Pure helper modules for workflow operations:
 
 All 43 YAWL workflow patterns live in `/Users/sac/cre/src/patterns/`:
 
-| Category | Patterns (26/43 implemented) |
+| Category | Patterns (40/43 implemented) |
 |----------|----------------------------|
 | Basic Control Flow (WCP-01 to WCP-10) | `parallel_split`, `or_join`, `exclusive_choice`, `simple_merge`, `multiple_choice`, `multiple_merge`, `discriminator`, `n_out_of_m`, `implicit_termination` |
 | Advanced Synchronization | `structured_loop`, `milestone`, `critical_section` |
@@ -481,7 +481,7 @@ This record is the `usr_info` field, updated via 3-tuple `fire/3` returns.
 
 ## YAWL Pattern Implementation Status
 
-### Implemented Patterns (26/43)
+### Implemented Patterns (40/43)
 
 | ID | Pattern Name | Module | Status |
 |----|-------------|--------|--------|
@@ -511,15 +511,13 @@ This record is the `usr_info` field, updated via 3-tuple `fire/3` returns.
 | WRP-04 | Resource Dealloc | `resource_deallocation` | Complete |
 | WRP-05 | Capability Alloc | `resource_allocation` | Complete |
 
-### Remaining Patterns (17 needed)
+### Remaining Patterns (3 needed)
 
 | Category | Missing Patterns |
 |----------|------------------|
-| Advanced Synchronization | Structured Synchronization, Partial Join |
-| Multiple Instances | No Sync, Runtime Knowledge, Without Prior Knowledge |
-| State-Based | Cancel Activity, Cancel Case |
-| Extended Control Flow | Recursion, Interleaved Loop, Protocol Pattern |
-| Exception Handling | Error Handler, Retry, Compensation (3 variants) |
+| Multiple Instances | Without Prior Knowledge |
+| Extended Control Flow | Try-Catch |
+| Exception Handling | Retry |
 
 ---
 

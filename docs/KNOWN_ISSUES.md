@@ -329,34 +329,21 @@ Clean up message handling in executor stats module.
 
 ---
 
-## Unimplemented YAWL Patterns (17 Without Dedicated Modules)
+## Unimplemented YAWL Patterns (3 Without Dedicated Modules)
 
-**Status:** 26 of 43 patterns have dedicated gen_pnet modules (60.5%)
+**Status:** 40 of 43 patterns have dedicated gen_pnet modules (93.0%)
 
 ### Patterns Without Dedicated Modules
 
-The following 17 patterns are functionally implemented via the `cre_yawl_patterns` module helper functions, but do not have dedicated gen_pnet behavior modules in `src/patterns/`:
+The following 3 patterns are functionally implemented via the `cre_yawl_patterns` module helper functions, but do not have dedicated gen_pnet behavior modules in `src/patterns/`:
 
 | Pattern ID | Pattern Name | Category | Priority |
 |------------|--------------|----------|----------|
-| WCP-12 | Multiple Instances without Sync | Multiple Instances | Low |
-| WCP-14 | Multiple Instances with Runtime Knowledge | Multiple Instances | Medium |
 | WCP-15 | Multiple Instances without Prior Knowledge | Multiple Instances | High |
-| WCP-19 | Cancel Activity | State-Based | High |
-| WCP-20 | Cancel Case | State-Based | High |
-| WCP-21 | Structured Synchronization | Extended Control | Medium |
-| WCP-22 | Partial Join | Extended Control | Medium |
-| WCP-24 | Recursion | Extended Control | Medium |
-| WCP-25 | Interleaved Loop | Extended Control | Medium |
-| WCP-27 | Protocol Pattern | Extended Control | Low |
 | WCP-28 | Try-Catch | Extended Control | High |
-| WHP-01 | Error Handler | Exception Handling | High |
 | WHP-02 | Retry | Exception Handling | High |
-| WHP-03 | Compensation | Exception Handling | High |
-| WHP-04 | Triggered Compensation | Exception Handling | Medium |
-| WHP-05 | Consecutive Compensation | Exception Handling | Medium |
 
-**Note:** All 43 patterns are functionally implemented. The 17 patterns listed above are available through the `cre_yawl_patterns` API but lack dedicated gen_pnet behavior modules for better modularity and testability.
+**Note:** All 43 patterns are functionally implemented. The 3 patterns listed above are available through the `cre_yawl_patterns` API but lack dedicated gen_pnet behavior modules for better modularity and testability.
 
 ---
 
@@ -511,7 +498,7 @@ When fixing issues:
 |------|---------|
 | 2026-02-06 | Initial creation from FINAL_MERGE_SUMMARY.md data |
 | 2026-02-06 | Added current test results (1226 total, 27 failures, 97.8% pass) |
-| 2026-02-06 | Corrected unimplemented pattern count (17 remaining, 26 of 43 implemented) |
+| 2026-02-06 | Updated pattern count to 40 of 43 implemented (3 remaining) |
 
 ---
 
