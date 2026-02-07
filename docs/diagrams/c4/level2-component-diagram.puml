@@ -1,0 +1,231 @@
+@startuml CRE Workflow Engine - C4 Level 2 Component Diagram
+
+!theme plain
+skinparam packageStyle rectangle
+skinparam componentStyle uml2
+
+title CRE Workflow Engine - C4 Level 2 Component Diagram
+
+legend right
+  <b>Legend:</b>
+  <b>Components:</b> Internal modules within containers
+  <b>Interfaces:</b> Communication protocols and contracts
+  <b>Data Flows:</b> Information flow with labels
+  <b>Dependencies:</b> Component relationships
+  endlegend
+
+package "CRE Application" {
+    [CRE App] as app <<Container>>
+    
+    app *-[ CRE Master ] as master_rel
+    app *-[ HTTP Interface ] as http_rel
+    app *-[ YAWL Engine ] as yawl_rel
+    app *-[ Worker Pool ] as worker_rel
+}
+
+package "CRE Master" as master <<Component>> {
+    [Client Manager] as client_mgr
+    [Worker Manager] as worker_mgr
+    [Resource Allocator] as resource_alloc
+    
+    client_mgr -[#blue]-> worker_mgr : "worker requests"
+    worker_mgr -[#blue]-> resource_alloc : "resource allocation"
+    resource_alloc -[#blue]-> client_mgr : "worker assignment"
+}
+
+package "YAWL Engine" as yawl <<Component>> {
+    [Net Manager] as net_mgr
+    [Token Processor] as token_proc
+    [State Manager] as state_mgr
+    
+    net_mgr -[#green]-> token_proc : "net structure"
+    token_proc -[#green]-> state_mgr : "token operations"
+    state_mgr -[#green]-> net_mgr : "state updates"
+}
+
+package "HTTP Interface" as http <<Component>> {
+    [Status Handler] as status_handler
+    [History Handler] as history_handler
+    [YAWL Interface] as yawl_interface
+    
+    status_handler -[#orange]-> history_handler : "status events"
+    history_handler -[#orange]-> yawl_interface : "workflow history"
+    yawl_interface -[#orange]-> status_handler : "API responses"
+}
+
+package "Worker Pool" as workers <<Component>> {
+    [Workflow Executor] as workflow_executor
+    [Task Handler] as task_handler
+    [Result Processor] as result_processor
+    
+    workflow_executor -[#purple]-> task_handler : "task distribution"
+    task_handler -[#purple]-> result_processor : "task results"
+    result_processor -[#purple]-> workflow_executor : "completion feedback"
+}
+
+' Interfaces and Data Flows
+master -[#blue]> http : "REST API calls"
+master -[#blue]> yawl : "workflow requests"
+master -[#blue]> workers : "task distribution"
+
+yawl -[#green]> workers : "task execution"
+yawl -[#green]> master : "status updates"
+
+workers -[#purple]> master : "task results"
+workers -[#purple>] yawl : "token updates"
+
+' External interfaces
+app -[#black]> [External Clients] as ext_clients : "HTTP/JSON API"
+app -[#black]> [Workflow Definitions] as workflows : "YAWL XML/Specs"
+
+' Detailed interfaces
+interface "Client Protocol" as client_proto
+interface "Workflow Protocol" as workflow_proto
+interface "Task Protocol" as task_proto
+interface "Status Protocol" as status_proto
+
+client_mgr -[#blue]> client_proto : "authenticate, request"
+worker_mgr -[#blue]> task_proto : "assign, monitor"
+resource_alloc -[#blue]> task_proto : "allocate, release"
+
+net_mgr -[#green]> workflow_proto : "validate, compile"
+token_proc -[#green]> workflow_proto : "process tokens"
+state_mgr -[#green]> workflow_proto : "track state"
+
+status_handler -[#orange]> status_proto : "JSON responses"
+history_handler -[#orange]> status_proto : "history events"
+yawl_interface -[#orange]> workflow_proto : "YAWL API"
+
+workflow_executor -[#purple]> task_proto : "execute tasks"
+task_handler -[#purple]> task_proto : "handle events"
+result_processor -[#purple]> status_proto : "result reports"
+
+' Data flow annotations
+note top of master
+  "Manages worker pools and\ntask distribution using\nPetri net marking\nalgebra"
+end note
+
+note top of yawl
+  "Executes YAWL workflows\nusing gen_pnet behavior\nwith token processing"
+end note
+
+note top of http
+  "Provides REST API for\nworkflow management\nand status monitoring"
+end note
+
+note top of workers
+  "Pool of worker processes\nexecuting individual tasks\nwith lifecycle management"
+end note
+
+' Cross-cutting concerns
+database "Workflow DB" as db <<Database>>
+master -[#cyan]> db : "persist cases"
+yawl -[#cyan]> db : "save states"
+workers -[#cyan]> db : "log results"
+
+message "YAWL XML\nSpecifications" as yawl_spec
+message "JSON\nRequests/Responses" as json_msg
+message "Task Tokens\nand Events" as task_events
+
+workflows -[#black]> yawl_spec
+ext_clients -[#black]> json_msg
+master -[#black]> task_events
+
+' Component responsibilities
+note bottom of client_mgr
+  Responsibilities:
+  - Client authentication
+  - Request validation
+  - Load balancing
+  - Session management
+end note
+
+note bottom of worker_mgr
+  Responsibilities:
+  - Worker lifecycle
+  - Task distribution
+  - Health monitoring
+  - Failure recovery
+end note
+
+note bottom of resource_alloc
+  Responsibilities:
+  - Resource allocation
+  - Priority management
+  - Capacity planning
+  - Performance optimization
+end note
+
+note bottom of net_mgr
+  Responsibilities:
+  - Net validation
+  - Compilation
+  - Schema management
+  - Pattern support
+end note
+
+note bottom of token_proc
+  Responsibilities:
+  - Token processing
+  - Transition firing
+  - Marking updates
+  - Progress loop
+end note
+
+note bottom of state_mgr
+  Responsibilities:
+  - State persistence
+  - Consistency
+  - Recovery
+  - Audit trails
+end note
+
+note bottom of status_handler
+  Responsibilities:
+  - Status endpoints
+  - Health checks
+  - Metrics collection
+  - Response formatting
+end note
+
+note bottom of history_handler
+  Responsibilities:
+  - History tracking
+  - Event logging
+  - Query support
+  - Export capabilities
+end note
+
+note bottom of yawl_interface
+  Responsibilities:
+  - YAWL API endpoints
+  - Workflow management
+  - Case operations
+  - Work item handling
+end note
+
+note bottom of workflow_executor
+  Responsibilities:
+  - Workflow execution
+  - Token handling
+  - Transition management
+  - Progress tracking
+end note
+
+note bottom of task_handler
+  Responsibilities:
+  - Task lifecycle
+  - External events
+  - State transitions
+  - Error handling
+end note
+
+note bottom of result_processor
+  Responsibilities:
+  - Result collection
+  - Validation
+  - Persistence
+  - Notifications
+end note
+
+@enduml

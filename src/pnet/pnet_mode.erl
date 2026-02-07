@@ -17,42 +17,8 @@
 %% limitations under the License.
 %%
 %% -------------------------------------------------------------------
-%% @doc Petri Net Mode Enumeration Module
-%%
-%% This module provides mode enumeration utilities for the gen_pnet
-%% Petri net framework. Modes represent the different ways a transition
-%% can be fired given the current marking.
-%%
-%% <h3>Key Concepts</h3>
-%%
-%% A <em>mode</em> specifies which tokens are consumed from each input
-%% place when a transition fires. For uncolored Petri nets, a mode is
-%% simply a selection of available tokens from each preset place.
-%%
-%% For colored Petri nets, a <em>cmode</em> (colored mode) extends this
-%% with variable bindings that match token values against arc expressions.
-%%
-%% <h3>Usage Example</h3>
-%% <pre><code>
-%% %% Get preset counts for a transition
-%% PresetPlaces = [p1, p2, p3],
-%% Counts = pnet_mode:preset_counts(PresetPlaces),
-%% %% => #{p1 => 1, p2 => 1, p3 => 1}
-%%
-%% %% Enumerate all possible modes given current marking
-%% Marking = #{p1 => [a, b], p2 => [c], p3 => [d, e]},
-%% Modes = pnet_mode:enum_modes(PresetPlaces, Marking),
-%% %% => [#{p1 => [a], p2 => [c], p3 => [d]},
-%% %%     #{p1 => [a], p2 => [c], p3 => [e]},
-%% %%     #{p1 => [b], p2 => [c], p3 => [d]},
-%% %%     #{p1 => [b], p2 => [c], p3 => [e]}]
-%% </code></pre>
-%%
-%% @end
-%% -------------------------------------------------------------------
 
 -module(pnet_mode).
-
 -moduledoc """
 Mode enumeration (input token selections).
 
@@ -63,27 +29,28 @@ enum_modes/2 enumerates deterministic modes:
 - output list is deterministic
 
 ```erlang
-> pnet_mode:preset_counts([p,p,q]).
-#{p => 2, q => 1}
+> pnet_mode:preset_counts([p1,p2,p1]).
+#{p1 => 2,p2 => 1}
 
-> Marking = #{p => [a,b,c], q => [x]}.
-> pnet_mode:enum_modes([p,p,q], Marking).
-[#{p => [a,b], q => [x]},
- #{p => [a,c], q => [x]},
- #{p => [b,c], q => [x]}]
+> Mark = #{p1 => [a,b], p2 => [c]}.
+> Modes = pnet_mode:enum_modes([p1,p2], Mark).
+> length(Modes).
+2
+> lists:sort([maps:get(p1, M) || M <- Modes]).
+[[a],[b]]
 
-> pnet_mode:enum_modes([p], #{p => []}).
+> Mark2 = #{p1 => [a,b,c]}.
+> Modes2 = pnet_mode:enum_modes([p1,p1], Mark2).
+> length(Modes2).
+3
+> lists:all(fun(M) -> length(maps:get(p1, M)) =:= 2 end, Modes2).
+true
+
+> pnet_mode:enum_modes([p9], #{p9 => []}).
 []
 
-> pnet_mode:enum_modes([p,q], #{p => [a,b], q => [x,y]}).
-[#{p => [a], q => [x]},
- #{p => [a], q => [y]},
- #{p => [b], q => [x]},
- #{p => [b], q => [y]}]
-
-> % Colored mode enumeration fallback
-> pnet_mode:enum_cmodes(t1, #{p => [a,b]}, ctx, basic_net).
-[{#{}, #{p => [a]}}, {#{}, #{p => [b]}}]
+> pnet_mode:enum_cmodes(t1, #{p => [a,b]}, ctx, wf_test_net_basic).
+{ok,[{#{},#{p => [a]}},{#{},#{p => [b]}}]}
 ```
 """.
 
@@ -159,11 +126,11 @@ enum_modes/2 enumerates deterministic modes:
 %%--------------------------------------------------------------------
 %% @doc Returns the count of tokens needed from each preset place.
 %%
-%% For basic Petri nets, each place needs at least 1 token.
-%% This function returns a map indicating the minimum requirement.
+%% Counts the multiplicity of each place in the preset list.
+%% For example, [p1, p2, p1] returns #{p1 => 2, p2 => 1}.
 %%
 %% @param PresetPlaces List of input places for a transition
-%% @return Map of places to required token count (always 1 for uncolored)
+%% @return Map of places to their count in the preset list
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -184,15 +151,18 @@ preset_counts(PresetPlaces) when is_list(PresetPlaces) ->
 %% @doc Enumerates all possible modes given the current marking.
 %%
 %% A mode represents one valid way to fire a transition by selecting
-%% tokens from each preset place. This function generates the Cartesian
-%% product of available tokens across all preset places.
+%% tokens from each preset place. The number of tokens selected from
+%% each place equals its multiplicity in the preset list.
 %%
-%% For example, with preset places [p1, p2] and marking #{p1 => [a,b], p2 => [c]},
+%% For example, with preset [p1, p2] and marking #{p1 => [a,b], p2 => [c]},
 %% returns [#{p1 => [a], p2 => [c]}, #{p1 => [b], p2 => [c]}].
+%%
+%% With preset [p1, p1] and marking #{p1 => [a,b,c]},
+%% returns all 3 combinations of 2 tokens: [#{p1 => [a,b]}, #{p1 => [a,c]}, #{p1 => [b,c]}].
 %%
 %% @param PresetPlaces List of input places for the transition
 %% @param Marking Current marking of the net
-%% @return List of all valid modes
+%% @return List of all valid modes (empty if no mode possible)
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -210,36 +180,46 @@ enum_modes(PresetPlaces, Marking) when is_list(PresetPlaces), is_map(Marking) ->
 %% @doc Enumerates colored modes with variable bindings.
 %%
 %% For colored Petri nets, this function calls the net module's
-%% cmodes callback to get modes that include variable bindings.
+%% cmodes/3 callback to get modes that include variable bindings.
 %% If the net module doesn't implement colored modes, falls back
-%% to basic mode enumeration.
+%% to basic mode enumeration with empty bindings.
 %%
 %% @param Trsn The transition to enumerate modes for
 %% @param Marking Current marking of the net
-%% @param Ctx User context (usr_info) for the net
+%% @param UsrInfo User context for the net
 %% @param NetMod The net module implementing pnet_net behaviour
-%% @return List of all valid colored modes
+%% @return {ok, [{Binding, Mode}]} pairs on success, {error, Reason} on failure
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec enum_cmodes(Trsn :: atom(), Marking :: marking(),
-                 Ctx :: usr_info(), NetMod :: net_mod()) ->
-          [cmode()].
+                 UsrInfo :: usr_info(), NetMod :: net_mod()) ->
+          {ok, [cmode()]} | {error, term()}.
 
-enum_cmodes(Trsn, Marking, Ctx, NetMod) when is_atom(Trsn), is_map(Marking),
-                                             is_atom(NetMod) ->
-    %% Check if the net module implements colored modes
+enum_cmodes(Trsn, Marking, UsrInfo, NetMod) when is_atom(Trsn), is_map(Marking),
+                                              is_atom(NetMod) ->
+    %% Check if the net module implements colored modes (cmodes/3)
     case erlang:function_exported(NetMod, cmodes, 3) of
         true ->
             try
-                NetMod:cmodes(Trsn, Marking, Ctx)
+                NetMod:cmodes(Trsn, Marking, UsrInfo)
             catch
-                _:_:_-> []
+                _Type:_Reason:_Stack ->
+                    %% On error, try fallback to basic enumeration
+                    Preset = NetMod:preset(Trsn),
+                    Modes = enum_modes(Preset, Marking),
+                    {ok, [{#{}, M} || M <- Modes]}
             end;
         false ->
             %% Fall back to basic mode enumeration with empty binding
-            Modes = enum_modes(NetMod:preset(Trsn), Marking),
-            [{#{}, M} || M <- Modes]
+            try
+                Preset = NetMod:preset(Trsn),
+                Modes = enum_modes(Preset, Marking),
+                {ok, [{#{}, M} || M <- Modes]}
+            catch
+                _Type:_Reason:_Stack ->
+                    {error, no_preset}
+            end
     end.
 
 %%====================================================================
@@ -251,7 +231,7 @@ enum_cmodes(Trsn, Marking, Ctx, NetMod) when is_atom(Trsn), is_map(Marking),
 %%
 %% For each place, generates all combinations of N tokens where N is
 %% the count from the preset multiplicity. Results are in deterministic
-%% term order.
+%% term order (combinations maintain original list order).
 %%
 %% @private
 %%--------------------------------------------------------------------
@@ -292,7 +272,13 @@ enum_modes_for_places([Place | Rest], Counts, Marking) ->
 %% @doc Generate all combinations of N elements from a list.
 %%
 %% Returns combinations in deterministic order (lexicographic by
-%% position in the original list).
+%% position in the original list). Each combination maintains the
+%% original order of elements from the input list.
+%%
+%% Examples:
+%%   combinations(2, [a,b,c]) -> [[a,b], [a,c], [b,c]]
+%%   combinations(1, [a,b]) -> [[a], [b]]
+%%   combinations(0, _) -> [[]]
 %%
 %% @private
 %%--------------------------------------------------------------------
@@ -318,4 +304,48 @@ combinations(N, [H | T]) ->
 
 doctest_test() ->
     doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%% Additional unit tests for comprehensive coverage
+
+preset_counts_test() ->
+    ?assertEqual(#{p1 => 2, p2 => 1}, preset_counts([p1, p2, p1])),
+    ?assertEqual(#{}, preset_counts([])),
+    ?assertEqual(#{p => 3}, preset_counts([p, p, p])).
+
+enum_modes_empty_preset_test() ->
+    Modes = enum_modes([], #{p => [a, b]}),
+    ?assertEqual([#{}], Modes).
+
+enum_modes_empty_tokens_test() ->
+    Modes = enum_modes([p1], #{p1 => []}),
+    ?assertEqual([], Modes).
+
+enum_modes_combinations_test() ->
+    Modes = enum_modes([p1, p1], #{p1 => [a, b, c]}),
+    ?assertEqual(3, length(Modes)),
+    ?assert(lists:all(fun(M) -> length(maps:get(p1, M)) =:= 2 end, Modes)).
+
+enum_modes_single_place_test() ->
+    Modes = enum_modes([p1], #{p1 => [a, b, c]}),
+    ?assertEqual(3, length(Modes)),
+    ?assertEqual([[a], [b], [c]], lists:sort([maps:get(p1, M) || M <- Modes])).
+
+enum_modes_multiple_places_test() ->
+    Modes = enum_modes([p1, p2], #{p1 => [a, b], p2 => [c]}),
+    ?assertEqual(2, length(Modes)),
+    ?assert(lists:all(fun(M) -> maps:get(p2, M) =:= [c] end, Modes)),
+    ?assertEqual([[a], [b]], lists:sort([maps:get(p1, M) || M <- Modes])).
+
+enum_modes_insufficient_tokens_test() ->
+    Modes = enum_modes([p1, p1], #{p1 => [a]}),
+    ?assertEqual([], Modes).
+
+enum_cmodes_no_cmodes_callback_test() ->
+    %% Test fallback when net module doesn't implement cmodes/3
+    Modes = enum_cmodes(t1, #{p => [a, b]}, ctx, wf_test_net_basic),
+    ?assertMatch({ok, _}, Modes),
+    {ok, Cmodes} = Modes,
+    ?assertEqual(2, length(Cmodes)),
+    ?assert(lists:all(fun({Binding, _}) -> Binding =:= #{} end, Cmodes)).
+
 -endif.

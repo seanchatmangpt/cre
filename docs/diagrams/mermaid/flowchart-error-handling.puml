@@ -1,0 +1,252 @@
+@startuml CRE Error Handling Flowchart
+!theme plain
+skinparam backgroundColor white
+skinparam handwritten false
+skinparam defaultFontName Arial
+
+title CRE Error Handling Flowchart
+
+start
+
+:Error Detection;
+note right
+ Multiple error detection points:
+ - Worker failures (worker_result failures)
+ - Task timeouts (wf_timerq)
+ - Network issues (link failures)
+ - Resource exhaustion (worker pool exhausted)
+ - Workflow validation errors
+end note
+
+:Error Analysis;
+note right
+ Error classification and severity assessment:
+ - Temporary errors (retryable)
+ - Permanent errors (non-retryable)
+ - System errors (infrastructure)
+ - Application errors (workflow logic)
+ - Resource errors (capacity issues)
+end note
+
+:Error Context Collection;
+note right
+ Gather error context for diagnosis:
+ - Error timestamp and location
+ - Worker node and process ID
+ - Task ID and workflow case
+ - Error stack trace and details
+ - Previous execution history
+end note
+
+:Error Severity Assessment;
+note right
+ Determine error impact and priority:
+ - Critical: System-wide failure
+ - High: Task workflow failure
+ - Medium: Individual task failure
+ - Low: Recoverable transient error
+ - Information: Warning conditions
+end note
+
+if (Error Type?) then (Temporary)
+    :Retry Decision;
+    note right
+     Evaluate retry eligibility:
+     - Retry limits not exceeded
+     - Error is transient
+     - Resources available
+     - Backoff timing calculated
+    end note
+    
+    if (Retry Eligible?) then (yes)
+        :Apply Retry Strategy;
+        note right
+         Exponential backoff applied
+         Retry limits enforced
+         Circuit breaker monitoring
+         Maximum retry attempts tracked
+        end note
+        
+        :Wait Backoff Period;
+        note right
+         Configurable backoff delay
+         Jitter applied to avoid thundering herd
+         Progressive increase with retries
+        end note
+        
+        :Retry Task;
+        note right
+         Task requeued for execution
+         Fresh worker assignment
+         Retry count incremented
+         Monitoring for retry loops
+        end note
+        
+        if (Retry Successful?) then (yes)
+            :Mark as Recovered;
+            note right
+             Task completed successfully
+             Error metrics updated
+             Recovery logged
+            end note
+        else (no)
+            if (Retry Limit Reached?) then (yes)
+                :Mark as Failed;
+                note right
+                 Task marked as permanently failed
+                 Error escalation triggered
+                 Client notified
+                 Recovery attempt stopped
+                end note
+            else (no)
+                :Continue Retry;
+                note right
+                 Back to retry decision
+                 Retry count incremented
+                 Next backoff period calculated
+                end note
+            endif
+        endif
+    else (no)
+        :Mark as Non-Retryable;
+        note right
+         Error cannot be retried:
+         - Permanent failure
+         - Resource exhaustion
+         - Validation errors
+         - Circuit breaker open
+        end note
+        :Handle Permanent Failure;
+        note right
+         Error propagated to client
+         Task marked as completed failed
+         Resources cleaned up
+        end note
+    endif
+else (Permanent)
+    :Immediate Failure Handling;
+    note right
+     Non-retryable errors:
+     - Invalid task specification
+     - Authentication failures
+     - Permission errors
+     - Resource quota exceeded
+     - System configuration errors
+    end note
+    
+    :Cleanup Resources;
+    note right
+     Resource release and cleanup:
+     - Worker state updated
+     - File system cleanup
+     - Memory resources freed
+     - Network connections closed
+    end note
+    
+    :Notify Stakeholders;
+    note right
+     Error notification to:
+     - Client application
+     - System administrators
+     - Monitoring systems
+     - Error tracking systems
+    end note
+endif
+
+:Update State and Metrics;
+note right
+ Error state management:
+ - Error metrics updated
+ - Alert thresholds checked
+ - Error tracking system notified
+ - Performance impact assessed
+end note
+
+:Generate Error Report;
+note right
+ Comprehensive error reporting:
+ - Error details and context
+ - Root cause analysis
+ - Impact assessment
+ - Recovery recommendations
+ - Prevention strategies
+end note
+
+:Log and Audit;
+note right
+ Error logging and audit trail:
+ - Error timestamp and location
+ - Error severity and type
+ - Recovery actions taken
+ - Impact assessment
+ - Follow-up required
+end note
+
+:Recovery Decision;
+note right
+ Determine recovery strategy:
+ - Automatic recovery possible
+ - Manual intervention required
+ - System restart needed
+ - Configuration changes required
+- Escalation to higher level
+end note
+
+if (Recovery Possible?) then (yes)
+    :Execute Recovery;
+    note right
+     Recovery actions:
+     - Retry with different strategy
+     - Use alternative worker
+     - Restart workflow case
+     - Apply configuration fix
+    end note
+    
+    if (Recovery Successful?) then (yes)
+        :Resume Normal Operation;
+        note right
+         System returns to normal
+         Error recovery completed
+         Monitoring continues
+        end note
+    else (no)
+        :Escalate Issue;
+        note right
+         Recovery failed:
+         - Manual intervention needed
+         - System administrator notified
+         - Service degradation may occur
+        end note
+    endif
+else (no)
+    :Implement Contingency;
+    note right
+     Contingency measures:
+     - Service degradation
+     - Alternative workflows
+     - Partial functionality
+     - Graceful degradation
+    end note
+    
+    :Monitor Degraded State;
+    note right
+     System monitoring in degraded mode:
+     - Performance metrics tracked
+     - User impact assessed
+     - Recovery window monitored
+     - Alert thresholds adjusted
+    end note
+endif
+
+:Update System State;
+note right
+ Final state update:
+ - Error resolution completed
+ - System state stabilized
+ - Performance metrics updated
+ - Alert status cleared
+end note
+
+stop
+
+@enduml

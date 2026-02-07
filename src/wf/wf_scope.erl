@@ -257,6 +257,62 @@ translate_places(Input, Mapping) when is_map(Input), is_map(Mapping) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+%%--------------------------------------------------------------------
+%% @doc EUnit test runner for the module.
+%% Tests the doctest examples from the moduledoc.
+%%--------------------------------------------------------------------
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    %% Setup binding table
+    BT = #{s1 => #{pin => cin, pout => cout}},
+
+    %% Test bindings/2
+    ?assertEqual(#{pin => cin, pout => cout}, bindings(BT, s1)),
+    ?assertEqual({error, unknown_scope}, bindings(BT, missing)),
+
+    %% Test enter/3
+    Parent = #{pin => [a, b]},
+    ?assertEqual(#{cin => [a, b]}, enter(BT, s1, Parent)),
+
+    %% Test leave/3
+    Child = #{cout => [ok]},
+    ?assertEqual(#{pout => [ok]}, leave(BT, s1, Child)),
+
+    %% Test unknown scope => identity
+    ?assertEqual(#{p1 => [x]}, enter(BT, missing, #{p1 => [x]})),
+
+    %% Additional coverage tests
+    ?assertEqual(#{}, enter(BT, s1, #{})),
+    ?assertEqual(#{}, leave(BT, s1, #{})),
+
+    %% Test list input (edge case)
+    ?assertEqual(#{p1 => []}, enter(BT, missing, [p1])),
+    ?assertEqual(#{p2 => []}, leave(BT, missing, [p2])),
+
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that enter/3 properly translates all keys in mapping.
+%%--------------------------------------------------------------------
+enter_full_mapping_test() ->
+    BT = #{scope => #{a => x, b => y, c => z}},
+    Input = #{a => [1], b => [2], d => [4]},
+    ?assertEqual(#{x => [1], y => [2], d => [4]}, enter(BT, scope, Input)).
+
+%%--------------------------------------------------------------------
+%% @doc Test that leave/3 properly reverses the mapping.
+%%--------------------------------------------------------------------
+leave_full_mapping_test() ->
+    BT = #{scope => #{a => x, b => y}},
+    Input = #{x => [1], y => [2], z => [3]},
+    ?assertEqual(#{a => [1], b => [2], z => [3]}, leave(BT, scope, Input)).
+
+%%--------------------------------------------------------------------
+%% @doc Test empty binding table.
+%%--------------------------------------------------------------------
+empty_binding_table_test() ->
+    BT = #{},
+    Input = #{a => [1]},
+    ?assertEqual(Input, enter(BT, any, Input)),
+    ?assertEqual(Input, leave(BT, any, Input)).
+
 -endif.

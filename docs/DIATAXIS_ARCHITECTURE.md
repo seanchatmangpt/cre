@@ -5,8 +5,8 @@
 This documentation describes the refactored CRE (Concurrent Runtime Environment) architecture following Joe Armstrong's principle: **one real OTP runner (`gen_pnet`), everything else pure helpers/utilities + message contracts**.
 
 The new architecture consists of:
-- **12 pure helper modules** for types, marking algebra, mode enumeration, choice enumeration, receipts, timers, tasks, scopes, YAWL validation, and YAWL compilation
-- **1 OTP behavior** (`gen_pnet`) as the only required runtime component
+- **13 pure helper modules** for types, marking algebra, mode enumeration, choice enumeration, receipts, timers, tasks, scopes, YAWL validation, YAWL compilation, and workflow utilities
+- **2 OTP behaviors** (`gen_pnet` and `gen_yawl`) with `gen_yawl` providing enhanced YAWL features
 - **Message contracts** for clean inter-process communication
 - **YAWL tooling** for validation and compilation to the new interface
 
@@ -16,6 +16,16 @@ The implementation is currently in progress with core utility modules being acti
 - ✅ `pnet_types.erl` - Complete with total validation functions
 - ✅ `pnet_marking.erl` - Complete with multiset marking algebra
 - ✅ `pnet_mode.erl` - Complete with mode enumeration utilities
+- ✅ `gen_pnet.erl` - Complete OTP runner with 20 API functions and 13 callbacks
+- ✅ `yawl_compile.erl` - Complete YAWL compilation system
+- ✅ `yawl_compiled.erl` - Complete compiled specification accessor functions
+- ✅ `wf_audit_log.erl` - Complete append-only receipt audit log
+- ✅ `wf_cancel.erl` - Complete YAWL cancellation region handling
+- ✅ `wf_conc.erl` - Complete concurrency testing utilities
+- ✅ `wf_pool.erl` - Complete worker pool management
+- ✅ `wf_pool_worker.erl` - Complete OTP worker placeholder
+- ✅ `wf_rules.erl` - Complete erlog-backed rules engine
+- ✅ `wf_yawl_pred.erl` - Complete XPath to Datalog translation
 
 ---
 
@@ -373,7 +383,43 @@ cfire(Trsn, Binding, Mode, UsrInfo) -> abort | {produce, produce_map()}
 
 **StateSummary Contract**: Minimal representation for decision-making (e.g., marking hash + usr_info).
 
-#### 10. `gen_pnet` - OTP Runner
+#### 10. `gen_yawl` - YAWL Wrapper with 3-tuple fire/3
+
+```erlang
+% Start workflows (same API as gen_pnet)
+start_link(NetMod, NetArg, Options) -> {ok, pid()}
+start_link(ServerName, NetMod, NetArg, Options) -> {ok, pid()}
+
+% Query functions (same as gen_pnet)
+ls(Name, Place) -> {ok, [token()]} | {error, bad_place}
+marking(Name) -> marking()
+usr_info(Name) -> term()              % Returns current user info
+stats(Name) -> stats()
+reset_stats(Name) -> ok
+
+% Communication (same as gen_pnet)
+call(Name, Request) -> Reply
+call(Name, Request, Timeout) -> Reply
+cast(Name, Request) -> ok
+reply(Client, Reply) -> ok
+
+% State property checking
+state_property(Name, Pred, PlaceLst) -> ok | {error, Reason}
+
+% Lifecycle
+stop(Name) -> ok
+
+% Net state accessors (forwarded from gen_pnet)
+get_ls(Place, NetState) -> [token()]
+get_usr_info(NetState) -> term()
+get_stats(NetState) -> stats()
+```
+
+**Purpose**: Drop-in replacement for `gen_pnet` that adds 3-tuple fire/3 support. The `fire/3` callback can return `{produce, ProduceMap, NewUsrInfo}` to automatically update user info during transition firing. This is essential for YAWL workflows where state needs to be tracked across transitions.
+
+**Key Difference**: Same API as `gen_pnet`, but with enhanced `fire/3` callback supporting 3-tuple returns for automatic state updates.
+
+#### 11. `gen_pnet` - OTP Runner
 
 ```erlang
 % Process lifecycle
@@ -405,7 +451,7 @@ subscribe(Name, Pid) -> ok  % Delivers {pnet_receipt, Receipt}
    - Run progress loop until blocked
    - Emit receipts and effect commands
 
-#### 11. `yawl_validate` - YAWL Validation
+#### 12. `yawl_validate` - YAWL Validation
 
 ```erlang
 validate(XmlOrSpec) -> ok | {error, Reason}
@@ -712,3 +758,75 @@ consume_tokens([Token | RestAvailable], TokensToTake) ->
 ```
 
 This architecture provides a clean, maintainable foundation for workflow systems with clear separation between the runtime engine and utility functions, following Joe Armstrong's principles of Erlang/OTP design.
+
+## YAWL Compilation Pipeline
+
+### From XML Specification to Runtime Execution
+
+The YAWL compilation pipeline transforms standard YAWL XML specifications into executable Erlang modules that run on the `gen_pnet` runtime.
+
+```mermaid
+graph TD
+    A[YAWL XML] --> B[yawl_validate:validate/1]
+    B --> C{Validation OK?}
+    C -->|No| D[Return Error]
+    C -->|Yes| E[yawl_compile:compile/2]
+    E --> F[Generate gen_pnet Module]
+    F --> G[Compile to BEAM]
+    G --> H[Cache in yawl_compiled]
+    H --> I[Runtime Execution]
+    I --> J[gen_pnet:start_link/3]
+    J --> K[Workflow Execution]
+    K --> L[Receipt Generation]
+
+    B -->|Error Handling| D
+    E -->|Options| M[seed, module_prefix, output_dir]
+    F -->|Generated Module| N[places(), trsn_lst(), fire/3, etc.]
+```
+
+### Pipeline Steps
+
+1. **Validation**: `yawl_validate:validate/1` checks XML structure and YAWL compliance
+2. **Compilation**: `yawl_compile:compile/2` generates callback-based modules
+3. **Module Generation**: Creates `gen_pnet` compatible modules with all required callbacks
+4. **Runtime**: `gen_pnet:start_link/3` executes compiled workflow
+5. **Observability**: Receipt generation for audit trails and monitoring
+
+### Compilation Options
+
+```erlang
+% Standard compilation
+{ok, OrderNet} = yawl_compile:compile(OrderSpec, #{
+    seed => 123,                     % Deterministic choice
+    module_prefix => "order_",        % Module naming
+    include_source => true,          % Include source code
+    gen_observer => false            % Observer support
+}).
+```
+
+### Key Benefits
+
+- **Standards Compliance**: Full YAWL 2.1/2.2 specification support
+- **Deterministic Execution**: Reproducible workflows with seeded choice
+- **Performance**: Compiled modules optimize runtime execution
+- **Maintainability**: Clear separation between specification and execution
+- **Observability**: Automatic receipt generation for audit trails
+
+## Architecture Benefits
+
+### Joe Armstrong Design Principles
+
+1. **Single Runtime Component**: Only `gen_pnet` maintains state
+2. **Pure Utilities**: All helper modules are stateless and side-effect free
+3. **Message Contracts**: Clean interfaces between components
+4. **Progress Loop**: Automatic token processing in `gen_pnet`
+5. **Callback Extension**: Net modules extend functionality through callbacks
+
+### System Advantages
+
+- **Simplicity**: Easy to understand and maintain
+- **Performance**: Minimal overhead, optimized execution
+- **Reliability**: Isolated components reduce failure surface
+- **Testability**: Pure utilities are easy to unit test
+- **Extensibility**: New patterns and features added through callbacks
+- **Observability**: Built-in audit trails and monitoring

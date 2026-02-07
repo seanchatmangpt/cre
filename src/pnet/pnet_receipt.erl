@@ -79,15 +79,7 @@ true
                      move := move(),
                      ts := integer()}.
 
-%%--------------------------------------------------------------------
-%% @doc An effect represents a side effect of execution.
-%%
-%% Effects can be extended by callback modules to represent
-%% I/O operations, state changes, or other observable behaviors.
-%%--------------------------------------------------------------------
--type effect() :: term().
-
--export_type([move/0, receipt/0, effect/0]).
+-export_type([move/0, receipt/0]).
 
 %%====================================================================
 %% API Functions
@@ -150,28 +142,32 @@ timestamp() ->
     erlang:monotonic_time(millisecond).
 
 %%--------------------------------------------------------------------
-%% @doc Extracts effects from a receipt.
+%% @doc Classifies a receipt by its production effects.
 %%
-%% By default, receipts have no associated effects and this function
-%% returns an empty list. This design allows callback modules to
-%% extend the receipt system with custom effects extraction logic.
+%% Analyzes the produce map in the receipt's move to classify the
+%% transition firing as:
+%% - `{silent, Receipt}`: No tokens produced (empty produce map)
+%% - `{single_production, Receipt}`: Tokens produced to exactly one place
+%% - `{multiple_production, Receipt}`: Tokens produced to multiple places
 %%
-%% Effects represent side effects produced during transition execution
-%% such as I/O operations, external system calls, or state mutations
-%% outside the Petri net marking.
-%%
-%% @param Receipt The receipt to extract effects from.
-%% @return List of effects (empty by default).
+%% @param Receipt The receipt to classify.
+%% @return A tuple `{Classification, Receipt}` where Classification is
+%%         one of: silent, single_production, or multiple_production.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec effects(Receipt :: receipt()) -> [effect()].
+-spec effects(Receipt :: receipt()) ->
+    {silent, receipt()} |
+    {single_production, receipt()} |
+    {multiple_production, receipt()}.
 
-effects(#{}) ->
-    %% Default implementation: no effects
-    %% Callback modules can override by pattern matching on specific
-    %% receipt structures and extracting their own effect metadata
-    [].
+effects(Receipt = #{move := #{produce := ProduceMap}}) ->
+    ProduceCount = maps:size(ProduceMap),
+    case ProduceCount of
+        0 -> {silent, Receipt};
+        1 -> {single_production, Receipt};
+        _ -> {multiple_production, Receipt}
+    end.
 
 %%====================================================================
 %% Internal Tests

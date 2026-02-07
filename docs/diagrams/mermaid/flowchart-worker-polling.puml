@@ -1,0 +1,165 @@
+@startuml CRE Worker Polling Process
+!theme plain
+skinparam backgroundColor white
+skinparam handwritten false
+skinparam defaultFontName Arial
+
+title CRE Worker Polling Process
+
+start
+
+:Worker Starts;
+note right
+ CRE worker process initialized
+ Worker registers with CRE master
+ Worker added to idle pool via pnet_marking
+end note
+
+:Initialize Worker State;
+note right
+ Worker calls cre_master:add_worker()
+ Worker state initialized via cre_worker:init()
+ Worker linked to CRE master for monitoring
+end note
+
+:Poll CRE Master;
+note right
+ Worker waits for task assignment
+ CRE master maintains worker marking
+ Idle workers tracked via pnet_marking:get()
+end note
+
+if (Task Available?) then (yes)
+    :Receive Task;
+    note right
+     gen_pnet:cast() delivers worker_request
+     Task placed in WorkerRequest place
+     Worker transitions to busy state
+    end note
+    
+    :Prepare Task Execution;
+    note right
+     cre_worker:prepare_case() called
+     Task initialization via callback
+     Input files staged via stagein_lst()
+    end note
+    
+    :Execute Stagein;
+    note right
+     Individual file staging via do_stagein()
+     Files processed sequentially
+     Success/failure tracked in PreSync
+    end note
+    
+    if (Stagein Successful?) then (yes)
+        :Run Task;
+        note right
+         Task execution via run() callback
+         Output generated
+         Results placed in Result place
+        end note
+    else (no)
+        :Handle Stagein Error;
+        note right
+         Error placed in Error place
+         Error expression via error_to_expr()
+         Task marked as failed
+        end note
+    endif
+    
+    if (Task Executed Successfully?) then (yes)
+        :Execute Stageout;
+        note right
+         Output files staged via stageout_lst()
+         Individual files via do_stageout()
+         Success/failure tracked in PostSync
+        end note
+        
+        if (Stageout Successful?) then (yes)
+            :Complete Task;
+            note right
+             Result returned via worker_result()
+             WorkerResult place triggered
+             Worker callback executed
+            end note
+        else (no)
+            :Handle Stageout Error;
+            note right
+             Error placed in Error place
+             Error expression returned
+             Task marked as failed
+            end note
+            :Return Error Result;
+            note right
+             Error returned to CRE master
+             Worker notified of failure
+            end note
+        endif
+    else (no)
+        :Return Error Result;
+        note right
+         Error from run() callback
+         Error expression created
+         WorkerResult place triggered
+        end note
+    endif
+    
+    :Return Result to Master;
+    note right
+     cre_master:worker_result() called
+     Worker state updated in CRE master
+     Worker marked as idle again
+     Notification of completion sent
+    end note
+    
+    :Update Worker Pool;
+    note right
+     CRE master updates worker marking
+     pnet_marking:take() from busy
+     pnet_marking:add() to idle
+     Worker available for new tasks
+    end note
+else (no)
+    :Continue Polling;
+    note right
+     Worker remains in idle state
+     CRE master continues monitoring
+     Polling continues indefinitely
+     Workers maintain connection to master
+    end note
+    :Check Again;
+    note right
+     Periodic polling via persistent_term
+     Wait interval configurable via cre_client_poll_interval
+     Backoff mechanism for high load
+    end note
+    :Poll CRE Master;
+    note right
+     Back to main polling loop
+    end note
+endif
+
+if (Worker Shutdown?) then (yes)
+    :Cleanup Worker;
+    note right
+     Worker unlinked from CRE master
+     Final cleanup via cleanup_case()
+     Resources released
+    end note
+    :Stop Worker;
+    note right
+     Worker process terminates
+     Removed from worker marking
+     CRE master notified of removal
+    end note
+else (no)
+    :Continue Polling;
+    note right
+     Worker remains active
+     Ready for next task assignment
+    end note
+endif
+
+stop
+
+@enduml

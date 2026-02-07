@@ -16,7 +16,10 @@ This tutorial series provides comprehensive, hands-on learning for the YAWL (Yet
 | [2. Basic Patterns](basic_patterns_tutorial.md) | 60 min | Tutorial 1 | WCP-01 to WCP-06 patterns |
 | [3. Advanced Patterns](advanced_patterns_tutorial.md) | 90 min | Tutorial 2 | WCP-07 to WCP-20 patterns |
 | [4. Colored Tokens](colored_tokens_tutorial.md) | 45 min | Tutorial 1 | Data-carrying tokens |
-| [5. Migration Guide](workflow_migration_tutorial.md) | 60 min | Tutorial 1 | Migrate from gen_statem |
+| [5. Pattern Examples](PATTERN_EXAMPLES.md) | 45 min | Tutorial 2 | Real-world pattern implementations |
+| [6. Handler Development](HANDLER_DEVELOPMENT.md) | 60 min | Tutorial 2 | Business logic integration |
+| [7. Migration Guide](workflow_migration_tutorial.md) | 60 min | Tutorial 1 | Migrate from gen_statem |
+| [8. Study Plan Template](YAWL_PATTERNS_STUDY_PLAN_TEMPLATE.md) | 3-6 hours | None | Personalized YAWL learning path |
 
 ---
 
@@ -155,7 +158,8 @@ docs/tutorials/
 ├── basic_patterns_tutorial.md       (basic patterns)
 ├── advanced_patterns_tutorial.md    (advanced patterns)
 ├── colored_tokens_tutorial.md       (data flow)
-└── workflow_migration_tutorial.md   (migration guide)
+├── workflow_migration_tutorial.md   (migration guide)
+└── YAWL_PATTERNS_STUDY_PLAN_TEMPLATE.md (personalized learning path)
 ```
 
 ---

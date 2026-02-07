@@ -63,7 +63,7 @@ The fire/3 callback can return:
 %% Includes
 %%====================================================================
 
--include_lib("gen_pnet/include/gen_pnet.hrl").
+-include("gen_pnet.hrl").
 
 %%====================================================================
 %% Callback Specifications

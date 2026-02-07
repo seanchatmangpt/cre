@@ -18,51 +18,72 @@
 %%
 %% -------------------------------------------------------------------
 
+-compile({no_auto_import,[apply/2]}).
 -module(pnet_marking).
 
 -moduledoc """
 Multiset marking algebra (places -> bag of tokens).
 
-Contracts:
-- multiplicity matters
-- unknown place => {error, bad_place}
-- consume is bag subtraction (order-insensitive)
-- hash is canonical for bags (token order does not change hash)
+Places map to token lists representing multisets. Operations respect
+multiplicity: adding [a,b] to [a] gives [a,a,b]; taking [a] from [a,a,b]
+leaves [a,b].
 
 ```erlang
 > M0 = pnet_marking:new([p1, p2]).
-_
+> maps:get(p1, M0).
+[]
+> maps:get(p2, M0).
+[]
 > pnet_marking:get(M0, p1).
 {ok, []}
-> pnet_marking:get(M0, missing).
-{error, bad_place}
+> pnet_marking:get(M0, missing_place).
+{ok, []}
+```
 
-> {ok, M1} = pnet_marking:add(M0, #{p1 => [a,b], p2 => [c]}).
-_
+```erlang
+> M0 = pnet_marking:new([p1]).
+> M1 = pnet_marking:set(M0, p1, [a,b]).
 > pnet_marking:get(M1, p1).
 {ok, [a,b]}
+```
 
-> {ok, M2} = pnet_marking:take(M1, #{p1 => [b,a]}).
-_
-> pnet_marking:get(M2, p1).
-{ok, []}
+```erlang
+> M0 = pnet_marking:new([p1, p2]).
+> M1 = pnet_marking:set(M0, p1, [a,b]).
+> M2 = pnet_marking:add(M1, #{p1 => [b], p2 => [c]}).
+> {ok, T1} = pnet_marking:get(M2, p1).
+> lists:sort(T1).
+[a,b,b]
+```
 
-> pnet_marking:take(M1, #{p1 => [a,a,a]}).
-{error, insufficient}
+```erlang
+> M0 = pnet_marking:new([p1, p2]).
+> M1 = pnet_marking:set(M0, p1, [a,b]).
+> M2 = pnet_marking:add(M1, #{p1 => [b], p2 => [c]}).
+> {ok, M3} = pnet_marking:take(M2, #{p1 => [a], p2 => [c]}).
+> {ok, T3} = pnet_marking:get(M3, p1).
+> lists:sort(T3).
+[b,b]
+```
 
-> {ok, M3} = pnet_marking:apply(M1, #{p1 => [a]}, #{p2 => [d]}).
-_
-> pnet_marking:get(M3, p1).
-{ok, [b]}
-> pnet_marking:get(M3, p2).
-{ok, [c,d]}
+```erlang
+> M0 = pnet_marking:new([p1, p2]).
+> M1 = pnet_marking:set(M0, p1, [a,b]).
+> M2 = pnet_marking:add(M1, #{p1 => [b], p2 => [c]}).
+> pnet_marking:take(M2, #{p1 => [a,a,a]}).
+{error,insufficient}
+```
 
-> {ok, Ma} = pnet_marking:set(pnet_marking:new([p]), p, [a,b]).
-_
-> {ok, Mb} = pnet_marking:set(pnet_marking:new([p]), p, [b,a]).
-_
-> pnet_marking:hash(Ma) =:= pnet_marking:hash(Mb).
-true
+```erlang
+> M0 = pnet_marking:new([p1, p2]).
+> M1 = pnet_marking:set(M0, p1, [a,b]).
+> M2 = pnet_marking:add(M1, #{p1 => [b], p2 => [c]}).
+> {ok, M3} = pnet_marking:take(M2, #{p1 => [a], p2 => [c]}).
+> Move = #{mode => #{p1 => [b]}, produce => #{p2 => [d]}}.
+> {ok, M4} = pnet_marking:apply(M3, Move).
+> {ok, T4p2} = pnet_marking:get(M4, p2).
+> T4p2.
+[d]
 ```
 """.
 
@@ -74,7 +95,7 @@ true
 -export([new/1, get/2, set/3]).
 
 %% Marking algebra operations
--export([add/2, take/2, apply/3]).
+-export([add/2, take/2, apply/2]).
 
 %% Inspection and utilities
 -export([snapshot/1, hash/1]).
@@ -120,8 +141,16 @@ true
 %%--------------------------------------------------------------------
 -type produce_map() :: #{place() => [token()]}.
 
+%%--------------------------------------------------------------------
+%% @doc A move represents a complete transition firing.
+%%
+%% Contains the mode (tokens to consume) and produce map (tokens to add).
+%%--------------------------------------------------------------------
+-type move() :: #{mode := consume_map(), produce := produce_map()}.
+
 %% Export types
--export_type([marking/0, place/0, token/0, consume_map/0, produce_map/0]).
+-export_type([marking/0, place/0, token/0, consume_map/0,
+              produce_map/0, move/0]).
 
 %%====================================================================
 %% API Functions
@@ -145,22 +174,22 @@ new(Places) when is_list(Places) ->
 %%--------------------------------------------------------------------
 %% @doc Gets the tokens at a specific place.
 %%
+%% Returns {ok, Tokens} where Tokens is the list at the place.
+%% For unknown places, returns {ok, []} (total function).
+%%
 %% @param Marking The marking to query
 %% @param Place The place to get tokens from
-%% @return {ok, Tokens} if place exists, {error, bad_place} otherwise
+%% @return {ok, Tokens} - always returns ok, empty list for missing places
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get(Marking :: marking(), Place :: place()) ->
-          {ok, [token()]} | {error, bad_place}.
+-spec get(Marking :: marking(), Place :: place()) -> {ok, [token()]}.
 
 get(Marking, Place) when is_map(Marking), is_atom(Place) ->
     case maps:find(Place, Marking) of
         {ok, Tokens} -> {ok, Tokens};
-        error -> {error, bad_place}
-    end;
-get(_Marking, _Place) ->
-    {error, bad_place}.
+        error -> {ok, []}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Sets the tokens at a specific place.
@@ -171,136 +200,97 @@ get(_Marking, _Place) ->
 %% @param Marking The marking to modify
 %% @param Place The place to set tokens at
 %% @param Tokens The new token list for the place
-%% @return Updated marking, or {error, bad_place} if place doesn't exist
+%% @return Updated marking
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec set(Marking :: marking(), Place :: place(), Tokens :: [token()]) ->
-          marking() | {error, bad_place}.
+          marking().
 
-set(Marking, Place, Tokens)
-  when is_map(Marking), is_atom(Place), is_list(Tokens) ->
-    case maps:is_key(Place, Marking) of
-        true -> Marking#{Place => Tokens};
-        false -> {error, bad_place}
-    end;
-set(_Marking, _Place, _Tokens) ->
-    {error, bad_place}.
+set(Marking, Place, Tokens) when is_map(Marking), is_atom(Place), is_list(Tokens) ->
+    Marking#{Place => Tokens}.
 
 %%--------------------------------------------------------------------
-%% @doc Adds tokens to the marking via a produce map.
+%% @doc Adds tokens to the marking via multiset union.
 %%
 %% Tokens are appended to existing tokens at each place.
-%% All places in the produce map must exist in the marking.
+%% Places are created if they don't exist.
 %%
 %% @param Marking The marking to add tokens to
 %% @param ProduceMap Map of places to token lists to add
-%% @return Updated marking, or {error, bad_place} if any place doesn't exist
+%% @return Updated marking
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add(Marking :: marking(), ProduceMap :: produce_map()) ->
-          marking() | {error, bad_place}.
+-spec add(Marking :: marking(), ProduceMap :: produce_map()) -> marking().
 
 add(Marking, ProduceMap) when is_map(Marking), is_map(ProduceMap) ->
-    try
-        maps:fold(fun
-            (Place, NewTokens, Acc) when is_atom(Place), is_list(NewTokens) ->
-                case maps:find(Place, Acc) of
-                    {ok, ExistingTokens} ->
-                        Acc#{Place => ExistingTokens ++ NewTokens};
-                    error ->
-                        throw({error, bad_place})
-                end;
-            (_, _, _) ->
-                throw({error, bad_place})
-        end, Marking, ProduceMap)
-    catch
-        throw:{error, bad_place} -> {error, bad_place}
-    end;
-add(_Marking, _ProduceMap) ->
-    {error, bad_place}.
+    maps:fold(fun
+        (Place, NewTokens, Acc) when is_atom(Place), is_list(NewTokens) ->
+            ExistingTokens = maps:get(Place, Acc, []),
+            Acc#{Place => ExistingTokens ++ NewTokens};
+        (_, _, Acc) ->
+            Acc
+    end, Marking, ProduceMap).
 
 %%--------------------------------------------------------------------
-%% @doc Takes tokens from the marking via a consume map.
+%% @doc Takes tokens from the marking via multiset subtraction.
 %%
-%% This is a multiset operation - the exact tokens specified must be
-%% present with sufficient multiplicity. Tokens are removed from the
-%% front of each place's token list.
+%% Returns {ok, UpdatedMarking} if all tokens are available with
+%% sufficient multiplicity. Returns {error, insufficient} otherwise.
 %%
 %% @param Marking The marking to take tokens from
 %% @param ConsumeMap Map of places to token lists to remove
-%% @return {ok, UpdatedMarking} on success, {error, bad_place | insufficient} on failure
+%% @return {ok, marking()} | {error, insufficient}
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec take(Marking :: marking(), ConsumeMap :: consume_map()) ->
-          {ok, marking()} | {error, bad_place | insufficient}.
+          {ok, marking()} | {error, insufficient}.
 
 take(Marking, ConsumeMap) when is_map(Marking), is_map(ConsumeMap) ->
-    try
-        Result = maps:fold(fun
-            (Place, TokensToTake, Acc) when is_atom(Place), is_list(TokensToTake) ->
-                case maps:find(Place, Acc) of
-                    {ok, ExistingTokens} ->
-                        case consume_tokens(ExistingTokens, TokensToTake) of
-                            {ok, RemainingTokens} ->
-                                Acc#{Place => RemainingTokens};
-                            {error, insufficient} ->
-                                throw({error, insufficient})
-                        end;
-                    error ->
-                        throw({error, bad_place})
-                end;
-            (_, _, _) ->
-                throw({error, bad_place})
-        end, Marking, ConsumeMap),
-        {ok, Result}
-    catch
-        throw:{error, Reason} -> {error, Reason}
-    end;
-take(_Marking, _ConsumeMap) ->
-    {error, bad_place}.
+    take_fold(maps:to_list(ConsumeMap), Marking).
+
+take_fold([], Marking) ->
+    {ok, Marking};
+take_fold([{Place, TokensToTake} | Rest], Marking) ->
+    CurrentTokens = maps:get(Place, Marking, []),
+    case multiset_subtract(CurrentTokens, TokensToTake) of
+        {ok, Remaining} ->
+            take_fold(Rest, Marking#{Place => Remaining});
+        {error, insufficient} ->
+            {error, insufficient}
+    end.
 
 %%--------------------------------------------------------------------
-%% @doc Applies a consume map and produce map atomically.
+%% @doc Applies a move (consume then produce) atomically.
 %%
-%% This is the primary operation for transition firing. Tokens are
-%% first consumed via the consume map, then tokens are added via the
-%% produce map. If consumption fails, the marking is unchanged.
+%% A move contains a mode (tokens to consume) and produce map
+%% (tokens to add). First consumes tokens via mode, then adds tokens
+%% via produce map. Returns error if consumption fails.
 %%
 %% @param Marking The marking to apply the operation to
-%% @param ConsumeMap Map of places to token lists to remove
-%% @param ProduceMap Map of places to token lists to add
-%% @return {ok, UpdatedMarking} on success, {error, bad_place | insufficient} on failure
+%% @param Move Map with mode and produce keys
+%% @return {ok, UpdatedMarking} | {error, insufficient}
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec 'apply'(Marking :: marking(),
-            ConsumeMap :: consume_map(),
-            ProduceMap :: produce_map()) ->
-          {ok, marking()} | {error, bad_place | insufficient}.
+-spec apply(Marking :: marking(), Move :: move()) ->
+          {ok, marking()} | {error, insufficient}.
 
-'apply'(Marking, ConsumeMap, ProduceMap)
-  when is_map(Marking), is_map(ConsumeMap), is_map(ProduceMap) ->
-    case take(Marking, ConsumeMap) of
+apply(Marking, #{mode := Mode, produce := Produce}) ->
+    case take(Marking, Mode) of
         {ok, Marking1} ->
-            case add(Marking1, ProduceMap) of
-                {error, Reason} -> {error, Reason};
-                Marking2 -> {ok, Marking2}
-            end;
-        {error, Reason} ->
-            {error, Reason}
-    end;
-'apply'(_Marking, _ConsumeMap, _ProduceMap) ->
-    {error, bad_place}.
+            {ok, add(Marking1, Produce)};
+        {error, _} = Error ->
+            Error
+    end.
 
 %%--------------------------------------------------------------------
-%% @doc Creates a deep copy (snapshot) of the marking.
+%% @doc Creates a snapshot (copy) of the marking.
 %%
-%% Returns an identical copy that can be modified without affecting
-%% the original. Since Erlang data is immutable, this returns the
-%% same marking but provides a clear semantic for snapshotting.
+%% Returns a copy equal to the input. Since Erlang data is immutable,
+%% this returns the same marking but provides semantic clarity.
 %%
 %% @param Marking The marking to snapshot
 %% @return An identical copy of the marking
@@ -310,15 +300,13 @@ take(_Marking, _ConsumeMap) ->
 -spec snapshot(Marking :: marking()) -> marking().
 
 snapshot(Marking) when is_map(Marking) ->
-    %% Erlang maps are immutable, so the marking itself is already
-    %% a snapshot. This function provides semantic clarity.
     Marking.
 
 %%--------------------------------------------------------------------
-%% @doc Computes a consistent hash of the marking.
+%% @doc Computes a stable hash independent of insertion order.
 %%
-%% Uses SHA-256 to hash the marking's term representation.
-%% Useful for state comparison, caching keys, and receipt generation.
+%% Uses SHA-256 on the canonical representation (sorted by place)
+%% for consistent hashing regardless of map key ordering.
 %%
 %% @param Marking The marking to hash
 %% @return Binary hash of the marking
@@ -328,7 +316,9 @@ snapshot(Marking) when is_map(Marking) ->
 -spec hash(Marking :: marking()) -> binary().
 
 hash(Marking) when is_map(Marking) ->
-    crypto:hash(sha256, term_to_binary(Marking)).
+    %% Sort by place, and sort tokens for canonical representation
+    Canonical = lists:sort([{Place, lists:sort(Tokens)} || {Place, Tokens} <- maps:to_list(Marking)]),
+    crypto:hash(sha256, term_to_binary(Canonical)).
 
 %%====================================================================
 %% Internal Functions
@@ -336,35 +326,83 @@ hash(Marking) when is_map(Marking) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc Consumes tokens from a list, respecting multiset semantics.
+%% @doc Multiset subtraction: removes tokens from Available.
 %%
-%% Removes each token in TokensToTake from AvailableTokens,
-%% checking that each token exists with sufficient multiplicity.
-%% Returns the remaining tokens or an error if consumption fails.
+%% Returns {ok, Remaining} if all tokens in Remove are present
+%% with sufficient multiplicity. Returns {error, insufficient}
+%% otherwise.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec consume_tokens(AvailableTokens :: [token()],
-                     TokensToTake :: [token()]) ->
+-spec multiset_subtract(Available :: [token()], Remove :: [token()]) ->
           {ok, [token()]} | {error, insufficient}.
 
-consume_tokens(AvailableTokens, []) ->
-    {ok, AvailableTokens};
-consume_tokens([], [_|_]) ->
-    {error, insufficient};
-consume_tokens([Token | RestAvailable], TokensToTake) ->
-    case lists:member(Token, TokensToTake) of
+multiset_subtract(Available, Remove) ->
+    %% Count available tokens
+    AvailableCounts = count_tokens(Available),
+    RemoveCounts = count_tokens(Remove),
+    %% Check if we have enough of each token
+    case can_consume(AvailableCounts, RemoveCounts) of
         true ->
-            %% Remove one occurrence of this token from TokensToTake
-            RemainingToTake = lists:delete(Token, TokensToTake),
-            consume_tokens(RestAvailable, RemainingToTake);
+            RemainingCounts = subtract_counts(AvailableCounts, RemoveCounts),
+            {ok, expand_counts(RemainingCounts)};
         false ->
-            %% This token isn't being consumed, keep it
-            case consume_tokens(RestAvailable, TokensToTake) of
-                {ok, Remaining} -> {ok, [Token | Remaining]};
-                {error, _} = Error -> Error
-            end
+            {error, insufficient}
     end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Counts tokens in a list (multiset frequency map).
+%%
+%% @end
+%%--------------------------------------------------------------------
+count_tokens(Tokens) ->
+    lists:foldl(fun(T, Acc) ->
+        maps:update_with(T, fun(V) -> V + 1 end, 1, Acc)
+    end, #{}, Tokens).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Checks if Remove counts can be satisfied by Available counts.
+%%
+%% @end
+%%--------------------------------------------------------------------
+can_consume(AvailableCounts, RemoveCounts) ->
+    maps:fold(fun(Token, Count, _) ->
+        case maps:get(Token, AvailableCounts, 0) of
+            AvailableCount when AvailableCount >= Count -> true;
+            _ -> false
+        end
+    end, true, RemoveCounts).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Subtracts RemoveCounts from AvailableCounts.
+%%
+%% Precondition: can_consume returned true.
+%% @end
+%%--------------------------------------------------------------------
+subtract_counts(AvailableCounts, RemoveCounts) ->
+    %% Start with AvailableCounts and subtract RemoveCounts
+    maps:fold(fun(Token, RemoveCount, Acc) ->
+        AvailableCount = maps:get(Token, AvailableCounts, 0),
+        NewCount = AvailableCount - RemoveCount,
+        case NewCount of
+            0 -> maps:remove(Token, Acc);
+            _ -> Acc#{Token => NewCount}
+        end
+    end, AvailableCounts, RemoveCounts).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Expands a frequency map back to a token list.
+%%
+%% @end
+%%--------------------------------------------------------------------
+expand_counts(Counts) ->
+    maps:fold(fun(_Token, 0, Acc) -> Acc;
+                 (Token, N, Acc) -> lists:duplicate(N, Token) ++ Acc
+              end, [], Counts).
 
 %%====================================================================
 %% EUnit Tests
@@ -375,4 +413,70 @@ consume_tokens([Token | RestAvailable], TokensToTake) ->
 
 doctest_test() ->
     doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%%====================================================================
+%% Unit Tests
+%%====================================================================
+
+new_test() ->
+    M = new([p1, p2]),
+    ?assertEqual([], maps:get(p1, M)),
+    ?assertEqual([], maps:get(p2, M)).
+
+get_test() ->
+    M0 = new([p1]),
+    ?assertEqual({ok, []}, get(M0, p1)),
+    ?assertEqual({ok, []}, get(M0, missing_place)),
+    M1 = set(M0, p1, [a, b]),
+    ?assertEqual({ok, [a, b]}, get(M1, p1)).
+
+set_test() ->
+    M0 = new([p1, p2]),
+    M1 = set(M0, p1, [a, b]),
+    ?assertEqual([a, b], maps:get(p1, M1)),
+    M2 = set(M1, p1, []),
+    ?assertEqual([], maps:get(p1, M2)).
+
+add_test() ->
+    M0 = new([p1, p2]),
+    M1 = set(M0, p1, [a, b]),
+    M2 = add(M1, #{p1 => [b], p2 => [c]}),
+    {ok, T1} = get(M2, p1),
+    ?assertEqual([a, b, b], lists:sort(T1)),
+    {ok, T2} = get(M2, p2),
+    ?assertEqual([c], T2).
+
+take_test() ->
+    M0 = new([p1, p2]),
+    M1 = add(M0, #{p1 => [a, b], p2 => [c]}),
+    ?assertMatch({ok, _}, take(M1, #{p1 => [a], p2 => [c]})),
+    {ok, M2} = take(M1, #{p1 => [a], p2 => [c]}),
+    {ok, T1} = get(M2, p1),
+    ?assertEqual([b], lists:sort(T1)),
+    ?assertEqual({error, insufficient}, take(M1, #{p1 => [a, a, a]})).
+
+apply_test() ->
+    M0 = new([p1, p2]),
+    M1 = add(M0, #{p1 => [a, b], p2 => [c]}),
+    {ok, M2} = take(M1, #{p1 => [a], p2 => [c]}),
+    Move = #{mode => #{p1 => [b]}, produce => #{p2 => [d]}},
+    {ok, M3} = apply(M2, Move),
+    {ok, Tp1} = get(M3, p1),
+    {ok, Tp2} = get(M3, p2),
+    ?assertEqual([], Tp1),
+    ?assertEqual([d], Tp2).
+
+hash_test() ->
+    M0 = new([p]),
+    Ma = set(M0, p, [a, b]),
+    Mb = set(M0, p, [b, a]),
+    ?assertEqual(hash(Ma), hash(Mb)).
+
+snapshot_test() ->
+    M0 = new([p1]),
+    M1 = set(M0, p1, [a, b]),
+    Snap = snapshot(M1),
+    ?assertEqual(M1, Snap),
+    ?assertMatch({ok, [a, b]}, get(Snap, p1)).
+
 -endif.

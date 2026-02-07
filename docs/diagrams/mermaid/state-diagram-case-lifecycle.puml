@@ -1,0 +1,113 @@
+@startuml CRE Case Lifecycle State Diagram
+!theme plain
+skinparam backgroundColor white
+skinparam handwritten false
+skinparam defaultFontName Arial
+
+title CRE Workflow Case Lifecycle States
+
+state "Created" as created
+state "Initializing" as initializing
+state "Running" as running
+state "Pending" as pending
+state "Suspended" as suspended
+state "Completed" as completed
+state "Cancelled" as cancelled
+state "Failed" as failed
+
+state "created" <<start>>
+state "completed" <<end>>
+
+created --> initializing : start_case()
+initializing --> running : workflow_loaded()
+initializing --> failed : load_error()
+initializing --> cancelled : cancel_during_init()
+
+running --> running : continue_workflow()
+running --> pending : wait_for_resources()
+running --> suspended : suspend_case()
+running --> completed : workflow_complete()
+running --> failed : task_error()
+running --> cancelled : cancel_case()
+
+pending --> running : resources_available()
+pending --> pending : wait_continues()
+pending --> failed : timeout_error()
+
+suspended --> running : resume_case()
+suspended --> cancelled : cancel_suspended_case()
+
+completed --> completed : stay_completed()
+failed --> failed : stay_failed()
+cancelled --> cancelled : stay_cancelled()
+
+note right of created
+ New workflow case created
+ Case ID assigned
+ Initial state set to created
+ Status timestamp recorded
+end note
+
+note right of initializing
+ Workflow specification loaded
+ Initial marking prepared
+ Callback modules initialized
+ Dependencies checked
+end note
+
+note right of running
+ Active execution state
+ Tasks being generated
+ Workers assigned
+ Progress monitored
+end note
+
+note right of pending
+ Waiting for resources
+ Task queue management
+ Worker pool exhausted
+ Timeout handling
+end note
+
+note right of suspended
+ Execution paused
+ State preserved
+ Resources held
+ Can be resumed
+end note
+
+note right of completed
+ Successfully finished
+ Final result available
+ All resources cleaned up
+ Case archived
+end note
+
+note right of failed
+ Execution failed
+ Error details recorded
+ Cleanup completed
+ Case archived
+end note
+
+note right of cancelled
+ User or system cancelled
+ Cleaned up
+ No further execution
+ Case archived
+end note
+
+legend right
+  State Transitions:
+  - solid arrows: normal flow
+  - dashed arrows: error/exception
+  - self loops: state maintenance
+  
+  State Types:
+  - start state: case creation
+  - end states: completed, failed, cancelled
+  - active states: running, pending
+  - transient states: initializing, suspended
+end legend
+
+@enduml

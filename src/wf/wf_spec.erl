@@ -88,6 +88,11 @@ true
 -export([tasks/1, task_doc/2, task_type/2]).
 -export([places/1, transitions/1]).
 
+%% Additional exports for IR access
+-export([uri/1, meta/1, schema_types/1, nets/1]).
+-export([tasks/2, task_name/3, join_split/3]).
+-export([flows/3, variables/2, timer/3, mi/3]).
+
 %% Advanced features accessors
 -export([split_type/2, join_type/2]).
 -export([decomposition_nets/1, decomposition_net/2]).
@@ -282,6 +287,155 @@ places(#compiled_spec{places = Places}) -> Places.
 
 -spec transitions(Compiled :: compiled_spec()) -> [transition()].
 transitions(#compiled_spec{transitions = Transitions}) -> Transitions.
+
+%%====================================================================
+%% IR Accessor Functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Alias for id/1 for compatibility.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec uri(Spec :: yawl_spec()) -> spec_id().
+uri(Spec) -> id(Spec).
+
+%%--------------------------------------------------------------------
+%% @doc Returns metadata map with title, version, identifier, persistent=false.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec meta(Spec :: yawl_spec()) -> map().
+meta(#yawl_spec{id = Id, title = Title, version = Version}) ->
+    #{
+        title => Title,
+        version => Version,
+        identifier => Id,
+        persistent => false
+    }.
+
+%%--------------------------------------------------------------------
+%% @doc Extract schema types (placeholder returning [] for now).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec schema_types(Spec :: yawl_spec()) -> [atom()].
+schema_types(_Spec) -> [].
+
+%%--------------------------------------------------------------------
+%% @doc Returns decomposition net IDs.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec nets(Spec :: yawl_spec()) -> [binary()].
+nets(#yawl_spec{decompositions = Decomps}) ->
+    maps:keys(Decomps).
+
+%%--------------------------------------------------------------------
+%% @doc Get tasks within a specific decomposition net.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec tasks(Spec :: yawl_spec(), NetId :: binary()) -> [task_id()].
+tasks(#yawl_spec{decompositions = Decomps}, NetId) ->
+    case maps:get(NetId, Decomps, undefined) of
+        #decomposition_info{tasks = Tasks} -> Tasks;
+        _ -> []
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Get human-readable name from task (uses task_doc).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec task_name(Spec :: yawl_spec(), NetId :: binary(), TaskId :: task_id()) ->
+          binary().
+task_name(Spec, _NetId, TaskId) ->
+    task_doc(Spec, TaskId).
+
+%%--------------------------------------------------------------------
+%% @doc Return join/split types tuple for a task in a net.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec join_split(Spec :: yawl_spec(), NetId :: binary(), TaskId :: task_id()) ->
+          {atom(), atom()}.
+join_split(#yawl_spec{tasks = Tasks}, _NetId, TaskId) ->
+    case maps:get(TaskId, Tasks, undefined) of
+        #task_info{join_type = Join, split_type = Split} ->
+            {Join, Split};
+        _ ->
+            {undefined, undefined}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Get outgoing flows from a task within a net.
+%%
+%% Returns a list of flow maps with 'to' and optional 'predicate' keys.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec flows(Spec :: yawl_spec(), NetId :: binary(), FromId :: task_id()) ->
+          [map()].
+flows(#yawl_spec{flows = Flows, decompositions = Decomps}, NetId, FromId) ->
+    %% Filter flows that originate from FromId and belong to the specified net
+    %% For now, we return all flows from FromId (net filtering would require
+    %% tracking which tasks belong to which net)
+    case maps:get(NetId, Decomps, undefined) of
+        #decomposition_info{tasks = NetTasks} ->
+            lists:filtermap(fun(F) ->
+                case F of
+                    #flow_info{from = FromId, to = ToId, predicate = Pred} ->
+                        %% Verify the target is in the same net
+                        case lists:member(ToId, NetTasks) of
+                            true ->
+                                {true, #{to => ToId, predicate => Pred}};
+                            false ->
+                                false
+                        end;
+                    _ ->
+                        false
+                end
+            end, Flows);
+        _ ->
+            []
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Extract local variables for a net (returns [] for now).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec variables(Spec :: yawl_spec(), NetId :: binary()) -> [map()].
+variables(_Spec, _NetId) -> [].
+
+%%--------------------------------------------------------------------
+%% @doc Extract timer configuration for a task in a net.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec timer(Spec :: yawl_spec(), NetId :: binary(), TaskId :: task_id()) ->
+          map() | undefined.
+timer(#yawl_spec{tasks = Tasks}, _NetId, TaskId) ->
+    case maps:get(TaskId, Tasks, undefined) of
+        #task_info{params = Params} ->
+            maps:get(<<"timer">>, Params, undefined);
+        _ ->
+            undefined
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Extract multi-instance parameters for a task in a net.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec mi(Spec :: yawl_spec(), NetId :: binary(), TaskId :: task_id()) ->
+          mi_params() | undefined.
+mi(#yawl_spec{tasks = Tasks}, _NetId, TaskId) ->
+    case maps:get(TaskId, Tasks, undefined) of
+        #task_info{mi_params = MiParams} -> MiParams;
+        _ -> undefined
+    end.
 
 %%====================================================================
 %% Advanced Feature Accessor Functions
@@ -754,6 +908,9 @@ extract_split_type(TaskContent) ->
                 <<"AND">> -> 'and';
                 <<"OR">> -> 'or';
                 <<"XOR">> -> 'xor';
+                <<"and">> -> 'and';
+                <<"or">> -> 'or';
+                <<"xor">> -> 'xor';
                 _ -> undefined
             end;
         _ ->
@@ -770,6 +927,9 @@ extract_join_type(TaskContent) ->
                 <<"AND">> -> 'and';
                 <<"OR">> -> 'or';
                 <<"XOR">> -> 'xor';
+                <<"and">> -> 'and';
+                <<"or">> -> 'or';
+                <<"xor">> -> 'xor';
                 _ -> undefined
             end;
         _ ->

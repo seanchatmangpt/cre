@@ -16,45 +16,53 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %%
+%% -------------------------------------------------------------------
 
 -module(pnet_choice).
 
 -moduledoc """
-Deterministic choice (all nondeterminism goes here).
+Deterministic choice (pure RNG state threading).
 
-The only required property is repeatability for the same seed and inputs.
-The actual picked element is not specified by the doctests.
+This module provides deterministic random choice operations for Petri net
+mode selection. The RNG state is explicitly threaded through all operations,
+ensuring reproducibility: same seed + same inputs always yield same choices.
+
+Uses the rand module with exrop algorithm for deterministic results
+across Erlang versions and platforms.
 
 ```erlang
-> R0 = pnet_choice:seed(123).
-_
-> {X1, R1} = pnet_choice:pick([a,b,c], R0).
-_
-> R0b = pnet_choice:seed(123).
-_
-> {X1b, _} = pnet_choice:pick([a,b,c], R0b).
-_
-> X1 =:= X1b.
+> R0 = pnet_choice:seed(42).
+> {C1, R1} = pnet_choice:pick([a,b,c], R0).
+> lists:member(C1, [a,b,c]) andalso R1 =/= R0.
 true
+```
 
+```erlang
+> R0a = pnet_choice:seed(42),
+.. R0b = pnet_choice:seed(42),
+.. {X1, _} = pnet_choice:pick([a,b,c], R0a),
+.. {X2, _} = pnet_choice:pick([a,b,c], R0b),
+.. X1 =:= X2.
+true
+```
+
+```erlang
 > pnet_choice:pick([], pnet_choice:seed(1)).
-{error, empty}
+{error,empty}
+```
 
-> pnet_choice:pick_weighted([], pnet_choice:seed(1)).
-{error, empty}
-> pnet_choice:pick_weighted([{a,0}], pnet_choice:seed(1)).
-{error, bad_weights}
-
-> R2 = pnet_choice:seed(999).
-_
-> {Y1, _R3} = pnet_choice:pick_weighted([{a,1},{b,3},{c,1}], R2).
-_
-> R2b = pnet_choice:seed(999).
-_
-> {Y1b, _} = pnet_choice:pick_weighted([{a,1},{b,3},{c,1}], R2b).
-_
-> Y1 =:= Y1b.
+```erlang
+> Rw0 = pnet_choice:seed(9).
+> {W1, _Rw1} = pnet_choice:pick_weighted([{a,1},{b,3},{c,1}], Rw0).
+> lists:member(W1, [a,b,c]).
 true
+```
+
+```erlang
+> pnet_choice:pick_weighted([], pnet_choice:seed(1)).
+{error,empty}
+> pnet_choice:pick_weighted([{a,0}], pnet_choice:seed(1)).
+{error,bad_weights}
 ```
 """.
 
@@ -62,106 +70,109 @@ true
 %% Exports
 %%====================================================================
 
-%% RNG operations
--export([seed/1, pick/2, pick_weighted/2]).
+%% RNG state management
+-export([seed/1]).
+
+%% Choice operations
+-export([pick/2, pick_weighted/2]).
 
 %%====================================================================
 %% Types
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Internal RNG state.
+%% @doc RNG state from rand module.
 %%
-%% Uses a 3-tuple state compatible with the standard Erlang rand
-%% module format for Xoshiro256** algorithm.
+%% Opaque state representing the random number generator state.
+%% Use seed/1 to create an initial state.
 %%--------------------------------------------------------------------
--type rng_state() :: {non_neg_integer(), non_neg_integer(), non_neg_integer(),
-                      non_neg_integer()} | {exs1024s,
-                                               non_neg_integer(),
-                                               non_neg_integer(),
-                                               non_neg_integer(),
-                                               non_neg_integer()}.
+-type rand_state() :: rand:state().
+
+%%--------------------------------------------------------------------
+%% @doc A weighted element for weighted choice.
+%%
+%% Tuple of {Element, Weight} where Weight is a non-negative integer.
+%% Elements with zero weight are never selected.
+%%--------------------------------------------------------------------
+-type weighted(Elem) :: {Elem, non_neg_integer()}.
 
 %% Export types
--export_type([rng_state/0]).
+-export_type([rand_state/0, weighted/1]).
 
 %%====================================================================
 %% API Functions
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Creates a new RNG state from a seed term.
+%% @doc Creates an RNG state from an integer seed.
 %%
-%% The seed term can be any Erlang term - it's hashed to create
-%% a deterministic initial state. This ensures reproducible
-%% randomness when the same seed is used.
+%% Uses the exrop algorithm for deterministic results across platforms.
+%% The same seed value will always produce the same sequence of choices.
 %%
-%% @param SeedTerm Any Erlang term to use as the seed
-%% @return A deterministic RNG state
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec seed(SeedTerm :: term()) -> rng_state().
-
-seed(SeedTerm) ->
-    %% Use erlang:phash2 to create a deterministic integer from any term
-    %% Then seed the rand module
-    IntSeed = erlang:phash2(SeedTerm),
-    {A, B, C} = {IntSeed bxor 16#5deece66d, IntSeed bxor 16#babe, IntSeed bxor 16#deadbeef},
-    %% Initialize a simple LCG state for deterministic behavior
-    State = seed_splitmix(A, B, C),
-    State.
-
-%%--------------------------------------------------------------------
-%% @doc Picks a random element from a list.
-%%
-%% Returns the chosen element along with the updated RNG state.
-%% The list is not modified.
-%%
-%% @param List Non-empty list to pick from
-%% @param RngState Current RNG state
-%% @return {Element, UpdatedRngState} or {error, empty} if list is empty
+%% @param Seed Integer seed value (any integer)
+%% @return New RNG state
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec pick(List :: [T], RngState :: rng_state()) ->
-          {T, rng_state()} | {error, empty}.
+-spec seed(integer()) -> rand_state().
 
-pick([], _RngState) ->
+seed(Seed) when is_integer(Seed) ->
+    rand:seed_s(exrop, {Seed, 0, 0}).
+
+%%--------------------------------------------------------------------
+%% @doc Uniformly picks a random element from a non-empty list.
+%%
+%% Returns {Element, NewState} where Element is from the input list
+%% and NewState is the updated RNG state. The same seed with the same
+%% list will always return the same element.
+%%
+%% @param List Non-empty list of elements to choose from
+%% @param RandState Current RNG state
+%% @return {Element, NewState} or {error, empty}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec pick(List :: [E], RandState :: rand_state()) ->
+          {E, rand_state()} | {error, empty}.
+
+pick([], _RandState) ->
     {error, empty};
-pick(List, RngState) when is_list(List), length(List) > 0 ->
+pick(List, RandState) when is_list(List), length(List) > 0 ->
     Len = length(List),
-    {Index, NewRngState} = rand_uniform(Len, RngState),
-    Element = lists:nth(Index + 1, List),
-    {Element, NewRngState}.
+    {Index, NewState} = rand:uniform_s(Len, RandState),
+    Element = lists:nth(Index, List),
+    {Element, NewState}.
 
 %%--------------------------------------------------------------------
-%% @doc Picks a random element from a weighted list.
+%% @doc Picks a random element based on weights.
 %%
-%% Each element is associated with a positive weight. Higher weight
-%% means higher probability of being selected. Returns the chosen
-%% element (not the weight) along with the updated RNG state.
+%% Elements are selected with probability proportional to their weight.
+%% Higher weights mean higher probability of selection. Elements with
+%% zero weight are never selected.
 %%
-%% @param Items Non-empty list of {Element, Weight} tuples
-%% @param RngState Current RNG state
-%% @return {Element, UpdatedRngState} or {error, empty | bad_weights}
+%% The input is a list of {Element, Weight} tuples.
+%%
+%% @param WeightedList Non-empty list of {Element, Weight} tuples
+%% @param RandState Current RNG state
+%% @return {Element, NewState} or {error, empty | bad_weights}
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec pick_weighted(Items :: [{T, pos_integer()}], RngState :: rng_state()) ->
-          {T, rng_state()} | {error, empty | bad_weights}.
+-spec pick_weighted(WeightedList :: [weighted(E)], RandState :: rand_state()) ->
+          {E, rand_state()} | {error, empty | bad_weights}.
 
-pick_weighted([], _RngState) ->
+pick_weighted([], _RandState) ->
     {error, empty};
-pick_weighted(Items, RngState) when is_list(Items) ->
-    case validate_weights(Items) of
-        false ->
+pick_weighted(WeightedList, RandState) when is_list(WeightedList) ->
+    case validate_weights(WeightedList) of
+        {ok, TotalWeight} when TotalWeight > 0 ->
+            {Value, NewState} = rand:uniform_s(TotalWeight, RandState),
+            Element = select_by_weight(WeightedList, Value, 0),
+            {Element, NewState};
+        {ok, 0} ->
             {error, bad_weights};
-        true ->
-            TotalWeight = lists:sum([W || {_, W} <- Items]),
-            {RandValue, NewRngState} = rand_uniform(TotalWeight, RngState),
-            Item = select_weighted(Items, RandValue, 0),
-            {Item, NewRngState}
+        {error, _Reason} = Error ->
+            Error
     end.
 
 %%====================================================================
@@ -170,104 +181,51 @@ pick_weighted(Items, RngState) when is_list(Items) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc Validates that all weights are positive integers.
+%% @doc Validates the weighted list and computes total weight.
+%%
+%% Returns {ok, TotalWeight} if all weights are non-negative integers,
+%% or {error, bad_weights} if any weight is invalid.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec validate_weights([{term(), pos_integer()}]) -> boolean().
+-spec validate_weights([weighted(_)]) ->
+          {ok, non_neg_integer()} | {error, bad_weights}.
 
-validate_weights([]) ->
-    true;
-validate_weights([{_Item, Weight} | Rest]) when is_integer(Weight), Weight > 0 ->
-    validate_weights(Rest);
-validate_weights(_) ->
-    false.
+validate_weights(WeightedList) ->
+    validate_weights(WeightedList, 0).
+
+validate_weights([], Total) ->
+    {ok, Total};
+validate_weights([{_Elem, W} | Rest], Acc) when is_integer(W), W >= 0 ->
+    validate_weights(Rest, Acc + W);
+validate_weights(_Invalid, _Acc) ->
+    {error, bad_weights}.
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc Selects an element from a weighted list using cumulative weights.
+%% @doc Selects an element based on accumulated weight threshold.
 %%
-%% Returns just the selected item. The RNG state is managed by the caller.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec select_weighted([{term(), pos_integer()}], non_neg_integer(),
-                     non_neg_integer()) -> term().
-
-select_weighted([{Item, _Weight} | _Rest], _RandValue, _Acc) ->
-    Item;
-select_weighted([{Item, Weight} | Rest], RandValue, Acc) ->
-    NewAcc = Acc + Weight,
-    if
-        RandValue < NewAcc ->
-            Item;
-        true ->
-            select_weighted(Rest, RandValue, NewAcc)
-    end.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc Generates a uniform random integer in [0, Max-1].
-%%
-%% Uses a simple XOR-based PRNG for deterministic behavior.
-%% Returns the random value and updated state.
+%% Traverses the weighted list, accumulating weights until the threshold
+%% is exceeded, then returns that element.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec rand_uniform(non_neg_integer(), rng_state()) ->
-          {non_neg_integer(), rng_state()}.
+-spec select_by_weight([weighted(E)], non_neg_integer(), non_neg_integer()) -> E
+      ; ([weighted(_)], non_neg_integer(), non_neg_integer()) -> term().
 
-rand_uniform(Max, {S1, S2, S3} = State) when Max > 0 ->
-    %% Simple XOR-shift PRNG
-    S1_ = (S1 bxor (S1 bsl 13)) band 16#ffffffff,
-    S1_1 = S1_ bxor (S1_ bsr 17),
-    S1_2 = S1_1 bxor (S1_1 bsl 5),
-    S2_ = (S2 bxor (S2 bsl 2)) band 16#ffffffff,
-    S2_1 = S2_ bxor (S2_ bsr 7),
-    S2_2 = S2_1 bxor (S2_1 bsl 3),
-    S3_ = (S3 bxor (S3 bsl 21)) band 16#ffffffff,
-    S3_1 = S3_ bxor (S3_ bsr 13),
-    S3_2 = S3_1 bxor (S3_1 bsl 8),
-
-    Rand = (S1_2 + S2_2 + S3_2) band 16#ffffffff,
-    NewState = {S1_2, S2_2, S3_2},
-
-    {(Rand rem Max), NewState};
-rand_uniform(_Max, State) ->
-    {0, State}.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc Creates a seeded RNG state using splitmix-style initialization.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec seed_splitmix(non_neg_integer(), non_neg_integer(),
-                   non_neg_integer()) -> rng_state().
-
-seed_splitmix(A, B, C) ->
-    %% Mix the seed values to create initial state
-    S1 = mix(A),
-    S2 = mix(B),
-    S3 = mix(C),
-    {S1, S2, S3}.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc Mixes a 64-bit value for seeding.
-%%
-%% Uses a simple mixing function similar to MurmurHash3's finalizer.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec mix(non_neg_integer()) -> non_neg_integer().
-
-mix(X) ->
-    X1 = X bxor (X bsr 30),
-    X2 = X1 * 16#bf58476d1ce4e5b9 band 16#ffffffffffffffff,
-    X3 = X2 bxor (X2 bsr 27),
-    X4 = X3 * 16#94d049bb133111eb band 16#ffffffffffffffff,
-    X4 bxor (X4 bsr 31).
+select_by_weight([{Elem, W} | _Rest], Threshold, Acc) when Threshold < Acc + W ->
+    Elem;
+select_by_weight([{_Elem, W} | Rest], Threshold, Acc) when W =:= 0 ->
+    %% Skip zero-weight elements
+    select_by_weight(Rest, Threshold, Acc);
+select_by_weight([{Elem, W} | _Rest], Threshold, Acc) when Threshold =:= Acc + W ->
+    %% Threshold exactly at boundary - select this element
+    Elem;
+select_by_weight([{_Elem, W} | Rest], Threshold, Acc) ->
+    select_by_weight(Rest, Threshold, Acc + W);
+select_by_weight([], _Threshold, _Acc) ->
+    %% Should never happen if validate_weights ensures TotalWeight > 0
+    error({unexpected, empty_list}).
 
 %%====================================================================
 %% EUnit Tests
@@ -276,11 +234,100 @@ mix(X) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-%%--------------------------------------------------------------------
-%% @doc Runs doctests from the moduledoc and function documentation.
-%%
-%% @end
-%%--------------------------------------------------------------------
 doctest_test() ->
     doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%% Additional unit tests for edge cases
+
+seed_returns_state_test() ->
+    R = seed(42),
+    %% rand:seed_s/2 returns a valid rand state
+    %% The format varies by Erlang version - just verify it works with pick
+    {C, _R1} = pick([a, b], R),
+    ?assert(lists:member(C, [a, b])).
+
+pick_empty_test() ->
+    R0 = seed(1),
+    ?assertEqual({error, empty}, pick([], R0)).
+
+pick_non_empty_test() ->
+    R0 = seed(42),
+    {C, _R1} = pick([a, b, c], R0),
+    ?assert(lists:member(C, [a, b, c])).
+
+pick_deterministic_test() ->
+    R0a = seed(42),
+    R0b = seed(42),
+    {X1, _} = pick([a, b, c], R0a),
+    {X2, _} = pick([a, b, c], R0b),
+    ?assertEqual(X1, X2).
+
+pick_advances_state_test() ->
+    R0 = seed(42),
+    {_, R1} = pick([a, b, c], R0),
+    ?assertNotEqual(R0, R1).
+
+pick_sequence_test() ->
+    R0 = seed(123),
+    {X1, R1} = pick([a, b, c], R0),
+    {X2, R2} = pick([a, b, c], R1),
+    {X3, _R3} = pick([a, b, c], R2),
+    %% All should be valid elements
+    ?assert(lists:member(X1, [a, b, c])),
+    ?assert(lists:member(X2, [a, b, c])),
+    ?assert(lists:member(X3, [a, b, c])),
+    %% Sequence should be deterministic
+    R0a = seed(123),
+    {Y1, R1a} = pick([a, b, c], R0a),
+    {Y2, R2a} = pick([a, b, c], R1a),
+    {Y3, _R3a} = pick([a, b, c], R2a),
+    ?assertEqual(X1, Y1),
+    ?assertEqual(X2, Y2),
+    ?assertEqual(X3, Y3).
+
+pick_weighted_empty_test() ->
+    R0 = seed(1),
+    ?assertEqual({error, empty}, pick_weighted([], R0)).
+
+pick_weighted_zero_total_test() ->
+    R0 = seed(1),
+    ?assertEqual({error, bad_weights}, pick_weighted([{a, 0}], R0)),
+    ?assertEqual({error, bad_weights}, pick_weighted([{a, 0}, {b, 0}], R0)).
+
+pick_weighted_invalid_weight_test() ->
+    R0 = seed(1),
+    ?assertEqual({error, bad_weights}, pick_weighted([{a, -1}], R0)),
+    ?assertEqual({error, bad_weights}, pick_weighted([{a, 1.5}], R0)),
+    ?assertEqual({error, bad_weights}, pick_weighted([{a, abc}], R0)).
+
+pick_weighted_valid_test() ->
+    R0 = seed(9),
+    {W, _R1} = pick_weighted([{a, 1}, {b, 3}, {c, 1}], R0),
+    ?assert(lists:member(W, [a, b, c])).
+
+pick_weighted_deterministic_test() ->
+    R0a = seed(7),
+    R0b = seed(7),
+    {X1, _} = pick_weighted([{a, 1}, {b, 2}, {c, 3}], R0a),
+    {X2, _} = pick_weighted([{a, 1}, {b, 2}, {c, 3}], R0b),
+    ?assertEqual(X1, X2).
+
+pick_weighted_distribution_test() ->
+    %% With seed 42, verify weighted selection works
+    %% Not testing full distribution, just that it runs
+    R0 = seed(42),
+    {W, _R1} = pick_weighted([{a, 10}, {b, 1}], R0),
+    ?assert(lists:member(W, [a, b])).
+
+pick_weighted_zero_allowed_test() ->
+    %% Zero-weight elements should be skipped
+    R0 = seed(5),
+    {W, _R1} = pick_weighted([{a, 0}, {b, 1}, {c, 0}], R0),
+    ?assertEqual(b, W).
+
+pick_weighted_single_element_test() ->
+    R0 = seed(1),
+    {W, _R1} = pick_weighted([{only, 100}], R0),
+    ?assertEqual(only, W).
+
 -endif.

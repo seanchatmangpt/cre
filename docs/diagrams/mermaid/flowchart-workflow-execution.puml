@@ -1,0 +1,194 @@
+@startuml CRE Workflow Execution Flow
+!theme plain
+skinparam backgroundColor white
+skinparam handwritten false
+skinparam defaultFontName Arial
+
+title CRE Main Workflow Execution Flow
+
+start
+
+:Client Registration;
+note right
+ CRE client connects to CRE master
+ Client state initialized with callback module
+end note
+
+:Case Creation;
+note right
+ Client submits workflow expression
+ cre_client:eval() called
+ Client loads workflow via ClientMod:load/2
+end note
+
+:Task Generation;
+note right
+ ClientMod:step() generates applications
+ Workflow tokens created
+ Tasks queued for execution
+end note
+
+if (Resources Available?) then (yes)
+    :Worker Assignment;
+    note right
+     CRE master polls idle workers
+     pnet_choice:pick() for deterministic selection
+     Worker transitioned from idle to busy
+     cre_worker:worker_request() dispatched
+    end note
+    :Execute Task;
+    note right
+     Worker receives task via gen_pnet
+     Task execution begins
+     Worker enters busy state
+    end note
+else (no)
+    :Queue Task;
+    note right
+     Task added to pending queue
+     CRE master tracks pending tasks via marking
+     Worker marked as busy in Petri net
+    end note
+    :Wait for Resources;
+    note right
+     CRE master maintains worker pool
+     Worker marking tracked via pnet_marking
+     Polling continues until resources available
+    end note
+    :Worker Assignment;
+    note right
+     Same as successful resource path
+    end note
+    :Execute Task;
+    note right
+     Same as successful execution path
+    end note
+endif
+
+:Monitor Progress;
+note right
+ CRE client polls for results
+ Polling via persistent_term intervals
+ State tracking via reply_map and request_map
+end note
+
+if (Task Timeout?) then (yes)
+    :Handle Timeout;
+    note right
+     Timeout detection via wf_timerq
+     Task marked as failed
+     Error notification to client
+    end note
+    :Update State;
+    note right
+     Worker status updated in CRE master
+     Task moved to failed queue
+     Recovery mechanisms triggered
+    end note
+    :Retry or Cancel?;
+    note right
+     Client decides retry strategy
+     Error recovery workflow activated
+    end note
+    if (Retry?) then (yes)
+        :Back to Task Generation;
+        note right
+         Failed task requeued for retry
+         Retry limits and backoff applied
+        end note
+        :Execute Task;
+        note right
+         Retry execution with fresh worker
+        end note
+    else (no)
+        :Cancel Task;
+        note right
+         Task removed from queue
+         Client notified of failure
+         Resources freed for other tasks
+        end note
+    endif
+else (no)
+    :Check for Errors;
+    note right
+     Error detection via worker result
+     Exception handling via wf_task:failed()
+     Worker failure notifications
+    end note
+    if (Error Detected?) then (yes)
+        :Handle Error;
+        note right
+         Error analysis via worker result
+         Error expression conversion
+         Cleanup triggered
+        end note
+        :Error Recovery;
+        note right
+         Recovery decision logic
+         Retry or cancel decision
+         Error propagation to client
+        end note
+        if (Recovery Successful?) then (yes)
+            :Continue Execution;
+            note right
+             Task restarted with recovery logic
+             Worker re-assigned if needed
+            end note
+        else (no)
+            :Mark as Failed;
+            note right
+             Task marked as completed failed
+             Client notified of failure
+             Resources cleaned up
+            end note
+        endif
+    else (no)
+        :Complete Task;
+        note right
+         Task result returned via worker_result
+         Worker transitioned back to idle
+         Client notified of completion
+        end note
+    endif
+endif
+
+:Update State;
+note right
+ CRE master updates worker marking
+ pnet_marking:take() from busy
+ pnet_marking:add() to idle
+ Task cache updated
+end note
+
+:Notify Client;
+note right
+ CRE client receives result
+ ClientMod:recv() aggregates replies
+ Client continues workflow evaluation
+end note
+
+if (More Tasks?) then (yes)
+    :Continue Workflow;
+    note right
+     Client continues stepping
+     More tasks generated
+     Back to Task Generation
+    end note
+else (no)
+    :Workflow Completion;
+    note right
+     ClientMod:is_value() returns true
+     ClientMod:unload() final result
+     All resources cleaned up
+    end note
+    :Return Result;
+    note right
+     Final result returned to client
+     Workflow case marked completed
+     All workers freed to idle state
+    end note
+endif
+
+stop
+
+@enduml
