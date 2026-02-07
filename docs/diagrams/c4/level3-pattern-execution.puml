@@ -1,0 +1,107 @@
+@startuml CRE C4 Level 3 - Pattern Execution Flow
+
+!theme plain
+skinparam {
+    BackgroundColor white
+    BorderColor #333333
+}
+
+title CRE - C4 Level 3: Pattern Execution Flow (43 Patterns)
+
+legend right
+  <b>Flow:</b> Spec → Compile → gen_yawl → Pattern modules
+  <b>Each pattern:</b> One gen_yawl module in src/patterns/
+endlegend
+
+rectangle "1. Specification" as spec_phase #E8F4FD {
+  [YAWL XML] as xml
+  [YAWL YAML 0.2] as yaml
+  [wf_spec] as wf_spec
+  [wf_yaml_spec] as wf_yaml
+  xml --> wf_spec
+  yaml --> wf_yaml
+  wf_spec --> [Parsed Spec]
+  wf_yaml --> [Parsed Spec]
+}
+
+rectangle "2. Compilation" as compile_phase #E8F4FD {
+  [Parsed Spec] as parsed
+  [yawl_validate] as validate
+  [yawl_compile] as compile
+  [yawl_pattern_registry] as registry
+  parsed --> validate
+  validate --> compile
+  compile --> registry : lookup macro
+  registry --> [Expanded Net]
+}
+
+rectangle "3. Pattern Registry Map" as registry_detail #FFF2CC {
+  note as reg_note
+    <b>43 Macros → gen_yawl Modules</b>
+    ----
+    P1_Sequence → sequence.erl
+    P2_ParallelSplit → parallel_split.erl
+    P3_Synchronization → and_join.erl
+    P4_ExclusiveChoice → exclusive_choice.erl
+    P5_SimpleMerge → simple_merge.erl
+    P6_P7 → or_split, or_join_structured
+    P8_MultipleMerge → multiple_merge.erl
+    P9_Discriminator → discriminator.erl
+    P10_ArbitraryCycles → arbitrary_cycles.erl
+    P11-P17 → implicit_termination, mi_*, deferred_choice...
+    P18-P20 → milestone, cancel_activity, cancel_case
+    P21-P22 → structured_loop, recursion
+    P23-P24 → transient_trigger, persistent_trigger
+    P25-P43 → cancel_region, partial_join, thread_split...
+    ----
+    All implement -behaviour(gen_yawl)
+  end note
+}
+
+rectangle "4. Runtime Execution" as runtime_phase #D4EDDA {
+  [Expanded Net] as expanded
+  [gen_yawl:start_link] as start
+  [Net Module] as net_mod
+  [place_lst, trsn_lst] as structure
+  [preset, is_enabled, fire] as semantics
+  expanded --> net_mod
+  start --> net_mod
+  net_mod --> structure
+  net_mod --> semantics
+  semantics --> [Token Production]
+  [Token Production] --> [Continue Loop]
+}
+
+rectangle "5. Pattern Module Callbacks" as callback_detail #E8F4FD {
+  note as cb_note
+    <b>Each pattern module provides:</b>
+    ----
+    place_lst() -> [p_start, p_branch1, ...]
+    trsn_lst() -> [t_split, t_join, ...]
+    init_marking(Place, UsrInfo) -> [token]
+    preset(Trsn) -> [Place]
+    is_enabled(Trsn, Mode, UsrInfo) -> boolean
+    fire(Trsn, Mode, UsrInfo) ->
+      {produce, ProduceMap}
+      | {produce, ProduceMap, NewUsrInfo}
+      | abort
+    ----
+    init(NetArg) -> UsrInfo
+    trigger(Place, Token, NetState) -> pass | drop
+  end note
+}
+
+spec_phase -down-> compile_phase
+compile_phase -down-> registry_detail
+registry_detail -down-> runtime_phase
+runtime_phase -down-> callback_detail
+
+note bottom of runtime_phase
+  <b>Single Runtime:</b>
+  gen_yawl is the ONLY process
+  running workflow logic.
+  No gen_pnet direct calls
+  from yawl_execution.
+end note
+
+@enduml

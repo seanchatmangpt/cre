@@ -49,6 +49,8 @@
          create_manifest/1, modify_pickup/1, modify_delivery/1,
          produce_shipping_notice/1, complete_appointment/1]).
 
+-include_lib("gen_pnet/include/gen_pnet.hrl").
+
 %% Record definitions
 -record(ca_state, {
     purchase_order = undefined :: undefined | map(),
@@ -282,7 +284,8 @@ fire(_Trsn, _Mode, _CAState) ->
 %% @doc Trigger callback for custom processing.
 %% @end
 %%--------------------------------------------------------------------
-trigger('p_quote_ready', _Token, CAState) ->
+trigger('p_quote_ready', _Token, NetState) ->
+    CAState = NetState#net_state.usr_info,
     #ca_state{log_id = LogId, quote = Quote} = CAState,
     case LogId of
         undefined -> pass;
@@ -291,9 +294,9 @@ trigger('p_quote_ready', _Token, CAState) ->
             yawl_xes:log_event(LogId, <<"CarrierAppointment">>, <<"QuoteReady">>, #{
                 <<"quote_id">> => QuoteId
             }),
-            {ok, Quote}
+            pass
     end;
-trigger(_Place, _Token, _CAState) ->
+trigger(_Place, _Token, _NetState) ->
     pass.
 
 %%--------------------------------------------------------------------
@@ -301,7 +304,7 @@ trigger(_Place, _Token, _CAState) ->
 %% @end
 %%--------------------------------------------------------------------
 init(CAState) ->
-    {ok, CAState}.
+    CAState.
 
 %%--------------------------------------------------------------------
 %% @doc Handles call messages.

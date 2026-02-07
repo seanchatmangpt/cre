@@ -271,8 +271,10 @@ doctest_test() ->
     %% Test proc_count/0 returns integer
     ?assert(is_integer(proc_count())),
 
-    %% Test mailbox_len/1 returns 0 for self (should be empty)
-    ?assertEqual(0, mailbox_len(self())),
+    %% Test mailbox_len/1 returns 0 for fresh process (self may have messages in eunit)
+    EmptyPid = spawn(fun() -> receive after infinity -> ok end end),
+    ?assertEqual(0, mailbox_len(EmptyPid)),
+    exit(EmptyPid, kill),
 
     %% Test proc_mem_words/1 returns integer
     ?assert(is_integer(proc_mem_words(self()))),
@@ -304,9 +306,12 @@ proc_count_positive_test() ->
 %% @doc Test mailbox_len/1 with current process.
 %%--------------------------------------------------------------------
 mailbox_len_self_test() ->
-    ?assertEqual(0, mailbox_len(self())),
+    %% Use fresh process - self() may have messages from eunit framework
+    Pid = spawn(fun() -> receive after infinity -> ok end end),
+    ?assertEqual(0, mailbox_len(Pid)),
+    exit(Pid, kill),
 
-    %% Send message and check length increases
+    %% Send message to self and check length increases
     self() ! test_message,
     ?assert(mailbox_len(self()) >= 1),
 

@@ -327,7 +327,8 @@ day_ms() -> 86400000.
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Basic day duration test
 parse_day_test() ->

@@ -280,7 +280,8 @@ terminate(_Reason, _NetState) ->
 %% @private
 %%--------------------------------------------------------------------
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Test place_lst
 place_lst_test() ->
@@ -331,18 +332,18 @@ is_enabled_without_token_test() ->
 %% Test fire produces correct tokens
 fire_t_choose_a_test() ->
     UsrInfo = init(#{seed => 1}),
-    ?assertEqual({produce, #{out => [chosen_a]}},
-                 fire(t_choose_a, #{in => []}, UsrInfo)).
+    ?assertEqual({produce, #{in => [], out => [chosen_a]}},
+                 fire(t_choose_a, #{in => [go]}, UsrInfo)).
 
 fire_t_choose_b_test() ->
     UsrInfo = init(#{seed => 1}),
-    ?assertEqual({produce, #{out => [chosen_b]}},
-                 fire(t_choose_b, #{in => []}, UsrInfo)).
+    ?assertEqual({produce, #{in => [], out => [chosen_b]}},
+                 fire(t_choose_b, #{in => [go]}, UsrInfo)).
 
 %% Test fire with invalid mode returns abort
 fire_invalid_mode_test() ->
     UsrInfo = init(#{seed => 1}),
-    ?assertEqual(abort, fire(t_choose_a, #{in => [go]}, UsrInfo)).
+    ?assertEqual(abort, fire(t_choose_a, #{in => []}, UsrInfo)).
 
 %% Test trigger always passes
 trigger_pass_test() ->

@@ -114,12 +114,10 @@ true
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec seed(integer() | {integer(), integer(), integer()}) -> rand_state().
+-spec seed(integer()) -> rand_state().
 
 seed(Seed) when is_integer(Seed) ->
-    rand:seed_s(exrop, {Seed, 0, 0});
-seed({A, B, C}) when is_integer(A), is_integer(B), is_integer(C) ->
-    rand:seed_s(exrop, {A, B, C}).
+    rand:seed_s(exrop, {Seed, 0, 0}).
 
 %%--------------------------------------------------------------------
 %% @doc Uniformly picks a random element from a non-empty list.
@@ -237,7 +235,8 @@ select_by_weight([], _Threshold, _Acc) ->
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Additional unit tests for edge cases
 

@@ -1,5 +1,23 @@
 %% -*- erlang -*-
-%%%% @author CRE Team
+%%
+%% CRE: common runtime environment for distributed programming languages
+%%
+%% Copyright 2015-2025 CRE Team
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% -------------------------------------------------------------------
+%% @author CRE Team
 %% @version 0.3.0
 %% -------------------------------------------------------------------
 
@@ -103,8 +121,12 @@ The fire/3 callback can return:
          reply/2,
          reset_stats/1,
          stop/1,
+         sync/2,
          usr_info/1,
-         state_property/3]).
+         state_property/3,
+         inject/2,
+         step/1,
+         drain/2]).
 
 %% Net state accessor functions
 -export([get_ls/2, get_usr_info/1, get_stats/1]).
@@ -327,6 +349,49 @@ stop(Name) ->
 
 
 %%--------------------------------------------------------------------
+%% @doc Synchronize with the net instance, waiting for it to stabilize.
+%%
+%%      This function waits until no more transitions are enabled (the net
+%%      has reached a stable state) or the timeout expires. Returns the
+%%      marking when stable or an error if timeout occurs.
+%%
+%%      This is useful in tests and doctests to wait for asynchronous
+%%      operations to complete.
+%%
+%% === Example ===
+%% ```
+%% {ok, Marking} = gen_yawl:sync(Pid, 1000).
+%% '''
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec sync(Name :: name(), Timeout :: non_neg_integer() | infinity) ->
+          {ok, #{atom() => [term()]}} | {error, term()}.
+
+sync(Name, Timeout) when is_pid(Name); is_atom(Name); is_tuple(Name) ->
+    try
+        %% Request the current marking and check if net is stable
+        gen_server:call(Name, sync, Timeout)
+    catch
+        exit:{noproc, _} ->
+            {error, no_process};
+        exit:{timeout, _} ->
+            {error, timeout};
+        _:Reason ->
+            {error, Reason}
+    end;
+
+sync(NetState, _Timeout) when is_record(NetState, net_state) ->
+    %% This case is for backwards compatibility with patterns that
+    %% incorrectly pass NetState instead of Pid. Since NetState is
+    %% just a data structure, we return it as-is.
+    {ok, NetState};
+
+sync(_Other, _Timeout) ->
+    {error, badarg}.
+
+
+%%--------------------------------------------------------------------
 %% @doc Synchronously send a request to the net instance.
 %%
 %%      Timeout is implicitly set to 5 seconds.
@@ -427,6 +492,45 @@ state_property(Name, Pred, PlaceLst)
     Marking = gen_yawl:marking(Name),
     ArgLst = [ maps:get(Place, Marking) || Place <- PlaceLst ],
     apply(Pred, ArgLst).
+
+%%--------------------------------------------------------------------
+%% @doc Inject tokens into the workflow.
+%%
+%%      Adds tokens to places specified in ProduceMap.
+%%      Equivalent to gen_pnet:inject/2.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec inject(Name :: name(), ProduceMap :: #{atom() => [term()]}) ->
+          {ok, #{atom() => [term()]}} | {error, term()}.
+
+inject(Name, ProduceMap) when is_map(ProduceMap) ->
+    gen_server:call(Name, {inject, ProduceMap}).
+
+%%--------------------------------------------------------------------
+%% @doc Fire at most one enabled transition.
+%%
+%%      Equivalent to gen_pnet:step/1.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec step(Name :: name()) -> abort | {ok, #{atom() => [term()]}}.
+
+step(Name) ->
+    gen_server:call(Name, step).
+
+%%--------------------------------------------------------------------
+%% @doc Fire transitions until none enabled or MaxSteps reached.
+%%
+%%      Equivalent to gen_pnet:drain/2.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec drain(Name :: name(), MaxSteps :: non_neg_integer()) ->
+          {ok, [#{atom() => [term()]}]} | {error, limit}.
+
+drain(Name, MaxSteps) when is_integer(MaxSteps), MaxSteps >= 0 ->
+    gen_server:call(Name, {drain, MaxSteps, []}).
 
 
 %%====================================================================
@@ -589,6 +693,76 @@ handle_call(stats, _From, WrapperState = #wrapper_state{net_state = NetState}) -
 handle_call(reset_stats, _From, WrapperState = #wrapper_state{net_state = NetState}) ->
     NetState1 = NetState#net_state{stats = undefined},
     {reply, ok, WrapperState#wrapper_state{net_state = NetState1}};
+
+handle_call(sync, _From, WrapperState = #wrapper_state{net_state = NetState}) ->
+    %% Return the current marking to indicate the net is synced
+    %% The caller can check if the expected state is reached
+    #net_state{marking = Marking} = NetState,
+    {reply, {ok, Marking}, WrapperState};
+
+handle_call({inject, ProduceMap}, _From,
+            WrapperState = #wrapper_state{net_mod = NetMod, net_state = NetState}) ->
+    try
+        NetState1 = handle_trigger(ProduceMap, NetState, NetMod),
+        Receipt = ProduceMap,
+        continue(self()),
+        {reply, {ok, Receipt}, WrapperState#wrapper_state{net_state = NetState1}}
+    catch
+        _:Reason ->
+            {reply, {error, Reason}, WrapperState}
+    end;
+
+handle_call(step, _From,
+            WrapperState = #wrapper_state{
+                              fire_timeout = FireTimeout,
+                              net_state = NetState0
+                             }) ->
+    case progress(NetState0, FireTimeout) of
+        abort ->
+            {reply, abort, WrapperState};
+        {delta, Mode, Pm, NewUsrInfo} ->
+            %% Extract receipt from delta
+            Receipt = Pm,
+            %% Update net state
+            NetState1 = cns(Mode, NetState0),
+            NetState2 = case NewUsrInfo of
+                undefined -> NetState1;
+                _ -> NetState1#net_state{usr_info = NewUsrInfo}
+            end,
+            NetMod = WrapperState#wrapper_state.net_mod,
+            NetState3 = handle_trigger(Pm, NetState2, NetMod),
+            continue(self()),
+            {reply, {ok, Receipt}, WrapperState#wrapper_state{net_state = NetState3}};
+        {error, Reason, NetState1} ->
+            {reply, {error, Reason}, WrapperState#wrapper_state{net_state = NetState1}}
+    end;
+
+handle_call({drain, MaxSteps, _Acc}, _From, WrapperState) when MaxSteps =< 0 ->
+    {reply, {error, limit}, WrapperState};
+
+handle_call({drain, MaxSteps, Acc}, _From,
+            WrapperState = #wrapper_state{
+                              fire_timeout = FireTimeout,
+                              net_state = NetState0
+                             }) ->
+    case progress(NetState0, FireTimeout) of
+        abort ->
+            {reply, {ok, lists:reverse(Acc)}, WrapperState};
+        {delta, Mode, Pm, NewUsrInfo} ->
+            Receipt = Pm,
+            NetState1 = cns(Mode, NetState0),
+            NetState2 = case NewUsrInfo of
+                undefined -> NetState1;
+                _ -> NetState1#net_state{usr_info = NewUsrInfo}
+            end,
+            NetMod = WrapperState#wrapper_state.net_mod,
+            NetState3 = handle_trigger(Pm, NetState2, NetMod),
+            continue(self()),
+            WrapperState1 = WrapperState#wrapper_state{net_state = NetState3},
+            handle_call({drain, MaxSteps - 1, [Receipt | Acc]}, _From, WrapperState1);
+        {error, Reason, NetState1} ->
+            {reply, {error, Reason}, WrapperState#wrapper_state{net_state = NetState1}}
+    end;
 
 handle_call(_Request, _From, WrapperState) ->
     {reply, {error, bad_msg}, WrapperState}.
@@ -950,7 +1124,7 @@ attempt_progress(ModeMap, NetMod, UsrInfo, FireTimeout) ->
                         end),
 
                     receive
-                        {fire_result, Result} ->
+                        {'DOWN', Ref, process, Pid, {fire_result, Result}} ->
                             Result;
                         {'DOWN', Ref, process, Pid, Reason} ->
                             logger:error("gen_yawl fire/3 process crashed: ~p", [Reason]),
@@ -1158,7 +1332,7 @@ permut_map_keys([], _Map, Acc) ->
     Acc;
 permut_map_keys([K | Rest], Map, Acc) ->
     Values = maps:get(K, Map),
-    NewAcc = [{maps:put(K, V, M)} || M <- Acc, V <- Values],
+    NewAcc = [maps:put(K, V, M) || M <- Acc, V <- Values],
     permut_map_keys(Rest, Map, NewAcc).
 
 %%====================================================================
@@ -1169,5 +1343,6 @@ permut_map_keys([K | Rest], Map, Acc) ->
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 -endif.

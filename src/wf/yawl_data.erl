@@ -40,7 +40,8 @@
 -module(yawl_data).
 
 -export([extract_data/3, validate_data/2, merge_data/2,
-         get_variable/2, set_variable/3, to_marking_data/1]).
+         get_variable/2, set_variable/3, to_marking_data/1,
+         check_constraint/3, check_basic_type/2]).
 
 -export_type([data/0, schema/0, type_def/0]).
 
@@ -116,6 +117,7 @@ validate_data(Data, Schema) ->
             case maps:find(VarName, Data) of
                 {ok, Value} ->
                     case validate_variable(VarName, Value, Schema) of
+                        {error, ReasonList} when is_list(ReasonList) -> ReasonList ++ Acc;
                         {error, Reason} -> [Reason | Acc];
                         ok -> Acc
                     end;
@@ -132,7 +134,7 @@ validate_data(Data, Schema) ->
 
         case Errors of
             [] -> {ok, Data};
-            _ -> {error, Errors}
+            _ -> {error, lists:reverse(Errors)}
         end
     catch
         Error:Reason ->
@@ -190,7 +192,8 @@ to_marking_data(Data) ->
 %%====================================================================
 
 %% @doc Validates a single variable against schema.
--spec validate_variable(binary(), term(), schema()) -> ok | {error, term()}.
+%% Returns ok or {error, [Reasons]} where Reasons is a list of error reasons.
+-spec validate_variable(binary(), term(), schema()) -> ok | {error, [term()]}.
 validate_variable(VarName, Value, Schema) ->
     case maps:find(VarName, Schema) of
         {ok, TypeDef} ->
@@ -198,7 +201,7 @@ validate_variable(VarName, Value, Schema) ->
                 {type, Required, Constraints} ->
                     case Required of
                         required when Value =:= undefined ->
-                            {error, {undefined_required_variable, VarName}};
+                            {error, [{undefined_required_variable, VarName}]};
                         required ->
                             validate_value_type(VarName, Value, Constraints);
                         optional ->
@@ -218,19 +221,20 @@ validate_variable(VarName, Value, Schema) ->
     end.
 
 %% @doc Validates value type and constraints.
--spec validate_value_type(binary(), term(), constraints()) -> ok | {error, term()}.
+%% Returns {error, [Reasons]} with a list of reasons, or ok.
+-spec validate_value_type(binary(), term(), constraints()) -> ok | {error, [term()]}.
 validate_value_type(VarName, Value, Constraints) ->
     try
         %% Basic type validation
         case check_basic_type(Value, Constraints) of
-            {error, Reason} -> {error, Reason};
+            {error, Reason} -> {error, [Reason]};
             ok ->
                 %% Check additional constraints
                 check_constraints(VarName, Value, Constraints)
         end
     catch
         Error:Reason1 ->
-            {error, {validation_error, Error, Reason1, VarName, Value, Constraints}}
+            {error, [{validation_error, Error, Reason1, VarName, Value, Constraints}]}
     end.
 
 %% @doc Checks basic type against constraints.
@@ -278,12 +282,16 @@ check_type_match(Value, Type) ->
 %% @doc Checks additional value constraints.
 -spec check_constraints(binary(), term(), constraints()) -> ok | {error, term()}.
 check_constraints(VarName, Value, Constraints) ->
-    lists:foldl(fun(Constraint, Acc) ->
+    Errors = lists:foldl(fun(Constraint, Acc) ->
         case check_constraint(VarName, Value, Constraint) of
             ok -> Acc;
             {error, Reason} -> [Reason | Acc]
         end
-    end, [], Constraints).
+    end, [], Constraints),
+    case Errors of
+        [] -> ok;
+        _ -> {error, lists:reverse(Errors)}
+    end.
 
 %% @doc Checks a single constraint.
 -spec check_constraint(binary(), term(), constraint()) -> ok | {error, term()}.

@@ -9,25 +9,22 @@
 run() ->
     io:format("Starting manual yawl_recovery test...~n"),
 
+    % Stop and delete any existing Mnesia schema for clean state
+    application:stop(mnesia),
+    timer:sleep(50),
+    mnesia:delete_schema([node()]),
+    timer:sleep(50),
+
     % Start Mnesia
     case mnesia:start() of
-        ok -> ok;
-        {error, {already_started, mnesia}} -> ok
+        ok -> io:format("Mnesia started~n");
+        {error, {already_started, mnesia}} -> io:format("Mnesia already running~n")
     end,
 
-    % Create table
-    case mnesia:create_table(
-        yawl_checkpoint,
-        [
-            {record_name, yawl_checkpoint},
-            {attributes, record_info(fields, yawl_checkpoint)},
-            {ram_copies, [node()]},
-            {type, set},
-            {index, [spec_id, case_id]}  % Add secondary indexes
-        ]
-    ) of
-        {atomic, ok} -> io:format("Table created~n");
-        {aborted, {already_exists, yawl_checkpoint}} -> io:format("Table already exists~n")
+    % Create table using init_schema
+    case yawl_recovery:init_schema() of
+        ok -> io:format("Table created~n");
+        {error, Reason} -> io:format("Error creating table: ~p~n", [Reason])
     end,
 
     % Test data

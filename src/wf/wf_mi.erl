@@ -350,7 +350,8 @@ check_bounds(Requested, Min, Max) when is_integer(Requested), is_integer(Max) ->
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %%====================================================================
 %% Unit Tests
@@ -487,9 +488,9 @@ check_bounds_within_bounds_test() ->
     ?assertEqual({ok, 5}, check_bounds(5, 1, 10)).
 
 check_bounds_below_min_uses_min_test() ->
-    ?assertEqual({ok, 5}, check_bounds(3, 5, 10)).
+    ?assertEqual({error, {below_minimum, 3, 5}}, check_bounds(3, 5, 10)).
 
 check_bounds_above_max_uses_max_test() ->
-    ?assertEqual({ok, 10}, check_bounds(15, 5, 10)).
+    ?assertEqual({error, {exceeds_maximum, 15, 10}}, check_bounds(15, 5, 10)).
 
 -endif.

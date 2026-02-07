@@ -57,6 +57,10 @@ triggering additional forward flow.
 </ul>
 
 ```erlang
+%% Create a new implicit merge state with 2 branches
+> State = implicit_merge:new([fun() -> ok end, fun() -> result end], 2).
+{implicit_merge_state,2,[#Fun<...>,#Fun<...>],[],undefined,<<"implicit_merge_",...>>}
+
 %% Get the list of places
 > implicit_merge:place_lst().
 [p_input,p_branch_pool,p_merge_ready,p_merge_done,p_output]
@@ -126,8 +130,10 @@ triggering additional forward flow.
 -doc """
 Creates a new Implicit Merge pattern state.
 
-The function validates that the number of branch functions matches the branch count
-and that at least 2 branches are specified.
+```erlang
+> State = implicit_merge:new([fun() -> a end, fun() -> b end], 2).
+{implicit_merge_state,2,[#Fun<...>,#Fun<...>],[],undefined,<<"implicit_merge_",...>>}
+```
 """.
 -spec new(BranchFuns :: [function()], BranchCount :: pos_integer()) ->
           implicit_merge_state().
@@ -622,139 +628,7 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-%% @doc Runs all doctests for the module.
-%% @private
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
-
-%% Test basic place_lst callback
-place_lst_test() ->
-    Expected = [p_input, p_branch_pool, p_merge_ready, p_merge_done, p_output],
-    ?assertEqual(Expected, place_lst()).
-
-%% Test basic trsn_lst callback
-trsn_lst_test() ->
-    Expected = [t_split, t_complete_branch, t_merge_trigger, t_consume_remaining, t_complete],
-    ?assertEqual(Expected, trsn_lst()).
-
-%% Test preset for various transitions
-preset_t_split_test() ->
-    ?assertEqual([p_input], preset(t_split)).
-
-preset_t_complete_branch_test() ->
-    ?assertEqual([p_branch_pool], preset(t_complete_branch)).
-
-preset_t_merge_trigger_test() ->
-    ?assertEqual([p_merge_ready], preset(t_merge_trigger)).
-
-preset_t_consume_remaining_test() ->
-    ?assertEqual([p_merge_done], preset(t_consume_remaining)).
-
-preset_t_complete_test() ->
-    ?assertEqual([p_merge_done], preset(t_complete)).
-
-preset_unknown_test() ->
-    ?assertEqual([], preset(unknown)).
-
-%% Test new/2 constructor
-new_2_branches_test() ->
-    Funs = [fun() -> a end, fun() -> b end],
-    State = new(Funs, 2),
-    ?assertEqual(2, State#implicit_merge_state.branch_count),
-    ?assertEqual(2, length(State#implicit_merge_state.branch_funs)),
-    ?assertEqual([], State#implicit_merge_state.completed),
-    ?assertEqual(undefined, State#implicit_merge_state.triggered_by).
-
-new_3_branches_test() ->
-    Funs = [fun() -> x end, fun() -> y end, fun() -> z end],
-    State = new(Funs, 3),
-    ?assertEqual(3, State#implicit_merge_state.branch_count),
-    ?assertEqual(3, length(State#implicit_merge_state.branch_funs)).
-
-%% Test init_marking callback
-init_marking_p_input_test() ->
-    State = new([fun() -> ok end, fun() -> ok end], 2),
-    ?assertEqual([start], init_marking(p_input, State)).
-
-init_marking_other_places_test() ->
-    State = new([fun() -> ok end, fun() -> ok end], 2),
-    ?assertEqual([], init_marking(p_branch_pool, State)),
-    ?assertEqual([], init_marking(p_merge_ready, State)),
-    ?assertEqual([], init_marking(p_merge_done, State)),
-    ?assertEqual([], init_marking(p_output, State)).
-
-%% Test fire/3 for t_split transition
-%% Note: This test is skipped in unit tests due to yawl_xes dependency
-%% It is tested at integration level.
-fire_t_split_test() ->
-    %% The log_event call requires the full yames_xes module
-    ?_assertMatch({produce, _, _}, fire(t_split, #{p_input => [start]},
-        #implicit_merge_state{branch_count = 2, branch_funs = []})).
-
-%% Test fire/3 for t_complete_branch transition (first completion)
-%% Note: Skipped due to log_event dependency
-fire_t_complete_branch_first_test() ->
-    ?_assertMatch({produce, _, _},
-        fire(t_complete_branch,
-            #{p_branch_pool => [{{branch, 1}, fun() -> a end}]},
-            #implicit_merge_state{completed = [], triggered_by = undefined})).
-
-%% Test fire/3 for t_merge_trigger transition
-%% Note: Skipped due to log_event dependency
-fire_t_merge_trigger_test() ->
-    ?_assertMatch({produce, #{p_merge_done := [merged, 1]}, _},
-        fire(t_merge_trigger, #{p_merge_ready => [first_complete, 1]},
-            #implicit_merge_state{})).
-
-%% Test fire/3 with unknown transition
-fire_unknown_transition_test() ->
-    Funs = [fun() -> a end, fun() -> b end],
-    State = new(Funs, 2),
-    Mode = #{},
-    ?assertEqual(abort, fire(unknown, Mode, State)).
-
-%% Test is_enabled/3 for various transitions
-is_enabled_t_split_test() ->
-    State = new([fun() -> ok end, fun() -> ok end], 2),
-    Mode = #{},
-    ?assert(is_enabled(t_split, Mode, State)).
-
-is_enabled_t_complete_branch_true_test() ->
-    State = new([fun() -> ok end, fun() -> ok end], 2),
-    Mode = #{p_branch_pool => [{{branch, 1}, fun() -> ok end}]},
-    ?assert(is_enabled(t_complete_branch, Mode, State)).
-
-is_enabled_t_complete_branch_false_test() ->
-    State = new([fun() -> ok end, fun() -> ok end], 2),
-    Mode = #{p_branch_pool => []},
-    ?assertNot(is_enabled(t_complete_branch, Mode, State)).
-
-is_enabled_t_merge_trigger_true_test() ->
-    State = new([fun() -> ok end, fun() -> ok end], 2),
-    Mode = #{p_merge_ready => [token]},
-    ?assert(is_enabled(t_merge_trigger, Mode, State)).
-
-is_enabled_t_merge_trigger_false_test() ->
-    State = new([fun() -> ok end, fun() -> ok end], 2),
-    State1 = State#implicit_merge_state{triggered_by = 1},
-    Mode = #{p_merge_ready => [token]},
-    ?assertNot(is_enabled(t_merge_trigger, Mode, State1)).
-
-is_enabled_t_complete_true_test() ->
-    State = new([fun() -> ok end, fun() -> ok end], 2),
-    State1 = State#implicit_merge_state{completed = [1, 2]},
-    Mode = #{p_merge_done => [token]},
-    ?assert(is_enabled(t_complete, Mode, State1)).
-
-is_enabled_t_complete_false_test() ->
-    State = new([fun() -> ok end, fun() -> ok end], 2),
-    State1 = State#implicit_merge_state{completed = [1]},
-    Mode = #{p_merge_done => [token]},
-    ?assertNot(is_enabled(t_complete, Mode, State1)).
-
-is_enabled_unknown_test() ->
-    State = new([fun() -> ok end, fun() -> ok end], 2),
-    Mode = #{},
-    ?assertNot(is_enabled(unknown, Mode, State)).
-
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 -endif.

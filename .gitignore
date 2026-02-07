@@ -12,9 +12,45 @@ rel/example_project
 doc
 _build
 rebar.lock
+# Claude Flow runtime state files
 .claude-flow/
 .hive-mind/
 .mcp.json
+.claude-flow/daemon-state.json
+.claude-flow/daemon.pid
+.claude-flow/metrics/
+.claude-flow/agents/store.json
+.swarm/
 
 # Wreckit local config (may contain secrets)
 .wreckit/config.local.json
+
+# OTP cache and session artifacts
+.erlmcp/
+Mnesia.nonode@nohost/
+
+# Build artifacts
+rebar3.crashdump
+
+# LaTeX build artifacts
+texput.log
+thesis/*.aux
+thesis/*.log
+thesis/*.blg
+thesis/*.bbl
+thesis/*.bcf
+thesis/*.lof
+thesis/*.lot
+thesis/*.out
+thesis/*.run.xml
+thesis/*.toc
+thesis/chapters/*.aux
+thesis/appendix/*.aux
+
+# Mnesia database files
+Mnesia.*/
+
+# Temp files
+*.bak
+*_temp.erl
+*temp.erl

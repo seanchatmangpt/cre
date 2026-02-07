@@ -905,13 +905,13 @@ doctest_test() ->
     UserId = generate_id(<<"user">>),
     true = is_binary(UserId),
     true = byte_size(UserId) > 4,
-    {ok, _} = re:run(UserId, <<"^user_[a-f0-9]+$">>),
+    {match, _} = re:run(UserId, <<"^user_[a-fA-F0-9]+$">>),
 
     %% Test 11: Session ID generation
     SessionId = generate_id(<<"session">>),
     true = is_binary(SessionId),
     true = byte_size(SessionId) > 8,
-    {ok, _} = re:run(SessionId, <<"^session_[a-f0-9]+$">>),
+    {match, _} = re:run(SessionId, <<"^session_[a-fA-F0-9]+$">>),
 
     %% Test 12: User record creation
     TestUser = new_user(<<"testuser">>, <<"TestPass123!">>, [<<"user">>]),

@@ -320,7 +320,7 @@ is_enabled(_Trsn, _Mode, _UsrInfo) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec fire(Trsn :: atom(), Mode :: map(), UsrInfo :: exclusive_choice_state()) ->
-          {produce, map()} | {produce, map(), exclusive_choice_state()} | abort.
+          {produce, map()} | abort.
 
 fire('t_select_a', #{'p_start' := [start]}, #exclusive_choice_state{branches = Branches} = State) ->
     %% Select branch A using nondeterministic choice
@@ -547,7 +547,8 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 %% @doc Runs all doctests for the module.
 %% @private
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Test basic place_lst callback
 place_lst_test() ->

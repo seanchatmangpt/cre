@@ -1,0 +1,133 @@
+@startuml CRE C4 Level 1 - Container Diagram (gen_yawl-centric)
+
+!theme plain
+skinparam {
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+}
+
+title CRE YAWL Workflow Engine - C4 Level 1 (Container Diagram)
+
+legend right
+  <b>Containers:</b> Deployable runtime components
+  <b>Runtime Rule:</b> gen_yawl is the ONLY workflow runtime.
+  gen_pnet is internal to gen_yawl. No direct gen_pnet for workflows.
+endlegend
+
+rectangle "CRE System" as creSystem #EEF2FF {
+
+  rectangle "Specification Pipeline" as specPipeline #E8F4FD {
+    <b>Specification Pipeline</b>
+    ==
+    <b>Responsibilities:</b>
+    • Parse YAWL XML/YAML
+    • Validate specifications
+    • Compile to gen_yawl modules
+    • Expand pattern instances
+    ==
+    <b>Technology:</b>
+    wf_spec, wf_yaml_spec
+    yawl_validate, yawl_compile
+    yawl_pattern_registry
+  }
+
+  rectangle "Workflow Runtime" as workflowRuntime #D4EDDA {
+    <b>Workflow Runtime</b>
+    ==
+    <b>Responsibilities:</b>
+    • Start workflow instances
+    • Execute transitions (fire/3)
+    • Manage tokens (marking)
+    • Update usr_info (3-tuple)
+    ==
+    <b>Technology:</b>
+    gen_yawl (ONLY runtime)
+    yawl_execution
+    wf_yawl_executor
+    ==
+    <b>Not used:</b> gen_pnet direct
+  }
+
+  rectangle "43 Pattern Modules" as patternModules #E8F4FD {
+    <b>Pattern Modules</b>
+    ==
+    <b>Responsibilities:</b>
+    • Each pattern = gen_yawl behaviour
+    • place_lst, trsn_lst, preset
+    • is_enabled, fire
+    ==
+    <b>Technology:</b>
+    src/patterns/*.erl
+    All -behaviour(gen_yawl)
+    ==
+    <b>Examples:</b>
+    parallel_split, simple_merge
+    discriminator, milestone
+    transient_trigger, thread_split
+  }
+
+  rectangle "CRE Master" as creMaster #E8F4FD {
+    <b>CRE Master</b>
+    ==
+    • Worker pool management
+    • Task distribution
+    • Load balancing
+    ==
+    Erlang/OTP gen_server
+  }
+
+  rectangle "HTTP Interface" as httpInterface #E8F4FD {
+    <b>HTTP Interface</b>
+    ==
+    • REST/JSON API
+    • Workflow endpoints
+    ==
+    Cowboy
+  }
+
+  rectangle "Persistence" as persistence #E8F4FD {
+    <b>Persistence</b>
+    ==
+    • State checkpoints
+    • Event logging
+    ==
+    yawl_persistence
+    XES Logger
+  }
+}
+
+' External
+rectangle "YAWL Client" as yawlClient #FFF2CC
+rectangle "External Apps" as extApps #FFF2CC
+rectangle "Monitoring" as monitoring #FFF2CC
+
+' Internal flows
+specPipeline -down-> workflowRuntime : Compiled\nmodules
+patternModules -down-> workflowRuntime : gen_yawl\nbehaviours
+workflowRuntime -down-> creMaster : Task\nrequests
+workflowRuntime -down-> persistence : Checkpoints\nEvents
+workflowRuntime -down-> monitoring : Telemetry
+
+' External flows
+yawlClient -down-> httpInterface : API
+extApps -down-> httpInterface : HTTP
+httpInterface -down-> workflowRuntime : Start\nExecute
+monitoring -up-> workflowRuntime : Metrics
+
+note bottom of workflowRuntime
+  <b>CRITICAL:</b>
+  All workflow execution goes through gen_yawl.
+  yawl_execution and wf_yawl_executor MUST use
+  gen_yawl:start_link, gen_yawl:step, etc.
+  NEVER gen_pnet directly for workflows.
+end note
+
+note bottom of patternModules
+  <b>Pattern Registry:</b>
+  yawl_pattern_registry maps YAML macros
+  (P1_Sequence, P42_ThreadSplit, etc.)
+  to gen_yawl modules.
+end note
+
+@enduml

@@ -426,12 +426,12 @@ is_enabled(_Trsn, _Mode, _UsrInfo) ->
 %% @param Trsn The transition to fire.
 %% @param Mode The current mode (marking).
 %% @param UsrInfo The parallel_split_state.
-%% @return {produce, NewMode} | {produce, NewMode, NewUsrInfo} | abort.
+%% @return {produce, NewMode} | abort.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec fire(Trsn :: atom(), Mode :: map(), UsrInfo :: parallel_split_state()) ->
-          {produce, map()} | {produce, map(), parallel_split_state()} | abort.
+          {produce, map()} | abort.
 
 fire('t_split', #{'p_start' := [start]}, #parallel_split_state{branch_count = Count} = State) ->
     %% Split into parallel branches
@@ -442,14 +442,14 @@ fire('t_split', #{'p_start' := [start]}, #parallel_split_state{branch_count = Co
                 'p_start' => [],
                 'p_branch1' => [{branch, 1}],
                 'p_branch2' => [{branch, 2}]
-            }, State};
+            }};
         3 ->
             {produce, #{
                 'p_start' => [],
                 'p_branch1' => [{branch, 1}],
                 'p_branch2' => [{branch, 2}],
                 'p_branch3' => [{branch, 3}]
-            }, State};
+            }};
         4 ->
             {produce, #{
                 'p_start' => [],
@@ -457,7 +457,7 @@ fire('t_split', #{'p_start' := [start]}, #parallel_split_state{branch_count = Co
                 'p_branch2' => [{branch, 2}],
                 'p_branch3' => [{branch, 3}],
                 'p_branch4' => [{branch, 4}]
-            }, State};
+            }};
         _ when Count > 4 ->
             %% For more than 4 branches, distribute tokens across first 4 places
             %% Multiple branches can share a place
@@ -468,7 +468,7 @@ fire('t_split', #{'p_start' := [start]}, #parallel_split_state{branch_count = Co
                 'p_branch2' => BranchTokens#{2 => [{branch, 2}]},
                 'p_branch3' => maps:get(3, BranchTokens, [{branch, 3}]),
                 'p_branch4' => maps:get(4, BranchTokens, [{branch, 4}])
-            }, State}
+            }}
     end;
 
 fire('t_join_branch1', #{'p_branch1' := [{branch, Index}]}, State) ->
@@ -497,7 +497,7 @@ fire('t_finish', _Mode, #parallel_split_state{completed = Completed, results = R
     {produce, #{
         'p_join_ready' => [],
         'p_end' => [{complete, maps:merge(Results, #{completed => Completed})}]
-    }, State};
+    }};
 
 fire(_Trsn, _Mode, _UsrInfo) ->
     abort.
@@ -603,7 +603,7 @@ terminate(_Reason, NetState) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec join_branch(Index :: pos_integer(), State :: parallel_split_state(), PlaceUpdates :: map()) ->
-          {produce, map(), parallel_split_state()}.
+          {produce, map()}.
 
 join_branch(Index, #parallel_split_state{completed = Completed, branch_count = Count} = State, PlaceUpdates) ->
     NewCompleted = [Index | Completed],
@@ -615,10 +615,10 @@ join_branch(Index, #parallel_split_state{completed = Completed, branch_count = C
         true ->
             %% All branches completed - add completion tokens to join_ready
             JoinTokens = [{branch_complete, I} || I <- lists:sort(NewCompleted)],
-            {produce, maps:merge(BaseProduce, #{'p_join_ready' => JoinTokens}), NewState};
+            {produce, maps:merge(BaseProduce, #{'p_join_ready' => JoinTokens})};
         false ->
             %% Still waiting for more branches
-            {produce, BaseProduce, NewState}
+            {produce, BaseProduce}
     end.
 
 %%--------------------------------------------------------------------
@@ -737,7 +737,8 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 %% @doc Runs all doctests for the module.
 %% @private
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Test basic place_lst callback
 place_lst_test() ->

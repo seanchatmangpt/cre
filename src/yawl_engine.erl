@@ -1585,9 +1585,9 @@ doctest_test() ->
     {ok, CancelledCase} = cancel_workflow_case(ResumedCase),
     cancelled = CancelledCase#workflow_case.status,
 
-    %% Test marking operations with pnet_marking
+    %% Test marking operations with pnet_marking (add returns map directly)
     Marking = pnet_marking:new([input, output, task1]),
-    {ok, Marking1} = pnet_marking:add(Marking, #{input => [start]}),
+    Marking1 = pnet_marking:add(Marking, #{input => [start]}),
     {ok, [start]} = pnet_marking:get(Marking1, input),
     {ok, Marking2} = pnet_marking:take(Marking1, #{input => [start]}),
     {ok, []} = pnet_marking:get(Marking2, input),

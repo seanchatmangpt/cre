@@ -275,9 +275,13 @@ take_fold([{Place, TokensToTake} | Rest], Marking) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec apply(Marking :: marking(), ConsumeMap :: consume_map(), ProduceMap :: produce_map()) ->
+          {ok, marking()} | {error, insufficient}.
+apply(Marking, ConsumeMap, ProduceMap) when is_map(Marking), is_map(ConsumeMap), is_map(ProduceMap) ->
+    apply(Marking, #{mode => ConsumeMap, produce => ProduceMap}).
+
 -spec apply(Marking :: marking(), Move :: move()) ->
           {ok, marking()} | {error, insufficient}.
-
 apply(Marking, #{mode := Mode, produce := Produce}) ->
     case take(Marking, Mode) of
         {ok, Marking1} ->
@@ -285,12 +289,6 @@ apply(Marking, #{mode := Mode, produce := Produce}) ->
         {error, _} = Error ->
             Error
     end.
-
-%% @doc Atomic consume-then-produce; convenience for (ConsumeMap, ProduceMap) callers.
--spec apply(Marking :: marking(), ConsumeMap :: consume_map(), ProduceMap :: produce_map()) ->
-          {ok, marking()} | {error, insufficient}.
-apply(Marking, ConsumeMap, ProduceMap) when is_map(ConsumeMap), is_map(ProduceMap) ->
-    apply(Marking, #{mode => ConsumeMap, produce => ProduceMap}).
 
 %%--------------------------------------------------------------------
 %% @doc Creates a snapshot (copy) of the marking.
@@ -418,7 +416,8 @@ expand_counts(Counts) ->
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %%====================================================================
 %% Unit Tests

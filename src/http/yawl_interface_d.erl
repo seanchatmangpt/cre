@@ -666,6 +666,12 @@ abort_worklet(ExecutionId) ->
 -spec doctest_test() -> ok.
 
 doctest_test() ->
+    %% Ensure server is running (cre may not start it)
+    _ = case start_link() of
+        {ok, _} -> ok;
+        {error, {already_started, _}} -> ok
+    end,
+
     %% Test 1: Register exception service
     {ok, SvcId} = register_exception_service(<<"doctest_handler">>,
         [{service_type, local}, {priority, 1}, {enabled, true}]),
@@ -830,7 +836,7 @@ handle_call({handle_exception, ExceptionType, ExceptionData}, _From, State) ->
 
     %% Find appropriate exception service based on exception type
     case find_service_for_exception(ExceptionType, Services) of
-        {ok, ServiceId} ->
+        {ok, _ServiceId} ->
             %% Get worklet spec ID from exception data or derive it
             WorkletSpecId = maps:get(worklet_spec_id, ExceptionData,
                                     derive_worklet_spec_id(ExceptionType)),
@@ -1035,7 +1041,7 @@ generate_service_id(ServiceName, Counter) ->
 -spec find_service_for_exception(atom(), #{binary() => #exception_service{}}) ->
         {ok, service_id()} | {error, no_handler}.
 
-find_service_for_exception(ExceptionType, Services) ->
+find_service_for_exception(_ExceptionType, Services) ->
     %% Filter enabled services
     EnabledServices = maps:filter(fun(_K, S) -> S#exception_service.enabled =:= true end, Services),
 
@@ -1214,7 +1220,7 @@ notify_worklet_launched(#worklet_execution{execution_id = ExecId,
     try
         case whereis(yawl_ipc) of
             undefined -> ok;
-            IpcPid ->
+            _IpcPid ->
                 yawl_ipc:publish_case_event(
                     CaseId,
                     <<"worklet_launched">>,

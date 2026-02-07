@@ -48,6 +48,7 @@
 -export([start/2, stop/1]).
 -export([main/1]).
 -export([doctest_test/0]).
+-export([ensure_cre_gen_pnet_loaded/0]).
 
 %%====================================================================
 %% Includes
@@ -180,6 +181,8 @@ Starting CRE: vsn="0.1.10" node=nonode@nohost port=4142
 -spec start(Type :: _, Args :: _) -> {ok, pid()} | {error, _}.
 
 start(_Type, _Args) ->
+    %% Load cre's gen_pnet (inject/step/drain) before dep's version
+    ensure_cre_gen_pnet_loaded(),
 
     %% Initialize persistent_term configuration (OTP 21+ optimization)
     ok = cre_config:init(),
@@ -275,6 +278,28 @@ main(_Args) ->
 %%====================================================================
 %% Internal functions
 %%====================================================================
+
+%% @doc Load cre's gen_pnet (extended with inject/step/drain) so it overrides
+%% the dependency's version. Call before starting any process that uses gen_pnet.
+ensure_cre_gen_pnet_loaded() ->
+    case code:lib_dir(cre) of
+        {error, _} ->
+            ok;
+        LibDir ->
+            CreEbin = filename:join(LibDir, "ebin"),
+            BeamPath = filename:join(CreEbin, "gen_pnet.beam"),
+            case filelib:is_file(BeamPath) of
+                true ->
+                    code:add_patha(CreEbin),
+                    _ = code:purge(gen_pnet),
+                    case code:load_file(gen_pnet) of
+                        {module, gen_pnet} -> ok;
+                        {error, _} -> ok
+                    end;
+                false ->
+                    ok
+            end
+    end.
 
 % start_cre_webservice/1
 % @doc Attempts to start the CRE web service under the given port.
@@ -394,18 +419,16 @@ doctest_test() ->
         error:function_clause -> ok
     end,
 
-    %% Test 8: Verify start_cre_webservice/1 with cowboy/ranch
-    %% When apps are started: {ok, _} or {error, {already_started, _}}
-    %% When cowboy not loaded: undef. When ranch not started: noproc.
+    %% Test 8: Verify start_cre_webservice/1 requires cowboy/ranch running
+    %% Returns error, undef, or exit when ranch_sup is not available
     try
-        Result = start_cre_webservice(4142),
-        case Result of
-            {ok, _Port} -> ok;
-            {error, _} -> ok
+        case start_cre_webservice(4142) of
+            {error, _} -> ok;
+            {ok, _} -> ok  %% If ranch happens to be running, that's fine
         end
     catch
         error:undef -> ok;
-        error:noproc -> ok
+        exit:{noproc, _} -> ok
     end,
 
     %% Test 9: Verify module exports are accessible

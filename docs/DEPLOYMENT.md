@@ -1,623 +1,314 @@
-# CRE YAWL Workflow Engine - Production Deployment Guide
+# CRE Deployment Guide
 
-This guide covers production deployment of CRE, including system requirements, configuration, scaling, monitoring, and security considerations.
+This guide covers deploying the CRE (Common Runtime Environment) workflow engine in production environments.
 
-## 🎯 Prerequisites
+## Table of Contents
 
-### System Requirements
+- [System Requirements](#system-requirements)
+- [OTP Version Requirements](#otp-version-requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Starting the Application](#starting-the-application)
+- [Production Considerations](#production-considerations)
+- [Monitoring and Logging](#monitoring-and-logging)
+- [Backup and Recovery](#backup-and-recovery)
+- [Upgrade Procedures](#upgrade-procedures)
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| **CPU Cores** | 2 | 8+ |
-| **Memory** | 4GB | 16GB+ |
-| **Disk Space** | 20GB | 100GB+ SSD |
-| **Network** | 1Gbps | 10Gbps |
-| **OTP Version** | 25.0+ | 27.0+ |
+---
 
-### Operating Systems
+## System Requirements
+
+### Minimum Requirements
+
+| Resource | Minimum |
+|----------|---------|
+| CPU | 2 cores |
+| Memory | 4 GB |
+| Disk | 20 GB SSD |
+| Network | 1 Gbps |
+
+### Recommended Requirements
+
+| Resource | Recommended |
+|----------|-------------|
+| CPU | 8+ cores |
+| Memory | 16+ GB |
+| Disk | 100+ GB SSD |
+| Network | 10 Gbps |
+
+### Operating System Support
 
 - **Linux**: Ubuntu 20.04+, CentOS 8+, RHEL 8+
-- **macOS**: 10.15+ (for development)
-- **Windows**: WSL2 (for development)
+- **macOS**: 10.15+ (development only)
+- **Windows**: WSL2 (development only)
 
-### Dependencies
+---
+
+## OTP Version Requirements
+
+CRE requires Erlang/OTP 25 through 28.
+
+| OTP Version | Status | Notes |
+|-------------|--------|-------|
+| 25.x | Supported | Minimum supported version |
+| 26.x | Supported | Stable |
+| 27.x | Supported | Latest stable |
+| 28.x | Supported | Tested with compatibility overrides |
+
+### Installing Erlang/OTP
 
 ```bash
-# Install system dependencies
-sudo apt-get update
-sudo apt-get install -y \
-    build-essential \
-    git \
-    curl \
-    wget \
-    openssl
+# Using asdf (recommended)
+asdf install erlang 27.2
+asdf global erlang 27.2
 
-# Install Erlang/OTP 25.0+
-# Use ASDF or Erlang Solutions package manager
-asdf install erlang 25.3.2.9
+# Using kerl (alternative)
+kerl build 27.2 27.2
+kerl install 27.2 ~/erlang/27.2
 
-# Install rebar3
-curl -L -o rebar3 https://s3.amazonaws.com/rebar3/rebar3
+# Verify installation
+erl -version
+```
+
+### Installing rebar3
+
+```bash
+curl -O https://s3.amazonaws.com/rebar3/rebar3
 chmod +x rebar3
 sudo mv rebar3 /usr/local/bin/
 ```
 
-## 🚀 Installation Methods
+---
 
-### Method 1: From Hex (Recommended for Production)
+## Installation
+
+### From Source
 
 ```bash
-# Create a new release project
-mkdir cre-deployment
-cd cre-deployment
-
-# Add CRE as dependency
-cat > rebar.config << 'EOF'
-{deps, [
-    {cre, "0.2.1"}
-]}.
-EOF
+# Clone repository
+git clone https://github.com/joergen7/cre.git
+cd cre
 
 # Fetch dependencies
-rebar3 deps
+rebar3 get-deps
 
-# Create release
-rebar3 release
-```
-
-### Method 2: From GitHub with Release
-
-```bash
-# Clone and build
-git clone https://github.com/your-org/cre.git
-cd cre
-git checkout v0.2.1
-
-# Build release
-rebar3 deps
+# Compile
 rebar3 compile
-rebar3 release
+
+# Run tests
+rebar3 eunit
 ```
 
-### Method 3: Docker Deployment
+### Building a Release
 
 ```bash
-# Build Docker image
-cat > Dockerfile << 'EOF'
-FROM erlang:25.3-alpine
+# Create production release
+rebar3 release
 
-# Install dependencies
-RUN apk add --no-cache \
-    build-base \
-    git \
-    openssl
+# The release will be in _build/default/rel/cre/
+_build/default/rel/cre/bin/cre console
+```
 
-# Copy and build
-COPY . /app
+### Docker Deployment
+
+```dockerfile
+FROM erlang:27-alpine
+
+# Install build dependencies
+RUN apk add --no-cache git build-base openssl-dev
+
+# Set working directory
 WORKDIR /app
-RUN rebar3 deps && rebar3 compile
+
+# Copy source files
+COPY . .
+
+# Build application
+RUN rebar3 get-deps && \
+    rebar3 compile && \
+    rebar3 release
 
 # Create runtime user
-RUN adduser -D -s /bin/sh creuser
-USER creuser
+RUN addgroup -g 1000 cre && \
+    adduser -D -u 1000 -G cre cre
+
+# Set permissions
+RUN chown -R cre:cre /app
+
+USER cre
 
 # Expose ports
-EXPOSE 8080 4369 8081
+# 4142 - Default CRE web service
+# 4369 - EPMD
+# 9100-9200 - Distributed Erlang
+EXPOSE 4142 4369
 
-# Start CRE
-CMD ["./_build/default/rel/cre/bin/cre", "console"]
-EOF
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:4142/[status.json] || exit 1
 
-# Build and run
-docker build -t cre:latest .
-docker run -d \
-    --name cre-server \
-    -p 8080:8080 \
-    -p 4369:4369 \
-    -e CRE_DASHBOARD_ENABLED=true \
-    cre:latest
+# Start application
+CMD ["/app/_build/default/rel/cre/bin/cre", "foreground"]
 ```
 
-## ⚙️ Configuration
+---
 
-### System Configuration (`sys.config`)
+## Configuration
+
+### Configuration via `cre_config`
+
+CRE uses `persistent_term` storage for configuration values (OTP 21+ optimization). Configuration is initialized at application startup via `cre_config:init/0`.
+
+#### Default Configuration Values
+
+| Configuration Key | Default Value | Description |
+|-------------------|---------------|-------------|
+| `cre_default_port` | 4142 | HTTP web service port |
+| `cre_status_route` | `/[status.json]` | Status endpoint |
+| `cre_history_route` | `/history.json` | History endpoint |
+| `cre_client_poll_interval` | 250 | Client poll interval (ms) |
+| `cre_auth_pbkdf2_iterations` | 100000 | Password hash iterations |
+| `cre_auth_default_session_timeout` | 3600 | Session timeout (seconds) |
+| `cre_auth_min_password_length` | 8 | Minimum password length |
+| `yawl_stateless_checkpoint_dir` | `priv/checkpoints` | Checkpoint directory |
+| `yawl_stateless_max_executions` | 1000 | Max concurrent executions |
+| `yawl_stateless_execution_ttl` | 3600000 | Execution TTL (ms) |
+| `yawl_stateless_ttl_cleanup_interval` | 60000 | TTL cleanup interval (ms) |
+| `yawl_timeout_default_timeout` | 30000 | Default timeout (ms) |
+| `yawl_timeout_deadlock_interval` | 5000 | Deadlock check interval (ms) |
+| `yawl_timeout_resource_check_interval` | 60000 | Resource check interval (ms) |
+
+### Setting Configuration Values
+
+Configuration can be set via `cre_config:set/2`:
 
 ```erlang
-% sys.config
-[
-    {kernel, [
-        % Increase process limit
-        {system_limits, [{max_processes, 1048576}]},
-        % Enable distributed features
-        {distributed, [{cre, [{name, cre@node}, {cookie, cre_secret}]}]},
-        % Set net kernel tick
-        {net_ticktime, 60}
-    ]},
+% Set custom port
+cre_config:set(cre_default_port, 8080).
 
-    {sasl, [
-        % Enable SASL logging
-        {sasl_error_logger, {file, "/var/log/cre/sasl.log"}},
-        {error_logger_mf_dir, "/var/log/cre"},
-        {error_logger_mf_size, 10485760},
-        {error_logger_mf_max, 5}
-    ]},
+% Set custom timeout
+cre_config:set(yawl_timeout_default_timeout, 60000).
 
-    {cre, [
-        % Core Configuration
-        {app_name, "CRE Workflow Engine"},
-        {version, "0.2.1"},
-        {log_level, info},
-
-        % Telemetry Configuration
-        {telemetry_enabled, true},
-        {telemetry_exporter, prometheus},
-        {telemetry_interval, 10000},
-
-        % Task Configuration
-        {task_timeout, 30},
-        {max_retries, 3},
-        {worker_timeout, 5000},
-
-        % Dashboard Configuration
-        {dashboard, [
-            {enabled, true},
-            {port, 8080},
-            {bind_address, "0.0.0.0"},
-            {ssl, [
-                {enabled, false},  % Set to true for HTTPS
-                {certfile, "/etc/cre/ssl/server.crt"},
-                {keyfile, "/etc/cre/ssl/server.key"}
-            ]},
-            {auth, [
-                {enabled, true},
-                {provider, jwt},
-                {secret, "your-jwt-secret"},
-                {token_expiry, 3600}
-            ]}
-        ]},
-
-        % Human-in-the-Loop Configuration
-        {human_in_the_loop, [
-            {enabled, true},
-            {notification, [
-                {email, [
-                    {enabled, true},
-                    {smtp_server, "smtp.gmail.com"},
-                    {smtp_port, 587},
-                    {username, "your-email@gmail.com"},
-                    {password, "your-password"},
-                    {from, "CRE Workflow Engine <noreply@company.com>"}
-                ]},
-                {slack, [
-                    {enabled, false},
-                    {webhook_url, "https://hooks.slack.com/services/YOUR/WEBHOOK"}
-                ]}
-            ]},
-            {llm_integration, [
-                {enabled, true},
-                {provider, openai},
-                {api_key, "your-openai-api-key"},
-                {model, "gpt-4"},
-                {max_tokens, 1000},
-                {temperature, 0.3}
-            ]}
-        ]},
-
-        % Cache Configuration
-        {cache, [
-            {enabled, true},
-            {type, ets},
-            {max_size, 1000000},
-            {ttl, 3600}
-        ]},
-
-        % Database Configuration (if using persistence)
-        {database, [
-            {type, postgresql},
-            {host, "localhost"},
-            {port, 5432},
-            {database, "cre_workflow"},
-            {username, "cre_user"},
-            {password, "cre_password"},
-            {pool_size, 10},
-            {timeout, 30000}
-        ]}
-    ]}
-].
+% Reload all configuration
+cre_config:reload().
 ```
 
 ### Environment Variables
 
-```bash
-# Set environment variables in /etc/default/cre
-export CRE_CONFIG_PATH=/etc/cre/sys.config
-export CRE_LOG_DIR=/var/log/cre
-export CRE_PID_FILE=/var/run/cre.pid
-export CRE_USER=creuser
-export CRE_GROUP=creuser
+Secrets are managed via environment variables with `CRE_` prefix:
 
-# Dashboard settings
-export CRE_DASHBOARD_ENABLED=true
-export CRE_DASHBOARD_PORT=8080
-export CRE_DASHBOARD_SSL_ENABLED=false
-
-# Telemetry settings
-export CRE_TELEMETRY_ENABLED=true
-export CRE_TELEMETRY_EXPORTER=prometheus
-export CRE_OTEL_EXPORTER_URL=http://localhost:4317
-
-# Security settings
-export CRE_COOKIE=cre_secret_key
-export CRE_NODE_NAME=cre@$(hostname)
-```
-
-## 🏢 Production Deployment
-
-### Step 1: Prepare System
+| Environment Variable | Description |
+|---------------------|-------------|
+| `CRE_COOKIE` | Erlang distribution cookie |
+| `CRE_DB_PASSWORD` | Database password |
+| `CRE_API_KEY` | API authentication key |
 
 ```bash
-# Create user and directories
-sudo useradd -r -s /bin/false creuser
-sudo mkdir -p /opt/cre /var/log/cre /var/run/cre /etc/cre
-sudo chown -R creuser:creuser /opt/cre /var/log/cre /var/run/cre /etc/cre
-
-# Copy files
-sudo cp -r _build/default/rel/cre /opt/cre/
-sudo cp sys.config /etc/cre/
-sudo cp -r ssl /etc/cre/
-
-# Set permissions
-sudo chmod +x /opt/cre/cre/bin/cre
-sudo chmod 600 /etc/cre/sys.config
-sudo chmod 600 /etc/cre/ssl/*
+# Set required secrets
+export CRE_COOKIE="your-secret-cookie-here"
+export CRE_API_KEY="your-api-key-here"
 ```
 
-### Step 2: Systemd Service
+### Runtime Configuration (vm.args)
 
-```bash
-# Create systemd service file
-cat > /etc/systemd/system/cre.service << 'EOF'
-[Unit]
-Description=CRE YAWL Workflow Engine
-Documentation=https://github.com/your-org/cre
-After=network.target network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=creuser
-Group=creuser
-WorkingDirectory=/opt/cre/cre
-ExecStart=/opt/cre/cre/bin/cre console
-ExecReload=/bin/kill -HUP $MAINPID
-PIDFile=/var/run/cre.pid
-Restart=on-failure
-RestartSec=5s
-EnvironmentFile=-/etc/default/cre
-
-# Security settings
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ReadWritePaths=/var/log/cre /var/run/cre
-ProtectHome=true
-RemoveIPC=true
-
-# Resource limits
-LimitNOFILE=1048576
-LimitNPROC=1048576
-
-[Install]
-WantedBy=multi-user.target
-EOF
 ```
-
-### Step 3: Start Service
-
-```bash
-# Reload systemd and start service
-sudo systemctl daemon-reload
-sudo systemctl enable cre
-sudo systemctl start cre
-
-# Check status
-sudo systemctl status cre
-journalctl -u cre -f
-```
-
-## 🔧 Scaling Deployment
-
-### Horizontal Scaling
-
-```mermaid
-graph TB
-    subgraph "Load Balancer"
-        LB[Nginx/HAProxy]
-    end
-
-    subgraph "CRE Cluster"
-        A[cre@node1] --> LB
-        B[cre@node2] --> LB
-        C[cre@node3] --> LB
-    end
-
-    subgraph "Database"
-        D[PostgreSQL] -.-> A
-        D -.-> B
-        D -.-> C
-    end
-
-    subgraph "Message Queue"
-        E[RabbitMQ] -.-> A
-        E -.-> B
-        E -.-> C
-    end
-```
-
-### Multi-Node Configuration
-
-1. **Generate Cookie File**:
-```bash
-# Create shared cookie
-openssl rand -base64 32 > /etc/cre/cookie
-chmod 400 /etc/cre/cookie
-```
-
-2. **Update sys.config**:
-```erlang
-% For each node
-{kernel, [
-    {distributed, [
-        {cre, [
-            {name, cre@node1},
-            {cookie, 'shared-cookie'}
-        ]}
-    ]},
-    {sync_nodes_mandatory, ['cre@node1', 'cre@node2', 'cre@node3']},
-    {net_ticktime, 60}
-]}
-```
-
-3. **Start Nodes**:
-```bash
-# On node1
-export CRE_NODE_NAME=cre@node1
-/opt/cre/cre/bin/cre start
-
-# On node2
-export CRE_NODE_NAME=cre@node2
-/opt/cre/cre/bin/cre start --cookie-file /etc/cre/cookie
-
-# On node3
-export CRE_NODE_NAME=cre@node3
-/opt/cre/cre/bin/cre start --cookie-file /etc/cre/cookie
-```
-
-### Auto-scaling Workers
-
-```erlang
-% Configure worker pool scaling
-{cre, [
-    {workers, [
-        {min_workers, 5},
-        {max_workers, 50},
-        {worker_strategy, dynamic},
-        {scale_threshold, 80},  % Scale at 80% utilization
-        {scale_down_interval, 300000},  % 5 minutes
-        {max_concurrent_tasks, 1000}
-    ]}
-]}.
-```
-
-## 🔒 Security Hardening
-
-### Network Security
-
-1. **Firewall Configuration**:
-```bash
-# Open only necessary ports
-sudo ufw allow ssh
-sudo ufw allow 8080/tcp   # Dashboard
-sudo ufw allow 4369/tcp   # EPMD
-sudo ufw allow 9100-9200/tcp  # Distributed Erlang
-sudo ufw enable
-```
-
-2. **SSL/TLS Configuration**:
-```erlang
-% Enable HTTPS for dashboard
-{dashboard, [
-    {ssl, [
-        {enabled, true},
-        {certfile, "/etc/cre/ssl/server.crt"},
-        {keyfile, "/etc/cre/ssl/server.key"},
-        {cafile, "/etc/cre/ssl/ca.crt"},
-        {verify, verify_none},
-        {versions, [tlsv1.2, tlsv1.3]},
-        {ciphers, ssl:cipher_suites('tlsv1.2', 'ecdhe_rsa', 'aes_256_gcm')}
-    ]}
-]}.
-```
-
-### Application Security
-
-1. **Authentication**:
-```erlang
-{dashboard, [
-    {auth, [
-        {enabled, true},
-        {provider, oauth2},
-        {oauth2_config, [
-            {provider, azure_ad},
-            {client_id, "your-client-id"},
-            {client_secret, "your-client-secret"},
-            {tenant_id, "your-tenant-id"},
-            {scopes, ["openid", "profile", "email"]}
-        ]}
-    ]}
-]}.
-```
-
-2. **API Keys**:
-```erlang
-{api, [
-    {enabled, true},
-    {auth_type, api_key},
-    {api_key_header, "X-API-Key"},
-    {rate_limit, [
-        {enabled, true},
-        {requests_per_minute, 100}
-    ]}
-]}.
-```
-
-### Database Security
-
-1. **Connection Security**:
-```erlang
-{database, [
-    {ssl, true},
-    {ssl_opts, [{verify, verify_none}]},
-    {pool_size, 10},
-    {max_overflow, 20}
-]}.
-```
-
-2. **Backups**:
-```bash
-# Daily backup script
-cat > /usr/local/bin/cre-backup << 'EOF'
-#!/bin/bash
-BACKUP_DIR="/var/backups/cre"
-DATE=$(date +%Y%m%d_%H%M%S)
-
-mkdir -p $BACKUP_DIR
-
-# Backup workflow definitions
-/opt/cre/cre/bin/cre backup-workflows $BACKUP_DIR/workflows_$DATE.json.gz
-
-# Backup XES logs
-find /var/log/cre -name "*.xes" -type f -exec gzip {} \; -exec mv {}.gz $BACKUP_DIR/ \;
-
-# Rotate backups
-find $BACKUP_DIR -name "*.json.gz" -mtime +30 -delete
-find $BACKUP_DIR -name "*.xes.gz" -mtime +7 -delete
-
-# Upload to S3 (optional)
-if command -v aws &> /dev/null; then
-    aws s3 sync $BACKUP_DIR s3://your-backup-bucket/cre/
-fi
-
-EOF
-
-chmod +x /usr/local/bin/cre-backup
-```
-
-## 📊 Monitoring & Observability
-
-### Prometheus Configuration
-
-```yaml
-# prometheus.yml
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-
-scrape_configs:
-  - job_name: 'cre-dashboard'
-    static_configs:
-      - targets: ['localhost:8080']
-    metrics_path: '/metrics'
-    scrape_interval: 10s
-
-  - job_name: 'cre-otlp'
-    static_configs:
-      - targets: ['localhost:4317']
-    scrape_interval: 30s
-```
-
-### Grafana Dashboard
-
-Import the provided Grafana dashboard with the following panels:
-
-1. **Workflows Executed**
-   - Prometheus query: `cre_workflows_total`
-
-2. **Task Success Rate**
-   - Prometheus query: `rate(cre_task_success_total[5m]) / rate(cre_task_total[5m])`
-
-3. **Response Time (p95)**
-   - Prometheus query: `histogram_quantile(0.95, rate(cre_task_duration_seconds_bucket[5m]))`
-
-4. **Worker Utilization**
-   - Prometheus query: `rate(cre_worker_tasks_total[5m])`
-
-### Logging Configuration
-
-```erlang
-% Enhanced logging
-{logger, [
-    {handler, default, logger_std_h,
-        {formatter, logger_formatter, [
-            {template, "~p [~p] ~p: ~p~n"},
-            {metadata, [time, level, pid, node, component, workflow_id]}
-        ]}},
-    {handler, file, logger_disk_log_h,
-        {formatter, logger_json_formatter, []},
-        {config, [
-            {file, "/var/log/cre/cre.log"},
-            {type, wrap},
-            {max_no_bytes, 10485760},
-            {max_no_files, 5}
-        ]}}
-]}.
-```
-
-## 🚀 Performance Tuning
-
-### Erlang VM Tuning
-
-```erlang
-% vm.args
--name cre@node
--setcookie cre_secret
--vm_memory_reservation 0.6
--vm_memory_limit 2GB
-+pc unicode
+-name cre@127.0.0.1
+-setcookie cre_secret_cookie
 +K true
 +A 128
-+Q 65536
 +P 2097152
-+zdbbl 2097152
-+zdbbl 2097152
-
-# For high-load systems
-+sssd true +sssd_cpu 8 +sssd_io 8 +sssd_ncpu 8
++Q 65536
++sdio 2 2
 ```
 
-### System Tuning
+### Application Configuration (sys.config)
+
+```erlang
+[
+    {kernel, [
+        {logger_level, info},
+        {logger, [
+            {handler, default, logger_std_h,
+                #{formatter => {logger_formatter, #{}}}}
+        ]}
+    ]},
+    {cre, [
+        {default_port, 4142},
+        {poll_interval, 250}
+    ]}
+].
+```
+
+---
+
+## Starting the Application
+
+### Development Mode
 
 ```bash
-# /etc/sysctl.conf
-# Increase file descriptor limits
-fs.file-max = 1048576
+# Start Erlang shell with CRE
+rebar3 shell
 
-# Increase network buffer size
-net.core.rmem_max = 16777216
-net.core.wmem_max = 16777216
-net.ipv4.tcp_rmem = 4096 87380 16777216
-net.ipv4.tcp_wmem = 4096 65536 16777216
-
-# TCP keepalive
-net.ipv4.tcp_keepalive_time = 60
-net.ipv4.tcp_keepalive_intvl = 10
-net.ipv4.tcp_keepalive_probes = 6
-
-# Apply changes
-sudo sysctl -p
+# Or using the application module
+erl -pa _build/default/lib/cre/ebin -s cre
 ```
 
-### Kernel Tuning
+### Production Mode (Release)
+
+```bash
+# Start as daemon
+_build/default/rel/cre/bin/cre start
+
+# Start in foreground
+_build/default/rel/cre/bin/cre foreground
+
+# Start interactive console
+_build/default/rel/cre/bin/cre console
+
+# Stop
+_build/default/rel/cre/bin/cre stop
+
+# Restart
+_build/default/rel/cre/bin/cre restart
+
+# Ping to check if running
+_build/default/rel/cre/bin/cre ping
+```
+
+### Distributed Mode
+
+```bash
+# Start with long node name
+erl -name cre@host.example.com -setcookie mycookie -s cre
+
+# Start with short name (local network only)
+erl -sname cre -setcookie mycookie -s cre
+
+# Connect to remote node
+erl -sname client -setcookie mycookie
+> erlang:spawn_node('cre@host.example.com').
+```
+
+### Connecting Nodes
+
+```erlang
+% On node1:
+erl -sname cre1 -setcookie shared_secret
+
+% On node2:
+erl -sname cre2 -setcookie shared_secret
+
+% From node2, connect to node1:
+net_adm:ping(cre1@hostname).
+```
+
+---
+
+## Production Considerations
+
+### Resource Limits
+
+Configure system limits for production:
 
 ```bash
 # /etc/security/limits.conf
@@ -627,159 +318,397 @@ creuser soft nproc 1048576
 creuser hard nproc 1048576
 ```
 
-## 🔧 Maintenance Operations
+### Systemd Service
 
-### Health Checks
+Create `/etc/systemd/system/cre.service`:
 
-```bash
-# Health check script
-cat > /usr/local/bin/cre-healthcheck << 'EOF'
-#!/bin/bash
+```ini
+[Unit]
+Description=CRE Workflow Engine
+Documentation=https://github.com/joergen7/cre
+After=network-online.target
+Wants=network-online.target
 
-# Check dashboard accessibility
-if ! curl -f http://localhost:8080/health > /dev/null 2>&1; then
-    echo "Health check failed"
-    exit 1
-fi
+[Service]
+Type=notify
+User=creuser
+Group=creuser
+WorkingDirectory=/opt/cre
+ExecStart=/opt/cre/bin/cre foreground
+ExecStop=/opt/cre/bin/cre stop
+Restart=on-failure
+RestartSec=5s
 
-# Check database connectivity
-if ! pg_isready -h localhost -U cre_user > /dev/null 2>&1; then
-    echo "Database check failed"
-    exit 1
-fi
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/cre /var/lib/cre
+ProtectHome=true
 
-# Check memory usage
-MEMORY_USAGE=$(ps -p $(pidof beam.smp) -o %mem --no-headers)
-if (( $(echo "$MEMORY_USAGE > 90" | bc -l) )); then
-    echo "High memory usage: ${MEMORY_USAGE}%"
-    exit 1
-fi
+# Resource Limits
+LimitNOFILE=1048576
+LimitNPROC=1048576
 
-echo "All health checks passed"
-exit 0
-EOF
+# Environment
+Environment="CRE_COOKIE=/etc/cre/cookie"
+EnvironmentFile=-/etc/default/cre
 
-chmod +x /usr/local/bin/cre-healthcheck
+[Install]
+WantedBy=multi-user.target
 ```
 
-### Backup and Recovery
+### Kernel Tuning
 
 ```bash
-# Full backup script
-cat > /usr/local/bin/cre-backup-full << 'EOF'
-#!/bin/bash
-BACKUP_DIR="/var/backups/cre"
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="cre_backup_$DATE.tar.gz"
+# /etc/sysctl.conf
+net.ipv4.tcp_keepalive_time = 60
+net.ipv4.tcp_keepalive_intvl = 10
+net.ipv4.tcp_keepalive_probes = 6
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+fs.file-max = 1048576
 
-# Create backup directory
-mkdir -p $BACKUP_DIR
-
-# System backup
-cd /opt/cre/cre
-tar -czf $BACKUP_DIR/$BACKUP_FILE .
-
-# Database backup (if configured)
-if [ -n "$DATABASE_URL" ]; then
-    pg_dump $DATABASE_URL | gzip > $BACKUP_DIR/database_$DATE.sql.gz
-fi
-
-# Configuration backup
-tar -czf $BACKUP_DIR/config_$DATE.tar.gz /etc/cre/
-
-# Cleanup old backups (keep 7 days)
-find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
-
-echo "Backup completed: $BACKUP_DIR/$BACKUP_FILE"
-EOF
-
-chmod +x /usr/local/bin/cre-backup-full
+# Apply
+sudo sysctl -p
 ```
 
-### Rolling Updates
+### Firewall Configuration
 
 ```bash
-# Rolling update script
-cat > /usr/local/bin/cre-rolling-update << 'EOF'
-#!/bin/bash
+# Essential ports
+sudo ufw allow 22/tcp    # SSH
+sudo ufw allow 4142/tcp  # CRE web service
+sudo ufw allow 4369/tcp  # EPMD
+sudo ufw allow 9100:9200/tcp  # Distributed Erlang
 
-NEW_VERSION=$1
-CLUSTER_NODES=("cre@node1" "cre@node2" "cre@node3")
-
-for node in "${CLUSTER_NODES[@]}"; do
-    echo "Updating node: $node"
-
-    # Stop the node
-    ssh $node "sudo systemctl stop cre"
-
-    # Update code
-    ssh $node "cd /opt/cre && git pull origin main && rebar3 release"
-
-    # Start the node
-    ssh $node "sudo systemctl start cre"
-
-    # Wait for health check
-    until curl -f http://$(echo $node | sed 's/cre@//'):8080/health > /dev/null 2>&1; do
-        echo "Waiting for node $node to be healthy..."
-        sleep 10
-    done
-
-    echo "Node $node updated successfully"
-done
-
-echo "Rolling update completed"
-EOF
-
-chmod +x /usr/local/bin/cre-rolling-update
+# Enable firewall
+sudo ufw enable
 ```
 
-## 🚨 Troubleshooting
+### Circuit Breaker Configuration
 
-### Common Issues
+CRE includes a circuit breaker (`yawl_breaker`) for preventing cascading failures:
 
-1. **Node Connection Failure**
-```bash
-# Check cookie consistency
-ls -la /etc/cre/cookie
-# Ensure all nodes have the same cookie
+```erlang
+% Configure circuit breaker thresholds
+Breaker = yawl_breaker:new(my_service),
+% Default: 5 failures before opening
+% Default: 60s timeout before half-open
+% Default: 3 successes to close
 
-# Check EPMD status
-epmd -names
-```
+% Check if request allowed
+case yawl_breaker:check_breaker(my_service) of
+    allow -> execute_request();
+    deny -> handle_circuit_open()
+end
 
-2. **Memory Issues**
-```bash
-# Monitor memory usage
-ps -p $(pidof beam.smp) -o pid,%mem,cmd
-
-# Check crash dumps
-ls /var/log/cre/erl_crash.dump
-```
-
-3. **Performance Degradation**
-```bash
-# Check system resources
-htop
-iotop
-
-# Check database queries
-psql -c "SELECT query, calls, total_time FROM pg_stat_statements ORDER BY total_time DESC LIMIT 10;"
-```
-
-### Log Analysis
-
-```bash
-# Follow logs
-journalctl -u cre -f
-
-# Analyze XES logs
-find /var/log/cre -name "*.xes" -exec grep -H "error" {} \;
-
-# Pattern analysis for common failures
-grep "timeout" /var/log/cre/cre.log | head -20
-grep "worker.*failed" /var/log/cre/cre.log | head -20
+% Record result
+case execute_request() of
+    {ok, Result} ->
+        yawl_breaker:record_success(my_service),
+        Result;
+    {error, Reason} ->
+        yawl_breaker:record_failure(my_service),
+        {error, Reason}
+end
 ```
 
 ---
 
-This deployment guide provides comprehensive instructions for deploying CRE in production environments. For additional help, refer to the [API Reference](./API_REFERENCE.md) and [Architecture Overview](./ARCHITECTURE.md).
+## Monitoring and Logging
+
+### Health Checks
+
+CRE provides health check endpoints:
+
+```bash
+# Check service health
+curl http://localhost:4142/[status.json]
+
+# Check history
+curl http://localhost:4142/history.json
+```
+
+### Health Module (`yawl_health`)
+
+Built-in health checks for production monitoring:
+
+```erlang
+% Run all health checks
+yawl_health:check_health().
+
+% Run specific checks
+yawl_health:check_health([mnesia, node_health]).
+
+% Readiness probe (for Kubernetes)
+yawl_health:readiness_probe().
+
+% Liveness probe
+yawl_health:liveness_probe().
+
+% Register custom health check
+yawl_health:register_check(my_check, fun() -> {ok, healthy} end).
+```
+
+### Status API
+
+The status endpoint returns JSON with:
+
+```json
+{
+  "cre_info": {
+    "load": 0.5,
+    "n_wrk": 10
+  },
+  "node_info": [
+    {
+      "node": "cre@localhost",
+      "n_wrk": 10,
+      "load": 0.5
+    }
+  ],
+  "app_info": {
+    "queued": [],
+    "active": [],
+    "complete": []
+  }
+}
+```
+
+### Logging Configuration
+
+```erlang
+% Configure logger
+logger:set_primary_config(level, info).
+
+% Add file handler
+logger:add_handler(file_handler, logger_disk_log_h,
+    #{config => #{
+        file => "/var/log/cre/cre.log",
+        max_no_files => 10,
+        max_no_bytes => 10485760
+    }}).
+
+% Set log format
+logger:set_handler_config(default, formatter,
+    {logger_formatter, #{template => [time," ",level," ",msg,"\n"]}}).
+```
+
+### Telemetry
+
+CRE supports Prometheus telemetry export:
+
+```erlang
+% Telemetry configuration
+% See yawl_telemetry_prometheus module for metrics
+```
+
+---
+
+## Backup and Recovery
+
+### Workflow State Persistence
+
+CRE uses Mnesia for workflow state persistence:
+
+```erlang
+% Initialize database
+wf_persistence:init_db().
+
+% Save workflow case
+wf_persistence:save_case(Case).
+
+% Load workflow case
+wf_persistence:load_case(<<"case-id">>).
+
+% List active cases (for recovery)
+wf_persistence:list_active_cases().
+
+% Delete case
+wf_persistence:delete_case(<<"case-id">>).
+```
+
+### Mnesia Backup
+
+```bash
+# Backup Mnesia schema
+erl -sname backup -setcookie cre_secret -mnesia dir '"/var/lib/cre/mnesia"' \
+    -eval "mnesia:backup('/var/backups/cre/backup.')"
+
+# Restore from backup
+erl -sname restore -setcookie cre_secret -mnesia dir '"/var/lib/cre/mnesia"' \
+    -eval "mnesia:restore('/var/backups/cre/backup.', [])"
+```
+
+### Checkpoint/Recovery
+
+```erlang
+% Create checkpoint
+wf_persistence:create_checkpoint(EngineState).
+
+% Restore from checkpoint
+wf_persistence:restore_from_checkpoint().
+```
+
+### Backup Script
+
+```bash
+#!/bin/bash
+# /usr/local/bin/cre-backup
+
+BACKUP_DIR="/var/backups/cre"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+mkdir -p "$BACKUP_DIR"
+
+# Backup Mnesia
+erl -noshell -sname backup -setcookie cre_secret \
+    -eval "mnesia:backup('$BACKUP_DIR/backup_$DATE.')" \
+    -s init stop
+
+# Backup configuration
+tar -czf "$BACKUP_DIR/config_$DATE.tar.gz" /etc/cre/
+
+# Cleanup old backups (keep 30 days)
+find "$BACKUP_DIR" -name "*.tar.gz" -mtime +30 -delete
+find "$BACKUP_DIR" -name "backup.*" -mtime +30 -delete
+
+echo "Backup completed: $BACKUP_DIR/backup_$DATE"
+```
+
+---
+
+## Upgrade Procedures
+
+### Hot Code Upgrade
+
+CRE supports hot code loading:
+
+```bash
+# Build new version
+rebar3 compile
+
+# Load new modules on running node
+erl -sname cre -setcookie cre_secret -remsh cre@nodename
+> l(Module).
+> c:lc().
+```
+
+### Rolling Upgrade (Multi-Node)
+
+```bash
+#!/bin/bash
+# Rolling upgrade script
+
+NEW_VERSION=$1
+NODES=("cre@node1" "cre@node2" "cre@node3")
+
+for node in "${NODES[@]}"; do
+    echo "Upgrading $node..."
+
+    # Drain node (stop accepting new work)
+    ssh $node "cre_admin:drain('$node')."
+
+    # Wait for active work to complete
+    while ssh $node "cre_master:get_status('$node')." | grep -q '"active".*\['; do
+        sleep 5
+    done
+
+    # Deploy new version
+    ssh $node "cd /opt/cre && git pull && rebar3 release"
+
+    # Restart node
+    ssh $node "/opt/cre/bin/cre restart"
+
+    # Wait for health check
+    until curl -f http://$(echo $node | sed 's/cre@//'):4142/[status.json] > /dev/null 2>&1; do
+        sleep 10
+    done
+
+    echo "$node upgraded successfully"
+done
+```
+
+### Zero-Downtime Deployment
+
+For zero-downtime deployment:
+
+1. Deploy new version alongside running version
+2. Use Erlang distribution to migrate state
+3. Switch traffic using load balancer
+4. Retire old version after verification
+
+### Downgrade Procedures
+
+```bash
+# Stop current version
+_build/default/rel/cre/bin/cre stop
+
+# Restore previous release
+cd /opt/cre
+git checkout previous-version
+rebar3 release
+
+# Start previous version
+_build/default/rel/cre/bin/cre start
+```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**Node connection failures:**
+```bash
+# Check EPMD
+epmd -names
+
+# Verify cookie consistency
+cat /etc/cre/cookie
+
+# Check network connectivity
+netstat -an | grep 4369
+```
+
+**Memory issues:**
+```bash
+# Check memory usage
+ps aux | grep beam.smp
+
+# Check crash dumps
+ls -la /var/log/cre/erl_crash.dump
+
+# Monitor in shell
+> erlang:memory(total).
+> recon:bin_leak(100).
+```
+
+**Performance issues:**
+```bash
+# Check process count
+> erlang:system_info(process_count).
+
+# Check scheduler utilization
+> recon:scheduler_usage(1).
+
+# Check ETS tables
+> ets:i().
+```
+
+### Debug Mode
+
+```bash
+# Start with debug logging
+erl -sname cre -setcookie cre -s cre logger level debug
+```
+
+---
+
+## Additional Resources
+
+- [API Reference](./API_REFERENCE.md)
+- [Architecture Overview](./ARCHITECTURE.md)
+- [YAWL Patterns Guide](./YAWL_PATTERNS_GUIDE.md)
+- [Testing Guide](./TESTING.md)

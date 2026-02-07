@@ -56,17 +56,28 @@ yawl_recovery_test_() ->
      end}.
 
 %%--------------------------------------------------------------------
-%% @doc Setup function - creates the Mnesia table.
+%% @doc Setup function - creates the Mnesia schema.
 %%--------------------------------------------------------------------
 setup() ->
-    ok = ensure_table(),
+    %% Stop and delete any existing Mnesia schema to ensure clean state
+    application:stop(mnesia),
+    timer:sleep(100),
+    mnesia:delete_schema([node()]),
+    timer:sleep(100),
+
+    %% Initialize schema with yawl_recovery
+    ok = yawl_recovery:init_schema(),
     ok.
 
 %%--------------------------------------------------------------------
 %% @doc Cleanup function - deletes the Mnesia table.
 %%--------------------------------------------------------------------
 cleanup(_Ctx) ->
-    ok = mnesia:delete_table(yawl_checkpoint),
+    %% Delete the checkpoint table
+    case mnesia:delete_table(yawl_checkpoint) of
+        {atomic, ok} -> ok;
+        {aborted, {no_exists, _}} -> ok
+    end,
     ok.
 
 %%====================================================================
@@ -89,7 +100,7 @@ test_checkpoint_creates_valid() ->
     ?assertEqual(<<"cp_">>, binary_part(Cpid, {0, 3})),
 
     %% Verify we can read it back from Mnesia
-    [{_, Record}] = ets:lookup(yawl_checkpoint, Cpid),
+    {atomic, [Record]} = mnesia:transaction(fun() -> mnesia:read(yawl_checkpoint, Cpid) end),
     ?assertEqual(SpecId, Record#yawl_checkpoint.spec_id),
     ?assertEqual(CaseId, Record#yawl_checkpoint.case_id),
     ?assertEqual(Marking, Record#yawl_checkpoint.marking),
@@ -242,7 +253,7 @@ test_checkpoint_with_options() ->
     {ok, Cpid} = yawl_recovery:checkpoint(SpecId, CaseId, Marking, Data, #{version => 2}),
 
     %% Verify version is stored
-    [{_, Record}] = ets:lookup(yawl_checkpoint, Cpid),
+    {atomic, [Record]} = mnesia:transaction(fun() -> mnesia:read(yawl_checkpoint, Cpid) end),
     ?assertEqual(2, Record#yawl_checkpoint.version).
 
 %%--------------------------------------------------------------------
@@ -373,7 +384,8 @@ test_large_data_checkpoint() ->
     %% Create large marking with many tokens
     LargeMarking = lists:foldl(
         fun(N, Acc) ->
-            maps:put(list_to_existing_atom("p" ++ integer_to_list(N)), lists:seq(1, 100), Acc)
+            Key = list_to_atom("p" ++ integer_to_list(N)),
+            maps:put(Key, lists:seq(1, 100), Acc)
         end,
         #{},
         lists:seq(1, 10)
@@ -382,7 +394,8 @@ test_large_data_checkpoint() ->
     %% Create large data map
     LargeData = lists:foldl(
         fun(N, Acc) ->
-            maps:put(list_to_existing_atom("key" ++ integer_to_list(N)), lists:seq(1, 100), Acc)
+            Key = list_to_atom("key" ++ integer_to_list(N)),
+            maps:put(Key, lists:seq(1, 100), Acc)
         end,
         #{},
         lists:seq(1, 20)
@@ -441,25 +454,3 @@ test_concurrent_checkpoints() ->
 %%====================================================================
 %% Helper Functions
 %%====================================================================
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc Ensures the yawl_checkpoint table exists.
-%%--------------------------------------------------------------------
-ensure_table() ->
-    case mnesia:system_info(is_running) of
-        no -> mnesia:start();
-        yes -> ok
-    end,
-
-    case mnesia:create_table(
-        yawl_checkpoint,
-        [
-            {attributes, record_info(fields, yawl_checkpoint)},
-            {ram_copies, [node()]},
-            {type, set}
-        ]
-    ) of
-        {atomic, ok} -> ok;
-        {aborted, {already_exists, yawl_checkpoint}} -> ok
-    end.

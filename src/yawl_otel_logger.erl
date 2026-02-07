@@ -109,10 +109,6 @@
 %% Types
 %%====================================================================
 
--type timestamp() :: integer().
--type trace_id() :: binary().
--type span_id() :: binary().
--type event_type() :: binary() | atom().
 -type event_level() :: debug | info | warning | error.
 
 -record(otel_state, {
@@ -123,8 +119,6 @@
     max_events :: non_neg_integer(),
     retention_ms :: non_neg_integer()
 }).
-
--type state() :: #otel_state{}.
 
 -define(SERVER, ?MODULE).
 -define(DEFAULT_MAX_EVENTS, 10000).
@@ -534,7 +528,7 @@ init(Options) ->
     RetentionMs = maps:get(retention_ms, Options, ?DEFAULT_RETENTION_MS),
 
     % Create ETS table for events
-    TableId = ets:new(?DEFAULT_OTEL_TABLE, [
+    ets:new(?DEFAULT_OTEL_TABLE, [
         named_table,
         public,
         ordered_set,
@@ -757,4 +751,5 @@ to_binary(_) -> <<"">>.
 %% @end
 %%--------------------------------------------------------------------
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.

@@ -63,6 +63,7 @@
 
 %% Include shared types
 -include_lib("order_fulfillment_types.hrl").
+-include_lib("gen_pnet/include/gen_pnet.hrl").
 
 %%====================================================================
 %% Records
@@ -286,18 +287,12 @@ fire('t_start_ordering', #{'p_input' := [start]}, State) ->
         <<"order_id">> => Order#order.order_id
     }),
     {ok, OrderingPid} = start_ordering(State),
-    State1 = State#fulfillment_state{ordering_pid = OrderingPid},
     Result = wait_for_subprocess(OrderingPid, ordering),
-    State2 = State1#fulfillment_state{ordering_result = Result},
-    TargetPlace = case Result of
-        ok -> 'p_ordering_complete';
-        {error, _} -> 'p_ordering_complete'
-    end,
     log_event(State, <<"OrderFulfillment">>, <<"OrderingComplete">>, #{
         <<"order_id">> => Order#order.order_id,
         <<"result">> => result_to_binary(Result)
     }),
-    {produce, #{TargetPlace => [start]}, State2};
+    {produce, #{'p_ordering_complete' => [start]}};
 
 fire('t_start_carrier', #{'p_ordering_complete' := [start]}, State) ->
     Order = State#fulfillment_state.order,
@@ -305,18 +300,12 @@ fire('t_start_carrier', #{'p_ordering_complete' := [start]}, State) ->
         <<"order_id">> => Order#order.order_id
     }),
     {ok, CarrierPid} = start_carrier(State),
-    State1 = State#fulfillment_state{carrier_pid = CarrierPid},
     Result = wait_for_subprocess(CarrierPid, carrier),
-    State2 = State1#fulfillment_state{carrier_result = Result},
-    TargetPlace = case Result of
-        ok -> 'p_carrier_complete';
-        {error, _} -> 'p_carrier_complete'
-    end,
     log_event(State, <<"OrderFulfillment">>, <<"CarrierAppointmentComplete">>, #{
         <<"order_id">> => Order#order.order_id,
         <<"result">> => result_to_binary(Result)
     }),
-    {produce, #{TargetPlace => [start]}, State2};
+    {produce, #{'p_carrier_complete' => [start]}};
 
 fire('t_start_payment', #{'p_carrier_complete' := [start]}, State) ->
     Order = State#fulfillment_state.order,
@@ -324,18 +313,12 @@ fire('t_start_payment', #{'p_carrier_complete' := [start]}, State) ->
         <<"order_id">> => Order#order.order_id
     }),
     {ok, PaymentPid} = start_payment(State),
-    State1 = State#fulfillment_state{payment_pid = PaymentPid},
     Result = wait_for_subprocess(PaymentPid, payment),
-    State2 = State1#fulfillment_state{payment_result = Result},
-    TargetPlace = case Result of
-        ok -> 'p_payment_complete';
-        {error, _} -> 'p_payment_complete'
-    end,
     log_event(State, <<"OrderFulfillment">>, <<"PaymentComplete">>, #{
         <<"order_id">> => Order#order.order_id,
         <<"result">> => result_to_binary(Result)
     }),
-    {produce, #{TargetPlace => [start]}, State2};
+    {produce, #{'p_payment_complete' => [start]}};
 
 fire('t_start_transit', #{'p_payment_complete' := [start]}, State) ->
     Order = State#fulfillment_state.order,
@@ -343,18 +326,12 @@ fire('t_start_transit', #{'p_payment_complete' := [start]}, State) ->
         <<"order_id">> => Order#order.order_id
     }),
     {ok, TransitPid} = start_transit(State),
-    State1 = State#fulfillment_state{transit_pid = TransitPid},
     Result = wait_for_subprocess(TransitPid, freight_in_transit),
-    State2 = State1#fulfillment_state{transit_result = Result},
-    TargetPlace = case Result of
-        ok -> 'p_transit_complete';
-        {error, _} -> 'p_transit_complete'
-    end,
     log_event(State, <<"OrderFulfillment">>, <<"TransitComplete">>, #{
         <<"order_id">> => Order#order.order_id,
         <<"result">> => result_to_binary(Result)
     }),
-    {produce, #{TargetPlace => [start]}, State2};
+    {produce, #{'p_transit_complete' => [start]}};
 
 fire('t_start_delivery', #{'p_transit_complete' := [start]}, State) ->
     Order = State#fulfillment_state.order,
@@ -368,28 +345,21 @@ fire('t_start_delivery', #{'p_transit_complete' := [start]}, State) ->
         <<"shipment_id">> => ShipmentId
     }),
     {ok, DeliveryPid} = start_delivery(State),
-    State1 = State#fulfillment_state{delivery_pid = DeliveryPid},
     Result = wait_for_subprocess(DeliveryPid, freight_delivered),
-    State2 = State1#fulfillment_state{delivery_result = Result},
-    TargetPlace = case Result of
-        ok -> 'p_delivery_complete';
-        {error, _} -> 'p_delivery_complete'
-    end,
     log_event(State, <<"OrderFulfillment">>, <<"DeliveryComplete">>, #{
         <<"order_id">> => Order#order.order_id,
         <<"result">> => result_to_binary(Result)
     }),
-    {produce, #{TargetPlace => [start]}, State2};
+    {produce, #{'p_delivery_complete' => [start]}};
 
 fire('t_complete', #{'p_delivery_complete' := [start]}, State) ->
     Order = State#fulfillment_state.order,
     CompletedAt = erlang:system_time(millisecond),
-    State1 = State#fulfillment_state{completed_at = CompletedAt},
     log_event(State, <<"OrderFulfillment">>, <<"OrderFulfillmentComplete">>, #{
         <<"order_id">> => Order#order.order_id,
         <<"duration_ms">> => CompletedAt - State#fulfillment_state.started_at
     }),
-    {produce, #{'p_output' => [start]}, State1};
+    {produce, #{'p_output' => [start]}};
 
 fire(_Trsn, _Mode, _State) ->
     abort.
@@ -398,8 +368,9 @@ fire(_Trsn, _Mode, _State) ->
 %% @doc Trigger callback for custom processing.
 %% @end
 %%--------------------------------------------------------------------
-trigger(Place, _Token, State) ->
-    log_event(State, <<"OrderFulfillment">>, <<"PlaceEntered">>, #{
+trigger(Place, _Token, NetState) ->
+    UsrInfo = NetState#net_state.usr_info,
+    log_event(UsrInfo, <<"OrderFulfillment">>, <<"PlaceEntered">>, #{
         <<"place">> => atom_to_binary(Place, utf8)
     }),
     pass.
@@ -417,9 +388,9 @@ init(FulfillmentState) ->
                 O -> O#order.order_id
             end,
             yawl_xes:log_case_start(LogId, OrderId),
-            {ok, State1};
+            State1;
         _ ->
-            {ok, FulfillmentState}
+            FulfillmentState
     end.
 
 %%--------------------------------------------------------------------
@@ -471,22 +442,22 @@ code_change(_OldVsn, NetState, _Extra) ->
 %% @doc Terminates the gen_pnet.
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, State) ->
-    LogId = State#fulfillment_state.log_id,
-    case LogId of
-        undefined -> ok;
-        _ ->
-            OrderId = case State#fulfillment_state.order of
+terminate(_Reason, NetState) ->
+    case NetState of
+        #net_state{usr_info = #fulfillment_state{log_id = LogId} = UsrInfo}
+          when LogId =/= undefined ->
+            OrderId = case UsrInfo#fulfillment_state.order of
                 undefined -> <<"UNKNOWN">>;
                 O -> O#order.order_id
             end,
             yawl_xes:log_case_complete(LogId, OrderId, #{
-                <<"ordering">> => result_to_binary(State#fulfillment_state.ordering_result),
-                <<"carrier">> => result_to_binary(State#fulfillment_state.carrier_result),
-                <<"payment">> => result_to_binary(State#fulfillment_state.payment_result),
-                <<"transit">> => result_to_binary(State#fulfillment_state.transit_result),
-                <<"delivery">> => result_to_binary(State#fulfillment_state.delivery_result)
-            })
+                <<"ordering">> => result_to_binary(UsrInfo#fulfillment_state.ordering_result),
+                <<"carrier">> => result_to_binary(UsrInfo#fulfillment_state.carrier_result),
+                <<"payment">> => result_to_binary(UsrInfo#fulfillment_state.payment_result),
+                <<"transit">> => result_to_binary(UsrInfo#fulfillment_state.transit_result),
+                <<"delivery">> => result_to_binary(UsrInfo#fulfillment_state.delivery_result)
+            });
+        _ -> ok
     end,
     ok.
 

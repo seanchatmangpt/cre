@@ -12,9 +12,9 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 
 1. **[QUICK_START.md](./QUICK_START.md)** - Get running in 5 minutes with basic setup and "Hello World" example
 2. **[WORKFLOW_PATTERNS_LEARNING_PATH.md](./WORKFLOW_PATTERNS_LEARNING_PATH.md)** - Understanding the 43 YAWL patterns structure
-3. **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** - Complete pattern reference
-4. **[CORE_YAWL_PATTERNS_GUIDE.md](./CORE_YAWL_PATTERNS_GUIDE.md)** - Core patterns guide
-5. **[CLIENT_API_COMPLETE_REFERENCE.md](./CLIENT_API_COMPLETE_REFERENCE.md)** - Complete client API reference
+3. **[YAWL_PATTERNS_SUMMARY.md](./YAWL_PATTERNS_SUMMARY.md)** - 80/20 learning principle overview
+4. **[CORE_YAWL_PATTERNS_QUICK_REFERENCE.md](./CORE_YAWL_PATTERNS_QUICK_REFERENCE.md)** - Essential patterns cheat sheet (6 core patterns)
+5. **[CLIENT_API_QUICK_REFERENCE.md](./CLIENT_API_QUICK_REFERENCE.md)** - Quick API reference for developers
 
 ---
 
@@ -27,7 +27,7 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 | **[QUICK_START.md](./QUICK_START.md)** | Installation and first workflow example | Beginner | 5 min | Basic setup and execution |
 | **[TUTORIALS_INDEX.md](./TUTORIALS_INDEX.md)** | Complete tutorial roadmap | Beginner | 15 min | Learning path guidance |
 | **[tutorials/getting_started.md](./tutorials/getting_started.md)** | Step-by-step implementation tutorial | Beginner | 30 min | First YAWL workflow creation |
-| **[CLIENT_API_TUTORIAL.md](./CLIENT_API_TUTORIAL.md)** | Client API usage examples | Beginner | 45 min | Using CRE as a library |
+| **[CLIENT_API_COMPLETE_REFERENCE.md](./CLIENT_API_COMPLETE_REFERENCE.md)** | Client API comprehensive guide | Beginner | 45 min | Using CRE as a library |
 | **[YAWL_COMPILE_COMPLETE_GUIDE.md](./YAWL_COMPILE_COMPLETE_GUIDE.md)** | YAWL compilation to Petri nets | Intermediate | 60 min | Understanding compilation pipeline |
 
 ### 2. Core YAWL Patterns Documentation
@@ -35,7 +35,7 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 #### 📖 Comprehensive Guides
 | File | Description | Level | Focus |
 |------|-------------|-------|-------|
-| **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** | Complete pattern reference | Intermediate | Pattern implementation details |
+| **[YAWL_PATTERNS_GUIDE.md](./YAWL_PATTERNS_GUIDE.md)** | Complete pattern implementation guide | Intermediate | Pattern implementation details |
 | **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** | Detailed pattern specifications | Advanced | Pattern library reference |
 | **[CORE_YAWL_PATTERNS_GUIDE.md](./CORE_YAWL_PATTERNS_GUIDE.md)** | Core patterns deep dive | Intermediate | Essential patterns mastery |
 | **[YAWL_PATTERN_REFERENCE.md](./YAWL_PATTERN_REFERENCE.md)** | Pattern semantics and use cases | Intermediate | Pattern selection guide |
@@ -43,8 +43,8 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 #### 🎯 Quick References
 | File | Description | Level | Use Case |
 |------|-------------|-------|----------|
-| **[QUICK_REFERENCE_CARD.md](./QUICK_REFERENCE_CARD.md)** | Quick reference card | Beginner | Quick reminders |
-| **[YAWL_PATTERN_REFERENCE.md](./YAWL_PATTERN_REFERENCE.md)** | Pattern reference card | Intermediate | Quick reminders |
+| **[CORE_YAWL_PATTERNS_QUICK_REFERENCE.md](./CORE_YAWL_PATTERNS_QUICK_REFERENCE.md)** | 6 essential patterns cheat sheet | Beginner | Quick pattern lookup |
+| **[YAWL_PATTERNS_REFERENCE_CARD.md](./YAWL_PATTERNS_REFERENCE_CARD.md)** | Pattern reference card | Intermediate | Quick reminders |
 | **[YAWL_PATTERNS_WORKBOOK.md](./YAWL_PATTERNS_WORKBOOK.md)** | Practice exercises | Beginner | Hands-on learning |
 
 ### 3. Advanced Topics
@@ -64,18 +64,17 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 |------|-------------|----------|-------|
 | **[COMPLETE_API_REFERENCE.md](./COMPLETE_API_REFERENCE.md)** | Complete API reference | Developers | All modules |
 | **[CLIENT_API_COMPLETE_REFERENCE.md](./CLIENT_API_COMPLETE_REFERENCE.md)** | Client API comprehensive guide | Application developers | Client-side APIs |
-| **[API_REFERENCE.md](./API_REFERENCE.md)** | Full API specification | Developers | All functions |
 | **[PNET_CORE_COMPREHENSIVE_REFERENCE.md](./PNET_CORE_COMPREHENSIVE_REFERENCE.md)** | Core net behaviors | System developers | Internal APIs |
 | **[GEN_PNET_USER_GUIDE.md](./GEN_PNET_USER_GUIDE.md)** | gen_pnet usage guide | Developers | Runtime usage |
 
 #### 🎯 Quick API References
 | File | Description | Audience | Time |
 |------|-------------|----------|------|
-| **[CLIENT_API_COMPLETE_REFERENCE.md](./CLIENT_API_COMPLETE_REFERENCE.md)** | Client API comprehensive guide | Developers | 5 min |
+| **[CLIENT_API_QUICK_REFERENCE.md](./CLIENT_API_QUICK_REFERENCE.md)** | Quick API lookup | Developers | 5 min |
 | **[PNET_TYPES_QUICK_REFERENCE.md](./PNET_TYPES_QUICK_REFERENCE.md)** | Type system quick ref | Developers | 5 min |
 | **[pnet_marking_quick_reference.md](./pnet_marking_quick_reference.md)** | Marking operations | Developers | 5 min |
 | **[PNET_MODE_QUICK_REFERENCE.md](./PNET_MODE_QUICK_REFERENCE.md)** | Mode enumeration | Developers | 5 min |
-| **[GEN_PNET_USER_GUIDE.md](./GEN_PNET_USER_GUIDE.md)** | gen_pnet user guide | Developers | 5 min |
+| **[GEN_PNET_QUICK_REFERENCE.md](./GEN_PNET_QUICK_REFERENCE.md)** | gen_pnet quick ref | Developers | 5 min |
 
 ### 5. Tutorial Documentation
 
@@ -98,7 +97,6 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 | **[pnet_marking_api_reference.md](./pnet_marking_api_reference.md)** | Marking API | Intermediate | State management |
 | **[pnet_marking_implementation.md](./pnet_marking_implementation.md)** | Marking implementation details | Advanced | Technical details |
 | **[PNET_MODE_GUIDE.md](./PNET_MODE_GUIDE.md)** | Mode enumeration concepts | Intermediate | Mode handling |
-| **[PNET_MODE_DOCTEST_REFERENCE.md](./PNET_MODE_DOCTEST_REFERENCE.md)** | Mode examples with tests | Beginner-Intermediate | Learning by example |
 
 ### 7. Integration and Deployment
 
@@ -115,7 +113,6 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 |------|-------------|-------|---------|
 | **[ORDER_FULFILLMENT_GUIDE.md](./ORDER_FULFILLMENT_GUIDE.md)** | Order Fulfillment workflow guide | Intermediate | Real-world workflow example |
 | **[YAWL_PATTERN_EXAMPLES.md](./YAWL_PATTERN_EXAMPLES.md)** | Pattern implementations | Beginner | Learning examples |
-| **[PATTERN_DOCTEST_REFERENCE.md](./PATTERN_DOCTEST_REFERENCE.md)** | Pattern tests | Intermediate | Testing patterns |
 | **[examples/](./examples/)** | Working examples | All | Hands-on practice |
 | **[YAWL_PATTERNS_WORKBOOK.md](./YAWL_PATTERNS_WORKBOOK.md)** | Practice exercises | Beginner | Skill development |
 | **[tutorials/YAWL_PATTERNS_STUDY_PLAN_TEMPLATE.md](./tutorials/YAWL_PATTERNS_STUDY_PLAN_TEMPLATE.md)** | Personalized learning path | All | Custom study plans |
@@ -134,7 +131,7 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 
 | File | Description | Level | Prerequisites |
 |------|-------------|-------|--------------|
-| **[YAWL_TELEMETRY.md](./YAWL_TELEMETRY.md)** | OpenTelemetry integration | Advanced | Monitoring concepts |
+| **[YAWL_TELEMETRY_GUIDE.md](./YAWL_TELEMETRY_GUIDE.md)** | OpenTelemetry integration | Advanced | Monitoring concepts |
 | **[YAWL_TIMEOUT_REFERENCE.md](./YAWL_TIMEOUT_REFERENCE.md)** | Timeout handling | Advanced | Basic workflows |
 | **[worklet_integration_summary.md](./worklet_integration_summary.md)** | Worklet integration | Advanced | External systems |
 
@@ -170,7 +167,7 @@ Visual documentation of system architecture and workflow patterns:
 ### Path 2: Focused on Pattern Implementation (2-3 days)
 
 ```
-1. YAWL_PATTERNS_REFERENCE.md (60 min)
+1. YAWL_PATTERNS_GUIDE.md (60 min)
 2. CORE_YAWL_PATTERNS_GUIDE.md (90 min)
 3. YAWL_PATTERN_REFERENCE.md (60 min)
 4. tutorials/advanced_patterns_tutorial.md (60 min)
@@ -193,12 +190,12 @@ Visual documentation of system architecture and workflow patterns:
 ### Path 4: Quick Reference for Experienced Users (30-60 min)
 
 ```
-1. QUICK_REFERENCE_CARD.md (10 min)
-2. CORE_YAWL_PATTERNS_GUIDE.md (5 min)
-3. CLIENT_API_COMPLETE_REFERENCE.md (5 min)
+1. YAWL_PATTERNS_SUMMARY.md (10 min)
+2. CORE_YAWL_PATTERNS_QUICK_REFERENCE.md (5 min)
+3. CLIENT_API_QUICK_REFERENCE.md (5 min)
 4. PNET_TYPES_QUICK_REFERENCE.md (5 min)
-5. YAWL_PATTERN_REFERENCE.md (5 min)
-6. QUICK_REFERENCE_CHEATSHEET.md (5 min)
+5. YAWL_PATTERNS_REFERENCE_CARD.md (5 min)
+6. QUICK_REFERENCE_CARD.md (5 min)
 ```
 
 ---
@@ -208,14 +205,14 @@ Visual documentation of system architecture and workflow patterns:
 ### 🎯 80/20 Learning Resources
 These focus on the 20% of content that provides 80% of value:
 
-- **[QUICK_START.md](./QUICK_START.md)** - Quick start guide
+- **[YAWL_PATTERNS_SUMMARY.md](./YAWL_PATTERNS_SUMMARY.md)** - 80/20 principle overview
 - **[CORE_YAWL_PATTERNS_GUIDE.md](./CORE_YAWL_PATTERNS_GUIDE.md)** - Core patterns mastery
-- **[QUICK_REFERENCE_CARD.md](./QUICK_REFERENCE_CARD.md)** - Essential quick reference
+- **[CORE_YAWL_PATTERNS_QUICK_REFERENCE.md](./CORE_YAWL_PATTERNS_QUICK_REFERENCE.md)** - Essential patterns only
 
 ### 📚 Comprehensive Documentation
 Complete coverage for deep understanding:
 
-- **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** - 40 of 43 patterns implemented (93.0%)
+- **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** - All 43 patterns
 - **[COMPLETE_API_REFERENCE.md](./COMPLETE_API_REFERENCE.md)** - All APIs
 - **[PNET_CORE_COMPREHENSIVE_REFERENCE.md](./PNET_CORE_COMPREHENSIVE_REFERENCE.md)** - Core internals
 
@@ -235,9 +232,9 @@ Hands-on practice with immediate feedback:
 | Level | First File | Next Steps |
 |-------|------------|------------|
 | **New to YAWL** | [QUICK_START.md](./QUICK_START.md) | [TUTORIALS_INDEX.md](./TUTORIALS_INDEX.md) → [tutorials/getting_started.md](./tutorials/getting_started.md) |
-| **New to CRE** | [WORKFLOW_PATTERNS_LEARNING_PATH.md](./WORKFLOW_PATTERNS_LEARNING_PATH.md) | [YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md) → [CORE_YAWL_PATTERNS_GUIDE.md](./CORE_YAWL_PATTERNS_GUIDE.md) |
-| **Experienced YAWL** | [ARCHITECTURE.md](./ARCHITECTURE.md) | [COMPLETE_API_REFERENCE.md](./COMPLETE_API_REFERENCE.md) → [DOCUMENTATION_INDEX.md](./DOCUMENTATION_INDEX.md) |
-| **Migrating** | [OTP_25_28_MIGRATION.md](./OTP_25_28_MIGRATION.md) | [tutorials/workflow_migration_tutorial.md](./tutorials/workflow_migration_tutorial.md) → [ARCHITECTURE.md](./ARCHITECTURE.md) |
+| **New to CRE** | [WORKFLOW_PATTERNS_LEARNING_PATH.md](./WORKFLOW_PATTERNS_LEARNING_PATH.md) | [YAWL_PATTERNS_SUMMARY.md](./YAWL_PATTERNS_SUMMARY.md) → [CORE_YAWL_PATTERNS_GUIDE.md](./CORE_YAWL_PATTERNS_GUIDE.md) |
+| **Experienced YAWL** | [NEW_FILES_OVERVIEW.md](./NEW_FILES_OVERVIEW.md) | [DIATAXIS_ARCHITECTURE.md](./DIATAXIS_ARCHITECTURE.md) → [COMPLETE_API_REFERENCE.md](./COMPLETE_API_REFERENCE.md) |
+| **Migrating** | [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) | [tutorials/workflow_migration_tutorial.md](./tutorials/workflow_migration_tutorial.md) → [ARCHITECTURE.md](./ARCHITECTURE.md) |
 
 ### By Task
 
@@ -246,7 +243,7 @@ Hands-on practice with immediate feedback:
 | **Install CRE** | [QUICK_START.md](./QUICK_START.md) |
 | **First workflow** | [tutorials/getting_started.md](./tutorials/getting_started.md) |
 | **Basic patterns** | [CORE_YAWL_PATTERNS_GUIDE.md](./CORE_YAWL_PATTERNS_GUIDE.md) |
-| **Complex workflows** | [YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md) → [tutorials/advanced_patterns_tutorial.md](./tutorials/advanced_patterns_tutorial.md) |
+| **Complex workflows** | [YAWL_PATTERNS_GUIDE.md](./YAWL_PATTERNS_GUIDE.md) → [tutorials/advanced_patterns_tutorial.md](./tutorials/advanced_patterns_tutorial.md) |
 | **Human approvals** | [HUMAN_IN_THE_LOOP.md](./HUMAN_IN_THE_LOOP.md) |
 | **Colored tokens** | [tutorials/colored_tokens_tutorial.md](./tutorials/colored_tokens_tutorial.md) |
 | **API reference** | [CLIENT_API_COMPLETE_REFERENCE.md](./CLIENT_API_COMPLETE_REFERENCE.md) |
@@ -259,21 +256,22 @@ Hands-on practice with immediate feedback:
 ### Most Popular Files
 - [QUICK_START.md](./QUICK_START.md) - Start here
 - [ORDER_FULFILLMENT_GUIDE.md](./ORDER_FULFILLMENT_GUIDE.md) - Real-world workflow example
-- [WORKFLOW_PATTERNS_LEARNING_PATH.md](./WORKFLOW_PATTERNS_LEARNING_PATH.md) - Learning structure
+- [YAWL_PATTERNS_SUMMARY.md](./YAWL_PATTERNS_SUMMARY.md) - 80/20 learning
 - [COMPLETE_API_REFERENCE.md](./COMPLETE_API_REFERENCE.md) - Complete API
+- [WORKFLOW_PATTERNS_LEARNING_PATH.md](./WORKFLOW_PATTERNS_LEARNING_PATH.md) - Learning structure
 - [TUTORIALS_INDEX.md](./TUTORIALS_INDEX.md) - Tutorial roadmap
 
 ### Quick References
-- [CORE_YAWL_PATTERNS_GUIDE.md](./CORE_YAWL_PATTERNS_GUIDE.md) - Core patterns
-- [CLIENT_API_COMPLETE_REFERENCE.md](./CLIENT_API_COMPLETE_REFERENCE.md) - Client API
-- [YAWL_PATTERN_REFERENCE.md](./YAWL_PATTERN_REFERENCE.md) - Pattern card
+- [CORE_YAWL_PATTERNS_QUICK_REFERENCE.md](./CORE_YAWL_PATTERNS_QUICK_REFERENCE.md) - Core patterns
+- [CLIENT_API_QUICK_REFERENCE.md](./CLIENT_API_QUICK_REFERENCE.md) - Client API
+- [YAWL_PATTERNS_REFERENCE_CARD.md](./YAWL_PATTERNS_REFERENCE_CARD.md) - Pattern card
 - [QUICK_REFERENCE_CARD.md](./QUICK_REFERENCE_CARD.md) - Quick reference
 
 ### Advanced Topics
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - Architecture
+- [DIATAXIS_ARCHITECTURE.md](./DIATAXIS_ARCHITECTURE.md) - Architecture
 - [PNET_CORE_COMPREHENSIVE_REFERENCE.md](./PNET_CORE_COMPREHENSIVE_REFERENCE.md) - Core internals
 - [YAWL_TELEMETRY_GUIDE.md](./YAWL_TELEMETRY_GUIDE.md) - Monitoring
-- [OTP_25_28_MIGRATION.md](./OTP_25_28_MIGRATION.md) - Migration
+- [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) - Migration
 
 ---
 
@@ -343,7 +341,7 @@ To contribute:
 ## 🔄 Last Updated
 
 - **Documentation Version**: v0.3.0
-- **Last Updated**: February 2026
+- **Last Updated**: February 2025
 - **OTP Support**: 25.0 - 28.x
 - **Pattern Count**: 43 YAWL patterns
 

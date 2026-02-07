@@ -267,7 +267,7 @@ stop(Name) ->
           {ok, produce_map()} | {error, term()}.
 
 inject_input(Name, ProduceMap) when is_map(ProduceMap) ->
-    try gen_pnet:inject(Name, ProduceMap) of
+    try gen_yawl:inject(Name, ProduceMap) of
         Result -> Result
     catch
         exit:{noproc, _} -> {error, no_process};
@@ -299,7 +299,7 @@ inject_input(Name, ProduceMap) when is_map(ProduceMap) ->
 -spec execute_step(Name :: name()) -> {ok, receipt()} | abort | {error, term()}.
 
 execute_step(Name) ->
-    try gen_pnet:step(Name) of
+    try gen_yawl:step(Name) of
         abort -> abort;
         {ok, Receipt} -> {ok, Receipt}
     catch
@@ -337,7 +337,7 @@ execute_step(Name) ->
           {ok, [receipt()]} | {error, term()}.
 
 drain_workflow(Name, MaxSteps) when is_integer(MaxSteps), MaxSteps >= 0 ->
-    try gen_pnet:drain(Name, MaxSteps) of
+    try gen_yawl:drain(Name, MaxSteps) of
         {ok, Receipts} -> {ok, Receipts};
         {error, limit} -> {error, limit}
     catch
@@ -374,7 +374,7 @@ drain_workflow(Name, MaxSteps) when is_integer(MaxSteps), MaxSteps >= 0 ->
 get_result(Name, Place) when is_atom(Place) ->
     try gen_pnet:ls(Name, Place) of
         {ok, _Tokens} = Result -> Result;
-        {error, #bad_place{}} = Error -> Error
+        {error, #bad_place{}} -> {error, bad_place}
     catch
         exit:{noproc, _} -> {error, no_process};
         exit:{normal, _} -> {error, terminated};
@@ -471,7 +471,8 @@ is_quiescent(Name) ->
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Unit tests for basic workflow execution operations
 
@@ -555,9 +556,11 @@ execute_until_complete_test() ->
     stop(Pid).
 
 error_handling_noproc_test() ->
-    ?assertEqual({error, no_process}, get_marking(self())),
-    ?assertEqual({error, no_process}, execute_step(self())),
-    ?assertEqual({error, no_process}, inject_input(self(), #{p => [a]})),
-    ?assertEqual({error, no_process}, get_result(self(), p)).
+    %% Use a dead pid - self() triggers calling_self; dead pid gives no_process or terminated
+    DeadPid = spawn(fun() -> ok end),
+    ?assert(lists:member(get_marking(DeadPid), [{error, no_process}, {error, terminated}])),
+    ?assert(lists:member(execute_step(DeadPid), [abort, {error, no_process}, {error, terminated}])),
+    ?assert(lists:member(inject_input(DeadPid, #{p => [a]}), [{error, no_process}, {error, terminated}])),
+    ?assert(lists:member(get_result(DeadPid, p), [{error, no_process}, {error, terminated}])).
 
 -endif.

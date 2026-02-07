@@ -106,6 +106,9 @@
 %% Exports
 %%====================================================================
 
+%% Schema initialization
+-export([init_schema/0]).
+
 %% Checkpoint operations
 -export([checkpoint/4, checkpoint/5]).
 -export([resume/3]).
@@ -136,6 +139,45 @@
 %%====================================================================
 %% API Functions
 %%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Initializes the Mnesia schema for yawl_recovery.
+%%
+%% Creates the yawl_checkpoint table with ram_copies on the current node.
+%% This function can be called multiple times - if the table already
+%% exists, it returns ok.
+%%
+%% Returns ok on success, {error, Reason} on failure.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec init_schema() -> ok | {error, term()}.
+
+init_schema() ->
+    Node = node(),
+
+    %% Start Mnesia if not running
+    _ = case mnesia:start() of
+        ok -> ok;
+        {error, {already_started, _}} -> ok
+    end,
+
+    %% Create yawl_checkpoint table
+    CheckpointAttrs = record_info(fields, yawl_checkpoint),
+    CheckpointDef = [
+        {attributes, CheckpointAttrs},
+        {ram_copies, [Node]},
+        {type, set}
+    ],
+
+    case mnesia:create_table(yawl_checkpoint, CheckpointDef) of
+        {atomic, ok} ->
+            ok;
+        {aborted, {already_exists, yawl_checkpoint}} ->
+            ok;
+        {aborted, Reason} ->
+            {error, Reason}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Creates a checkpoint of workflow state.
@@ -194,11 +236,11 @@ checkpoint(SpecId, CaseId, Marking, Data, Options) when
         false ->
             {error, invalid_marking};
         true ->
-            %% Create checkpoint record
+            %% Create checkpoint record (checkpoint_id first = Mnesia key)
             CheckpointRecord = #yawl_checkpoint{
+                checkpoint_id = CheckpointId,
                 spec_id = SpecId,
                 case_id = CaseId,
-                checkpoint_id = CheckpointId,
                 marking = Marking,
                 data = Data,
                 timestamp = Timestamp,

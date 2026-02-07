@@ -119,11 +119,12 @@ groups() ->
 -spec init_per_suite(Config :: ct:config()) -> ct:config().
 init_per_suite(Config) ->
     ct:pal("Starting wf_compound_integration_SUITE"),
-    %% Ensure Mnesia is running for store tests
-    case mnesia:start() of
-        ok -> ok;
-        {error, {already_started, _}} -> ok
-    end,
+    ok = test_helper:ensure_cre_gen_pnet_loaded(),
+    %% Clean slate - stop and delete any existing Mnesia schema
+    application:stop(mnesia),
+    timer:sleep(50),
+    mnesia:delete_schema([node()]),
+    timer:sleep(50),
     Config.
 
 %% @doc Suite-level cleanup.
@@ -176,6 +177,7 @@ clean_mnesia_tables() ->
             case mnesia:delete_table(Table) of
                 {atomic, ok} -> ok;
                 {aborted, {no_exists, _}} -> ok;
+                {aborted, {already_exists, _}} -> ok;  % Race condition guard
                 _ -> ok
             end
         end,

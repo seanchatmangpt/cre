@@ -1426,11 +1426,12 @@ get_stats_table() ->
     TableName = list_to_atom(atom_to_list(?MODULE) ++ "_stats"),
     case ets:whereis(TableName) of
         undefined ->
-            Heir = case get_heir_process() of
-                undefined -> none;
-                Pid -> {heir, Pid, []}
+            Opts = [named_table, public, {read_concurrency, true}],
+            OptsWithHeir = case get_heir_process() of
+                undefined -> Opts;
+                Pid when is_pid(Pid) -> Opts ++ [{heir, Pid, []}]
             end,
-            ets:new(TableName, [named_table, public, {read_concurrency, true}, Heir]),
+            ets:new(TableName, OptsWithHeir),
             TableName;
         Table ->
             Table
@@ -1551,7 +1552,10 @@ rollback_execution_state(ExecId) ->
 
 evaluate_condition(ConditionFun, Input) when is_function(ConditionFun, 1) ->
     try ConditionFun(Input)
-    catch _:_ -> false end;
+    catch Class:Reason ->
+        logger:warning("evaluate_condition: ~p:~p", [Class, Reason]),
+        false
+    end;
 evaluate_condition(true, _Input) -> true;
 evaluate_condition(false, _Input) -> false;
 evaluate_condition(_, _Input) -> false.
@@ -1657,8 +1661,8 @@ doctest_test() ->
     value = context_get(Ctx3, key),  %% Original key preserved
 
     %% Test 8: Context to map
-    MapList = context_to_map(Ctx3),
-    true = is_list(MapList),
+    MapResult = context_to_map(Ctx3),
+    true = is_map(MapResult),
 
     %% Test 9: Parallel split pattern execution
     ParallelPattern = #parallel_split{

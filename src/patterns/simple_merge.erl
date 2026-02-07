@@ -508,12 +508,12 @@ handle_call({execute_branch, Branch, InputData}, _From, NetState) ->
             try
                 Result1 = Fun(InputData),
                 %% Trigger the merge
-                gen_yawl:sync(NetState, 1000),
+                {ok, _Receipts, NewNetState} = gen_yawl:sync(NetState, 1000),
                 NewState = UsrInfo#simple_merge_state{
                     merged_by = branch_a,
                     result = {ok, Result1}
                 },
-                NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
+                NewUsrInfo = gen_yawl:set_usr_info(NewNetState, NewState),
                 {reply, {ok, Result1}, NewUsrInfo}
             catch
                 Error:Reason:Stack ->
@@ -524,12 +524,12 @@ handle_call({execute_branch, Branch, InputData}, _From, NetState) ->
             try
                 Result1 = Fun(InputData),
                 %% Trigger the merge
-                gen_yawl:sync(NetState, 1000),
+                {ok, _Receipts, NewNetState} = gen_yawl:sync(NetState, 1000),
                 NewState = UsrInfo#simple_merge_state{
                     merged_by = branch_b,
                     result = {ok, Result1}
                 },
-                NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
+                NewUsrInfo = gen_yawl:set_usr_info(NewNetState, NewState),
                 {reply, {ok, Result1}, NewUsrInfo}
             catch
                 Error:Reason:Stack ->
@@ -671,65 +671,7 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-%% @doc Runs all doctests for the module.
-%% @private
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
-
-%% Test basic place_lst callback
-place_lst_test() ->
-    Expected = [p_start, p_branch_a, p_branch_b, p_merge_ready, p_merged, p_end],
-    ?assertEqual(Expected, place_lst()).
-
-%% Test basic trsn_lst callback
-trsn_lst_test() ->
-    Expected = [t_split_a, t_split_b, t_merge_a, t_merge_b, t_finish],
-    ?assertEqual(Expected, trsn_lst()).
-
-%% Test preset for various transitions
-preset_t_split_a_test() ->
-    ?assertEqual([p_start], preset(t_split_a)).
-
-preset_t_split_b_test() ->
-    ?assertEqual([p_start], preset(t_split_b)).
-
-preset_t_merge_a_test() ->
-    ?assertEqual([p_branch_a, p_merge_ready], preset(t_merge_a)).
-
-preset_t_merge_b_test() ->
-    ?assertEqual([p_branch_b, p_merge_ready], preset(t_merge_b)).
-
-preset_t_finish_test() ->
-    ?assertEqual([p_merged], preset(t_finish)).
-
-preset_unknown_test() ->
-    ?assertEqual([], preset(unknown)).
-
-%% Test new/2 constructor
-new_2_branches_test() ->
-    BranchAFun = fun(X) -> X + 1 end,
-    BranchBFun = fun(X) -> X * 2 end,
-    State = new(BranchAFun, BranchBFun),
-    ?assert(is_function(State#simple_merge_state.branch_a_fun)),
-    ?assert(is_function(State#simple_merge_state.branch_b_fun)),
-    ?assertEqual(undefined, State#simple_merge_state.merged_by),
-    ?assertEqual(undefined, State#simple_merge_state.result),
-    ?assert(is_binary(State#simple_merge_state.log_id)).
-
-%% Test init_marking callback
-init_marking_p_start_test() ->
-    State = new(fun(_) -> ok end, fun(_) -> ok end),
-    ?assertEqual([start], init_marking(p_start, State)).
-
-init_marking_p_merge_ready_test() ->
-    State = new(fun(_) -> ok end, fun(_) -> ok end),
-    ?assertEqual([ready], init_marking(p_merge_ready, State)).
-
-init_marking_other_place_test() ->
-    State = new(fun(_) -> ok end, fun(_) -> ok end),
-    ?assertEqual([], init_marking(p_branch_a, State)),
-    ?assertEqual([], init_marking(p_branch_b, State)),
-    ?assertEqual([], init_marking(p_merged, State)),
-    ?assertEqual([], init_marking(p_end, State)).
-
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 -endif.

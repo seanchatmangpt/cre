@@ -4,45 +4,21 @@
 
 This document provides detailed documentation for all 43 YAWL (Yet Another Workflow Language) workflow patterns implemented in CRE v0.3.0. The patterns are categorized into seven groups based on their functionality and complexity.
 
-**NEW**: Advanced patterns (P23-P36, P10) are now documented in [Advanced Patterns Reference](patterns/ADVANCED_PATTERNS.md).
-
 ## Version Information
 
 - **CRE Version**: v0.3.0
 - **OTP Support**: 25.0 - 28.x
 - **Patterns Count**: 40 of 43 YAWL patterns implemented (93.0%)
-- **Last Updated**: February 2026
+- **Last Updated**: December 2024
 
 ## Quick Links
 
 - [New Features in v0.3.0](#new-features-in-v030)
-- [Advanced Patterns](patterns/ADVANCED_PATTERNS.md) - P23-P36, P10
 - [Performance Characteristics](#performance-characteristics)
 - [DOT Graph Visualizations](#dot-graph-visualizations)
 - [Real-world Use Cases](#real-world-use-cases)
 
 ## New Features in v0.3.0
-
-### Advanced Patterns (14 New Modules)
-
-The following advanced patterns are now fully implemented and documented:
-
-| Pattern | Module | Description | Link |
-|---------|--------|-------------|------|
-| **P10** | `arbitrary_cycles` | Arbitrary backward cycles to any node | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#10-arbitrary-cycles-pattern-wcp-31--p10) |
-| **P23** | `transient_trigger` | Event only matters while task enabled | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p23-transient-trigger-pattern) |
-| **P24** | `persistent_trigger` | Event persists until consumed | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p24-persistent-trigger-pattern) |
-| **P26** | `cancel_mi_activity` | Cancel all MI instances | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p26-cancel-mi-activity-pattern) |
-| **P27** | `complete_mi_activity` | Complete MI early on condition | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p27-complete-mi-activity-pattern) |
-| **P28** | `blocking_discriminator` | First completion wins, blocks others | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p28-blocking-discriminator-pattern) |
-| **P29** | `cancelling_discriminator` | First completion wins, cancels others | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p29-cancelling-discriminator-pattern) |
-| **P30** | `structured_partial_join` | N-of-M quorum-based join | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p30-structured-partial-join-n-of-m-pattern) |
-| **P31** | `blocking_partial_join` | Partial then final output | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p31-blocking-partial-join-pattern) |
-| **P32** | `cancelling_partial_join` | N-of-M, cancel remaining | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p32-cancelling-partial-join-pattern) |
-| **P33** | `generalized_and_join` | Join active branches only | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p33-generalized-and-join-pattern) |
-| **P34** | `static_partial_join_mi` | N-of-M with fixed pool | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p34-static-partial-join-for-mi-pattern) |
-| **P35** | `cancelling_partial_join_mi` | N-of-M MI with cancellation | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p35-cancelling-partial-join-for-mi-pattern) |
-| **P36** | `dynamic_partial_join_mi` | Adaptive threshold at runtime | [Advanced Patterns](patterns/ADVANCED_PATTERNS.md#p36-dynamic-partial-join-for-mi-pattern) |
 
 ### Enhancements
 - ✅ **Human-in-the-loop integration** with LLM support
@@ -51,7 +27,6 @@ The following advanced patterns are now fully implemented and documented:
 - ✅ **XES logging** for process mining compliance
 - ✅ **Improved timeout management** across all patterns
 - ✅ **Enhanced error handling** with better diagnostics
-- ✅ **100% pattern coverage** - All 43 patterns implemented
 
 ### Performance Improvements
 - 🚀 **2x faster** pattern validation
@@ -68,7 +43,6 @@ The following advanced patterns are now fully implemented and documented:
 | **Multiple Instances** | WCP-11 to WCP-17 | Concurrent and parallel execution |
 | **State-Based** | WCP-18 to WCP-20 | State-dependent workflow behavior |
 | **Extended Control Flow** | WCP-21 to WCP-28 | Advanced flow control structures |
-| **Advanced Patterns** | P23-P36, P10 | Trigger, partial join, MI control, arbitrary cycles |
 | **Data Flow** | WDP-01 to WDP-05 | Data transformation and movement |
 | **Resource** | WRP-01 to WRP-05 | Resource management and allocation |
 | **Exception Handling** | WHP-01 to WHP-05 | Error handling and recovery |

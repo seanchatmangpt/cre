@@ -59,7 +59,7 @@ erl -pa ../src -pa ../test -s approval_workflow demo -s init stop
 
 ## Integration Notes
 
-- All examples require CRE v0.2.1+
+- All examples require CRE v0.3.0+
 - Basic workflows can run standalone
 - Advanced features require additional modules
 - OpenTelemetry provides comprehensive monitoring

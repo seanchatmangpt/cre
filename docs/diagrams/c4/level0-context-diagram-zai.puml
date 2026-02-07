@@ -1,0 +1,65 @@
+@startuml CRE C4 Level 0 - System Context (with Z.AI)
+
+!theme plain
+skinparam {
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+}
+
+title CRE YAWL Workflow Engine - C4 Level 0 (System Context with Z.AI)
+
+legend right
+  <b>Purpose:</b> Shows CRE, users, external systems.
+  <b>Z.AI:</b> LLM for human task decisions in simulation.
+  <b>Runtime:</b> gen_yawl is the ONLY workflow runtime.
+endlegend
+
+rectangle "CRE YAWL Workflow Engine" as creSystem #E8F4FD {
+  <b>CRE System</b>
+  ==
+  Executes YAWL workflow specifications
+  using Petri net semantics and 43 workflow
+  control patterns. Single runtime: gen_yawl.
+  ==
+  <b>Simulation:</b> Participant agents use Z.AI
+  for LLM-backed human task decisions.
+}
+
+actor "Workflow Developer" as dev
+actor "Business User" as user
+actor "System Administrator" as admin
+
+rectangle "Z.AI Chat API" as zai #FFF2CC
+rectangle "YAWL Client\n(Erlang/API)" as client #FFF2CC
+rectangle "External Applications" as extApps #FFF2CC
+rectangle "Monitoring Stack" as monitoring #FFF2CC
+rectangle "Persistence\n(Event Store)" as persistence #FFF2CC
+
+dev -down-> creSystem : [Creates] YAWL specs\n(XML/YAML)
+user -down-> creSystem : [Uses] Workflow execution\nvia API
+admin -down-> creSystem : [Manages] Configuration\nDeployment
+
+creSystem -right-> client : [Provides] Workflow API\nCase management
+creSystem -right-> zai : [Calls] chat_json for\nhuman task decisions
+creSystem -right-> extApps : [Integrates] REST/HTTP\nWebhooks
+creSystem -down-> persistence : [Stores] State\nEvents\nCheckpoints
+creSystem -down-> monitoring : [Exports] Metrics\nTraces\nLogs
+
+note bottom of creSystem
+  <b>Joe Armstrong Principle:</b>
+  One real OTP runner (gen_yawl),
+  everything else pure utilities.
+  All 43 patterns use gen_yawl.
+  Z.AI used by participant agents
+  when zai_enabled for simulation.
+end note
+
+note bottom of zai
+  <b>Z.AI Integration:</b>
+  zai_client:chat_json/2
+  API: api.z.ai/paas/v4/chat/completions
+  Key: ZAI_API_KEY or cre.zai_api_key
+end note
+
+@enduml

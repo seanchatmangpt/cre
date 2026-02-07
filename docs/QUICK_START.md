@@ -16,7 +16,7 @@ Choose one of these three methods to install CRE:
 
 ```bash
 # Add CRE to your project dependencies
-echo '{deps, [{cre, ".*", {git, "https://github.com/your-org/cre.git", {tag, "v0.2.1"}}}]}' > rebar.config
+echo '{deps, [{cre, ".*", {git, "https://github.com/your-org/cre.git", {tag, "v0.3.0"}}}]}' > rebar.config
 rebar3 deps
 ```
 
@@ -38,7 +38,7 @@ rebar3 compile
 
 ```bash
 # Download the precompiled escript
-wget https://github.com/your-org/cre/releases/download/v0.2.1/cre.escript
+wget https://github.com/your-org/cre/releases/download/v0.3.0/cre.escript
 
 # Make executable
 chmod +x cre.escript

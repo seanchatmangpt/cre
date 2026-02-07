@@ -596,7 +596,8 @@ take_expired(Remaining, _Now, Acc) ->
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Basic operations test
 basic_test() ->

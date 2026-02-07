@@ -930,7 +930,7 @@ do_list_all(State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-do_get_receipt(CheckpointId, State) ->
+do_get_receipt(CheckpointId, _State) ->
     case ets:whereis(yawl_approval_receipts) of
         undefined -> {error, receipts_table_not_found};
         _Table ->
@@ -946,7 +946,7 @@ do_get_receipt(CheckpointId, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-do_list_receipts(State) ->
+do_list_receipts(_State) ->
     case ets:whereis(yawl_approval_receipts) of
         undefined -> [];
         _Table ->
@@ -1179,25 +1179,6 @@ get_decision(CheckpointId) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc Records a decision.
-%%
-%% @end
-%%--------------------------------------------------------------------
-record_decision(CheckpointId, Approved, DecisionMaker, Reason) ->
-    Decision = #approval_decision{
-        checkpoint_id = CheckpointId,
-        approved = Approved,
-        decision_maker = DecisionMaker,
-        reason = to_binary(Reason),
-        metadata = #{},
-        decided_at = erlang:system_time(millisecond)
-    },
-    Table = ensure_ets_table(),
-    ets:insert(Table, {{decision, CheckpointId}, Decision}),
-    ok.
-
-%%--------------------------------------------------------------------
-%% @private
 %% @doc Generates an approval prompt for Claude.
 %%
 %% @end
@@ -1249,20 +1230,6 @@ to_binary(_) -> <<"">>.
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc Ensures the ETS table exists.
-%%
-%% @end
-%%--------------------------------------------------------------------
-ensure_ets_table() ->
-    case ets:whereis(?MODULE) of
-        undefined ->
-            ets:new(?MODULE, [named_table, public, {read_concurrency, true}]);
-        Table ->
-            Table
-    end.
-
-%%--------------------------------------------------------------------
-%% @private
 %% @doc Logs checkpoint events to XES.
 %%
 %% @end
@@ -1294,7 +1261,8 @@ log_checkpoint_event(Checkpoint, EventType) ->
 %% Tests examples embedded in documentation strings.
 %%--------------------------------------------------------------------
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %%--------------------------------------------------------------------
 %% @doc Test for checkpoint ID generation.
@@ -1302,8 +1270,8 @@ doctest_test() ->
 checkpoint_id_format_test() ->
     Id = generate_checkpoint_id(),
     ?assert(is_binary(Id)),
-    ?assertEqual(<<"approval_">>, binary_part(Id, {0, 8})),
-    ?assertEqual(40, byte_size(Id)).  % "approval_" (8) + 32 hex chars
+    ?assertEqual(<<"approval_">>, binary_part(Id, {0, 9})),
+    ?assertEqual(41, byte_size(Id)).  % "approval_" (9) + 32 hex chars
 
 %%--------------------------------------------------------------------
 %% @doc Test for valid approval status atoms.

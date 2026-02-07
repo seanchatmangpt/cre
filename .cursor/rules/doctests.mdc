@@ -1,0 +1,38 @@
+---
+description: Doctest ownership and maintenance after merges
+alwaysApply: false
+globs: "scripts/run_doctests.sh,**/run_doctests*,src/**/*.erl"
+---
+
+# Doctest Maintenance
+
+## Ownership
+
+The AI agent is responsible for ensuring **all doctests work** after merges from remote branches.
+
+## Quick Commands
+
+```bash
+./scripts/run_doctests.sh   # Run all doctests (~3–8s)
+./scripts/run_eunit.sh      # Full eunit (compile + run)
+```
+
+## Script Behavior
+
+- **`run_doctests.sh`** auto-discovers doctest modules from `src/` (files with `doctest_test/0`).
+- New modules added by merges are included automatically.
+- Uses `run_eunit.sh` for reliable compile (yawl_persistence.beam rename workaround).
+
+## When Doctests Fail
+
+1. Run `./scripts/run_doctests.sh` to reproduce.
+2. If batch fails, isolate: `./scripts/run_eunit.sh --module=MODULE`
+3. Fix the failing module (doctest expectations, bindings across blocks, or manual assertions).
+4. Re-run `./scripts/run_doctests.sh` until all pass.
+
+## Common Fixes
+
+- **Unbound variable across blocks**: Combine moduledoc code blocks so bindings carry.
+- **Wrong expected value**: Update doctest to match implementation (e.g. wf_timer seconds vs minutes).
+- **XML/JSON iolist**: Use `iolist_to_binary/1` for output that must be binary.
+- **Timestamp/datetime**: Use `calendar:system_time_to_universal_time/2` for httpd_util:rfc1123_date.

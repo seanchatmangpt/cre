@@ -1,6 +1,6 @@
 # CRE - YAWL Workflow Engine Documentation
 
-![Version](https://img.shields.io/badge/v0.2.1-blue)
+![Version](https://img.shields.io/badge/v0.3.0-blue)
 ![OTP](https://img.shields.io/badge/OTP%2025%2B-green)
 ![License](https://img.shields.io/badge/APACHE%202.0-orange)
 
@@ -21,12 +21,12 @@ CRE is a **YAWL (Yet Another Workflow Language)** workflow engine implemented in
 
 | Feature | Description | Release |
 |---------|-------------|---------|
-| **YAWL Patterns** | Complete set of 43 workflow patterns for process modeling | v0.2.1 |
-| **Human-in-the-Loop** | Approval workflows with LLM integration and checkpointing | v0.2.1 |
-| **OpenTelemetry** | Structured logging, metrics, and distributed tracing | v0.2.1 |
-| **Web Dashboard** | Real-time workflow visualization and monitoring | v0.2.1 |
-| **XES Logging** | Event log standard for process mining and analysis | v0.2.1 |
-| **OTP 25+ Support** | Modern Erlang/OTP with improved performance | v0.2.0 |
+| **YAWL Patterns** | Complete set of 43 workflow patterns for process modeling | v0.3.0 |
+| **Human-in-the-Loop** | Approval workflows with LLM integration and checkpointing | v0.3.0 |
+| **OpenTelemetry** | Structured logging, metrics, and distributed tracing | v0.3.0 |
+| **Web Dashboard** | Real-time workflow visualization and monitoring | v0.3.0 |
+| **XES Logging** | Event log standard for process mining and analysis | v0.3.0 |
+| **OTP 25+ Support** | Modern Erlang/OTP with improved performance | v0.3.0 |
 
 ## 📚 Where to Start?
 
@@ -105,7 +105,7 @@ docs/
 
 ## 📝 What Happened to Cuneiform?
 
-CRE was originally developed as the **Cuneiform runtime environment** for distributed programming. Starting with **v0.2.0**, CRE has evolved into a YAWL workflow engine while maintaining backward compatibility with the original CRE client/worker APIs. The core execution engine remains compatible, but the focus has shifted to workflow modeling and human-in-the-loop processes.
+CRE was originally developed as the **Cuneiform runtime environment** for distributed programming. Starting with **v0.3.0**, CRE has evolved into a YAWL workflow engine while maintaining backward compatibility with the original CRE client/worker APIs. The core execution engine remains compatible, but the focus has shifted to workflow modeling and human-in-the-loop processes.
 
 > **Note**: All existing CRE applications continue to work without changes. The evolution adds YAWL patterns on top of the existing foundation.
 
@@ -117,7 +117,7 @@ CRE was originally developed as the **Cuneiform runtime environment** for distri
 
 ---
 
-## 📊 CRE v0.2.1 Highlights
+## 📊 CRE v0.3.0 Highlights
 
 - ✅ **43 YAWL patterns** - Complete pattern library for complex workflows
 - ✅ **Human-in-the-loop** - Approval workflows with LLM integration
