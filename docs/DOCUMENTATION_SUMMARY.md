@@ -15,8 +15,8 @@ The documentation system includes 12 new files covering:
 
 ## Documentation Files Created
 
-### 1. **NEW_FILES_OVERVIEW.md**
-- **Purpose**: Complete inventory of all new files created in the refactoring
+### 1. **DOCUMENTATION_INDEX.md**
+- **Purpose**: Complete inventory of all documentation files
 - **Content**:
   - Architecture summary with diagram
   - File categories and purposes
@@ -24,7 +24,7 @@ The documentation system includes 12 new files covering:
   - Integration points
 - **Audience**: Everyone involved in the project
 
-### 2. **DIATAXIS_ARCHITECTURE.md**
+### 2. **ARCHITECTURE.md**
 - **Purpose**: Conceptual understanding of the new architecture
 - **Content**:
   - Joe Armstrong design principles
@@ -51,14 +51,14 @@ The documentation system includes 12 new files covering:
   - Performance considerations
 - **Audience**: Developers implementing complex workflows
 
-### 5. **MIGRATION_GUIDE.md**
-- **Purpose**: Path from old to new architecture
+### 5. **OTP_25_28_MIGRATION.md**
+- **Purpose**: Erlang/OTP version migration guide
 - **Content**:
-  - Architecture comparison
-  - Step-by-step migration strategy
+  - Version compatibility notes
+  - Step-by-step upgrade strategy
   - Code examples (old vs new)
   - Common migration pitfalls
-- **Audience**: Teams migrating existing workflows
+- **Audience**: Teams upgrading Erlang/OTP versions
 
 ### 6. **UTILITY_MODULES_GUIDE.md**
 - **Purpose**: Detailed documentation for each utility module
@@ -69,10 +69,10 @@ The documentation system includes 12 new files covering:
   - Integration patterns
 - **Audience**: All developers using the framework
 
-### 7. **YAWL_PATTERNS_GUIDE.md**
-- **Purpose**: Implementation guide for workflow patterns
+### 7. **YAWL_PATTERNS_REFERENCE.md**
+- **Purpose**: Complete pattern reference for workflow patterns
 - **Content**:
-  - 10 YAWL pattern implementations
+  - 43 YAWL pattern specifications
   - Integration with utility modules
   - Pattern composition examples
   - Testing strategies
@@ -87,7 +87,7 @@ The documentation system includes 12 new files covering:
   - Exercise suggestions
 - **Audience**: New developers and learners
 
-### 9. **EXAMPLES_GUIDE.md**
+### 9. **EXAMPLES.md**
 - **Purpose**: Working implementations and usage patterns
 - **Content**:
   - Complete demo workflow implementation
@@ -204,27 +204,27 @@ Every concept includes:
 ## Reading Recommendations
 
 ### For Project Managers
-1. **NEW_FILES_OVERVIEW.md** - Understand scope and impact
-2. **DIATAXIS_ARCHITECTURE.md** - High-level design concepts
-3. **MIGRATION_GUIDE.md** - Planning for transition
+1. **DOCUMENTATION_INDEX.md** - Understand scope and impact
+2. **ARCHITECTURE.md** - High-level design concepts
+3. **OTP_25_28_MIGRATION.md** - Planning for transition
 
 ### For Architects
-1. **DIATAXIS_ARCHITECTURE.md** - Design rationale
+1. **ARCHITECTURE.md** - Design rationale
 2. **HELPER_INTEGRATION_GUIDE.md** - System design patterns
 3. **COMPLETE_API_REFERENCE.md** - Technical compliance
 
 ### For Developers
 1. **UTILITY_MODULES_GUIDE.md** - Learn the tools
-2. **YAWL_PATTERNS_GUIDE.md** - Implementation patterns
+2. **YAWL_PATTERNS_REFERENCE.md** - Implementation patterns
 3. **TUTORIALS/** - Hands-on learning
 
 ### For New Team Members
 1. **QUICK_REFERENCE_CARD.md** - Quick start
 2. **TUTORIALS_INDEX.md** → **getting_started.md** - Learning path
-3. **EXAMPLES_GUIDE.md** - Practical examples
+3. **EXAMPLES.md** - Practical examples
 
 ### For Migration Teams
-1. **MIGRATION_GUIDE.md** - High-level migration
+1. **OTP_25_28_MIGRATION.md** - High-level migration
 2. **workflow_migration_tutorial.md** - Hands-on migration
 3. **HELPER_INTEGRATION_GUIDE.md** - New capabilities
 

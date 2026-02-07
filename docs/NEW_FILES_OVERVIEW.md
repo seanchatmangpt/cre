@@ -361,8 +361,8 @@ Each follows the same interface with pattern-specific logic.
 
 ### Documentation Files
 
-#### 1. `docs/DIATAXIS_ARCHITECTURE.md`
-**Purpose**: Comprehensive architecture overview following diataxis principles.
+#### 1. `docs/ARCHITECTURE.md`
+**Purpose**: Comprehensive architecture overview following Joe Armstrong principles.
 **Content**:
 - Architecture rationale and design principles
 - Tutorial with step-by-step examples
@@ -385,12 +385,12 @@ Each follows the same interface with pattern-specific logic.
 - Data flow diagrams
 - Performance considerations
 
-#### 4. `docs/MIGRATION_GUIDE.md`
-**Purpose**: Migration path from old architecture to new.
+#### 4. `docs/OTP_25_28_MIGRATION.md`
+**Purpose**: Erlang/OTP version migration path.
 **Content**:
-- Architecture comparison
-- Step-by-step migration strategy
-- Code examples for old vs new
+- Version compatibility notes
+- Step-by-step upgrade strategy
+- Code examples for different OTP versions
 - Common migration pitfalls
 
 #### 5. `docs/tutorials/` Directory

@@ -28,7 +28,7 @@
 
 **Study Resources**:
 - [ ] Complete Phase 1 of [Learning Path](../WORKFLOW_PATTERNS_LEARNING_PATH.md)
-- [ ] Practice with [Quick Reference Card](../YAWL_PATTERNS_REFERENCE_CARD.md)
+- [ ] Practice with [Quick Reference Card](../QUICK_REFERENCE_CARD.md)
 - [ ] Study [Basic Tutorial](basic_patterns_tutorial.md)
 - [ ] Review [Core Patterns Guide](../CORE_YAWL_PATTERNS_GUIDE.md)
 
@@ -245,7 +245,7 @@
 | Resource | Status | Notes |
 |----------|--------|-------|
 | [WORKFLOW_PATTERNS_LEARNING_PATH.md](../WORKFLOW_PATTERNS_LEARNING_PATH.md) | [ ] Complete | ___________________ |
-| [YAWL_PATTERNS_REFERENCE_CARD.md](../YAWL_PATTERNS_REFERENCE_CARD.md) | [ ] Reviewed | ___________________ |
+| [QUICK_REFERENCE_CARD.md](../QUICK_REFERENCE_CARD.md) | [ ] Reviewed | ___________________ |
 | [Basic Patterns Tutorial](basic_patterns_tutorial.md) | [ ] Completed | ___________________ |
 | [Advanced Patterns Tutorial](advanced_patterns_tutorial.md) | [ ] Completed | ___________________ |
 | [CRE Engine Documentation](../COMPLETE_API_REFERENCE.md) | [ ] Used | ___________________ |

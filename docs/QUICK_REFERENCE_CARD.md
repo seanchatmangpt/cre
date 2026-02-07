@@ -379,10 +379,10 @@ cd examples
 - `pnet_receipt`: Audit trails
 
 ### Must-Read Documentation
-- `docs/DIATAXIS_ARCHITECTURE.md` - Architecture concepts
+- `docs/ARCHITECTURE.md` - Architecture concepts
 - `docs/COMPLETE_API_REFERENCE.md` - Full API
 - `docs/UTILITY_MODULES_GUIDE.md` - Utilities guide
-- `docs/YAWL_PATTERNS_GUIDE.md` - Patterns guide
+- `docs/YAWL_PATTERNS_REFERENCE.md` - Patterns guide
 
 ### Quick Start
 1. Read architecture docs

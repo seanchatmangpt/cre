@@ -47,13 +47,13 @@ This document summarizes the complete 80/20 learning system for mastering YAWL w
 ## Learning Resources Created
 
 ### 1. Main Learning Path
-- **File**: `docs/YAWL_PATTERNS_GUIDE.md`
+- **File**: `docs/YAWL_PATTERNS_REFERENCE.md`
 - **Purpose**: Complete 80/20 structured learning guide
-- **Content**: 3 phases, progressive learning, real-world examples
+- **Content**: 43 patterns, progressive learning, real-world examples
 - **Time**: 3-6 hours total
 
 ### 2. Quick Reference Card
-- **File**: `docs/YAWL_PATTERNS_REFERENCE_CARD.md`
+- **File**: `docs/YAWL_PATTERN_REFERENCE.md`
 - **Purpose**: Instant reference and memory aid
 - **Content**: Patterns, API, examples, decision trees
 - **Time**: 5-minute reference guide

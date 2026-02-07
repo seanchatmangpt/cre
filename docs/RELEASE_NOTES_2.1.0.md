@@ -231,7 +231,7 @@ No changes required! The Order Fulfillment workflow still works exactly as befor
 ### Updated Documentation
 
 1. **API Reference**: `docs/COMPLETE_API_REFERENCE.md`
-2. **Architecture**: `docs/DIATAXIS_ARCHITECTURE.md`
+2. **Architecture**: `docs/ARCHITECTURE.md`
 3. **Verification Report**: `docs/VERIFICATION_REPORT.md` (NEW)
 4. **User Guides**: Various pattern guides in `docs/`
 

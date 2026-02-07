@@ -42,7 +42,7 @@ CRE is a **YAWL (Yet Another Workflow Language)** workflow engine implemented in
 
 ### 📖 Specific Topics
 - **Human-in-the-Loop**: [Approval Workflows](./HUMAN_IN_THE_LOOP.md)
-- **Telemetry**: [OpenTelemetry Integration](./YAWL_TELEMETRY.md)
+- **Telemetry**: [OpenTelemetry Integration](./YAWL_TELEMETRY_GUIDE.md)
 - **Migration**: [v0.1 to v0.2 Migration](./old/MIGRATION_V0.1_TO_V0.2.md) (archived)
 
 ## 🔗 Documentation Map
@@ -58,7 +58,7 @@ docs/
 ├── MIGRATION.md                       # 📥 Upgrade guides
 ├── YAWL_PATTERNS_REFERENCE.md         # 🔍 Pattern details
 ├── YAWL_PATTERN_EXAMPLES.md          # 💯 Pattern examples
-├── YAWL_TELEMETRY.md                  # 📊 Monitoring setup
+├── YAWL_TELEMETRY_GUIDE.md          # 📊 Monitoring setup
 ├── YAWL_TIMEOUT_REFERENCE.md          # ⏱️ Timeout configuration
 ├── HUMAN_IN_THE_LOOP.md               # 👥 Human approval flows
 ├── examples/                          # 💻 Working code examples
@@ -84,7 +84,7 @@ docs/
 ### Core Features
 - [43 YAWL Patterns](./YAWL_PATTERNS_REFERENCE.md) - Complete workflow pattern library
 - [Human-in-the-Loop Workflows](./HUMAN_IN_THE_LOOP.md) - Approval flows with LLM integration
-- [OpenTelemetry Integration](./YAWL_TELEMETRY.md) - Observability and monitoring
+- [OpenTelemetry Integration](./YAWL_TELEMETRY_GUIDE.md) - Observability and monitoring
 - [Web Dashboard](https://github.com/your-org/cre-dashboard) - Real-time visualization
 
 ### Getting Started

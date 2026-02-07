@@ -1735,4 +1735,4 @@ This API reference covers all major functions available in CRE. For additional d
 - [QUICK_START.md](./QUICK_START.md) - Getting started guide
 - [YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md) - Pattern reference
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture
-- [TELEMETRY.md](./YAWL_TELEMETRY.md) - Telemetry details
+- [YAWL_TELEMETRY_GUIDE.md](./YAWL_TELEMETRY_GUIDE.md) - Telemetry details

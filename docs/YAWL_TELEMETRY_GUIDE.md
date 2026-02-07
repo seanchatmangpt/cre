@@ -718,5 +718,5 @@ execute(OrderId) ->
 ## References
 
 - [Complete API Reference](COMPLETE_API_REFERENCE.md)
-- [YAWL Patterns Reference](YAWL_PATTERNS_REFERENCE_CARD.md)
-- [Diataxis Architecture](DIATAXIS_ARCHITECTURE.md)
+- [YAWL Patterns Reference](YAWL_PATTERNS_REFERENCE.md)
+- [Architecture](ARCHITECTURE.md)
