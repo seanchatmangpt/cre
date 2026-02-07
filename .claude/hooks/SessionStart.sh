@@ -12,8 +12,9 @@
 #   Phase 2D: Source build (fallback)
 #   Phase 3: Environment setup
 #   Phase 4: Lock file creation
+#   Phase 5: Project build (rebar3 + deps + compile)
 #
-# Strategy: CACHE → PLATFORM → EXISTING → DOWNLOAD → BUILD → LOCK
+# Strategy: CACHE → PLATFORM → EXISTING → DOWNLOAD → BUILD → LOCK → PROJECT
 # Idempotency: Lock file prevents re-execution
 
 set -euo pipefail
@@ -24,13 +25,19 @@ set -euo pipefail
 
 readonly REQUIRED_OTP_VERSION="28.3.1"
 readonly REQUIRED_OTP_MAJOR=28
-readonly ERLMCP_ROOT="$(cd "${ERLMCP_ROOT:-.}" 2>/dev/null && pwd || echo "$PWD")"
+# Derive project root from script location (.claude/hooks/SessionStart.sh → project root)
+readonly _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly ERLMCP_ROOT="$(cd "$_SCRIPT_DIR/../.." && pwd)"
 readonly OTP_CACHE_DIR="${ERLMCP_ROOT}/.erlmcp/otp-${REQUIRED_OTP_VERSION}"
 readonly OTP_BIN="${OTP_CACHE_DIR}/bin/erl"
 readonly LOCK_FILE="${ERLMCP_ROOT}/.erlmcp/cache/sessionstart.lock"
 readonly LOG_FILE="${ERLMCP_ROOT}/.erlmcp/sessionstart.log"
 readonly BUILD_TEMP_DIR="/tmp/otp-build-$$"
-readonly SCRIPT_VERSION="2.4.0-consolidated"
+readonly SCRIPT_VERSION="2.5.0-consolidated"
+
+# Rebar3 download URL
+readonly REBAR3_URL="https://s3.amazonaws.com/rebar3/rebar3"
+readonly REBAR3_BIN="${ERLMCP_ROOT}/.erlmcp/cache/rebar3"
 
 # Pre-built OTP distribution (Linux only, ~30s)
 readonly OTP_PREBUILT_URL="https://github.com/seanchatmangpt/erlmcp/releases/download/erlang-28.3.1/erlang-28.3.1-linux-x86_64.tar.gz"
@@ -170,7 +177,7 @@ search_existing_otp_macos() {
 #==============================================================================
 
 download_prebuilt_otp() {
-    log_phase "2C/4" "Attempting pre-built OTP download (Linux fast path)"
+    log_phase "2C/5" "Attempting pre-built OTP download (Linux fast path)"
 
     log_info "URL: $OTP_PREBUILT_URL"
     mkdir -p "$OTP_CACHE_DIR"
@@ -255,7 +262,7 @@ download_prebuilt_otp() {
 #==============================================================================
 
 build_otp_from_source() {
-    log_phase "2D/4" "Building OTP from source (slow path, ~6m)"
+    log_phase "2D/5" "Building OTP from source (slow path, ~6m)"
 
     log_info "URL: $OTP_RELEASE_URL"
     mkdir -p "$BUILD_TEMP_DIR"
@@ -307,7 +314,7 @@ build_otp_from_source() {
 #==============================================================================
 
 verify_otp_build() {
-    log_phase "4/6" "Verifying OTP build"
+    log_phase "2E/5" "Verifying OTP build"
 
     if [[ ! -f "$OTP_BIN" ]]; then
         log_error "OTP binary not found at $OTP_BIN"
@@ -351,7 +358,7 @@ verify_otp_build() {
 #==============================================================================
 
 setup_environment() {
-    log_phase "3/4" "Environment setup"
+    log_phase "3/5" "Environment setup"
 
     # IMPORTANT: System bins FIRST to preserve commands like head, tail, etc.
     # OTP bin appended at end
@@ -423,12 +430,106 @@ EOF
 #==============================================================================
 
 create_lock_file() {
-    log_phase "4/4" "Lock file creation"
+    log_phase "4/5" "Lock file creation"
 
     mkdir -p "$(dirname "$LOCK_FILE")"
     echo "$REQUIRED_OTP_VERSION" > "$LOCK_FILE"
 
     log_success "Lock file created: $LOCK_FILE"
+    return 0
+}
+
+#==============================================================================
+# Phase 5: Ensure rebar3 + project build
+#==============================================================================
+
+ensure_rebar3() {
+    if [[ -f "$REBAR3_BIN" ]] && [[ -x "$REBAR3_BIN" ]]; then
+        log_info "rebar3 already cached at $REBAR3_BIN"
+        return 0
+    fi
+
+    log_info "Downloading rebar3..."
+    mkdir -p "$(dirname "$REBAR3_BIN")"
+    if curl -fsSL -o "$REBAR3_BIN" "$REBAR3_URL" 2>&1 | tee -a "$LOG_FILE"; then
+        chmod +x "$REBAR3_BIN"
+        log_success "rebar3 downloaded"
+        return 0
+    else
+        log_error "Failed to download rebar3"
+        return 1
+    fi
+}
+
+patch_cowlib_otp28() {
+    # cowlib <2.16.0 has an unbound type variable in cow_sse.erl that
+    # OTP 28 treats as a hard error. Patch it in-place after deps are fetched.
+    local cow_sse="${ERLMCP_ROOT}/_build/default/lib/cowlib/src/cow_sse.erl"
+
+    if [[ ! -f "$cow_sse" ]]; then
+        return 0
+    fi
+
+    # Check if patch is already applied (look for "when State :: state()")
+    if grep -q "when State :: state()" "$cow_sse" 2>/dev/null; then
+        log_info "cowlib cow_sse.erl already patched for OTP 28"
+        return 0
+    fi
+
+    # Check if the buggy pattern exists
+    if grep -q 'State} | {more, State}\.' "$cow_sse" 2>/dev/null; then
+        log_info "Patching cowlib cow_sse.erl for OTP 28 compatibility..."
+        # Replace the two-line type spec with the fixed version
+        sed -i 's/-spec parse(binary(), state())/-spec parse(binary(), State)/' "$cow_sse"
+        sed -i 's/\t-> {event, parsed_event(), State} | {more, State}\./\t-> {event, parsed_event(), State} | {more, State}\n\twhen State :: state()./' "$cow_sse"
+        log_success "cowlib cow_sse.erl patched"
+    else
+        log_info "cowlib cow_sse.erl does not need patching"
+    fi
+
+    return 0
+}
+
+ensure_project_compiled() {
+    log_phase "5/5" "Project build (rebar3 deps + compile)"
+
+    if ! ensure_rebar3; then
+        log_error "Cannot build project without rebar3"
+        return 1
+    fi
+
+    cd "$ERLMCP_ROOT"
+
+    # Check if project is already compiled (beam files exist)
+    local beam_count
+    beam_count=$(find "${ERLMCP_ROOT}/_build/default/lib/cre/ebin" -name "*.beam" 2>/dev/null | wc -l)
+    if [[ "$beam_count" -gt 0 ]]; then
+        log_info "Project already compiled ($beam_count beam files), verifying..."
+        if "$REBAR3_BIN" compile 2>&1 | tee -a "$LOG_FILE" | tail -5; then
+            log_success "Project compilation verified"
+            return 0
+        fi
+        log_info "Re-compilation needed..."
+    fi
+
+    # Fetch deps
+    log_info "Fetching dependencies..."
+    if ! "$REBAR3_BIN" get-deps 2>&1 | tee -a "$LOG_FILE" | tail -10; then
+        log_error "Failed to fetch dependencies"
+        return 1
+    fi
+    log_success "Dependencies fetched"
+
+    # Patch cowlib for OTP 28
+    patch_cowlib_otp28
+
+    # Compile
+    log_info "Compiling project..."
+    if ! "$REBAR3_BIN" compile 2>&1 | tee -a "$LOG_FILE" | tail -10; then
+        log_error "Compilation failed"
+        return 1
+    fi
+    log_success "Project compiled successfully"
     return 0
 }
 
@@ -452,74 +553,74 @@ main() {
     log_info "Starting SessionStart.sh (v$SCRIPT_VERSION)"
     log_info "Platform: $PLATFORM"
 
+    local otp_ready=false
+
     # Phase 1: Check cache
-    log_phase "1/4" "Cache check"
+    log_phase "1/5" "Cache check"
     if is_otp_cached; then
-        setup_environment
-        write_env_file
-        create_lock_file
-        log_success "SessionStart complete (cached, <1s)"
-        exit 0
-    fi
+        otp_ready=true
+    else
+        log_info "OTP not cached, attempting acquisition..."
 
-    log_info "OTP not cached, attempting acquisition..."
+        # Phase 2A: Platform-specific paths
+        if [[ "$PLATFORM" == "macos" ]]; then
+            # Phase 2B: Search existing OTP (macOS)
+            log_phase "2B/5" "Searching existing OTP (macOS)"
 
-    # Phase 2A: Platform-specific paths
-    if [[ "$PLATFORM" == "macos" ]]; then
-        # Phase 2B: Search existing OTP (macOS)
-        log_phase "2B/4" "Searching existing OTP (macOS)"
+            local existing_erl
+            if existing_erl=$(search_existing_otp_macos); then
+                # Link existing OTP to cache
+                local existing_bin_dir
+                existing_bin_dir=$(dirname "$existing_erl")
+                mkdir -p "${OTP_CACHE_DIR}/bin"
 
-        local existing_erl
-        if existing_erl=$(search_existing_otp_macos); then
-            # Link existing OTP to cache
-            local existing_bin_dir
-            existing_bin_dir=$(dirname "$existing_erl")
-            mkdir -p "${OTP_CACHE_DIR}/bin"
+                for binary in "$existing_bin_dir"/*; do
+                    if [[ -f "$binary" ]]; then
+                        ln -sf "$binary" "${OTP_CACHE_DIR}/bin/$(basename "$binary")" 2>/dev/null || true
+                    fi
+                done
+                otp_ready=true
+            else
+                log_info "Pre-built OTP verification failed, cleaning up for fallback..."
+                rm -rf "$OTP_CACHE_DIR"
+            fi
 
-            # Create individual symlinks for each Erlang binary
-            for binary in "$existing_bin_dir"/*; do
-                if [[ -f "$binary" ]]; then
-                    ln -sf "$binary" "${OTP_CACHE_DIR}/bin/$(basename "$binary")" 2>/dev/null || true
-                fi
-            done
-
-            setup_environment
-            write_env_file
-            create_lock_file
-            log_success "SessionStart complete (existing OTP, ~5s)"
-            exit 0
-        else
-            log_info "Pre-built OTP verification failed, cleaning up for fallback..."
-            rm -rf "$OTP_CACHE_DIR"
+        elif [[ "$PLATFORM" == "linux" ]]; then
+            # Phase 2C: Pre-built (Linux fast path)
+            if download_prebuilt_otp; then
+                otp_ready=true
+            else
+                log_info "Pre-built unavailable, falling back to source build..."
+            fi
         fi
 
-        log_info "No suitable OTP found, falling back to source build..."
-
-    elif [[ "$PLATFORM" == "linux" ]]; then
-        # Phase 2C: Pre-built (Linux fast path)
-        if download_prebuilt_otp; then
-            setup_environment
-            write_env_file
-            create_lock_file
-            log_success "SessionStart complete (pre-built, ~30s)"
-            exit 0
+        # Phase 2D: Source build (fallback, all platforms)
+        if [[ "$otp_ready" != "true" ]]; then
+            if build_otp_from_source; then
+                otp_ready=true
+            fi
         fi
-
-        log_info "Pre-built unavailable, falling back to source build..."
     fi
 
-    # Phase 2D: Source build (fallback, all platforms)
-    if build_otp_from_source; then
-        setup_environment
-        write_env_file
-        create_lock_file
-        log_success "SessionStart complete (source build, ~6m)"
-        exit 0
+    if [[ "$otp_ready" != "true" ]]; then
+        log_error "FATAL: All OTP acquisition methods failed"
+        cleanup
+        exit 1
     fi
 
-    log_error "FATAL: All OTP acquisition methods failed"
+    # Phase 3: Environment
+    setup_environment
+    write_env_file
+
+    # Phase 4: Lock file
+    create_lock_file
+
+    # Phase 5: Project build (rebar3 + deps + compile)
+    ensure_project_compiled || log_info "Project build skipped or failed (non-fatal)"
+
+    log_success "SessionStart complete"
     cleanup
-    exit 1
+    exit 0
 }
 
 main "$@"
