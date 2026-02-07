@@ -11,9 +11,12 @@
 | Level | Diagram | File | Purpose |
 |-------|---------|------|---------|
 | 0 | System Context | [level0-context-diagram.puml](level0-context-diagram.puml) | CRE system, users, external systems |
+| 0 | System Context + Z.AI | [level0-context-diagram-zai.puml](level0-context-diagram-zai.puml) | CRE with Z.AI for LLM-backed human tasks |
 | 1 | Container | [level1-container-diagram-v2.puml](level1-container-diagram-v2.puml) | Deployable containers, gen_yawl-centric |
+| 1 | Container + Z.AI | [level1-container-diagram-zai.puml](level1-container-diagram-zai.puml) | Containers with Z.AI, simulation orchestrator |
 | 2 | Component | [level2-yawl-engine-component.puml](level2-yawl-engine-component.puml) | YAWL Engine internals, execution flow |
 | 3 | Code/Flow | [level3-pattern-execution.puml](level3-pattern-execution.puml) | 43 patterns execution pipeline |
+| Seq | Omega + Z.AI | [sequence-omega-zai-execution.puml](sequence-omega-zai-execution.puml) | Omega simulation with gen_yawl + Z.AI |
 
 **Legacy (superseded):** `level1-container-diagram.puml`, `level2-component-diagram.puml` — use v2 diagrams.
 
@@ -129,6 +132,12 @@ gen_yawl:start_link(parallel_split, #{branches => [...]}, []).
 - Do not have some callers use gen_pnet and others gen_yawl for the same workflow.
 - Standardize on gen_yawl everywhere.
 
+### Anti-Pattern 5: wf_engine Without gen_yawl
+
+- **wf_engine** is the high-level workflow API (worklist, allocate, complete, case_state).
+- **wf_engine** is supposed to use gen_yawl internally. Currently it does not.
+- Participants use wf_engine API — that is correct. The fix: make wf_engine delegate to gen_yawl.
+
 ---
 
 ## Migration Checklist
@@ -145,8 +154,20 @@ When implementing or refactoring:
 
 ---
 
+## Z.AI Integration
+
+For LLM-backed human task decisions in simulation:
+
+- **zai_client** — HTTP client for Z.AI Chat API (`chat_json/2`)
+- **Participant agents** — Call `zai_client:chat_json` when `zai_enabled => true`
+- **gen_yawl:inject** — Participant completes human task by injecting decision token
+- **Flow:** gen_yawl quiescent → discover pending tasks → Z.AI decision → inject → execute_step
+
+See [sequence-omega-zai-execution.puml](sequence-omega-zai-execution.puml).
+
 ## References
 
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — Joe Armstrong design, gen_pnet/gen_yawl
 - [43 Patterns Plan](../../REMOTE_BRANCH_MERGE_SUMMARY.md) — Implementation context; see plan file for full details
 - [gen_yawl.erl](../../../src/core/gen_yawl.erl) — Runtime implementation
+- [zai_client.erl](../../../src/api/zai_client.erl) — Z.AI Chat API client

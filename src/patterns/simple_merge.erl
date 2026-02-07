@@ -508,12 +508,12 @@ handle_call({execute_branch, Branch, InputData}, _From, NetState) ->
             try
                 Result1 = Fun(InputData),
                 %% Trigger the merge
-                gen_yawl:sync(NetState, 1000),
+                {ok, _Receipts, NewNetState} = gen_yawl:sync(NetState, 1000),
                 NewState = UsrInfo#simple_merge_state{
                     merged_by = branch_a,
                     result = {ok, Result1}
                 },
-                NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
+                NewUsrInfo = gen_yawl:set_usr_info(NewNetState, NewState),
                 {reply, {ok, Result1}, NewUsrInfo}
             catch
                 Error:Reason:Stack ->
@@ -524,12 +524,12 @@ handle_call({execute_branch, Branch, InputData}, _From, NetState) ->
             try
                 Result1 = Fun(InputData),
                 %% Trigger the merge
-                gen_yawl:sync(NetState, 1000),
+                {ok, _Receipts, NewNetState} = gen_yawl:sync(NetState, 1000),
                 NewState = UsrInfo#simple_merge_state{
                     merged_by = branch_b,
                     result = {ok, Result1}
                 },
-                NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
+                NewUsrInfo = gen_yawl:set_usr_info(NewNetState, NewState),
                 {reply, {ok, Result1}, NewUsrInfo}
             catch
                 Error:Reason:Stack ->

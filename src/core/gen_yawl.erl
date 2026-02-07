@@ -123,7 +123,10 @@ The fire/3 callback can return:
          stop/1,
          sync/2,
          usr_info/1,
-         state_property/3]).
+         state_property/3,
+         inject/2,
+         step/1,
+         drain/2]).
 
 %% Net state accessor functions
 -export([get_ls/2, get_usr_info/1, get_stats/1]).
@@ -490,6 +493,45 @@ state_property(Name, Pred, PlaceLst)
     ArgLst = [ maps:get(Place, Marking) || Place <- PlaceLst ],
     apply(Pred, ArgLst).
 
+%%--------------------------------------------------------------------
+%% @doc Inject tokens into the workflow.
+%%
+%%      Adds tokens to places specified in ProduceMap.
+%%      Equivalent to gen_pnet:inject/2.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec inject(Name :: name(), ProduceMap :: #{atom() => [term()]}) ->
+          {ok, #{atom() => [term()]}} | {error, term()}.
+
+inject(Name, ProduceMap) when is_map(ProduceMap) ->
+    gen_server:call(Name, {inject, ProduceMap}).
+
+%%--------------------------------------------------------------------
+%% @doc Fire at most one enabled transition.
+%%
+%%      Equivalent to gen_pnet:step/1.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec step(Name :: name()) -> abort | {ok, #{atom() => [term()]}}.
+
+step(Name) ->
+    gen_server:call(Name, step).
+
+%%--------------------------------------------------------------------
+%% @doc Fire transitions until none enabled or MaxSteps reached.
+%%
+%%      Equivalent to gen_pnet:drain/2.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec drain(Name :: name(), MaxSteps :: non_neg_integer()) ->
+          {ok, [#{atom() => [term()]}]} | {error, limit}.
+
+drain(Name, MaxSteps) when is_integer(MaxSteps), MaxSteps >= 0 ->
+    gen_server:call(Name, {drain, MaxSteps, []}).
+
 
 %%====================================================================
 %% Net state accessor functions (forwarded from gen_pnet)
@@ -657,6 +699,70 @@ handle_call(sync, _From, WrapperState = #wrapper_state{net_state = NetState}) ->
     %% The caller can check if the expected state is reached
     #net_state{marking = Marking} = NetState,
     {reply, {ok, Marking}, WrapperState};
+
+handle_call({inject, ProduceMap}, _From,
+            WrapperState = #wrapper_state{net_mod = NetMod, net_state = NetState}) ->
+    try
+        NetState1 = handle_trigger(ProduceMap, NetState, NetMod),
+        Receipt = ProduceMap,
+        continue(self()),
+        {reply, {ok, Receipt}, WrapperState#wrapper_state{net_state = NetState1}}
+    catch
+        _:Reason ->
+            {reply, {error, Reason}, WrapperState}
+    end;
+
+handle_call(step, _From,
+            WrapperState = #wrapper_state{
+                              fire_timeout = FireTimeout,
+                              net_state = NetState0
+                             }) ->
+    case progress(NetState0, FireTimeout) of
+        abort ->
+            {reply, abort, WrapperState};
+        {delta, Mode, Pm, NewUsrInfo} ->
+            %% Extract receipt from delta
+            Receipt = Pm,
+            %% Update net state
+            NetState1 = cns(Mode, NetState0),
+            NetState2 = case NewUsrInfo of
+                undefined -> NetState1;
+                _ -> NetState1#net_state{usr_info = NewUsrInfo}
+            end,
+            NetMod = WrapperState#wrapper_state.net_mod,
+            NetState3 = handle_trigger(Pm, NetState2, NetMod),
+            continue(self()),
+            {reply, {ok, Receipt}, WrapperState#wrapper_state{net_state = NetState3}};
+        {error, Reason, NetState1} ->
+            {reply, {error, Reason}, WrapperState#wrapper_state{net_state = NetState1}}
+    end;
+
+handle_call({drain, MaxSteps, _Acc}, _From, WrapperState) when MaxSteps =< 0 ->
+    {reply, {error, limit}, WrapperState};
+
+handle_call({drain, MaxSteps, Acc}, _From,
+            WrapperState = #wrapper_state{
+                              fire_timeout = FireTimeout,
+                              net_state = NetState0
+                             }) ->
+    case progress(NetState0, FireTimeout) of
+        abort ->
+            {reply, {ok, lists:reverse(Acc)}, WrapperState};
+        {delta, Mode, Pm, NewUsrInfo} ->
+            Receipt = Pm,
+            NetState1 = cns(Mode, NetState0),
+            NetState2 = case NewUsrInfo of
+                undefined -> NetState1;
+                _ -> NetState1#net_state{usr_info = NewUsrInfo}
+            end,
+            NetMod = WrapperState#wrapper_state.net_mod,
+            NetState3 = handle_trigger(Pm, NetState2, NetMod),
+            continue(self()),
+            WrapperState1 = WrapperState#wrapper_state{net_state = NetState3},
+            handle_call({drain, MaxSteps - 1, [Receipt | Acc]}, _From, WrapperState1);
+        {error, Reason, NetState1} ->
+            {reply, {error, Reason}, WrapperState#wrapper_state{net_state = NetState1}}
+    end;
 
 handle_call(_Request, _From, WrapperState) ->
     {reply, {error, bad_msg}, WrapperState}.

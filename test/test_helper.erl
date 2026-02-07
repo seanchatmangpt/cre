@@ -25,21 +25,4 @@ cleanup(_) ->
 %% the dependency's version. Call before starting cre.
 -spec ensure_cre_gen_pnet_loaded() -> ok.
 ensure_cre_gen_pnet_loaded() ->
-    case code:lib_dir(cre) of
-        {error, _} ->
-            ok;
-        LibDir ->
-            CreEbin = filename:join(LibDir, "ebin"),
-            BeamPath = filename:join(CreEbin, "gen_pnet.beam"),
-            case filelib:is_file(BeamPath) of
-                true ->
-                    code:add_patha(CreEbin),
-                    _ = code:purge(gen_pnet),
-                    case code:load_file(gen_pnet) of
-                        {module, gen_pnet} -> ok;
-                        {error, _} -> ok
-                    end;
-                false ->
-                    ok
-            end
-    end.
+    cre:ensure_cre_gen_pnet_loaded().

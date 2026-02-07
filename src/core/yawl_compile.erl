@@ -1,6 +1,12 @@
 %% -*- erlang -*-
 %%%% @doc YAWL to pnet_net compiler.
 %%
+%% **Joe Armstrong Design: Pure Helper Module (Stateless)**
+%%
+%% This module provides pure functional code generation. No state is maintained -
+%% all compilation functions are stateless transformations from YAWL specs to
+%% Erlang module source code.
+%%
 %% This module compiles YAWL 2.1/2.2 specifications into gen_pnet compatible
 %% Petri net modules. Each YAWL decomposition becomes a standalone Erlang
 %% module implementing the gen_pnet behavior.
@@ -223,9 +229,73 @@ compile(Spec, Options) when is_tuple(Spec), element(1, Spec) =:= yawl_spec ->
         throw:{compile_error, Reason} -> {error, Reason};
         _:Reason:Stack -> {error, {compile_exception, Reason, Stack}}
     end;
-
+compile(Spec, Options) when is_tuple(Spec), element(1, Spec) =:= yawl_yaml_spec ->
+    compile_yaml_spec(Spec, Options);
 compile(_Spec, _Options) ->
     {error, invalid_spec}.
+
+%% Compile YAML-based YAWL spec (new implementation)
+compile_yaml_spec(Spec, Options) ->
+    SpecId = wf_yaml_spec:id(Spec),
+    Nets = wf_yaml_spec:nets(Spec),
+    PatternInstances = wf_yaml_spec:pattern_instances(Spec),
+    Context = #{spec => Spec},
+
+    %% Build net infos with per-net pattern expansion
+    NetInfos = build_yaml_net_infos(Spec, Nets, PatternInstances, Context),
+    
+    try
+        CompileOpts = normalize_options(Options),
+        
+        Modules = maps:fold(fun(NetId, NetInfo, Acc) ->
+            case generate_module(NetId, NetInfo, CompileOpts) of
+                {ok, ModuleCode} ->
+                    Acc#{NetId => ModuleCode};
+                {error, Reason} ->
+                    throw({module_generation_error, NetId, Reason})
+            end
+        end, #{}, NetInfos),
+        
+        {Places, Transitions} = extract_places_and_transitions(Modules, NetInfos),
+        
+        Compiled = #{
+            spec_id => SpecId,
+            modules => Modules,
+            places => Places,
+            transitions => Transitions,
+            net_info => NetInfos
+        },
+        
+        {ok, Compiled}
+    catch
+        throw:{compile_error, Reason} -> {error, Reason};
+        _:Reason:Stack -> {error, {compile_exception, Reason, Stack}}
+    end.
+
+%% Build net infos from YAML spec with per-net pattern expansion.
+build_yaml_net_infos(Spec, Nets, PatternInstances, Context) ->
+    lists:foldl(fun(NetId, Acc) ->
+        Tasks = wf_yaml_spec:tasks(Spec, NetId),
+        Expanded = yawl_pattern_expander:expand_patterns_for_net(PatternInstances, NetId, Context),
+        InputCond = wf_yaml_spec:net_input_condition(Spec, NetId),
+        OutputCond = wf_yaml_spec:net_output_condition(Spec, NetId),
+        NetInfo = #{
+            id => NetId,
+            spec_id => wf_yaml_spec:id(Spec),
+            is_root => (NetId =:= wf_yaml_spec:root_net(Spec)),
+            tasks => Tasks,
+            places => maps:get(places, Expanded, []),
+            transitions => maps:get(transitions, Expanded, []),
+            preset => maps:get(preset, Expanded, #{}),
+            postset => maps:get(postset, Expanded, #{}),
+            flows => maps:get(flows, Expanded, []),
+            split_types => #{},
+            join_types => #{},
+            input_condition => InputCond,
+            output_condition => OutputCond
+        },
+        Acc#{NetId => NetInfo}
+    end, #{}, Nets).
 
 
 %%--------------------------------------------------------------------

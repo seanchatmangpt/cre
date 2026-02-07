@@ -1,0 +1,109 @@
+@startuml CRE C4 Level 1 - Container Diagram (gen_yawl + Z.AI)
+
+!theme plain
+skinparam {
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+}
+
+title CRE YAWL Workflow Engine - C4 Level 1 (gen_yawl + Z.AI)
+
+legend right
+  <b>Architecture:</b> wf_engine is the API layer.
+  wf_engine is supposed to use gen_yawl internally.
+  Participants use wf_engine; Z.AI for decisions.
+endlegend
+
+rectangle "CRE System" as creSystem #EEF2FF {
+
+  rectangle "Specification Pipeline" as specPipeline #E8F4FD {
+    <b>Specification Pipeline</b>
+    ==
+    wf_spec, wf_yaml_spec
+    yawl_validate, yawl_compile
+    yawl_pattern_registry
+  }
+
+  rectangle "Workflow Runtime" as workflowRuntime #D4EDDA {
+    <b>wf_engine</b> (API layer)
+    ==
+    worklist, allocate, complete
+    case_state, start_case
+    ==
+    <b>Uses gen_yawl internally</b>
+    (currently wf_engine does not;
+     integration needed)
+  }
+
+  rectangle "43 Pattern Modules" as patternModules #E8F4FD {
+    <b>Pattern Modules</b>
+    ==
+    src/patterns/*.erl
+    All -behaviour(gen_yawl)
+    ==
+    P1-P43 via yawl_pattern_registry
+  }
+
+  rectangle "Simulation Orchestrator" as simOrch #E8F4FD {
+    <b>Simulation Orchestrator</b>
+    ==
+    agi_symposium_simulator
+    agi_symposium_participants
+    ==
+    Uses wf_engine API
+    Calls Z.AI for human tasks
+    wf_engine:complete for completion
+  }
+
+  rectangle "CRE Master" as creMaster #E8F4FD {
+    <b>CRE Master</b>
+    ==
+    Worker pool, task distribution
+  }
+
+  rectangle "HTTP Interface" as httpInterface #E8F4FD {
+    <b>HTTP Interface</b>
+    ==
+    Cowboy REST/JSON
+  }
+
+  rectangle "Persistence" as persistence #E8F4FD {
+    <b>Persistence</b>
+    ==
+    yawl_persistence, XES
+  }
+}
+
+rectangle "Z.AI Chat API" as zai #FFF2CC
+rectangle "YAWL Client" as yawlClient #FFF2CC
+rectangle "External Apps" as extApps #FFF2CC
+
+specPipeline -down-> workflowRuntime : Compiled\nmodules
+patternModules -down-> workflowRuntime : gen_yawl\nbehaviours
+workflowRuntime -down-> simOrch : worklist\ncase_state
+simOrch -right-> zai : chat_json\nhuman decisions
+simOrch -down-> workflowRuntime : wf_engine:complete
+workflowRuntime -down-> creMaster : Task\nrequests
+workflowRuntime -down-> persistence : Checkpoints
+yawlClient -down-> httpInterface : API
+httpInterface -down-> workflowRuntime : Start\nExecute
+
+note bottom of workflowRuntime
+  <b>Intended:</b>
+  wf_engine wraps gen_yawl.
+  Spec from yawl_compile -> gen_yawl module.
+  wf_engine:start_case -> gen_yawl:start_link
+  wf_engine:complete -> gen_yawl:inject
+  Currently wf_engine has own impl; needs integration.
+end note
+
+note bottom of simOrch
+  <b>Participant Flow:</b>
+  1. wf_engine:worklist (per role)
+  2. zai_client:chat_json(role, prompt)
+  3. wf_engine:complete(WiId, User, Data)
+  4. wf_engine drives gen_yawl underneath
+end note
+
+@enduml

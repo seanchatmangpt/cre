@@ -1,0 +1,64 @@
+@startuml CRE - Omega Simulation with Z.AI (gen_yawl Path)
+
+title Omega Simulation Execution - gen_yawl + Z.AI
+
+actor Operator
+participant "run_omega_with_zai" as Script
+participant "wf_yawl_executor" as WfExec
+participant "yawl_execution" as YawlExec
+participant "gen_yawl" as GenYawl
+participant "Compiled Omega Net" as NetMod
+participant "Participant Agents" as Participants
+participant "zai_client" as Zai
+participant "Z.AI API" as ZaiApi
+
+Operator -> Script: run_omega_with_zai.escript
+Script -> Script: ZAI_API_KEY check
+Script -> WfExec: load_workflow_from_yaml(omega.yaml)
+WfExec -> WfExec: wf_yaml_spec:from_yaml_file
+WfExec -> WfExec: yawl_compile:compile
+WfExec -> WfExec: ensure_modules_loaded
+WfExec <-- WfExec: Executor
+
+Script -> WfExec: start_workflow(Executor, #{})
+WfExec -> YawlExec: start_link(NetMod, InitData)
+YawlExec -> GenYawl: gen_yawl:start_link(NetMod, InitData, [])
+note right: NOT gen_pnet
+GenYawl -> NetMod: init, place_lst, trsn_lst
+GenYawl <-- YawlExec: {ok, Pid}
+WfExec <-- Script: {ok, Pid, CaseId}
+
+loop Until completed
+    Script -> WfExec: execute_step(Pid, N)
+    WfExec -> YawlExec: step(Pid) / drain(Pid, N)
+    YawlExec -> GenYawl: gen_yawl:call(Pid, step)
+    GenYawl -> NetMod: preset, is_enabled, fire
+    alt Quiescent (human task waiting)
+        GenYawl <-- YawlExec: abort
+        YawlExec <-- WfExec: abort
+        WfExec <-- Script: abort
+
+        Script -> Participants: run_participants(Pid, State)
+        Participants -> Participants: get_workflow_state(Pid)
+        Participants -> Participants: find pending human tasks
+        loop For each human task
+            Participants -> Zai: chat_json(Messages, Opts)
+            Zai -> ZaiApi: POST /chat/completions
+            ZaiApi --> Zai: JSON response
+            Zai --> Participants: {ok, #{decision => accept}}
+            Participants -> YawlExec: inject_token(Pid, Place, Token)
+            YawlExec -> GenYawl: gen_yawl:inject(Pid, #{Place => [Token]})
+            GenYawl -> GenYawl: update marking
+        end
+    else Transitions enabled
+        NetMod --> GenYawl: {produce, Map}
+        GenYawl <-- YawlExec: Receipt
+        YawlExec <-- WfExec: {ok, Receipts}
+        WfExec <-- Script: {ok, Receipts}
+    end
+end
+
+Script -> Script: io:format results
+Script --> Operator: Done
+
+@enduml

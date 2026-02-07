@@ -1213,9 +1213,9 @@ complete_workitem(#wf_case{work_items = WIs, marking = Marking, data = CaseData}
     %% Create completion receipt
     BeforeHash = pnet_marking:hash(Marking),
 
-    %% Fire the transition for this task
+    %% Fire the transition for this task (use completion_produce when available)
     Spec = State#engine_state.spec,
-    ProduceMap = fire_transition(Task, Data, Spec),
+    ProduceMap = fire_transition(Task, Data, Spec, true),
 
     %% Update marking
     Marking1 = apply_produce_map(Marking, ProduceMap),
@@ -1450,12 +1450,19 @@ fire_enabled_transition(#wf_case{marking = Marking, data = Data} = Case, Trsn, D
 %% @end
 %%--------------------------------------------------------------------
 -spec fire_transition(atom(), map(), map()) -> pnet_types:produce_map().
-
 fire_transition(Trsn, Data, Spec) ->
+    fire_transition(Trsn, Data, Spec, false).
+
+-spec fire_transition(atom(), map(), map(), boolean()) -> pnet_types:produce_map().
+fire_transition(Trsn, _Data, Spec, ForCompletion) ->
     Transitions = maps:get(transitions, Spec, #{}),
     case maps:get(Trsn, Transitions, undefined) of
-        undefined -> #{};
-        Def -> maps:get(produce, Def, #{})
+        undefined ->
+            #{};
+        Def when ForCompletion ->
+            maps:get(completion_produce, Def, maps:get(produce, Def, #{}));
+        Def ->
+            maps:get(produce, Def, #{})
     end.
 
 %%--------------------------------------------------------------------

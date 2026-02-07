@@ -267,7 +267,7 @@ stop(Name) ->
           {ok, produce_map()} | {error, term()}.
 
 inject_input(Name, ProduceMap) when is_map(ProduceMap) ->
-    try gen_pnet:inject(Name, ProduceMap) of
+    try gen_yawl:inject(Name, ProduceMap) of
         Result -> Result
     catch
         exit:{noproc, _} -> {error, no_process};
@@ -299,7 +299,7 @@ inject_input(Name, ProduceMap) when is_map(ProduceMap) ->
 -spec execute_step(Name :: name()) -> {ok, receipt()} | abort | {error, term()}.
 
 execute_step(Name) ->
-    try gen_pnet:step(Name) of
+    try gen_yawl:step(Name) of
         abort -> abort;
         {ok, Receipt} -> {ok, Receipt}
     catch
@@ -337,7 +337,7 @@ execute_step(Name) ->
           {ok, [receipt()]} | {error, term()}.
 
 drain_workflow(Name, MaxSteps) when is_integer(MaxSteps), MaxSteps >= 0 ->
-    try gen_pnet:drain(Name, MaxSteps) of
+    try gen_yawl:drain(Name, MaxSteps) of
         {ok, Receipts} -> {ok, Receipts};
         {error, limit} -> {error, limit}
     catch

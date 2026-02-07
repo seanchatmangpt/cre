@@ -48,6 +48,7 @@
 -export([start/2, stop/1]).
 -export([main/1]).
 -export([doctest_test/0]).
+-export([ensure_cre_gen_pnet_loaded/0]).
 
 %%====================================================================
 %% Includes
@@ -180,6 +181,8 @@ Starting CRE: vsn="0.1.10" node=nonode@nohost port=4142
 -spec start(Type :: _, Args :: _) -> {ok, pid()} | {error, _}.
 
 start(_Type, _Args) ->
+    %% Load cre's gen_pnet (inject/step/drain) before dep's version
+    ensure_cre_gen_pnet_loaded(),
 
     %% Initialize persistent_term configuration (OTP 21+ optimization)
     ok = cre_config:init(),
@@ -275,6 +278,28 @@ main(_Args) ->
 %%====================================================================
 %% Internal functions
 %%====================================================================
+
+%% @doc Load cre's gen_pnet (extended with inject/step/drain) so it overrides
+%% the dependency's version. Call before starting any process that uses gen_pnet.
+ensure_cre_gen_pnet_loaded() ->
+    case code:lib_dir(cre) of
+        {error, _} ->
+            ok;
+        LibDir ->
+            CreEbin = filename:join(LibDir, "ebin"),
+            BeamPath = filename:join(CreEbin, "gen_pnet.beam"),
+            case filelib:is_file(BeamPath) of
+                true ->
+                    code:add_patha(CreEbin),
+                    _ = code:purge(gen_pnet),
+                    case code:load_file(gen_pnet) of
+                        {module, gen_pnet} -> ok;
+                        {error, _} -> ok
+                    end;
+                false ->
+                    ok
+            end
+    end.
 
 % start_cre_webservice/1
 % @doc Attempts to start the CRE web service under the given port.

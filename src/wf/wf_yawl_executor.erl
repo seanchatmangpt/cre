@@ -109,8 +109,9 @@
 %%====================================================================
 
 %% Workflow loading and compilation
--export([load_workflow/1, load_workflow_from_xml/1]).
+-export([load_workflow/1, load_workflow_from_xml/1, load_workflow_from_yaml/1]).
 -export([compile_workflow/1, compile_workflow/2]).
+-export([ensure_modules_loaded/1]).
 
 %% Workflow lifecycle
 -export([start_workflow/2, start_workflow/3]).
@@ -127,7 +128,7 @@
 -export([execute_workflow/2, execute_workflow/3]).
 
 %% Executor info
--export([executor_info/1]).
+-export([executor_info/1, get_root_module/1]).
 
 %%====================================================================
 %% Includes
@@ -303,6 +304,111 @@ load_workflow_from_xml(Xml) when is_binary(Xml) ->
     end.
 
 %%--------------------------------------------------------------------
+%% @doc Loads a YAWL workflow from a YAML file.
+%%
+%% Parses the YAML 0.2 specification and returns an executor.
+%%
+%% @param FilePath Path to YAML specification file
+%% @return {ok, Executor} | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec load_workflow_from_yaml(FilePath :: file:filename_all()) ->
+          {ok, executor()} | {error, term()}.
+
+load_workflow_from_yaml(FilePath) when is_list(FilePath); is_binary(FilePath) ->
+    case wf_yaml_spec:from_yaml_file(FilePath) of
+        {ok, Spec} ->
+            load_workflow_from_yaml_spec(Spec);
+        {error, Reason} ->
+            {error, {load_error, Reason}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Ensures compiled modules from an executor are loaded into the VM.
+%%
+%% Writes generated module source to a temp directory, compiles, and loads.
+%% Call after compile_workflow when the executor was created from compiled
+%% source (e.g. YAML) that wasn't written to disk.
+%%
+%% @param Executor Executor from compile_workflow/1 or compile_workflow/2
+%% @return {ok, Executor} | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec ensure_modules_loaded(Executor :: executor()) -> {ok, executor()} | {error, term()}.
+
+ensure_modules_loaded(#yawl_executor{compiled = Compiled} = Executor) ->
+    Modules = maps:get(modules, Compiled, #{}),
+    TmpDir = filename:join(os:getenv("TMPDIR", "/tmp"), "cre_yawl_" ++ integer_to_list(erlang:unique_integer())),
+    case file:make_dir(TmpDir) of
+        ok ->
+            try
+                load_compiled_modules(Modules, TmpDir),
+                {ok, Executor}
+            catch
+                throw:Reason ->
+                    {error, Reason}
+            after
+                cleanup_tmp_dir(TmpDir)
+            end;
+        {error, Reason} ->
+            {error, {mkdir_failed, Reason}}
+    end.
+
+%% @private
+load_compiled_modules(Modules, TmpDir) ->
+    code:add_patha(TmpDir),
+    maps:foreach(fun(_NetId, ModuleCode) when is_binary(ModuleCode) ->
+        ModuleName = extract_module_name_from_source(ModuleCode),
+        FilePath = filename:join(TmpDir, atom_to_list(ModuleName) ++ ".erl"),
+        case file:write_file(FilePath, ModuleCode) of
+            ok ->
+                case compile:file(FilePath, [binary, return_errors, {outdir, TmpDir}]) of
+                    {ok, CompiledModule, Binary} ->
+                        case code:load_binary(CompiledModule, FilePath, Binary) of
+                            {module, _} -> ok;
+                            {error, Reason} -> throw({load_failed, CompiledModule, Reason})
+                        end;
+                    {error, Errors} ->
+                        throw({compile_failed, ModuleName, Errors})
+                end;
+            {error, Reason} ->
+                throw({write_failed, FilePath, Reason})
+        end
+    end, Modules).
+
+%% @private
+%% Extracts -module(Name). from Erlang source binary.
+extract_module_name_from_source(ModuleCode) when is_binary(ModuleCode) ->
+    case binary:match(ModuleCode, <<"-module(">>) of
+        {Start, _} ->
+            Rest = binary:part(ModuleCode, Start + 8, byte_size(ModuleCode) - Start - 8),
+            case binary:split(Rest, <<").">>) of
+                [NameBin | _] ->
+                    NameStr = binary_to_list(NameBin),
+                    list_to_atom(string:trim(NameStr));
+                _ ->
+                    %% Fallback
+                    list_to_atom("yawl_unknown")
+            end;
+        nomatch ->
+            list_to_atom("yawl_unknown")
+    end.
+
+%% @private
+cleanup_tmp_dir(Dir) ->
+    case file:list_dir(Dir) of
+        {ok, Files} ->
+            lists:foreach(fun(F) ->
+                file:delete(filename:join(Dir, F))
+            end, Files),
+            file:del_dir(Dir);
+        _ ->
+            ok
+    end.
+
+%%--------------------------------------------------------------------
 %% @doc Compiles a loaded workflow specification.
 %%
 %% Takes a YAWL spec and generates gen_pnet modules. Returns an
@@ -355,44 +461,48 @@ compile_workflow(Spec) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec compile_workflow(Spec :: wf_spec:yawl_spec(), Options :: map()) ->
+-spec compile_workflow(Spec :: wf_spec:yawl_spec() | wf_yaml_spec:yawl_yaml_spec(), Options :: map()) ->
           {ok, executor()} | {error, term()}.
 
-compile_workflow(Spec, Options) when is_tuple(Spec), element(1, Spec) =:= yawl_spec;
+compile_workflow(Spec, Options) when is_tuple(Spec), element(1, Spec) =:= yawl_spec,
                                      is_map(Options) ->
     case wf_spec:validate(Spec) of
         ok ->
-            case yawl_compile:compile(Spec, Options) of
-                {ok, Compiled} ->
-                    %% Extract root module
-                    RootNet = wf_spec:root_net(Spec),
-                    RootModule = list_to_atom(
-                        binary_to_list(
-                            case maps:get(module_prefix, Options, <<"yawl_">>) of
-                                Prefix -> <<Prefix/binary, RootNet/binary>>
-                            end
-                        )
-                    ),
+            do_compile_workflow(Spec, Options, fun wf_spec:root_net/1);
+        {error, Errors} ->
+            {error, {validation_error, Errors}}
+    end;
 
-                    %% Get all compiled modules
-                    Modules = maps:keys(maps:get(modules, Compiled, #{})),
-
-                    Executor = #yawl_executor{
-                        spec = Spec,
-                        compiled = Compiled,
-                        root_module = RootModule,
-                        modules = [RootModule | Modules]
-                    },
-                    {ok, Executor};
-                {error, Reason} ->
-                    {error, {compile_error, Reason}}
-            end;
+compile_workflow(Spec, Options) when is_tuple(Spec), element(1, Spec) =:= yawl_yaml_spec,
+                                     is_map(Options) ->
+    case wf_yaml_spec:validate(Spec) of
+        ok ->
+            do_compile_workflow(Spec, Options, fun wf_yaml_spec:root_net/1);
         {error, Errors} ->
             {error, {validation_error, Errors}}
     end;
 
 compile_workflow(_Spec, _Options) ->
     {error, invalid_spec}.
+
+%% @private
+do_compile_workflow(Spec, Options, RootNetFun) ->
+    case yawl_compile:compile(Spec, Options) of
+        {ok, Compiled} ->
+            RootNet = RootNetFun(Spec),
+            Prefix = maps:get(module_prefix, Options, <<"yawl_">>),
+            RootModule = list_to_atom(binary_to_list(<<Prefix/binary, RootNet/binary>>)),
+            Modules = maps:keys(maps:get(modules, Compiled, #{})),
+            Executor = #yawl_executor{
+                spec = Spec,
+                compiled = Compiled,
+                root_module = RootModule,
+                modules = [RootModule | Modules]
+            },
+            {ok, Executor};
+        {error, Reason} ->
+            {error, {compile_error, Reason}}
+    end.
 
 %%====================================================================
 %% API Functions - Workflow Lifecycle
@@ -427,7 +537,7 @@ start_workflow(#yawl_executor{root_module = RootMod}, InitialData) when is_map(I
     CaseId = generate_case_id(),
     NetArg = #{initial_data => InitialData, case_id => CaseId},
 
-    case gen_pnet:start_link(RootMod, NetArg, []) of
+    case gen_yawl:start_link(RootMod, NetArg, []) of
         {ok, Pid} ->
             {ok, Pid, CaseId};
         {error, Reason} ->
@@ -460,7 +570,7 @@ start_workflow(#yawl_executor{root_module = RootMod}, InitialData) when is_map(I
 %%--------------------------------------------------------------------
 -spec start_workflow(Executor :: executor(),
                      InitialData :: initial_data(),
-                     ServerName :: gen_pnet:server_name()) ->
+                     ServerName :: {local, atom()} | {global, atom()} | {via, atom(), term()}) ->
           {ok, pid(), case_id()} | {error, term()}.
 
 start_workflow(#yawl_executor{root_module = RootMod}, InitialData, ServerName)
@@ -468,7 +578,7 @@ start_workflow(#yawl_executor{root_module = RootMod}, InitialData, ServerName)
     CaseId = generate_case_id(),
     NetArg = #{initial_data => InitialData, case_id => CaseId},
 
-    case gen_pnet:start_link(ServerName, RootMod, NetArg, []) of
+    case gen_yawl:start_link(ServerName, RootMod, NetArg, []) of
         {ok, Pid} ->
             {ok, Pid, CaseId};
         {error, Reason} ->
@@ -495,7 +605,7 @@ start_workflow(#yawl_executor{root_module = RootMod}, InitialData, ServerName)
 
 stop_workflow(Pid) when is_pid(Pid) ->
     try
-        gen_pnet:stop(Pid),
+        gen_yawl:stop(Pid),
         ok
     catch
         exit:{noproc, _} -> {error, no_process};
@@ -530,7 +640,7 @@ stop_workflow(Pid) when is_pid(Pid) ->
 
 execute_step(Pid) when is_pid(Pid) ->
     try
-        case gen_pnet:step(Pid) of
+        case gen_yawl:step(Pid) of
             abort -> abort;
             {ok, Receipt} ->
                 %% Normalize receipt format
@@ -572,7 +682,7 @@ execute_step(Pid) when is_pid(Pid) ->
 
 execute_step(Pid, MaxSteps) when is_pid(Pid), is_integer(MaxSteps), MaxSteps >= 0 ->
     try
-        case gen_pnet:drain(Pid, MaxSteps) of
+        case gen_yawl:drain(Pid, MaxSteps) of
             {ok, Receipts} ->
                 Normalized = [normalize_receipt(R) || R <- Receipts],
                 {ok, Normalized};
@@ -611,7 +721,7 @@ execute_step(Pid, MaxSteps) when is_pid(Pid), is_integer(MaxSteps), MaxSteps >= 
 
 inject_token(Pid, Place, Token) when is_pid(Pid), is_atom(Place) ->
     try
-        case gen_pnet:inject(Pid, #{Place => [Token]}) of
+        case gen_yawl:inject(Pid, #{Place => [Token]}) of
             {ok, _} ->
                 %% Return receipt of injection
                 {ok, #{place => Place, token => Token}};
@@ -653,13 +763,13 @@ inject_token(Pid, Place, Token) when is_pid(Pid), is_atom(Place) ->
 
 get_workflow_state(Pid) when is_pid(Pid) ->
     try
-        Marking = gen_pnet:marking(Pid),
+        Marking = gen_yawl:marking(Pid),
 
         %% Determine status from marking
         Status = determine_status(Marking),
 
         %% Extract case_id from usr_info
-        UsrInfo = gen_pnet:usr_info(Pid),
+        UsrInfo = gen_yawl:usr_info(Pid),
         CaseId = maps:get(case_id, UsrInfo, <<"unknown">>),
         SpecId = maps:get(spec_id, UsrInfo, <<"unknown">>),
 
@@ -856,6 +966,9 @@ execute_workflow(FilePath, InitialData, Options)
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec get_root_module(Executor :: executor()) -> atom().
+get_root_module(#yawl_executor{root_module = RootMod}) -> RootMod.
+
 -spec executor_info(Executor :: executor()) -> map().
 
 executor_info(#yawl_executor{spec = Spec, compiled = Compiled,
@@ -880,6 +993,20 @@ executor_info(#yawl_executor{spec = Spec, compiled = Compiled,
 %% Loads workflow from a parsed spec
 load_workflow_from_spec(Spec) ->
     case wf_spec:validate(Spec) of
+        ok ->
+            case compile_workflow(Spec) of
+                {ok, Executor} ->
+                    {ok, Executor};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        {error, Errors} ->
+            {error, {validation_error, Errors}}
+    end.
+
+%% @private
+load_workflow_from_yaml_spec(Spec) ->
+    case wf_yaml_spec:validate(Spec) of
         ok ->
             case compile_workflow(Spec) of
                 {ok, Executor} ->

@@ -1,0 +1,468 @@
+yawl_yaml_version: "0.2"
+specificationSet:
+  yawl_schema_version: "2.1"
+  uri: "agi_symposium_omega"
+  metaData:
+    title: "AGI Symposium Ω"
+    version: "0.2"
+    creator: "BEAM workflow swarm"
+    persistent: false
+    identifier: "UID_AGI_SYMPOSIUM_OMEGA_0002"
+
+  rootNet: Symposium
+
+  roles:
+    - Chair
+    - Secretary
+    - ProgramChair
+    - TrackChair
+    - AreaChair
+    - Reviewer
+    - EthicsChair
+    - ArtifactChair
+    - OpsLead
+    - VenueLead
+    - AVLead
+    - SafetyOfficer
+    - SponsorshipLead
+    - FinanceLead
+    - TravelGrantsLead
+    - PublicationsChair
+    - PressLead
+    - Speaker
+    - Attendee
+    - WorkshopChair
+
+  # ===========================================================================
+  # Nets (interacting, not linear)
+  # ===========================================================================
+  nets:
+
+    - id: Symposium
+      type: NetFacts
+      variables:
+        - {name: symposium_state, type: string, initial: "planning"}
+        - {name: publish_allowed, type: boolean, initial: false}
+        - {name: emergency_stop, type: boolean, initial: false}
+        - {name: press_mode, type: string, initial: "declass_only"}
+        - {name: attendance_estimate, type: long, initial: 800}
+        - {name: venue_selected, type: boolean, initial: false}
+        - {name: security_green, type: boolean, initial: false}
+        - {name: program_locked, type: boolean, initial: false}
+        - {name: incident_open, type: boolean, initial: false}
+        - {name: cfp_deadline_ms, type: long, initial: 0}
+        - {name: camera_ready, type: boolean, initial: false}
+        - {name: network_ready, type: boolean, initial: false}
+
+      nodes:
+        - {id: Start, kind: inputCondition}
+        - {id: End, kind: outputCondition, name: "symposium_done"}
+
+        # Thread hubs
+        - {id: SplitMegaThreads, kind: task, taskType: automated, name: "Split Program/Ops/Comms"}
+        - {id: MergeMegaThreads, kind: task, taskType: automated, name: "Merge Program/Ops/Comms"}
+
+        # Global gates
+        - {id: GoNoGo, kind: task, taskType: human, name: "Go/No-Go Council"}
+        - {id: OpenDoors, kind: task, taskType: automated, name: "Open Doors / Start Live"}
+        - {id: CloseSymposium, kind: task, taskType: human, name: "Close Symposium"}
+        - {id: PublishProceedings, kind: task, taskType: service, name: "Publish Proceedings"}
+        - {id: EmergencyShutdown, kind: task, taskType: automated, name: "Emergency Shutdown"}
+
+        # Dashboard fan-in (multiple merge sink)
+        - {id: UpdateDashboard, kind: task, taskType: service, name: "Update Public Dashboard"}
+
+      flows:
+        - {from: Start, to: SplitMegaThreads}
+        - {from: MergeMegaThreads, to: GoNoGo}
+        - {from: GoNoGo, to: OpenDoors}
+        - {from: OpenDoors, to: CloseSymposium}
+        - {from: CloseSymposium, to: PublishProceedings}
+        - {from: PublishProceedings, to: End}
+
+      subnets:
+        - {id: ProgramThread, entry: ProgramEntry, exit: ProgramExit}
+        - {id: OpsThread, entry: OpsEntry, exit: OpsExit}
+        - {id: CommsThread, entry: CommsEntry, exit: CommsExit}
+        - {id: IncidentThread, entry: IncidentEntry, exit: IncidentExit}
+        - {id: SatelliteSymposium, entry: SatEntry, exit: SatExit}
+
+      regions:
+        # Cancelling only the high-risk demo expo (not the entire symposium)
+        - {id: Region_HighRisk_Demos, cancel_region: true, description: "High-risk demo expo zone"}
+
+    # ---------------- Program Thread ----------------
+    - id: ProgramThread
+      type: NetFacts
+      nodes:
+        - {id: ProgramEntry, kind: condition}
+        - {id: CFP, kind: task, taskType: service, name: "Call for Papers"}
+        - {id: Submissions, kind: task, taskType: service, name: "Collect Submissions"}
+        - {id: DeskTriage, kind: task, taskType: human, name: "Desk Triage"}
+        - {id: AssignTracks, kind: task, taskType: automated, name: "Assign Tracks"}
+        - {id: ReviewCycle, kind: task, taskType: human, name: "Review Cycle"}
+        - {id: AuthorRebuttal, kind: task, taskType: human, name: "Author Rebuttal"}
+        - {id: MetaReview, kind: task, taskType: human, name: "Meta-Review"}
+        - {id: Decision, kind: task, taskType: human, name: "Decision"}
+        - {id: ProgramBuild, kind: task, taskType: human, name: "Program Build"}
+        - {id: MainHallMutex, kind: condition, name: "Main Hall Mutex"}
+        - {id: ProgramExit, kind: condition}
+
+    # ---------------- Ops Thread ----------------
+    - id: OpsThread
+      type: NetFacts
+      nodes:
+        - {id: OpsEntry, kind: condition}
+        - {id: VenueRace, kind: task, taskType: human, name: "Venue Contracting"}
+        - {id: SecurityClear, kind: task, taskType: human, name: "Security Clearance"}
+        - {id: AVPrep, kind: task, taskType: human, name: "A/V + Streaming Prep"}
+        - {id: NetworkPrep, kind: task, taskType: human, name: "Network Prep"}
+        - {id: Registration, kind: task, taskType: service, name: "Registration System"}
+        - {id: TravelGrants, kind: task, taskType: human, name: "Travel Grants"}
+        - {id: VisaLetters, kind: task, taskType: human, name: "Visa Letters"}
+        - {id: SpeakerOnboarding, kind: task, taskType: human, name: "Speaker Onboarding"}
+        - {id: OpsExit, kind: condition}
+
+    # ---------------- Comms Thread ----------------
+    - id: CommsThread
+      type: NetFacts
+      nodes:
+        - {id: CommsEntry, kind: condition}
+        - {id: PressBriefs, kind: task, taskType: service, name: "Press Briefs (Declass)"}
+        - {id: SocialUpdates, kind: task, taskType: service, name: "Social Updates"}
+        - {id: SponsorLiaison, kind: task, taskType: human, name: "Sponsor Liaison"}
+        - {id: CommsExit, kind: condition}
+
+    # ---------------- Incident Thread ----------------
+    - id: IncidentThread
+      type: NetFacts
+      nodes:
+        - {id: IncidentEntry, kind: condition}
+        - {id: IncidentIntake, kind: task, taskType: human, name: "Incident Intake"}
+        - {id: IncidentResponse, kind: task, taskType: human, name: "Incident Response Cell"}
+        - {id: IncidentComms, kind: task, taskType: service, name: "Incident Statement (Declass)"}
+        - {id: IncidentExit, kind: condition}
+
+    # ---------------- Satellite Symposium (recursion target) ----------------
+    - id: SatelliteSymposium
+      type: NetFacts
+      nodes:
+        - {id: SatEntry, kind: condition}
+        - {id: SatRun, kind: task, taskType: automated, name: "Run Satellite Symposium"}
+        - {id: SatExit, kind: condition}
+
+  # ===========================================================================
+  # Pattern Instances (ALL 43 USED + LABELED, placed where reality needs them)
+  # ===========================================================================
+  pattern_instances:
+
+    # P42 Thread Split — real symposium forks immediately into big workstreams
+    - {id: P42_split_megathreads, pattern: P42_ThreadSplit, net: Symposium,
+       split_task: SplitMegaThreads, branches: [ProgramThread, OpsThread, CommsThread, IncidentThread],
+       label: "P42 Thread Split: Program/Ops/Comms/Incident"}
+
+    # P41 Thread Merge — unify outcomes before Go/No-Go
+    - {id: P41_merge_megathreads, pattern: P41_ThreadMerge, net: Symposium,
+       merge_task: MergeMegaThreads, label: "P41 Thread Merge: consolidate readiness"}
+
+    # P2 Parallel Split — inside ProgramThread, split triage into lanes
+    - {id: P2_parallel_triage_lanes, pattern: P2_ParallelSplit, net: ProgramThread,
+       split_task: DeskTriage, branches: [ethics_lane, artifact_lane, topical_lane],
+       label: "P2 Parallel Split: ethics/artifact/topic lanes"}
+
+    # P3 Synchronization — Go/No-Go waits for readiness signals
+    - {id: P3_sync_gonogo, pattern: P3_Synchronization, net: Symposium,
+       join_task: GoNoGo, waits_for: [ProgramExit, OpsExit, CommsExit],
+       label: "P3 Sync: Go/No-Go waits program+ops+comms"}
+
+    # P1 Sequence — within each paper lifecycle (but not the whole symposium)
+    - {id: P1_seq_paper_lifecycle, pattern: P1_Sequence, net: ProgramThread,
+       from: CFP, to: ProgramBuild,
+       label: "P1 Sequence: per-paper lifecycle (CFP→Decision→ProgramBuild)"}
+
+    # P4 Exclusive Choice — decision per paper: accept/reject/revise
+    - {id: P4_choice_decision, pattern: P4_ExclusiveChoice, net: ProgramThread,
+       at: Decision, choices: [accept, reject, revise],
+       label: "P4 Exclusive Choice: accept vs reject vs revise"}
+
+    # P21 Structured Loop — revise & resubmit loop
+    - {id: P21_loop_revise, pattern: P21_StructuredLoop, net: ProgramThread,
+       entry: AuthorRebuttal, body: [ReviewCycle, MetaReview, Decision],
+       exit_condition: "accept||reject",
+       label: "P21 Structured Loop: rebuttal/review until accept or reject"}
+
+    # P10 Arbitrary Cycles — real exception routing (ethics, plagiarism, dual submission)
+    - {id: P10_arbitrary_rework, pattern: P10_ArbitraryCycles, net: ProgramThread,
+       nodes: [DeskTriage, AssignTracks, ReviewCycle, MetaReview],
+       label: "P10 Arbitrary Cycles: send paper back anywhere on exceptions"}
+
+    # P6 Multiple Choice — one submission can land in multiple tracks (alignment + systems)
+    - {id: P6_multi_track_assign, pattern: P6_MultipleChoice, net: ProgramThread,
+       at: AssignTracks, branches: [track_alignment, track_systems, track_cognition, track_safety],
+       label: "P6 Multiple Choice: multi-track assignment"}
+
+    # P7 Structured Synchronizing Merge — join only activated track branches
+    - {id: P7_struct_sync_merge_tracks, pattern: P7_StructuredSyncMerge, net: ProgramThread,
+       join: ReviewCycle, froms: [track_alignment, track_systems, track_cognition, track_safety],
+       label: "P7 Structured Sync Merge: join only activated tracks"}
+
+    # P5 Simple Merge — invited talks + accepted talks converge without waiting
+    - {id: P5_simple_merge_talk_types, pattern: P5_SimpleMerge, net: ProgramThread,
+       froms: [accept, invited_accept], to: ProgramBuild,
+       label: "P5 Simple Merge: invited and accepted converge"}
+
+    # P12 MI without Sync — blast CFP to many channels; don't block on stragglers
+    - {id: P12_mi_cfp_blast, pattern: P12_MI_NoSync, net: ProgramThread,
+       task: CFP, instances: 20,
+       label: "P12 MI no-sync: CFP broadcast to 20 channels"}
+
+    # P13 MI design-time — default 3 reviews
+    - {id: P13_mi_reviews3, pattern: P13_MI_DesignTime, net: ProgramThread,
+       task: ReviewCycle, instances: 3,
+       label: "P13 MI design-time: 3 reviews default"}
+
+    # P14 MI runtime-known — high-risk papers get N reviews decided at runtime
+    - {id: P14_mi_reviewsN_risk, pattern: P14_MI_RuntimeKnown, net: ProgramThread,
+       task: ReviewCycle, instances_expr: "risk_to_N",
+       label: "P14 MI runtime-known: N reviews based on risk"}
+
+    # P15 MI runtime-unknown — fact checks until satisfied (anti-hype + citation audit)
+    - {id: P15_mi_factcheck_until, pattern: P15_MI_RuntimeUnknown, net: ProgramThread,
+       task: fact_check, stop_condition: "confidence>=threshold",
+       label: "P15 MI runtime-unknown: spawn fact checks until threshold"}
+
+    # P34 Static Partial Join for MI — proceed after 3 of 5 reviews (fixed pool)
+    - {id: P34_static_partial_join_mi, pattern: P34_StaticPartialJoinMI, net: ProgramThread,
+       total_instances: 5, threshold: 3,
+       label: "P34 Static Partial Join MI: 3-of-5 reviews sufficient"}
+
+    # P35 Cancelling Partial Join for MI — cancel remaining reviewers after threshold
+    - {id: P35_cancel_partial_join_mi, pattern: P35_CancellingPartialJoinMI, net: ProgramThread,
+       total_instances: 5, threshold: 3,
+       label: "P35 Cancelling Partial Join MI: cancel remaining reviews"}
+
+    # P27 Complete MI Activity — early complete review stage if confidence achieved
+    - {id: P27_complete_mi_early, pattern: P27_CompleteMIActivity, net: ProgramThread,
+       mi_task: ReviewCycle, complete_condition: "reviews>=3 && confidence>=threshold",
+       label: "P27 Complete MI Activity: stop review stage early"}
+
+    # P26 Cancel MI Activity — withdraw paper cancels all pending review instances
+    - {id: P26_cancel_mi_on_withdraw, pattern: P26_CancelMIActivity, net: ProgramThread,
+       mi_task: ReviewCycle, cancel_event: paper_withdrawn,
+       label: "P26 Cancel MI Activity: withdrawal cancels reviewers"}
+
+    # P16 Deferred Choice — workshop slot assigned by first event (sponsor vs chair)
+    - {id: P16_deferred_workshop_slot, pattern: P16_DeferredChoice, net: CommsThread,
+       events: [sponsor_slot_confirmed, chair_fallback_slot],
+       label: "P16 Deferred Choice: workshop slot by first confirmation"}
+
+    # P17 Interleaved Parallel Routing — speaker onboarding fields one-at-a-time
+    - {id: P17_interleaved_onboarding, pattern: P17_InterleavedParallelRouting, net: OpsThread,
+       tasks: [bio, headshot, av_needs, travel_details, consent_forms],
+       label: "P17 Interleaved Parallel Routing: per-speaker onboarding edits"}
+
+    # P40 Interleaved Routing — policy checklist (must do all once, one-at-a-time)
+    - {id: P40_interleaved_policy_checklist, pattern: P40_InterleavedRouting, net: OpsThread,
+       tasks: [policy_coc, policy_accessibility, policy_safety, policy_recording],
+       label: "P40 Interleaved Routing: ops policy checklist"}
+
+    # P18 Milestone — early-bird registration ends at deadline milestone
+    - {id: P18_milestone_earlybird, pattern: P18_Milestone, net: OpsThread,
+       gate_task: Registration, milestone: earlybird_closed,
+       label: "P18 Milestone: early-bird window"}
+
+    # P23 Transient Trigger — fire alarm only matters while live
+    - {id: P23_transient_fire_alarm, pattern: P23_TransientTrigger, net: Symposium,
+       event: fire_alarm, enabled_only_in: OpenDoors,
+       label: "P23 Transient Trigger: alarm only during live state"}
+
+    # P24 Persistent Trigger — visa approval might arrive early; persist until consumed
+    - {id: P24_persistent_visa, pattern: P24_PersistentTrigger, net: OpsThread,
+       event: visa_approved, consumed_in: VisaLetters,
+       label: "P24 Persistent Trigger: visa approvals persist"}
+
+    # P29 Cancelling Discriminator — first venue contract wins, cancel others
+    - {id: P29_cancel_discriminator_venue, pattern: P29_CancellingDiscriminator, net: OpsThread,
+       race: [venue_a, venue_b, venue_c], cancel_rest: true,
+       label: "P29 Cancelling Discriminator: venue race"}
+
+    # P9 Discriminator — keynote slot: first confirmed keynote locks slot (others ignored)
+    - {id: P9_discriminator_keynote, pattern: P9_Discriminator, net: ProgramThread,
+       race: [keynote_a, keynote_b, keynote_c], winner_to: keynote_locked,
+       label: "P9 Discriminator: first keynote confirmation wins"}
+
+    # P28 Blocking Discriminator — first incident triggers response, blocks final statement until cleared
+    - {id: P28_blocking_discriminator_incident, pattern: P28_BlockingDiscriminator, net: IncidentThread,
+       trigger: IncidentIntake, blocks_until: [IncidentResponse, IncidentComms],
+       label: "P28 Blocking Discriminator: incident blocks final comms until handled"}
+
+    # P8 Multiple Merge — many independent updates drive dashboard outputs
+    - {id: P8_multiple_merge_updates, pattern: P8_MultipleMerge, net: Symposium,
+       froms: [ProgramBuild, Registration, PressBriefs, IncidentComms], to: UpdateDashboard,
+       label: "P8 Multiple Merge: dashboard update fan-in"}
+
+    # P37 Local Sync Merge — per-track wrap-up joins only local sessions
+    - {id: P37_local_sync_merge_trackwrap, pattern: P37_LocalSyncMerge, net: ProgramThread,
+       scope: track_local, join: track_wrapup,
+       label: "P37 Local Sync Merge: per-track wrap-up"}
+
+    # P38 General Sync Merge — global merge across unstructured live branches before close
+    - {id: P38_general_sync_merge_close, pattern: P38_GeneralSyncMerge, net: Symposium,
+       join: CloseSymposium,
+       label: "P38 General Sync Merge: close waits for active branches only"}
+
+    # P39 Critical Section — main hall scheduling mutex
+    - {id: P39_critical_section_mainhall, pattern: P39_CriticalSection, net: ProgramThread,
+       mutex: MainHallMutex, protected: main_hall_schedule,
+       label: "P39 Critical Section: main hall schedule mutex"}
+
+    # P30 Structured Partial Join (N-out-of-M) — 2 of 3 chairs approve schedule internally
+    - {id: P30_struct_partial_join_schedule, pattern: P30_StructuredPartialJoin, net: ProgramThread,
+       join: internal_schedule_ready, m: 3, n: 2,
+       label: "P30 Structured Partial Join: 2-of-3 chairs approve internal schedule"}
+
+    # P31 Blocking Partial Join — internal schedule after 2 approvals, public after all approvals
+    - {id: P31_blocking_partial_join_public, pattern: P31_BlockingPartialJoin, net: ProgramThread,
+       partial_out: internal_schedule_ready, final_out: public_schedule_published, m: 3, n: 2,
+       label: "P31 Blocking Partial Join: internal vs public schedule gate"}
+
+    # P32 Cancelling Partial Join — demo safety review: 2-of-3 pass cancels remaining
+    - {id: P32_cancel_partial_join_demo_safety, pattern: P32_CancellingPartialJoin, net: Symposium,
+       m: 3, n: 2, cancel_remaining: true,
+       label: "P32 Cancelling Partial Join: demo safety 2-of-3 cancels remaining"}
+
+    # P33 Generalized AND-Join — rework paths after arbitrary cycles must rejoin active branches
+    - {id: P33_generalized_and_join_rework, pattern: P33_GeneralizedANDJoin, net: ProgramThread,
+       join: rework_join,
+       label: "P33 Generalized AND-Join: rework join across active branches"}
+
+    # P36 Dynamic Partial Join for MI — feedback needed depends on attendance
+    - {id: P36_dynamic_partial_join_feedback, pattern: P36_DynamicPartialJoinMI, net: Symposium,
+       threshold_expr: "ceil(attendance_estimate*0.08)",
+       label: "P36 Dynamic Partial Join MI: feedback threshold from attendance"}
+
+    # P11 Implicit Termination — micro-workshops end when empty
+    - {id: P11_implicit_termination_microevents, pattern: P11_ImplicitTermination, net: Symposium,
+       scope: micro_workshops,
+       label: "P11 Implicit Termination: micro-workshops end naturally"}
+
+    # P22 Recursion — satellite symposium runs same pipeline and reports back
+    - {id: P22_recursion_satellite, pattern: P22_Recursion, net: Symposium,
+       call: SatelliteSymposium,
+       label: "P22 Recursion: satellite symposium"}
+
+    # P25 Cancel Region — cancel the high-risk demo zone only
+    - {id: P25_cancel_region_highrisk, pattern: P25_CancelRegion, net: Symposium,
+       region: Region_HighRisk_Demos, cancel_event: safety_red_flag,
+       label: "P25 Cancel Region: high-risk demos cancelled, rest continues"}
+
+    # P19 Cancel Activity — cancel one talk slot if speaker drops
+    - {id: P19_cancel_activity_speaker_drop, pattern: P19_CancelActivity, net: ProgramThread,
+       target: talk_slot_prep, cancel_event: speaker_withdraws,
+       label: "P19 Cancel Activity: cancel single talk prep"}
+
+    # P20 Cancel Case — entire symposium cancelled (force majeure)
+    - {id: P20_cancel_case_force_majeure, pattern: P20_CancelCase, net: Symposium,
+       cancel_event: EmergencyShutdown,
+       label: "P20 Cancel Case: cancel whole symposium"}
+
+    # P43 Explicit Termination — hard-stop overrides everything
+    - {id: P43_explicit_termination_emergency, pattern: P43_ExplicitTermination, net: Symposium,
+       terminator: EmergencyShutdown, cancels_all: true,
+       label: "P43 Explicit Termination: emergency hard-stop"}
+
+  # ===========================================================================
+  # Pattern registry (macro expansion targets)
+  # ===========================================================================
+  pattern_registry:
+    P1_Sequence: {macro: "sequence"}
+    P2_ParallelSplit: {macro: "parallel_split"}
+    P3_Synchronization: {macro: "and_join"}
+    P4_ExclusiveChoice: {macro: "xor_choice"}
+    P5_SimpleMerge: {macro: "simple_merge"}
+    P6_MultipleChoice: {macro: "or_split_structured"}
+    P7_StructuredSyncMerge: {macro: "or_join_structured"}
+    P8_MultipleMerge: {macro: "multiple_merge"}
+    P9_Discriminator: {macro: "discriminator"}
+    P10_ArbitraryCycles: {macro: "arbitrary_cycles"}
+    P11_ImplicitTermination: {macro: "implicit_termination"}
+    P12_MI_NoSync: {macro: "mi_no_sync"}
+    P13_MI_DesignTime: {macro: "mi_design_time"}
+    P14_MI_RuntimeKnown: {macro: "mi_runtime_known"}
+    P15_MI_RuntimeUnknown: {macro: "mi_runtime_unknown"}
+    P16_DeferredChoice: {macro: "deferred_choice"}
+    P17_InterleavedParallelRouting: {macro: "interleaved_parallel_routing"}
+    P18_Milestone: {macro: "milestone"}
+    P19_CancelActivity: {macro: "cancel_activity"}
+    P20_CancelCase: {macro: "cancel_case"}
+    P21_StructuredLoop: {macro: "structured_loop"}
+    P22_Recursion: {macro: "recursion"}
+    P23_TransientTrigger: {macro: "transient_trigger"}
+    P24_PersistentTrigger: {macro: "persistent_trigger"}
+    P25_CancelRegion: {macro: "cancel_region"}
+    P26_CancelMIActivity: {macro: "cancel_mi_activity"}
+    P27_CompleteMIActivity: {macro: "complete_mi_activity"}
+    P28_BlockingDiscriminator: {macro: "blocking_discriminator"}
+    P29_CancellingDiscriminator: {macro: "cancelling_discriminator"}
+    P30_StructuredPartialJoin: {macro: "structured_partial_join"}
+    P31_BlockingPartialJoin: {macro: "blocking_partial_join"}
+    P32_CancellingPartialJoin: {macro: "cancelling_partial_join"}
+    P33_GeneralizedANDJoin: {macro: "generalized_and_join"}
+    P34_StaticPartialJoinMI: {macro: "static_partial_join_mi"}
+    P35_CancellingPartialJoinMI: {macro: "cancelling_partial_join_mi"}
+    P36_DynamicPartialJoinMI: {macro: "dynamic_partial_join_mi"}
+    P37_LocalSyncMerge: {macro: "local_sync_merge"}
+    P38_GeneralSyncMerge: {macro: "general_sync_merge"}
+    P39_CriticalSection: {macro: "critical_section"}
+    P40_InterleavedRouting: {macro: "interleaved_routing"}
+    P41_ThreadMerge: {macro: "thread_merge"}
+    P42_ThreadSplit: {macro: "thread_split"}
+    P43_ExplicitTermination: {macro: "explicit_termination"}
+
+  # ===========================================================================
+  # Proof index (CI can assert all 43 exist)
+  # ===========================================================================
+  pattern_usage_index:
+    P1:  [P1_seq_paper_lifecycle]
+    P2:  [P2_parallel_triage_lanes]
+    P3:  [P3_sync_gonogo]
+    P4:  [P4_choice_decision]
+    P5:  [P5_simple_merge_talk_types]
+    P6:  [P6_multi_track_assign]
+    P7:  [P7_struct_sync_merge_tracks]
+    P8:  [P8_multiple_merge_updates]
+    P9:  [P9_discriminator_keynote]
+    P10: [P10_arbitrary_rework]
+    P11: [P11_implicit_termination_microevents]
+    P12: [P12_mi_cfp_blast]
+    P13: [P13_mi_reviews3]
+    P14: [P14_mi_reviewsN_risk]
+    P15: [P15_mi_factcheck_until]
+    P16: [P16_deferred_workshop_slot]
+    P17: [P17_interleaved_onboarding]
+    P18: [P18_milestone_earlybird]
+    P19: [P19_cancel_activity_speaker_drop]
+    P20: [P20_cancel_case_force_majeure]
+    P21: [P21_loop_revise]
+    P22: [P22_recursion_satellite]
+    P23: [P23_transient_fire_alarm]
+    P24: [P24_persistent_visa]
+    P25: [P25_cancel_region_highrisk]
+    P26: [P26_cancel_mi_on_withdraw]
+    P27: [P27_complete_mi_early]
+    P28: [P28_blocking_discriminator_incident]
+    P29: [P29_cancel_discriminator_venue]
+    P30: [P30_struct_partial_join_schedule]
+    P31: [P31_blocking_partial_join_public]
+    P32: [P32_cancel_partial_join_demo_safety]
+    P33: [P33_generalized_and_join_rework]
+    P34: [P34_static_partial_join_mi]
+    P35: [P35_cancel_partial_join_mi]
+    P36: [P36_dynamic_partial_join_feedback]
+    P37: [P37_local_sync_merge_trackwrap]
+    P38: [P38_general_sync_merge_close]
+    P39: [P39_critical_section_mainhall]
+    P40: [P40_interleaved_policy_checklist]
+    P41: [P41_merge_megathreads]
+    P42: [P42_split_megathreads]
+    P43: [P43_explicit_termination_emergency]
