@@ -1,0 +1,270 @@
+================================================================================
+[SessionStart] Timestamp: 2026-02-06T21:38:57-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[INFO] OTP not cached, attempting acquisition...
+
+================================================================================
+[PHASE 2B/5/4] 2B/5 Searching existing OTP (macOS)
+================================================================================
+[INFO] Searching for existing OTP installation on macOS...
+[SUCCESS] Found OTP 28 at: /Users/sac/.erlmcp/otp-28.3.1/lib/erlang/bin/erl
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] Downloading rebar3...
+[SUCCESS] rebar3 downloaded
+[INFO] Project already compiled (     146 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+     ┌─ src/yawl_approval.erl:
+     │
+ 933 │  do_get_receipt(CheckpointId, State) ->
+     │                               ╰── Warning: variable 'State' is unused
+
+     ┌─ src/yawl_approval.erl:
+     │
+ 949 │  do_list_receipts(State) ->
+     │                   ╰── Warning: variable 'State' is unused
+
+      ┌─ src/yawl_approval.erl:
+      │
+ 1186 │  record_decision(CheckpointId, Approved, DecisionMaker, Reason) ->
+      │  ╰── Warning: function record_decision/4 is unused
+
+      ┌─ src/yawl_approval.erl:
+      │
+ 1256 │  ensure_ets_table() ->
+      │  ╰── Warning: function ensure_ets_table/0 is unused
+
+
+     ┌─ src/yawl_otel_logger.erl:
+     │
+ 112 │  -type timestamp() :: integer().
+     │   ╰── Warning: type timestamp() is unused
+
+     ┌─ src/yawl_otel_logger.erl:
+     │
+ 113 │  -type trace_id() :: binary().
+     │   ╰── Warning: type trace_id() is unused
+
+     ┌─ src/yawl_otel_logger.erl:
+     │
+ 114 │  -type span_id() :: binary().
+     │   ╰── Warning: type span_id() is unused
+
+     ┌─ src/yawl_otel_logger.erl:
+     │
+ 115 │  -type event_type() :: binary() | atom().
+     │   ╰── Warning: type event_type() is unused
+
+     ┌─ src/yawl_otel_logger.erl:
+     │
+ 127 │  -type state() :: #otel_state{}.
+     │   ╰── Warning: type state() is unused
+
+     ┌─ src/yawl_otel_logger.erl:
+     │
+ 537 │      TableId = ets:new(?DEFAULT_OTEL_TABLE, [
+     │      ╰── Warning: variable 'TableId' is unused
+
+
+     ┌─ src/cre_yawl.erl:
+     │
+ 202 │  -record(parallel_merge, {merge_task_id :: element_id(), incoming_task_ids :: [element_id()], required_count :: pos_integer() | all}).
+     │   ╰── Warning: record parallel_merge is unused
+
+     ┌─ src/cre_yawl.erl:
+     │
+ 203 │  -record(blocking_discriminator, {merge_task_id :: element_id(), incoming_task_ids :: [element_id()], blocking_mode :: block_subsequent | reset_on_first}).
+     │   ╰── Warning: record blocking_discriminator is unused
+
+     ┌─ src/cre_yawl.erl:
+     │
+ 204 │  -record(arb_cycles, {loop_task_id :: element_id(), back_edge_targets :: [element_id()], condition_fun :: function(), max_iterations :: pos_integer() | unlimited}).
+     │   ╰── Warning: record arb_cycles is unused
+
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-06T22:25:42-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     170 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-06T22:26:56-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     170 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-06T22:28:14-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     170 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete

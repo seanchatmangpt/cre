@@ -95,7 +95,7 @@ leaves [a,b].
 -export([new/1, get/2, set/3]).
 
 %% Marking algebra operations
--export([add/2, take/2, apply/2]).
+-export([add/2, take/2, apply/2, apply/3]).
 
 %% Inspection and utilities
 -export([snapshot/1, hash/1]).
@@ -285,6 +285,12 @@ apply(Marking, #{mode := Mode, produce := Produce}) ->
         {error, _} = Error ->
             Error
     end.
+
+%% @doc Atomic consume-then-produce; convenience for (ConsumeMap, ProduceMap) callers.
+-spec apply(Marking :: marking(), ConsumeMap :: consume_map(), ProduceMap :: produce_map()) ->
+          {ok, marking()} | {error, insufficient}.
+apply(Marking, ConsumeMap, ProduceMap) when is_map(ConsumeMap), is_map(ProduceMap) ->
+    apply(Marking, #{mode => ConsumeMap, produce => ProduceMap}).
 
 %%--------------------------------------------------------------------
 %% @doc Creates a snapshot (copy) of the marking.

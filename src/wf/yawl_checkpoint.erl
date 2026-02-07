@@ -1,14 +1,14 @@
 %% -*- erlang -*-
-%%%% @doc YAWL Workflow Persistence Layer using Mnesia
+%%%% @doc YAWL Workflow Checkpoint Layer using Mnesia
 %%
-%% This module provides persistent storage for YAWL workflow instances
+%% This module provides checkpoint storage for YAWL workflow instances
 %% using Mnesia. It supports checkpointing workflow state for recovery
 %% after crashes or restarts.
 %%
 %% @end
 %% -------------------------------------------------------------------
 
--module(yawl_persistence).
+-module(yawl_checkpoint).
 -behaviour(gen_server).
 
 %%====================================================================
@@ -49,7 +49,7 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Starts the persistence server with default options.
+%% @doc Starts the checkpoint server with default options.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -58,7 +58,7 @@ start_link() ->
     start_link([]).
 
 %%--------------------------------------------------------------------
-%% @doc Starts the persistence server with options.
+%% @doc Starts the checkpoint server with options.
 %%
 %% Options:
 %% - `{ram_copies, boolean()}` - Use ram_copies instead of disc_copies
@@ -212,7 +212,7 @@ get_checkpoint_info(CaseId) when is_binary(CaseId) ->
     case mnesia:transaction(fun() -> mnesia:read(yawl_instance, CaseId) end) of
         {atomic, [#yawl_instance{net_mod = NetMod,
                                  timestamp = Timestamp,
-                                 status = Status} = Checkpoint]} ->
+                                 status = Status}]} ->
             {ok, #{
                 <<"case_id">> => CaseId,
                 <<"net_mod">> => NetMod,
@@ -235,10 +235,10 @@ init(_Options) ->
     %% Ensure schema is initialized
     case init_schema() of
         ok ->
-            logger:info("yawl_persistence initialized"),
+            logger:info("yawl_checkpoint initialized"),
             {ok, #{}};
         {error, Reason} ->
-            logger:error("yawl_persistence init failed: ~p", [Reason]),
+            logger:error("yawl_checkpoint init failed: ~p", [Reason]),
             {stop, Reason}
     end.
 

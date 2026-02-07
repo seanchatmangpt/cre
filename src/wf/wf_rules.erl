@@ -588,9 +588,11 @@ index_clauses(Clauses) ->
                  Binding :: binding()) ->
           {ok, binding()} | no_match.
 
+-define(MAX_RECURSION_DEPTH, 64).
+
 eval_query({PredName, Args}, Clauses, Facts, ExtraFacts, InitialBinding) ->
-    %% Try to find a proof
-    case prove({PredName, Args}, Clauses, Facts, ExtraFacts, InitialBinding) of
+    %% Try to find a proof (with depth bound for recursive rules)
+    case prove({PredName, Args}, Clauses, Facts, ExtraFacts, InitialBinding, 0) of
         {ok, Binding} -> {ok, Binding};
         no_match -> no_match
     end.
@@ -604,10 +606,12 @@ eval_query({PredName, Args}, Clauses, Facts, ExtraFacts, InitialBinding) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec prove(pred_ref(), #{predicate() => [clause()]}, [fact()],
-            #{atom() => term()}, binding()) ->
+            #{atom() => term()}, binding(), non_neg_integer()) ->
           {ok, binding()} | no_match.
 
-prove({PredName, Args}, Clauses, Facts, ExtraFacts, Binding) ->
+prove(_Goal, _Clauses, _Facts, _ExtraFacts, _Binding, Depth) when Depth >= ?MAX_RECURSION_DEPTH ->
+    no_match;
+prove({PredName, Args}, Clauses, Facts, ExtraFacts, Binding, Depth) ->
     %% First try facts (ground facts matching the goal)
     case match_facts({PredName, Args}, Facts, Binding) of
         {ok, NewBinding} -> {ok, NewBinding};
@@ -617,7 +621,7 @@ prove({PredName, Args}, Clauses, Facts, ExtraFacts, Binding) ->
                 [] -> no_match;
                 PredClauses ->
                     prove_clauses({PredName, Args}, PredClauses, Clauses,
-                                  Facts, ExtraFacts, Binding)
+                                  Facts, ExtraFacts, Binding, Depth)
             end
     end.
 
@@ -654,22 +658,22 @@ match_facts_loop(Goal, [_OtherFact | Rest], Binding) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec prove_clauses(pred_ref(), [clause()], #{predicate() => [clause()]},
-                     [fact()], #{atom() => term()}, binding()) ->
+                     [fact()], #{atom() => term()}, binding(), non_neg_integer()) ->
           {ok, binding()} | no_match.
 
-prove_clauses(_Goal, [], _Clauses, _Facts, _ExtraFacts, _Binding) ->
+prove_clauses(_Goal, [], _Clauses, _Facts, _ExtraFacts, _Binding, _Depth) ->
     no_match;
-prove_clauses({PredName, Args}, [Clause | Rest], Clauses, Facts, ExtraFacts, Binding) ->
+prove_clauses({PredName, Args}, [Clause | Rest], Clauses, Facts, ExtraFacts, Binding, Depth) ->
     #{head := {PredName, HeadArgs}, body := Body} = Clause,
     case unify(Args, HeadArgs, Binding) of
         {ok, NewBinding} ->
-            case prove_body(Body, Clauses, Facts, ExtraFacts, NewBinding) of
+            case prove_body(Body, Clauses, Facts, ExtraFacts, NewBinding, Depth + 1) of
                 {ok, FinalBinding} -> {ok, FinalBinding};
                 no_match ->
-                    prove_clauses({PredName, Args}, Rest, Clauses, Facts, ExtraFacts, Binding)
+                    prove_clauses({PredName, Args}, Rest, Clauses, Facts, ExtraFacts, Binding, Depth)
             end;
         no_match ->
-            prove_clauses({PredName, Args}, Rest, Clauses, Facts, ExtraFacts, Binding)
+            prove_clauses({PredName, Args}, Rest, Clauses, Facts, ExtraFacts, Binding, Depth)
     end.
 
 %%--------------------------------------------------------------------
@@ -681,15 +685,15 @@ prove_clauses({PredName, Args}, [Clause | Rest], Clauses, Facts, ExtraFacts, Bin
 %% @end
 %%--------------------------------------------------------------------
 -spec prove_body([pred_ref()], #{predicate() => [clause()]}, [fact()],
-                 #{atom() => term()}, binding()) ->
+                 #{atom() => term()}, binding(), non_neg_integer()) ->
           {ok, binding()} | no_match.
 
-prove_body([], _Clauses, _Facts, _ExtraFacts, Binding) ->
+prove_body([], _Clauses, _Facts, _ExtraFacts, Binding, _Depth) ->
     {ok, Binding};
-prove_body([Goal | Rest], Clauses, Facts, ExtraFacts, Binding) ->
-    case prove(Goal, Clauses, Facts, ExtraFacts, Binding) of
+prove_body([Goal | Rest], Clauses, Facts, ExtraFacts, Binding, Depth) ->
+    case prove(Goal, Clauses, Facts, ExtraFacts, Binding, Depth) of
         {ok, NewBinding} ->
-            prove_body(Rest, Clauses, Facts, ExtraFacts, NewBinding);
+            prove_body(Rest, Clauses, Facts, ExtraFacts, NewBinding, Depth);
         no_match ->
             no_match
     end.
@@ -811,8 +815,8 @@ collect_all_bindings({PredName, Args}, Clauses, Facts, ExtraFacts) ->
 find_all_solutions(Goal, Clauses, Facts, ExtraFacts, InitialBinding) ->
     %% First try facts
     FactSolutions = find_fact_solutions(Goal, Facts, InitialBinding, []),
-    %% Then try rules
-    RuleSolutions = find_rule_solutions(Goal, Clauses, Facts, ExtraFacts, InitialBinding, []),
+    %% Then try rules (with depth bound for recursion)
+    RuleSolutions = find_rule_solutions(Goal, Clauses, Facts, ExtraFacts, InitialBinding, [], 0),
     %% Deduplicate and combine
     lists:usort(FactSolutions ++ RuleSolutions).
 
@@ -845,16 +849,18 @@ find_fact_solutions({_PredName, Args}, Facts, Binding, Acc) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec prove_body_all([pred_ref()], #{predicate() => [clause()]}, [fact()],
-                      #{atom() => term()}, binding()) -> [binding()].
+                      #{atom() => term()}, binding(), non_neg_integer()) -> [binding()].
 
-prove_body_all([], _Clauses, _Facts, _ExtraFacts, Binding) ->
+prove_body_all([], _Clauses, _Facts, _ExtraFacts, Binding, _Depth) ->
     [Binding];
-prove_body_all([Goal | Rest], Clauses, Facts, ExtraFacts, Binding) ->
+prove_body_all(_, _Clauses, _Facts, _ExtraFacts, _Binding, Depth) when Depth >= ?MAX_RECURSION_DEPTH ->
+    [];
+prove_body_all([Goal | Rest], Clauses, Facts, ExtraFacts, Binding, Depth) ->
     %% Find all solutions for Goal
-    GoalSolutions = find_goal_solutions(Goal, Clauses, Facts, ExtraFacts, Binding),
+    GoalSolutions = find_goal_solutions(Goal, Clauses, Facts, ExtraFacts, Binding, Depth),
     %% For each solution, prove the rest of the body
     lists:foldl(fun(GoalBinding, SolAcc) ->
-        case prove_body_all(Rest, Clauses, Facts, ExtraFacts, GoalBinding) of
+        case prove_body_all(Rest, Clauses, Facts, ExtraFacts, GoalBinding, Depth) of
             [] -> SolAcc;
             RestSolutions -> RestSolutions ++ SolAcc
         end
@@ -867,13 +873,13 @@ prove_body_all([Goal | Rest], Clauses, Facts, ExtraFacts, Binding) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec find_goal_solutions(pred_ref(), #{predicate() => [clause()]}, [fact()],
-                          #{atom() => term()}, binding()) -> [binding()].
+                          #{atom() => term()}, binding(), non_neg_integer()) -> [binding()].
 
-find_goal_solutions(Goal, Clauses, Facts, ExtraFacts, Binding) ->
+find_goal_solutions(Goal, Clauses, Facts, ExtraFacts, Binding, Depth) ->
     %% Try facts first
     FactSols = find_fact_solutions_for_goal(Goal, Facts, Binding, []),
     %% Try rules
-    RuleSols = find_rule_solutions_for_goal(Goal, Clauses, Facts, ExtraFacts, Binding, []),
+    RuleSols = find_rule_solutions_for_goal(Goal, Clauses, Facts, ExtraFacts, Binding, [], Depth),
     FactSols ++ RuleSols.
 
 %%--------------------------------------------------------------------
@@ -902,9 +908,12 @@ find_fact_solutions_for_goal({_PredName, Args}, Facts, Binding, Acc) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec find_rule_solutions_for_goal(pred_ref(), #{predicate() => [clause()]}, [fact()],
-                                   #{atom() => term()}, binding(), [binding()]) -> [binding()].
+                                   #{atom() => term()}, binding(), [binding()], non_neg_integer()) -> [binding()].
 
-find_rule_solutions_for_goal({PredName, Args}, Clauses, Facts, ExtraFacts, Binding, Acc) ->
+find_rule_solutions_for_goal(_Goal, _Clauses, _Facts, _ExtraFacts, _Binding, Acc, Depth)
+        when Depth >= ?MAX_RECURSION_DEPTH ->
+    Acc;
+find_rule_solutions_for_goal({PredName, Args}, Clauses, Facts, ExtraFacts, Binding, Acc, Depth) ->
     case maps:get(PredName, Clauses, []) of
         [] -> Acc;
         PredClauses ->
@@ -912,7 +921,7 @@ find_rule_solutions_for_goal({PredName, Args}, Clauses, Facts, ExtraFacts, Bindi
                 #{head := {PredName, HeadArgs}, body := Body} = Clause,
                 case unify(Args, HeadArgs, Binding) of
                     {ok, NewBinding} ->
-                        BodySolutions = prove_body_all(Body, Clauses, Facts, ExtraFacts, NewBinding),
+                        BodySolutions = prove_body_all(Body, Clauses, Facts, ExtraFacts, NewBinding, Depth + 1),
                         BodySolutions ++ SolutionsAcc;
                     no_match ->
                         SolutionsAcc
@@ -927,9 +936,12 @@ find_rule_solutions_for_goal({PredName, Args}, Clauses, Facts, ExtraFacts, Bindi
 %% @end
 %%--------------------------------------------------------------------
 -spec find_rule_solutions(pred_ref(), #{predicate() => [clause()]}, [fact()],
-                          #{atom() => term()}, binding(), [binding()]) -> [binding()].
+                          #{atom() => term()}, binding(), [binding()], non_neg_integer()) -> [binding()].
 
-find_rule_solutions({PredName, Args}, Clauses, Facts, ExtraFacts, Binding, Acc) ->
+find_rule_solutions(_Goal, _Clauses, _Facts, _ExtraFacts, _Binding, Acc, Depth)
+        when Depth >= ?MAX_RECURSION_DEPTH ->
+    Acc;
+find_rule_solutions({PredName, Args}, Clauses, Facts, ExtraFacts, Binding, Acc, Depth) ->
     case maps:get(PredName, Clauses, []) of
         [] -> Acc;
         PredClauses ->
@@ -938,7 +950,7 @@ find_rule_solutions({PredName, Args}, Clauses, Facts, ExtraFacts, Binding, Acc) 
                 case unify(Args, HeadArgs, Binding) of
                     {ok, NewBinding} ->
                         %% Find all solutions for the body
-                        BodySolutions = prove_body_all(Body, Clauses, Facts, ExtraFacts, NewBinding),
+                        BodySolutions = prove_body_all(Body, Clauses, Facts, ExtraFacts, NewBinding, Depth + 1),
                         BodySolutions ++ SolutionsAcc;
                     no_match ->
                         SolutionsAcc
@@ -1109,12 +1121,10 @@ query_empty_result_test() ->
     {ok, []} = query(Rules, {p, {var, x}}, Facts, #{}).
 
 query_transitive_test() ->
-    %% TODO: Implement recursive rule evaluation with cycle detection
-    %% {ok, Rules} = compile(<<"ancestor(X, Y) :- parent(X, Y). ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).">>),
-    %% Facts = [{parent, [a, b]}, {parent, [b, c]}, {parent, [c, d]}],
-    %% {ok, Bs} = query(Rules, {ancestor, {var, x}, d}, Facts, #{}),
-    %% 3 = length(Bs).
-    {comment, "Transitive rules require cycle detection"}.
+    {ok, Rules} = compile(<<"ancestor(X, Y) :- parent(X, Y). ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).">>),
+    Facts = [{parent, [a, b]}, {parent, [b, c]}, {parent, [c, d]}],
+    {ok, Bs} = query(Rules, {ancestor, {var, x}, d}, Facts, #{}),
+    3 = length(Bs).
 
 %% Unit tests for compile
 compile_valid_program_test() ->

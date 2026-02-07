@@ -772,7 +772,7 @@ terminate(Reason, #wrapper_state{net_mod = NetMod,
     end,
 
     %% Persist final state if available
-    _ = case catch yawl_persistence:checkpoint_save(self(), NetState) of
+    _ = case catch yawl_checkpoint:checkpoint_save(self(), NetState) of
         ok ->
             logger:info("gen_yawl successfully persisted final state"),
             ok;

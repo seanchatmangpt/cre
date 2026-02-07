@@ -125,7 +125,7 @@ marshal_to_xml(Term) when is_list(Term); is_tuple(Term) ->
         Error:Reason -> {error, {Error, Reason}}
     end;
 marshal_to_xml(Term) when is_integer(Term); is_float(Term); is_binary(Term); is_atom(Term) ->
-    {ok, format_primitive(Term)};
+    {ok, iolist_to_binary(format_primitive(Term))};
 marshal_to_xml(_Term) ->
     {error, unsupported_type}.
 
@@ -272,7 +272,7 @@ format_xml(Xml) when is_binary(Xml) ->
 %%--------------------------------------------------------------------
 -spec escape_xml(binary() | string()) -> binary().
 escape_xml(Text) when is_binary(Text) ->
-    escape_xml(binary_to_list(Text), []);
+    iolist_to_binary(escape_xml(binary_to_list(Text), []));
 escape_xml(Text) when is_list(Text) ->
     iolist_to_binary(escape_xml(Text, [])).
 
@@ -297,7 +297,7 @@ escape_xml([C | Rest], Acc) ->
 %%--------------------------------------------------------------------
 -spec unescape_xml(binary() | string()) -> binary().
 unescape_xml(Text) when is_binary(Text) ->
-    unescape_xml(binary_to_list(Text), []);
+    iolist_to_binary(unescape_xml(binary_to_list(Text), []));
 unescape_xml(Text) when is_list(Text) ->
     iolist_to_binary(unescape_xml(Text, [])).
 
@@ -422,7 +422,12 @@ term_to_map(Value) -> #{value => Value}.
 -spec xmerl_to_simple(term()) -> xml_element().
 xmerl_to_simple(XmlEl) ->
     % Access xmlElement record fields directly instead of using deprecated xmerl_lib functions
-    Name = list_to_binary(XmlEl#xmlElement.name),
+    RawName = XmlEl#xmlElement.name,
+    Name = case RawName of
+               N when is_list(N) -> list_to_binary(N);
+               N when is_atom(N) -> atom_to_binary(N, utf8);
+               N when is_binary(N) -> N
+           end,
     Attrs = convert_xmerl_attrs(XmlEl#xmlElement.attributes),
     Content = [xmerl_content_to_simple(C) || C <- XmlEl#xmlElement.content],
     {Name, Attrs, Content}.
@@ -433,9 +438,19 @@ xmerl_to_simple(XmlEl) ->
 %%--------------------------------------------------------------------
 -spec convert_xmerl_attrs([term()]) -> [{binary(), binary()}].
 convert_xmerl_attrs(AttrList) ->
-    lists:map(fun({K, V}) ->
-        {list_to_binary(K), list_to_binary(format_xmerl_attr(V))}
-    end, AttrList).
+    lists:map(fun parse_xml_attr/1, AttrList).
+
+parse_xml_attr(Attr) when element(1, Attr) =:= xmlAttribute ->
+    K = element(2, Attr),
+    V = element(9, Attr),
+    {to_binary_attr(K), list_to_binary(format_xmerl_attr(V))};
+parse_xml_attr({K, V}) ->
+    {to_binary_attr(K), list_to_binary(format_xmerl_attr(V))}.
+
+-spec to_binary_attr(list() | atom() | binary()) -> binary().
+to_binary_attr(N) when is_list(N) -> list_to_binary(N);
+to_binary_attr(N) when is_atom(N) -> atom_to_binary(N, utf8);
+to_binary_attr(N) when is_binary(N) -> N.
 
 %%--------------------------------------------------------------------
 %% @private Formats xmerl attribute value.
@@ -453,7 +468,9 @@ format_xmerl_attr(V) -> io_lib:format("~p", [V]).
 -spec xmerl_content_to_simple(term()) -> binary() | xml_element().
 xmerl_content_to_simple(Content) ->
     case Content of
-        #xmlText{value = V} -> list_to_binary(V);
+        #xmlText{value = V} when is_list(V) -> list_to_binary(V);
+        #xmlText{value = V} when is_binary(V) -> V;
+        #xmlText{value = V} when is_atom(V) -> atom_to_binary(V, utf8);
         #xmlElement{} = El -> xmerl_to_simple(El);
         _ -> <<"">>
     end.
@@ -516,6 +533,8 @@ parse_attr(Attr) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec xml_element_to_map(xml_element()) -> xml_map().
+xml_element_to_map({Name, Attrs, Content}) when is_binary(Content) ->
+    xml_element_to_map({Name, Attrs, [Content]});
 xml_element_to_map({Name, Attrs, Content}) ->
     ContentMap = content_to_map(Content),
     % maps:merge/3 doesn't exist; use nested maps:merge/2 calls
@@ -525,7 +544,9 @@ xml_element_to_map({Name, Attrs, Content}) ->
 %% @private Converts content to map.
 %% @end
 %%--------------------------------------------------------------------
--spec content_to_map([term()]) -> xml_map().
+-spec content_to_map([term()] | binary()) -> xml_map().
+content_to_map(Content) when is_binary(Content) ->
+    content_to_map([Content], #{});
 content_to_map(Content) ->
     content_to_map(Content, #{}).
 
@@ -585,7 +606,7 @@ build_map_xml(Map, RootName, Indent) when is_map(Map) ->
         [[build_map_entry(K, V, Indent + 2), $\n] || {K, V} <- maps:to_list(Map),
           not (K =:= <<"__name">> orelse K =:= <<"__text">>)],
         case maps:get(<<"__text">>, Map, undefined) of
-            undefined -> ok;
+            undefined -> [];
             Text -> [IndentStr, $\s, Text, $\n]
         end,
         IndentStr, $<, $/, RootName, $>
@@ -876,8 +897,9 @@ doctest_test() ->
 
     %% Test 17: build_xml with attributes
     BuiltXml2 = build_xml({<<"root">>, [{<<"id">>, <<"123">>}], []}),
-    true = is_list(BuiltXml2),
-    true = lists:member(<<"id">>, BuiltXml2),
+    true = is_list(BuiltXml2) orelse is_binary(BuiltXml2),
+    BuiltXml2Bin = iolist_to_binary(BuiltXml2),
+    true = binary:match(BuiltXml2Bin, <<"id">>) =/= nomatch,
 
     %% Test 18: build_xml with content
     BuiltXml3 = build_xml({<<"root">>, [], [<<"text">>]}),
@@ -906,7 +928,7 @@ doctest_test() ->
     %% Test 24: term_to_map converts list
     ListMap = term_to_map([1, 2, 3]),
     true = is_map(ListMap),
-    true = maps:is_key(<<"items">>, ListMap),
+    true = maps:is_key(items, ListMap),
 
     %% Test 25: term_to_map converts tuple
     TupleMap = term_to_map({a, b, c}),

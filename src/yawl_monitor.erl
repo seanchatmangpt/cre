@@ -570,7 +570,7 @@ handle_cast({record_metric, Name, Value, Labels, Timestamp}, State) ->
         State#monitor_state.metric_index),
 
     %% Update case index if case_id label exists
-    CaseIndex = case maps:get(<<"case_id">>, Labels) of
+    CaseIndex = case maps:get(<<"case_id">>, Labels, undefined) of
         undefined ->
             case maps:get(case_id, Labels, undefined) of
                 undefined -> State#monitor_state.case_index;

@@ -366,24 +366,23 @@ compile_workflow(Spec, Options) when is_tuple(Spec), element(1, Spec) =:= yawl_s
                 {ok, Compiled} ->
                     %% Extract root module
                     RootNet = wf_spec:root_net(Spec),
-                    RootModule = list_to_atom(
-                        binary_to_list(
-                            case maps:get(module_prefix, Options, <<"yawl_">>) of
-                                Prefix -> <<Prefix/binary, RootNet/binary>>
-                            end
-                        )
-                    ),
+                    Prefix = maps:get(module_prefix, Options, <<"yawl_">>),
+                    RootModule = list_to_atom(binary_to_list(<<Prefix/binary, RootNet/binary>>)),
 
-                    %% Get all compiled modules
-                    Modules = maps:keys(maps:get(modules, Compiled, #{})),
-
-                    Executor = #yawl_executor{
-                        spec = Spec,
-                        compiled = Compiled,
-                        root_module = RootModule,
-                        modules = [RootModule | Modules]
-                    },
-                    {ok, Executor};
+                    %% Compile and load generated modules into VM
+                    case load_compiled_modules(Compiled, Options) of
+                        ok ->
+                            Modules = maps:keys(maps:get(modules, Compiled, #{})),
+                            Executor = #yawl_executor{
+                                spec = Spec,
+                                compiled = Compiled,
+                                root_module = RootModule,
+                                modules = [RootModule | Modules]
+                            },
+                            {ok, Executor};
+                        {error, Reason} ->
+                            {error, {load_error, Reason}}
+                    end;
                 {error, Reason} ->
                     {error, {compile_error, Reason}}
             end;
@@ -877,6 +876,39 @@ executor_info(#yawl_executor{spec = Spec, compiled = Compiled,
 %%====================================================================
 
 %% @private
+%% Compiles and loads generated modules into the VM.
+load_compiled_modules(#{modules := ModulesMap}, Options) ->
+    Prefix = maps:get(module_prefix, Options, <<"yawl_">>),
+    TmpDir = filename:join([os:getenv("TMPDIR", "/tmp"),
+        "yawl_exec_" ++ integer_to_list(erlang:unique_integer())]),
+    try
+        ok = file:make_dir(TmpDir),
+        _ = maps:fold(fun(NetId, ModuleCode, Acc) ->
+            ModName = list_to_atom(binary_to_list(<<Prefix/binary, NetId/binary>>)),
+            TmpPath = filename:join(TmpDir, atom_to_list(ModName) ++ ".erl"),
+            ok = file:write_file(TmpPath, ModuleCode),
+            case compile:file(TmpPath, [binary, return_errors]) of
+                {ok, ModName, Binary} ->
+                    case code:load_binary(ModName, TmpPath, Binary) of
+                        {module, ModName} -> [ModName | Acc];
+                        {error, Reason} -> exit({load_failed, ModName, Reason})
+                    end;
+                {error, Errors} ->
+                    exit({compile_failed, ModName, Errors})
+            end
+        end, [], ModulesMap),
+        ok
+    after
+        %% Cleanup temp files
+        maps:foreach(fun(NetId, _) ->
+            ModName = list_to_atom(binary_to_list(<<Prefix/binary, NetId/binary>>)),
+            TmpPath = filename:join(TmpDir, atom_to_list(ModName) ++ ".erl"),
+            file:delete(TmpPath)
+        end, ModulesMap),
+        file:del_dir(TmpDir)
+    end.
+
+%% @private
 %% Loads workflow from a parsed spec
 load_workflow_from_spec(Spec) ->
     case wf_spec:validate(Spec) of
@@ -991,14 +1023,10 @@ load_workflow_test() ->
     >>,
 
     %% Mock wf_spec:from_xml_file by using from_xml
-    MeckConfig = fun() ->
-        meck:new(wf_spec, [passthrough]),
-        meck:expect(wf_spec, from_xml_file, fun(_File) ->
-            wf_spec:from_xml(Xml)
-        end)
-    end,
-
-    meck_config = MeckConfig,
+    meck:new(wf_spec, [passthrough]),
+    meck:expect(wf_spec, from_xml_file, fun(_File) ->
+        wf_spec:from_xml(Xml)
+    end),
 
     %% Test loading
     ?assertMatch({ok, #yawl_executor{}}, load_workflow("test.yawl")),
