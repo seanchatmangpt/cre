@@ -106,7 +106,6 @@
 | [PNET Types Tutorial](PNET_TYPES_TUTORIAL.md) | Beginner-Intermediate type system |
 | [PNET Types API Reference](PNET_TYPES_API_REFERENCE.md) | Type definitions and validation |
 | [PNET Types Quick Reference](PNET_TYPES_QUICK_REFERENCE.md) | Type system quick ref |
-| [PNET Types Doctest Reference](PNET_TYPES_DOCTEST_REFERENCE.md) | Examples with tests |
 
 ### Marking Algebra
 
@@ -118,7 +117,6 @@
 | [pnet_marking API Reference](pnet_marking_api_reference.md) | State management API |
 | [pnet_marking Quick Reference](pnet_marking_quick_reference.md) | Quick operations lookup |
 | [PNET Marking Tests](PNET_MARKING_TESTS.md) | Test documentation |
-| [PNET Marking Doctest Reference](PNET_MARKING_DOCTEST_REFERENCE.md) | Examples with tests |
 
 ### Mode Enumeration
 
@@ -127,13 +125,6 @@
 | [PNET Mode Guide](PNET_MODE_GUIDE.md) | Mode enumeration concepts |
 | [PNET Mode Tutorial](PNET_MODE_TUTORIAL.md) | Beginner-Intermediate mode handling |
 | [PNET Mode Quick Reference](PNET_MODE_QUICK_REFERENCE.md) | Mode enumeration quick ref |
-| [PNET Mode Doctest Reference](PNET_MODE_DOCTEST_REFERENCE.md) | Examples with tests |
-
-### Patterns Doctest
-
-| Document | Description |
-|----------|-------------|
-| [Patterns Doctest Reference](PATTERNS_DOCTEST_REFERENCE.md) | Pattern tests and examples |
 
 ---
 

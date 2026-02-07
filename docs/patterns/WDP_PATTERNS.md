@@ -675,4 +675,3 @@ rebar3 eunit --module=data_visibility
 
 - `/Users/sac/cre/docs/YAWL_PATTERNS_GUIDE.md` - Core YAWL pattern reference
 - `/Users/sac/cre/docs/CORE_YAWL_PATTERNS_GUIDE.md` - Core patterns guide
-- `/Users/sac/cre/docs/PATTERNS_DOCTEST_REFERENCE.md` - Pattern doctests

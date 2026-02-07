@@ -113,7 +113,6 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 |------|-------------|-------|---------|
 | **[ORDER_FULFILLMENT_GUIDE.md](./ORDER_FULFILLMENT_GUIDE.md)** | Order Fulfillment workflow guide | Intermediate | Real-world workflow example |
 | **[YAWL_PATTERN_EXAMPLES.md](./YAWL_PATTERN_EXAMPLES.md)** | Pattern implementations | Beginner | Learning examples |
-| **[PATTERN_DOCTEST_REFERENCE.md](./PATTERN_DOCTEST_REFERENCE.md)** | Pattern tests | Intermediate | Testing patterns |
 | **[examples/](./examples/)** | Working examples | All | Hands-on practice |
 | **[YAWL_PATTERNS_WORKBOOK.md](./YAWL_PATTERNS_WORKBOOK.md)** | Practice exercises | Beginner | Skill development |
 | **[tutorials/YAWL_PATTERNS_STUDY_PLAN_TEMPLATE.md](./tutorials/YAWL_PATTERNS_STUDY_PLAN_TEMPLATE.md)** | Personalized learning path | All | Custom study plans |
@@ -341,7 +340,7 @@ To contribute:
 
 ## 🔄 Last Updated
 
-- **Documentation Version**: v0.2.1
+- **Documentation Version**: v0.3.0
 - **Last Updated**: February 2025
 - **OTP Support**: 25.0 - 28.x
 - **Pattern Count**: 43 YAWL patterns

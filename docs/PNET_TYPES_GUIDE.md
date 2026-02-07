@@ -548,9 +548,9 @@ pnet_types:is_binding({}).                  % -> false (not a map)
 
 ## Doctest Examples
 
-The module includes comprehensive doctest examples in its moduledoc. For a complete reference with extensive examples, see [PNet Types Doctest Reference](./PNET_TYPES_DOCTEST_REFERENCE.md).
+The module includes comprehensive doctest examples. See the module source for extensive examples.
 
-### Basic Examples (from moduledoc)
+### Basic Examples
 
 ```erlang
 % Marking validation examples

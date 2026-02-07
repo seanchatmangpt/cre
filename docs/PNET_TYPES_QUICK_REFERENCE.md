@@ -115,4 +115,4 @@ end.
 
 ## Comprehensive Documentation
 
-For extensive doctest examples, detailed usage patterns, and advanced scenarios, see [PNet Types Doctest Reference](./PNET_TYPES_DOCTEST_REFERENCE.md).
+For detailed usage patterns and advanced scenarios, see [PNet Types Guide](./PNET_TYPES_GUIDE.md) and [PNet Types API Reference](./PNET_TYPES_API_REFERENCE.md).
