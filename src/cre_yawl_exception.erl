@@ -89,6 +89,24 @@
          update_metrics/3,
          log_audit_event/3]).
 
+%% Validation API
+-export([validate_pattern/1,
+         validate_condition/1,
+         validate_task/1,
+         validate_workflow/1,
+         validate_exception/1,
+         validate_compensator/1,
+         validate_retry_policy/1,
+         validate_error_handler/1]).
+
+%% Logging API
+-export([log_info/3,
+         log_warning/3,
+         log_error/3,
+         log_debug/3,
+         log_exception/2,
+         log_validation_error/3]).
+
 %% Compensation API
 -export([new_compensator/3,
          compensate/2,
@@ -1429,3 +1447,561 @@ init(_Arg) ->
 terminate(_Reason, _NetState) -> ok.
 
 trigger(_Place, _Token, _NetState) -> pass.
+
+%%====================================================================
+%% Validation API Implementation
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Validates a workflow pattern record.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_pattern(Pattern :: term()) -> {ok, term()} | {error, {invalid_pattern, term()}}.
+
+validate_pattern(Pattern) ->
+    case is_valid_pattern(Pattern) of
+        true ->
+            {ok, Pattern};
+        false ->
+            {error, {invalid_pattern, {unrecognized_pattern_type, Pattern}}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Validates a condition expression.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_condition(Condition :: term()) -> {ok, term()} | {error, {invalid_condition, term()}}.
+
+validate_condition(Condition) when is_binary(Condition) ->
+    {ok, Condition};
+validate_condition({Atom, _Term} = Condition) when is_atom(Atom) ->
+    {ok, Condition};
+validate_condition(Condition) when is_function(Condition, 0) ->
+    {ok, Condition};
+validate_condition(InvalidCondition) ->
+    {error, {invalid_condition, InvalidCondition}}.
+
+%%--------------------------------------------------------------------
+%% @doc Validates a task record.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_task(Task :: term()) -> {ok, term()} | {error, {invalid_task, term()}}.
+
+validate_task(Task) when is_record(Task, task) ->
+    case validate_task_fields(Task) of
+        ok -> {ok, Task};
+        {error, Reason} -> {error, {invalid_task, Reason}}
+    end;
+validate_task(InvalidTask) ->
+    {error, {invalid_task, {not_a_task_record, InvalidTask}}}.
+
+%%--------------------------------------------------------------------
+%% @doc Validates a complete workflow.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_workflow(Workflow :: term()) -> {ok, term()} | {error, {invalid_workflow, term()}}.
+
+validate_workflow(Workflow) when is_record(Workflow, workflow) ->
+    case validate_workflow_fields(Workflow) of
+        ok -> {ok, Workflow};
+        {error, Reason} -> {error, {invalid_workflow, Reason}}
+    end;
+validate_workflow(InvalidWorkflow) ->
+    {error, {invalid_workflow, {not_a_workflow_record, InvalidWorkflow}}}.
+
+%%--------------------------------------------------------------------
+%% @doc Validates an exception record.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_exception(Exception :: term()) -> {ok, exception()} | {error, {invalid_exception, term()}}.
+
+validate_exception(Exception) when is_record(Exception, yawl_exception) ->
+    case validate_exception_fields(Exception) of
+        ok -> {ok, Exception};
+        {error, Reason} -> {error, {invalid_exception, Reason}}
+    end;
+validate_exception(InvalidException) ->
+    {error, {invalid_exception, {not_an_exception_record, InvalidException}}}.
+
+%%--------------------------------------------------------------------
+%% @doc Validates a compensator record.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_compensator(Compensator :: term()) -> {ok, compensator()} | {error, {invalid_compensator, term()}}.
+
+validate_compensator(Compensator) when is_record(Compensator, compensator) ->
+    case validate_compensator_fields(Compensator) of
+        ok -> {ok, Compensator};
+        {error, Reason} -> {error, {invalid_compensator, Reason}}
+    end;
+validate_compensator(InvalidCompensator) ->
+    {error, {invalid_compensator, {not_a_compensator_record, InvalidCompensator}}}.
+
+%%--------------------------------------------------------------------
+%% @doc Validates a retry policy record.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_retry_policy(Policy :: term()) -> {ok, retry_policy()} | {error, {invalid_retry_policy, term()}}.
+
+validate_retry_policy(Policy) when is_record(Policy, retry_policy) ->
+    case validate_retry_policy_fields(Policy) of
+        ok -> {ok, Policy};
+        {error, Reason} -> {error, {invalid_retry_policy, Reason}}
+    end;
+validate_retry_policy(InvalidPolicy) ->
+    {error, {invalid_retry_policy, {not_a_retry_policy_record, InvalidPolicy}}}.
+
+%%--------------------------------------------------------------------
+%% @doc Validates an error handler record.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_error_handler(Handler :: term()) -> {ok, error_handler()} | {error, {invalid_error_handler, term()}}.
+
+validate_error_handler(Handler) when is_record(Handler, error_handler) ->
+    case validate_error_handler_fields(Handler) of
+        ok -> {ok, Handler};
+        {error, Reason} -> {error, {invalid_error_handler, Reason}}
+    end;
+validate_error_handler(InvalidHandler) ->
+    {error, {invalid_error_handler, {not_an_error_handler_record, InvalidHandler}}}.
+
+%%====================================================================
+%% Logging API Implementation
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Logs an informational message with context.
+%% @end
+%%--------------------------------------------------------------------
+-spec log_info(Module :: atom(), Message :: binary() | string(), Context :: map()) -> ok.
+
+log_info(Module, Message, Context) when is_list(Message) ->
+    log_info(Module, list_to_binary(Message), Context);
+log_info(Module, Message, Context) when is_binary(Message) ->
+    log_with_context(info, Module, Message, Context).
+
+%%--------------------------------------------------------------------
+%% @doc Logs a warning message with context.
+%% @end
+%%--------------------------------------------------------------------
+-spec log_warning(Module :: atom(), Message :: binary() | string(), Context :: map()) -> ok.
+
+log_warning(Module, Message, Context) when is_list(Message) ->
+    log_warning(Module, list_to_binary(Message), Context);
+log_warning(Module, Message, Context) when is_binary(Message) ->
+    log_with_context(warning, Module, Message, Context).
+
+%%--------------------------------------------------------------------
+%% @doc Logs an error message with context.
+%% @end
+%%--------------------------------------------------------------------
+-spec log_error(Module :: atom(), Message :: binary() | string(), Context :: map()) -> ok.
+
+log_error(Module, Message, Context) when is_list(Message) ->
+    log_error(Module, list_to_binary(Message), Context);
+log_error(Module, Message, Context) when is_binary(Message) ->
+    log_with_context(error, Module, Message, Context).
+
+%%--------------------------------------------------------------------
+%% @doc Logs a debug message with context.
+%% @end
+%%--------------------------------------------------------------------
+-spec log_debug(Module :: atom(), Message :: binary() | string(), Context :: map()) -> ok.
+
+log_debug(Module, Message, Context) when is_list(Message) ->
+    log_debug(Module, list_to_binary(Message), Context);
+log_debug(Module, Message, Context) when is_binary(Message) ->
+    log_with_context(debug, Module, Message, Context).
+
+%%--------------------------------------------------------------------
+%% @doc Logs an exception with full context and stacktrace.
+%% @end
+%%--------------------------------------------------------------------
+-spec log_exception(Module :: atom(), Exception :: exception()) -> ok.
+
+log_exception(Module, #yawl_exception{
+                         type = Type,
+                         severity = Severity,
+                         message = Message,
+                         context = Context,
+                         stacktrace = Stacktrace
+                        } = Exception) ->
+    ExceptionContext = #{
+        exception_id => Exception#yawl_exception.id,
+        exception_type => Type,
+        severity => Severity,
+        message => Message,
+        context => Context,
+        stacktrace => format_stacktrace(Stacktrace),
+        timestamp => Exception#yawl_exception.timestamp
+    },
+    case Severity of
+        critical -> log_with_context(error, Module, <<"Critical exception occurred">>, ExceptionContext);
+        high -> log_with_context(error, Module, <<"High severity exception">>, ExceptionContext);
+        medium -> log_with_context(warning, Module, <<"Medium severity exception">>, ExceptionContext);
+        low -> log_with_context(info, Module, <<"Low severity exception">>, ExceptionContext)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Logs a validation error with details.
+%% @end
+%%--------------------------------------------------------------------
+-spec log_validation_error(Module :: atom(), Field :: atom(), Reason :: term()) -> ok.
+
+log_validation_error(Module, Field, Reason) ->
+    Context = #{
+        field => Field,
+        reason => Reason,
+        timestamp => erlang:system_time(millisecond)
+    },
+    log_with_context(error, Module, <<"Validation error">>, Context).
+
+%%====================================================================
+%% Internal Validation Functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Checks if a term is a valid pattern type.
+%% @end
+%%--------------------------------------------------------------------
+-spec is_valid_pattern(Term :: term()) -> boolean().
+
+is_valid_pattern(Pattern) when is_record(Pattern, workflow) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, task) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, sequence) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, parallel_split) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, synchronization) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, exclusive_choice) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, simple_merge) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, multi_choice) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, synchronizing_merge) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, multi_merge) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, discriminator) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, arbitration) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, param_pass) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, data_transform) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, data_distribute) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, data_accumulate) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, data_visibility) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, resource_create) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, role_allocate) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, resource_start) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, role_distribute) -> true;
+is_valid_pattern(Pattern) when is_record(Pattern, capability_allocate) -> true;
+is_valid_pattern(_) -> false.
+
+%%--------------------------------------------------------------------
+%% @doc Validates task record fields.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_task_fields(Task :: term()) -> ok | {error, term()}.
+
+validate_task_fields(Task) ->
+    try
+        Id = element(2, Task),
+        Name = element(3, Task),
+        Type = element(4, Task),
+
+        % Validate ID
+        case is_binary(Id) of
+            false -> {error, {invalid_field, id, not_binary}};
+            true ->
+                % Validate Name
+                case is_binary(Name) of
+                    false -> {error, {invalid_field, name, not_binary}};
+                    true ->
+                        % Validate Type
+                        case lists:member(Type, [atomic, composite, subworkflow, multi_instance]) of
+                            false -> {error, {invalid_field, type, invalid_task_type}};
+                            true -> ok
+                        end
+                end
+        end
+    catch
+        _:_ -> {error, malformed_task_record}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Validates workflow record fields.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_workflow_fields(Workflow :: term()) -> ok | {error, term()}.
+
+validate_workflow_fields(Workflow) ->
+    try
+        Id = element(2, Workflow),
+        Name = element(3, Workflow),
+        Tasks = element(4, Workflow),
+
+        case is_binary(Id) of
+            false -> {error, {invalid_field, id, not_binary}};
+            true ->
+                case is_binary(Name) of
+                    false -> {error, {invalid_field, name, not_binary}};
+                    true ->
+                        case is_map(Tasks) of
+                            false -> {error, {invalid_field, tasks, not_a_map}};
+                            true -> ok
+                        end
+                end
+        end
+    catch
+        _:_ -> {error, malformed_workflow_record}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Validates exception record fields.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_exception_fields(Exception :: term()) -> ok | {error, term()}.
+
+validate_exception_fields(Exception) ->
+    try
+        Id = element(2, Exception),
+        Type = element(3, Exception),
+        Severity = element(4, Exception),
+        Message = element(5, Exception),
+
+        case is_binary(Id) of
+            false -> {error, {invalid_field, id, not_binary}};
+            true ->
+                case is_valid_exception_type(Type) of
+                    false -> {error, {invalid_field, type, invalid_exception_type}};
+                    true ->
+                        case is_valid_severity(Severity) of
+                            false -> {error, {invalid_field, severity, invalid_severity}};
+                            true ->
+                                case is_binary(Message) of
+                                    false -> {error, {invalid_field, message, not_binary}};
+                                    true -> ok
+                                end
+                        end
+                end
+        end
+    catch
+        _:_ -> {error, malformed_exception_record}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Validates compensator record fields.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_compensator_fields(Compensator :: term()) -> ok | {error, term()}.
+
+validate_compensator_fields(Compensator) ->
+    try
+        ActivityId = element(2, Compensator),
+        Handler = element(3, Compensator),
+        Strategy = element(4, Compensator),
+        State = element(5, Compensator),
+
+        case is_binary(ActivityId) of
+            false -> {error, {invalid_field, activity_id, not_binary}};
+            true ->
+                case is_function(Handler) of
+                    false -> {error, {invalid_field, handler, not_a_function}};
+                    true ->
+                        case lists:member(Strategy, [immediate, deferred, chained, parallel]) of
+                            false -> {error, {invalid_field, strategy, invalid_compensation_strategy}};
+                            true ->
+                                case lists:member(State, [pending, executing, completed, failed, cancelled]) of
+                                    false -> {error, {invalid_field, state, invalid_state}};
+                                    true -> ok
+                                end
+                        end
+                end
+        end
+    catch
+        _:_ -> {error, malformed_compensator_record}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Validates retry policy record fields.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_retry_policy_fields(Policy :: term()) -> ok | {error, term()}.
+
+validate_retry_policy_fields(Policy) ->
+    try
+        MaxAttempts = element(2, Policy),
+        Strategy = element(3, Policy),
+        BaseDelay = element(4, Policy),
+        MaxDelay = element(5, Policy),
+
+        case is_integer(MaxAttempts) andalso MaxAttempts > 0 of
+            false -> {error, {invalid_field, max_attempts, not_positive_integer}};
+            true ->
+                case lists:member(Strategy, [exponential, linear, constant, custom, fibonacci, adaptive]) of
+                    false -> {error, {invalid_field, strategy, invalid_retry_strategy}};
+                    true ->
+                        case is_integer(BaseDelay) andalso BaseDelay >= 0 of
+                            false -> {error, {invalid_field, base_delay, not_non_negative_integer}};
+                            true ->
+                                case is_integer(MaxDelay) andalso MaxDelay >= BaseDelay of
+                                    false -> {error, {invalid_field, max_delay, not_valid_max_delay}};
+                                    true -> ok
+                                end
+                        end
+                end
+        end
+    catch
+        _:_ -> {error, malformed_retry_policy_record}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Validates error handler record fields.
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_error_handler_fields(Handler :: term()) -> ok | {error, term()}.
+
+validate_error_handler_fields(Handler) ->
+    try
+        HandlerId = element(2, Handler),
+        ExceptionTypes = element(3, Handler),
+        HandlerFun = element(4, Handler),
+
+        case is_binary(HandlerId) of
+            false -> {error, {invalid_field, handler_id, not_binary}};
+            true ->
+                case is_list(ExceptionTypes) of
+                    false -> {error, {invalid_field, exception_types, not_a_list}};
+                    true ->
+                        case all_valid_exception_types(ExceptionTypes) of
+                            false -> {error, {invalid_field, exception_types, contains_invalid_types}};
+                            true ->
+                                case is_function(HandlerFun) of
+                                    false -> {error, {invalid_field, handler_fun, not_a_function}};
+                                    true -> ok
+                                end
+                        end
+                end
+        end
+    catch
+        _:_ -> {error, malformed_error_handler_record}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Checks if all items in a list are valid exception types.
+%% @end
+%%--------------------------------------------------------------------
+-spec all_valid_exception_types(List :: list()) -> boolean().
+
+all_valid_exception_types([]) -> true;
+all_valid_exception_types([H | T]) ->
+    case is_valid_exception_type(H) of
+        true -> all_valid_exception_types(T);
+        false -> false
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Checks if a term is a valid exception type.
+%% @end
+%%--------------------------------------------------------------------
+-spec is_valid_exception_type(Term :: term()) -> boolean().
+
+is_valid_exception_type(business_exception) -> true;
+is_valid_exception_type(system_exception) -> true;
+is_valid_exception_type(timeout_exception) -> true;
+is_valid_exception_type(resource_exception) -> true;
+is_valid_exception_type(data_exception) -> true;
+is_valid_exception_type(communication_exception) -> true;
+is_valid_exception_type(validation_exception) -> true;
+is_valid_exception_type(security_exception) -> true;
+is_valid_exception_type(workflow_exception) -> true;
+is_valid_exception_type(compensation_exception) -> true;
+is_valid_exception_type(_) -> false.
+
+%%--------------------------------------------------------------------
+%% @doc Checks if a term is a valid severity level.
+%% @end
+%%--------------------------------------------------------------------
+-spec is_valid_severity(Term :: term()) -> boolean().
+
+is_valid_severity(low) -> true;
+is_valid_severity(medium) -> true;
+is_valid_severity(high) -> true;
+is_valid_severity(critical) -> true;
+is_valid_severity(_) -> false.
+
+%%====================================================================
+%% Internal Logging Functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Internal function for structured logging with context.
+%% @end
+%%--------------------------------------------------------------------
+-spec log_with_context(Level :: atom(), Module :: atom(), Message :: binary(), Context :: map()) -> ok.
+
+log_with_context(Level, Module, Message, Context) ->
+    Timestamp = erlang:system_time(millisecond),
+    LogEntry = #{
+        timestamp => Timestamp,
+        module => Module,
+        message => Message,
+        context => Context,
+        level => Level
+    },
+
+    % Log to standard logger
+    logger:log(Level, "~p: ~s - Context: ~p", [Module, Message, Context]),
+
+    % Store in metrics if enabled
+    case ?METRICS_ENABLED of
+        true ->
+            store_log_entry(LogEntry);
+        false ->
+            ok
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Stores a log entry in the metrics system.
+%% @end
+%%--------------------------------------------------------------------
+-spec store_log_entry(LogEntry :: map()) -> ok.
+
+store_log_entry(_LogEntry) ->
+    % Placeholder for metrics storage integration
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Formats a stacktrace for logging.
+%% @end
+%%--------------------------------------------------------------------
+-spec format_stacktrace(Stacktrace :: list()) -> binary().
+
+format_stacktrace(Stacktrace) when is_list(Stacktrace) ->
+    try
+        Formatted = format_stacktrace_items(Stacktrace),
+        list_to_binary(Formatted)
+    catch
+        _:_ ->
+            <<"[stacktrace formatting error]">>
+    end;
+format_stacktrace(_) ->
+    <<"[invalid stacktrace]">>.
+
+%%--------------------------------------------------------------------
+%% @doc Formats individual stacktrace items.
+%% @end
+%%--------------------------------------------------------------------
+-spec format_stacktrace_items(Items :: list()) -> string().
+
+format_stacktrace_items([]) ->
+    "";
+format_stacktrace_items([{Module, Function, Arity, Location} | Rest]) ->
+    File = proplists:get_value(file, Location, "unknown"),
+    Line = proplists:get_value(line, Location, 0),
+    Item = io_lib:format("~p:~p/~p at ~s:~p", [Module, Function, Arity, File, Line]),
+    case Rest of
+        [] -> Item;
+        _ -> [Item, " | ", format_stacktrace_items(Rest)]
+    end;
+format_stacktrace_items([{Module, Function, Arity} | Rest]) ->
+    Item = io_lib:format("~p:~p/~p", [Module, Function, Arity]),
+    case Rest of
+        [] -> Item;
+        _ -> [Item, " | ", format_stacktrace_items(Rest)]
+    end;
+format_stacktrace_items([_ | Rest]) ->
+    format_stacktrace_items(Rest).

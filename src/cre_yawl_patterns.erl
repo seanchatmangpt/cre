@@ -125,6 +125,34 @@
          triggered_compensation/3,
          consecutive_compensate/1]).
 
+%% Pattern API functions - Data Flow (WDP-01 through WDP-05)
+-export([param_pass/2,
+         data_transform/2,
+         data_distribute/3,
+         data_accumulate/3,
+         data_visibility/3]).
+
+%% Pattern Execution API functions - Data Flow (WDP-01 through WDP-05)
+-export([execute_param_pass/2,
+         execute_data_transform/2,
+         execute_data_distribute/3,
+         execute_data_accumulate/3,
+         execute_data_visibility/3]).
+
+%% Pattern API functions - Resource (WRP-01 through WRP-05)
+-export([direct_resource_creation/2,
+         role_based_allocation/3,
+         resource_initialization/3,
+         role_based_distribution/4,
+         capability_based_allocation/3]).
+
+%% Pattern Execution API functions - Resource (WRP-01 through WRP-05)
+-export([execute_wrp_01_direct_creation/2,
+         execute_wrp_02_role_allocation/3,
+         execute_wrp_03_resource_init/3,
+         execute_wrp_04_role_distribution/4,
+         execute_wrp_05_capability_allocation/3]).
+
 %%====================================================================
 %% Record definitions
 %%====================================================================
@@ -181,6 +209,94 @@
           exception_type :: atom(),
           exception_reason :: term(),
           handled :: boolean()
+         }).
+
+%% Data Flow Pattern Records (WDP-01 through WDP-05)
+
+-record(param_pass_state, {
+          source_task :: atom() | function(),
+          target_task :: atom() | function(),
+          param_type :: term(),
+          param_schema :: map() | undefined,
+          validation_rules = [] :: list()
+         }).
+
+-record(data_transform_state, {
+          transform_fn :: function() | {module(), atom()},
+          input_type :: term(),
+          output_type :: term(),
+          schema_in :: map() | undefined,
+          schema_out :: map() | undefined,
+          validation_mode = strict :: atom()
+         }).
+
+-record(data_distribute_state, {
+          distribution_strategy :: broadcast | round_robin | partitioned,
+          source_data :: term(),
+          target_tasks :: list(),
+          partition_fn :: function() | undefined,
+          batch_size :: pos_integer() | unlimited
+         }).
+
+-record(data_accumulate_state, {
+          accumulation_fn :: sum | avg | count | max | min | custom,
+          custom_accumulator :: function() | undefined,
+          initial_value :: term(),
+          collected_values = [] :: list(),
+          intermediate_results = [] :: list()
+         }).
+
+-record(data_visibility_state, {
+          scope :: local | branch | global,
+          variable_name :: atom(),
+          variable_value :: term(),
+          accessible_contexts = [] :: list(),
+          visibility_rules = #{} :: map()
+         }).
+
+%% Resource Pattern Records (WRP-01 through WRP-05)
+-record(resource, {
+          resource_id :: reference() | atom(),
+          name :: atom(),
+          status :: available | busy | unavailable,
+          capabilities = [] :: list(),
+          roles = [] :: list(),
+          workload = 0 :: non_neg_integer(),
+          parameters = #{} :: map(),
+          created_at :: non_neg_integer(),
+          metadata = #{} :: map()
+         }).
+
+-record(resource_registry, {
+          resources = #{} :: map(),
+          role_index = #{} :: map(),
+          capability_index = #{} :: map(),
+          allocation_history = [] :: list(),
+          total_allocations = 0 :: non_neg_integer()
+         }).
+
+-record(resource_allocation, {
+          allocation_id :: reference(),
+          resource_id :: reference(),
+          work_item_id :: reference(),
+          allocated_at :: non_neg_integer(),
+          allocated_by :: atom(),
+          strategy :: atom(),
+          criteria = #{} :: map(),
+          status :: pending | active | completed,
+          result :: term(),
+          completed_at :: non_neg_integer() | undefined
+         }).
+
+-record(work_item, {
+          work_item_id :: reference(),
+          activity_id :: atom(),
+          required_capabilities = [] :: list(),
+          required_roles = [] :: list(),
+          parameters = #{} :: map(),
+          affinity :: atom() | undefined,
+          created_at :: non_neg_integer(),
+          data :: term()
          }).
 
 %%====================================================================
@@ -2952,3 +3068,946 @@ collect_pending_results([{Pid, Key} | Rest], Results) ->
     after 1000 ->
         collect_pending_results(Rest, [{Key, {error, timeout}} | Results])
     end.
+
+%%====================================================================
+%% YAWL Data Flow Patterns (WDP-01 through WDP-05)
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc WDP-01: Task-to-Task Data Pass Pattern
+%%
+%% Implements direct parameter passing between tasks with type checking
+%% and validation. Ensures data integrity and type safety.
+%%
+%% @param SourceTask The source task function or module:function tuple
+%% @param TargetTask The target task function or module:function tuple
+%% @return {ok, Pattern} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec param_pass(SourceTask :: term(), TargetTask :: term()) ->
+          {ok, #param_pass_state{}} | {error, term()}.
+
+param_pass(SourceTask, TargetTask)
+  when (is_function(SourceTask) or (is_tuple(SourceTask) andalso
+        tuple_size(SourceTask) =:= 2)) andalso
+       (is_function(TargetTask) or (is_tuple(TargetTask) andalso
+        tuple_size(TargetTask) =:= 2)) ->
+    {ok, #param_pass_state{
+        source_task = SourceTask,
+        target_task = TargetTask,
+        param_type = term,
+        param_schema = undefined,
+        validation_rules = []
+    }};
+
+param_pass(_SourceTask, _TargetTask) ->
+    {error, invalid_task_reference}.
+
+%%--------------------------------------------------------------------
+%% @doc Execute WDP-01: Task-to-Task Data Pass Pattern
+%%
+%% Executes parameter passing with type checking and validation.
+%%
+%% @param State Pattern state containing source and target tasks
+%% @param InputData Input data to pass from source to target
+%% @return {ok, Result} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_param_pass(State :: #param_pass_state{}, InputData :: term()) ->
+          {ok, term()} | {error, term()}.
+
+execute_param_pass(#param_pass_state{
+    source_task = SourceTask,
+    target_task = TargetTask,
+    validation_rules = Rules}, InputData) ->
+    try
+        %% Validate input data against schema if rules defined
+        case validate_param_data(InputData, Rules) of
+            {ok, ValidData} ->
+                %% Execute source task to obtain parameter
+                case execute_task(SourceTask, InputData) of
+                    {ok, Param} ->
+                        %% Execute target task with parameter from source
+                        case execute_task(TargetTask, Param) of
+                            {ok, Result} -> {ok, Result};
+                            {error, Reason} -> {error, {target_failed, Reason}}
+                        end;
+                    {error, Reason} ->
+                        {error, {source_failed, Reason}}
+                end;
+            {error, Reason} ->
+                {error, {validation_failed, Reason}}
+        end
+    catch
+        _Type:_Reason:_Stack ->
+            {error, execution_exception}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc WDP-02: Task-to-Task Data Transformation Pattern
+%%
+%% Implements data transformation between tasks with schema validation.
+%% Supports custom transformation functions with input/output schemas.
+%%
+%% @param TransformFn Function to transform data
+%% @param Schemas Map with input_schema and output_schema
+%% @return {ok, Pattern} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec data_transform(TransformFn :: term(), Schemas :: map()) ->
+          {ok, #data_transform_state{}} | {error, term()}.
+
+data_transform(TransformFn, Schemas)
+  when (is_function(TransformFn) or (is_tuple(TransformFn) andalso
+        tuple_size(TransformFn) =:= 2)) andalso
+       is_map(Schemas) ->
+    InputSchema = maps:get(input_schema, Schemas, undefined),
+    OutputSchema = maps:get(output_schema, Schemas, undefined),
+    ValidationMode = maps:get(validation_mode, Schemas, strict),
+
+    case ValidationMode of
+        strict -> ok;
+        lax -> ok;
+        permissive -> ok;
+        _ -> throw({error, invalid_validation_mode})
+    end,
+
+    {ok, #data_transform_state{
+        transform_fn = TransformFn,
+        input_type = maps:get(input_type, Schemas, term),
+        output_type = maps:get(output_type, Schemas, term),
+        schema_in = InputSchema,
+        schema_out = OutputSchema,
+        validation_mode = ValidationMode
+    }};
+
+data_transform(_TransformFn, _Schemas) ->
+    {error, invalid_transform_specification}.
+
+%%--------------------------------------------------------------------
+%% @doc Execute WDP-02: Task-to-Task Data Transformation Pattern
+%%
+%% Executes data transformation with schema validation.
+%%
+%% @param State Pattern state with transformation function
+%% @param InputData Data to transform
+%% @return {ok, TransformedData} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_data_transform(State :: #data_transform_state{},
+                             InputData :: term()) ->
+          {ok, term()} | {error, term()}.
+
+execute_data_transform(#data_transform_state{
+    transform_fn = TransformFn,
+    schema_in = SchemaIn,
+    schema_out = SchemaOut,
+    validation_mode = ValidationMode}, InputData) ->
+    try
+        %% Validate input data against input schema
+        case validate_schema(InputData, SchemaIn, ValidationMode) of
+            {ok, ValidatedInput} ->
+                %% Apply transformation function
+                case apply_transform(TransformFn, ValidatedInput) of
+                    {ok, TransformedData} ->
+                        %% Validate output against output schema
+                        case validate_schema(TransformedData, SchemaOut, ValidationMode) of
+                            {ok, ValidatedOutput} ->
+                                {ok, ValidatedOutput};
+                            {error, Reason} ->
+                                {error, {output_validation_failed, Reason}}
+                        end;
+                    {error, Reason} ->
+                        {error, {transformation_failed, Reason}}
+                end;
+            {error, Reason} ->
+                {error, {input_validation_failed, Reason}}
+        end
+    catch
+        _Type:_Reason:_Stack ->
+            {error, transformation_exception}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc WDP-03: Data Distribution Pattern
+%%
+%% Implements data distribution strategies: broadcast, round_robin,
+%% and partitioned. Supports multiple target tasks.
+%%
+%% @param Strategy Distribution strategy (broadcast|round_robin|partitioned)
+%% @param TargetTasks List of target tasks
+%% @param Options Map with optional partition_fn and batch_size
+%% @return {ok, Pattern} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec data_distribute(Strategy :: atom(), TargetTasks :: list(),
+                      Options :: map()) ->
+          {ok, #data_distribute_state{}} | {error, term()}.
+
+data_distribute(Strategy, TargetTasks, Options)
+  when (Strategy =:= broadcast orelse
+        Strategy =:= round_robin orelse
+        Strategy =:= partitioned) andalso
+       is_list(TargetTasks) andalso
+       TargetTasks =/= [] andalso
+       is_map(Options) ->
+    PartitionFn = maps:get(partition_fn, Options, undefined),
+    BatchSize = maps:get(batch_size, Options, unlimited),
+
+    %% Validate partition function for partitioned strategy
+    case Strategy =:= partitioned andalso PartitionFn =:= undefined of
+        true ->
+            {error, partitioned_strategy_requires_partition_fn};
+        false ->
+            {ok, #data_distribute_state{
+                distribution_strategy = Strategy,
+                source_data = undefined,
+                target_tasks = TargetTasks,
+                partition_fn = PartitionFn,
+                batch_size = BatchSize
+            }}
+    end;
+
+data_distribute(_Strategy, _TargetTasks, _Options) ->
+    {error, invalid_distribution_specification}.
+
+%%--------------------------------------------------------------------
+%% @doc Execute WDP-03: Data Distribution Pattern
+%%
+%% Executes data distribution using specified strategy.
+%%
+%% @param State Pattern state with distribution strategy
+%% @param InputData Data to distribute
+%% @param Timeout Execution timeout in milliseconds
+%% @return {ok, Results} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_data_distribute(State :: #data_distribute_state{},
+                              InputData :: term(),
+                              Timeout :: pos_integer() | infinity) ->
+          {ok, map()} | {error, term()}.
+
+execute_data_distribute(#data_distribute_state{
+    distribution_strategy = Strategy,
+    target_tasks = Targets,
+    partition_fn = PartitionFn,
+    batch_size = BatchSize}, InputData, Timeout) ->
+    try
+        case Strategy of
+            broadcast ->
+                execute_broadcast(Targets, InputData, Timeout);
+            round_robin ->
+                execute_round_robin(Targets, InputData, Timeout);
+            partitioned ->
+                execute_partitioned(Targets, InputData, PartitionFn,
+                                  BatchSize, Timeout)
+        end
+    catch
+        _Type:_Reason:_Stack ->
+            {error, distribution_exception}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc WDP-04: Data Accumulation Pattern
+%%
+%% Implements data accumulation with aggregation functions
+%% (sum, avg, count, max, min, custom).
+%%
+%% @param AggregationFn Aggregation function (sum|avg|count|max|min|custom)
+%% @param CustomFn Custom function if using custom aggregation
+%% @param Options Map with initial_value and other options
+%% @return {ok, Pattern} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec data_accumulate(AggregationFn :: atom(),
+                      CustomFn :: function() | undefined,
+                      Options :: map()) ->
+          {ok, #data_accumulate_state{}} | {error, term()}.
+
+data_accumulate(AggregationFn, CustomFn, Options)
+  when is_atom(AggregationFn) andalso is_map(Options) ->
+    ValidFns = [sum, avg, count, max, min, custom],
+    case lists:member(AggregationFn, ValidFns) of
+        false ->
+            {error, {invalid_aggregation_fn, AggregationFn}};
+        true ->
+            %% Validate custom function if custom aggregation
+            case AggregationFn =:= custom andalso not is_function(CustomFn) of
+                true ->
+                    {error, custom_aggregation_requires_function};
+                false ->
+                    InitialValue = maps:get(initial_value, Options, undefined),
+                    {ok, #data_accumulate_state{
+                        accumulation_fn = AggregationFn,
+                        custom_accumulator = CustomFn,
+                        initial_value = InitialValue,
+                        collected_values = [],
+                        intermediate_results = []
+                    }}
+            end
+    end;
+
+data_accumulate(_AggregationFn, _CustomFn, _Options) ->
+    {error, invalid_accumulation_specification}.
+
+%%--------------------------------------------------------------------
+%% @doc Execute WDP-04: Data Accumulation Pattern
+%%
+%% Executes data accumulation with specified aggregation function.
+%%
+%% @param State Pattern state with aggregation function
+%% @param DataList List of values to accumulate
+%% @return {ok, Result} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_data_accumulate(State :: #data_accumulate_state{},
+                              DataList :: list()) ->
+          {ok, term()} | {error, term()}.
+
+execute_data_accumulate(#data_accumulate_state{
+    accumulation_fn = AggregationFn,
+    custom_accumulator = CustomFn,
+    initial_value = InitialValue,
+    collected_values = _CollectedValues}, DataList) ->
+    try
+        case validate_data_list(DataList) of
+            {ok, ValidList} ->
+                case AggregationFn of
+                    sum ->
+                        Result = lists:foldl(fun(X, Acc) -> Acc + X end,
+                                           InitialValue orelse 0, ValidList),
+                        {ok, Result};
+                    avg when ValidList =/= [] ->
+                        Sum = lists:foldl(fun(X, Acc) -> Acc + X end, 0, ValidList),
+                        {ok, Sum / length(ValidList)};
+                    count ->
+                        {ok, length(ValidList)};
+                    max when ValidList =/= [] ->
+                        {ok, lists:max(ValidList)};
+                    min when ValidList =/= [] ->
+                        {ok, lists:min(ValidList)};
+                    custom when is_function(CustomFn) ->
+                        Result = lists:foldl(CustomFn, InitialValue, ValidList),
+                        {ok, Result};
+                    _ ->
+                        {error, {invalid_aggregation_for_data, AggregationFn}}
+                end;
+            {error, Reason} ->
+                {error, {invalid_data_list, Reason}}
+        end
+    catch
+        _Type:_Reason:_Stack ->
+            {error, accumulation_exception}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc WDP-05: Data Visibility/Scope Pattern
+%%
+%% Implements data visibility with local, branch, and global scoping.
+%% Controls which contexts can access variables.
+%%
+%% @param VariableName Name of the variable
+%% @param Scope Visibility scope (local|branch|global)
+%% @param VisibilityRules Map with visibility configuration
+%% @return {ok, Pattern} or {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec data_visibility(VariableName :: atom(), Scope :: atom(),
+                      VisibilityRules :: map()) ->
+          {ok, #data_visibility_state{}} | {error, term()}.
+
+data_visibility(VariableName, Scope, VisibilityRules)
+  when is_atom(VariableName) andalso
+       (Scope =:= local orelse Scope =:= branch orelse Scope =:= global) andalso
+       is_map(VisibilityRules) ->
+    AccessibleContexts = maps:get(accessible_contexts, VisibilityRules, []),
+
+    %% Validate scoping rules
+    case validate_visibility_scope(Scope, AccessibleContexts) of
+        ok ->
+            {ok, #data_visibility_state{
+                scope = Scope,
+                variable_name = VariableName,
+                variable_value = undefined,
+                accessible_contexts = AccessibleContexts,
+                visibility_rules = VisibilityRules
+            }};
+        {error, Reason} ->
+            {error, Reason}
+    end;
+
+data_visibility(_VariableName, _Scope, _VisibilityRules) ->
+    {error, invalid_visibility_specification}.
+
+%%--------------------------------------------------------------------
+%% @doc Execute WDP-05: Data Visibility/Scope Pattern
+%%
+%% Executes data visibility check and enforces scope restrictions.
+%%
+%% @param State Pattern state with visibility rules
+%% @param VariableValue Value to store
+%% @param RequestingContext Context requesting access
+%% @return {ok, Value} or {error, access_denied}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_data_visibility(State :: #data_visibility_state{},
+                              VariableValue :: term(),
+                              RequestingContext :: atom()) ->
+          {ok, term()} | {error, term()}.
+
+execute_data_visibility(#data_visibility_state{
+    scope = Scope,
+    variable_name = VarName,
+    accessible_contexts = AccessibleContexts,
+    visibility_rules = VisibilityRules}, VariableValue, RequestingContext) ->
+    try
+        %% Check if requesting context has access
+        case check_visibility_access(Scope, RequestingContext,
+                                    AccessibleContexts, VisibilityRules) of
+            {ok, allowed} ->
+                {ok, VariableValue};
+            {ok, denied} ->
+                {error, {access_denied, {variable, VarName}, {context, RequestingContext}}};
+            {error, Reason} ->
+                {error, Reason}
+        end
+    catch
+        _Type:_Reason:_Stack ->
+            {error, visibility_check_exception}
+    end.
+
+%%====================================================================
+%% Helper Functions for Data Flow Patterns
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Validate parameter data against validation rules
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_param_data(Data :: term(), Rules :: list()) ->
+          {ok, term()} | {error, term()}.
+
+validate_param_data(Data, []) ->
+    {ok, Data};
+
+validate_param_data(Data, Rules) ->
+    case apply_validation_rules(Data, Rules) of
+        true -> {ok, Data};
+        false -> {error, validation_failed}
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Apply validation rules to data
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec apply_validation_rules(Data :: term(), Rules :: list()) ->
+          boolean().
+
+apply_validation_rules(_Data, []) ->
+    true;
+
+apply_validation_rules(Data, [Rule | Rest]) ->
+    case apply_validation_rule(Data, Rule) of
+        true -> apply_validation_rules(Data, Rest);
+        false -> false
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Apply a single validation rule
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec apply_validation_rule(Data :: term(), Rule :: term()) ->
+          boolean().
+
+apply_validation_rule(Data, {type, Type}) ->
+    case Type of
+        integer when is_integer(Data) -> true;
+        float when is_float(Data) -> true;
+        number when is_number(Data) -> true;
+        atom when is_atom(Data) -> true;
+        list when is_list(Data) -> true;
+        map when is_map(Data) -> true;
+        binary when is_binary(Data) -> true;
+        _ -> false
+    end;
+
+apply_validation_rule(Data, {min, Min}) when is_number(Data) ->
+    Data >= Min;
+
+apply_validation_rule(Data, {max, Max}) when is_number(Data) ->
+    Data =< Max;
+
+apply_validation_rule(Data, {length, Len}) when is_list(Data) ->
+    length(Data) =:= Len;
+
+apply_validation_rule(_Data, _Rule) ->
+    false.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Validate data against schema
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_schema(Data :: term(), Schema :: map() | undefined,
+                      ValidationMode :: atom()) ->
+          {ok, term()} | {error, term()}.
+
+validate_schema(Data, undefined, _ValidationMode) ->
+    {ok, Data};
+
+validate_schema(Data, Schema, ValidationMode)
+  when is_map(Schema) ->
+    case ValidationMode of
+        strict ->
+            case check_strict_schema(Data, Schema) of
+                true -> {ok, Data};
+                false -> {error, schema_mismatch}
+            end;
+        lax ->
+            {ok, Data};
+        permissive ->
+            {ok, Data}
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Check strict schema compliance
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec check_strict_schema(Data :: term(), Schema :: map()) ->
+          boolean().
+
+check_strict_schema(Data, Schema) when is_map(Data) ->
+    maps:fold(fun(Key, Type, Acc) ->
+        case maps:get(Key, Data, undefined) of
+            undefined -> false;
+            Value ->
+                case check_type_match(Value, Type) of
+                    true -> Acc;
+                    false -> false
+                end
+        end
+    end, true, Schema);
+
+check_strict_schema(_Data, _Schema) ->
+    false.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Check if value matches type
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec check_type_match(Value :: term(), Type :: term()) ->
+          boolean().
+
+check_type_match(Value, Type) ->
+    case Type of
+        integer -> is_integer(Value);
+        float -> is_float(Value);
+        number -> is_number(Value);
+        atom -> is_atom(Value);
+        list -> is_list(Value);
+        map -> is_map(Value);
+        binary -> is_binary(Value);
+        term -> true;
+        _ -> false
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Apply transformation function to data
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec apply_transform(TransformFn :: term(), InputData :: term()) ->
+          {ok, term()} | {error, term()}.
+
+apply_transform(Fun, InputData) when is_function(Fun, 1) ->
+    try
+        Result = Fun(InputData),
+        {ok, Result}
+    catch
+        _Type:Reason:_Stack ->
+            {error, {transformation_error, Reason}}
+    end;
+
+apply_transform({Module, Function}, InputData)
+  when is_atom(Module), is_atom(Function) ->
+    try
+        Result = erlang:apply(Module, Function, [InputData]),
+        {ok, Result}
+    catch
+        _Type:Reason:_Stack ->
+            {error, {module_function_error, Reason}}
+    end;
+
+apply_transform(_TransformFn, _InputData) ->
+    {error, invalid_transform_function}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Execute a task (function or module:function)
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_task(Task :: term(), Argument :: term()) ->
+          {ok, term()} | {error, term()}.
+
+execute_task(Fun, Argument) when is_function(Fun, 1) ->
+    try
+        Result = Fun(Argument),
+        {ok, Result}
+    catch
+        _Type:Reason:_Stack ->
+            {error, {task_failed, Reason}}
+    end;
+
+execute_task({Module, Function}, Argument)
+  when is_atom(Module), is_atom(Function) ->
+    try
+        Result = erlang:apply(Module, Function, [Argument]),
+        {ok, Result}
+    catch
+        _Type:Reason:_Stack ->
+            {error, {task_failed, Reason}}
+    end;
+
+execute_task(_Task, _Argument) ->
+    {error, invalid_task}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Execute broadcast distribution strategy
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_broadcast(Targets :: list(), Data :: term(),
+                        Timeout :: pos_integer() | infinity) ->
+          {ok, map()} | {error, term()}.
+
+execute_broadcast(Targets, Data, Timeout) ->
+    Results = maps:new(),
+    execute_broadcast_tasks(Targets, Data, Timeout, Results).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Execute broadcast tasks recursively
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_broadcast_tasks(Targets :: list(), Data :: term(),
+                              Timeout :: pos_integer() | infinity,
+                              Results :: map()) ->
+          {ok, map()} | {error, term()}.
+
+execute_broadcast_tasks([], _Data, _Timeout, Results) ->
+    {ok, Results};
+
+execute_broadcast_tasks([Target | Rest], Data, Timeout, Results) ->
+    case execute_task(Target, Data) of
+        {ok, Result} ->
+            TargetKey = task_to_key(Target),
+            NewResults = maps:put(TargetKey, {ok, Result}, Results),
+            execute_broadcast_tasks(Rest, Data, Timeout, NewResults);
+        {error, Reason} ->
+            TargetKey = task_to_key(Target),
+            NewResults = maps:put(TargetKey, {error, Reason}, Results),
+            execute_broadcast_tasks(Rest, Data, Timeout, NewResults)
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Execute round-robin distribution strategy
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_round_robin(Targets :: list(), Data :: term(),
+                          Timeout :: pos_integer() | infinity) ->
+          {ok, map()} | {error, term()}.
+
+execute_round_robin(Targets, Data, Timeout) ->
+    DistributedData = distribute_round_robin(Data, Targets),
+    Results = maps:new(),
+    execute_round_robin_tasks(DistributedData, Timeout, Results).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Distribute data using round-robin strategy
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec distribute_round_robin(Data :: term(), Targets :: list()) ->
+          list().
+
+distribute_round_robin(Data, Targets) when is_list(Data) ->
+    NumTargets = length(Targets),
+    lists:zip(Targets, distribute_list_round_robin(Data, NumTargets));
+
+distribute_round_robin(Data, Targets) ->
+    lists:zip(Targets, lists:duplicate(length(Targets), Data)).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Distribute list items round-robin
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec distribute_list_round_robin(Data :: list(), NumBuckets :: pos_integer()) ->
+          list().
+
+distribute_list_round_robin(Data, NumBuckets) ->
+    Buckets = lists:duplicate(NumBuckets, []),
+    distribute_into_buckets(Data, Buckets, 0).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Distribute items into buckets
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec distribute_into_buckets(Data :: list(), Buckets :: list(),
+                              Index :: non_neg_integer()) ->
+          list().
+
+distribute_into_buckets([], Buckets, _Index) ->
+    Buckets;
+
+distribute_into_buckets([Item | Rest], Buckets, Index) ->
+    BucketIndex = (Index rem length(Buckets)) + 1,
+    UpdatedBuckets = update_bucket(Buckets, BucketIndex, Item),
+    distribute_into_buckets(Rest, UpdatedBuckets, Index + 1).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Update a specific bucket
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec update_bucket(Buckets :: list(), Index :: pos_integer(),
+                    Item :: term()) ->
+          list().
+
+update_bucket(Buckets, Index, Item) ->
+    lists:nth(Index, Buckets) ++ [Item].
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Execute round-robin tasks
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_round_robin_tasks(TaskDataPairs :: list(),
+                                Timeout :: pos_integer() | infinity,
+                                Results :: map()) ->
+          {ok, map()} | {error, term()}.
+
+execute_round_robin_tasks([], _Timeout, Results) ->
+    {ok, Results};
+
+execute_round_robin_tasks([{Task, Data} | Rest], Timeout, Results) ->
+    case execute_task(Task, Data) of
+        {ok, Result} ->
+            TaskKey = task_to_key(Task),
+            NewResults = maps:put(TaskKey, {ok, Result}, Results),
+            execute_round_robin_tasks(Rest, Timeout, NewResults);
+        {error, Reason} ->
+            TaskKey = task_to_key(Task),
+            NewResults = maps:put(TaskKey, {error, Reason}, Results),
+            execute_round_robin_tasks(Rest, Timeout, NewResults)
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Execute partitioned distribution strategy
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_partitioned(Targets :: list(), Data :: term(),
+                          PartitionFn :: function(),
+                          BatchSize :: pos_integer() | unlimited,
+                          Timeout :: pos_integer() | infinity) ->
+          {ok, map()} | {error, term()}.
+
+execute_partitioned(Targets, Data, PartitionFn, BatchSize, Timeout) ->
+    case apply_partition_function(Data, PartitionFn, Targets) of
+        {ok, Partitions} ->
+            Results = maps:new(),
+            execute_partitioned_tasks(Partitions, BatchSize, Timeout, Results);
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Apply partition function
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec apply_partition_function(Data :: term(), PartitionFn :: function(),
+                               Targets :: list()) ->
+          {ok, list()} | {error, term()}.
+
+apply_partition_function(Data, PartitionFn, Targets)
+  when is_function(PartitionFn, 2) ->
+    try
+        Partitions = PartitionFn(Data, Targets),
+        {ok, Partitions}
+    catch
+        _Type:Reason:_Stack ->
+            {error, {partition_function_failed, Reason}}
+    end;
+
+apply_partition_function(_Data, _PartitionFn, _Targets) ->
+    {error, invalid_partition_function}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Execute partitioned tasks
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_partitioned_tasks(Partitions :: list(),
+                                BatchSize :: pos_integer() | unlimited,
+                                Timeout :: pos_integer() | infinity,
+                                Results :: map()) ->
+          {ok, map()} | {error, term()}.
+
+execute_partitioned_tasks([], _BatchSize, _Timeout, Results) ->
+    {ok, Results};
+
+execute_partitioned_tasks([{Task, PartitionData} | Rest],
+                          BatchSize, Timeout, Results) ->
+    case execute_task(Task, PartitionData) of
+        {ok, Result} ->
+            TaskKey = task_to_key(Task),
+            NewResults = maps:put(TaskKey, {ok, Result}, Results),
+            execute_partitioned_tasks(Rest, BatchSize, Timeout, NewResults);
+        {error, Reason} ->
+            TaskKey = task_to_key(Task),
+            NewResults = maps:put(TaskKey, {error, Reason}, Results),
+            execute_partitioned_tasks(Rest, BatchSize, Timeout, NewResults)
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Validate data list for accumulation
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_data_list(Data :: term()) ->
+          {ok, list()} | {error, term()}.
+
+validate_data_list(Data) when is_list(Data) ->
+    {ok, Data};
+
+validate_data_list(_Data) ->
+    {error, not_a_list}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Validate visibility scope
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec validate_visibility_scope(Scope :: atom(), AccessibleContexts :: list()) ->
+          ok | {error, term()}.
+
+validate_visibility_scope(local, _AccessibleContexts) ->
+    ok;
+
+validate_visibility_scope(branch, AccessibleContexts) when is_list(AccessibleContexts) ->
+    ok;
+
+validate_visibility_scope(global, _AccessibleContexts) ->
+    ok;
+
+validate_visibility_scope(_Scope, _AccessibleContexts) ->
+    {error, invalid_scope}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Check visibility access permissions
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec check_visibility_access(Scope :: atom(), RequestingContext :: atom(),
+                              AccessibleContexts :: list(),
+                              VisibilityRules :: map()) ->
+          {ok, allowed | denied} | {error, term()}.
+
+check_visibility_access(global, _RequestingContext, _AccessibleContexts, _Rules) ->
+    {ok, allowed};
+
+check_visibility_access(local, RequestingContext, AccessibleContexts, _Rules) ->
+    case lists:member(RequestingContext, AccessibleContexts) of
+        true -> {ok, allowed};
+        false -> {ok, denied}
+    end;
+
+check_visibility_access(branch, RequestingContext, AccessibleContexts, Rules) ->
+    case maps:get(branch_context, Rules, undefined) of
+        undefined ->
+            case lists:member(RequestingContext, AccessibleContexts) of
+                true -> {ok, allowed};
+                false -> {ok, denied}
+            end;
+        BranchContext ->
+            case lists:member(RequestingContext, AccessibleContexts) andalso
+                 is_same_branch(RequestingContext, BranchContext) of
+                true -> {ok, allowed};
+                false -> {ok, denied}
+            end
+    end;
+
+check_visibility_access(_Scope, _RequestingContext, _AccessibleContexts, _Rules) ->
+    {error, invalid_scope}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Check if context is in same branch
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec is_same_branch(Context :: atom(), BranchContext :: atom()) ->
+          boolean().
+
+is_same_branch(Context, BranchContext) ->
+    Context =:= BranchContext.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Convert task to key for results map
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec task_to_key(Task :: term()) ->
+          atom() | string().
+
+task_to_key(Fun) when is_function(Fun) ->
+    erlang:fun_to_list(Fun);
+
+task_to_key({Module, Function})
+  when is_atom(Module), is_atom(Function) ->
+    list_to_atom(atom_to_list(Module) ++ ":" ++ atom_to_list(Function));
+
+task_to_key(Task) ->
+    Task.

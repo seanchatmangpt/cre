@@ -141,6 +141,24 @@
 }).
 
 %%--------------------------------------------------------------------
+%% WCP-05: Parallel Merge Pattern
+%%--------------------------------------------------------------------
+-record(wcp_05_parallel_merge, {
+    merge_task_id :: binary(),
+    incoming_task_ids :: [binary()],
+    required_count :: pos_integer() | all
+}).
+
+%%--------------------------------------------------------------------
+%% WCP-06: Blocking Discriminator Pattern
+%%--------------------------------------------------------------------
+-record(wcp_06_blocking_discriminator, {
+    merge_task_id :: binary(),
+    incoming_task_ids :: [binary()],
+    blocking_mode :: block_subsequent | reset_on_first
+}).
+
+%%--------------------------------------------------------------------
 %% WCP-07: Structured Synchronization Merge Pattern
 %%--------------------------------------------------------------------
 -record(wcp_07_structured_sync_merge, {
@@ -149,11 +167,30 @@
 }).
 
 %%--------------------------------------------------------------------
+%% WCP-08: Multi-Merge Pattern
+%%--------------------------------------------------------------------
+-record(wcp_08_multi_merge, {
+    merge_task_id :: binary(),
+    incoming_task_ids :: [binary()],
+    firing_semantics :: fire_on_each | accumulate | none
+}).
+
+%%--------------------------------------------------------------------
 %% WCP-09: Discriminator Pattern
 %%--------------------------------------------------------------------
 -record(wcp_09_discriminator, {
     branch_count :: pos_integer(),
     branch_tasks :: [binary()]
+}).
+
+%%--------------------------------------------------------------------
+%% WCP-10: Arbitrary Cycles Pattern
+%%--------------------------------------------------------------------
+-record(wcp_10_arbitrary_cycles, {
+    loop_task_id :: binary(),
+    back_edge_targets :: [binary()],
+    condition_fun :: fun((term()) -> boolean()),
+    max_iterations :: pos_integer() | unlimited
 }).
 
 %%--------------------------------------------------------------------
