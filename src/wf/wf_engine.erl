@@ -78,6 +78,7 @@
 -export([service_reply/5]).
 -export([publish/4]).
 -export([case_log/2]).
+-export([offered_workitems/2]).
 -export([set_worklet/2]).
 -export([apply_worklet/4]).
 -export([doctest_test/0]).
@@ -733,6 +734,16 @@ case_log(Engine, CaseId) ->
     gen_server:call(Engine, {case_log, CaseId}).
 
 %%--------------------------------------------------------------------
+%% @doc Returns offered (unallocated) work items for a case.
+%% @return [{Task, WiId}] Work items with status=offered
+%% @end
+%%--------------------------------------------------------------------
+-spec offered_workitems(Engine :: pid() | atom(), CaseId :: case_id()) ->
+    [{atom(), wi_id()}].
+offered_workitems(Engine, CaseId) ->
+    gen_server:call(Engine, {offered_workitems, CaseId}).
+
+%%--------------------------------------------------------------------
 %% @doc Runs doctests for the module.
 %%
 %% == Example
@@ -1024,6 +1035,18 @@ handle_call({case_log, CaseId}, _From, State) ->
     case maps:get(CaseId, State#engine_state.cases, undefined) of
         undefined -> {reply, {error, not_found}, State};
         #wf_case{log = Log} -> {reply, lists:reverse(Log), State}
+    end;
+
+handle_call({offered_workitems, CaseId}, _From, State) ->
+    case maps:get(CaseId, State#engine_state.cases, undefined) of
+        undefined -> {reply, [], State};
+        #wf_case{work_items = WIs} ->
+            Offered = [
+                {WI#work_item.task, WI#work_item.wi_id}
+                || WI <- maps:values(WIs),
+                   WI#work_item.status =:= offered
+            ],
+            {reply, Offered, State}
     end;
 
 handle_call({set_worklet, Worklet}, _From, State) ->

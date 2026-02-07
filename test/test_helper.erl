@@ -5,7 +5,8 @@
 %% Ensures cre's gen_pnet (with inject/step/drain) is loaded before the dep's version,
 %% which lacks these functions and causes {undef, gen_pnet:inject} in CT.
 -module(test_helper).
--export([setup/0, cleanup/1, ensure_cre_gen_pnet_loaded/0]).
+-export([setup/0, cleanup/1, ensure_cre_gen_pnet_loaded/0,
+         ensure_app_started/1, ensure_app_stopped/1]).
 
 setup() ->
     ok = ensure_cre_gen_pnet_loaded(),
@@ -26,3 +27,23 @@ cleanup(_) ->
 -spec ensure_cre_gen_pnet_loaded() -> ok.
 ensure_cre_gen_pnet_loaded() ->
     cre:ensure_cre_gen_pnet_loaded().
+
+%% @doc Safely start an application. Handles already_started for test isolation.
+%% Returns ok when app is running or already running; ignores unknown app.
+-spec ensure_app_started(atom()) -> ok | {error, term()}.
+ensure_app_started(App) ->
+    case application:ensure_all_started(App) of
+        {ok, _} -> ok;
+        {error, {already_started, _}} -> ok;
+        {error, {not_found, _}} -> ok;  %% App not in deps, skip
+        {error, _} = Err -> Err
+    end.
+
+%% @doc Safely stop an application. Handles not_started for test isolation.
+-spec ensure_app_stopped(atom()) -> ok | {error, term()}.
+ensure_app_stopped(App) ->
+    case application:stop(App) of
+        ok -> ok;
+        {error, {not_started, _}} -> ok;
+        {error, _} = Err -> Err
+    end.

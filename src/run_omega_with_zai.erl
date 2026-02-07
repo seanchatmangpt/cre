@@ -30,7 +30,7 @@ do_main(_Args) ->
             io:format("Step 1: Z.AI API key configured~n")
     end,
 
-    %% Step 2: Start applications (yamerl for YAML; cre loads deps)
+    %% Step 2: Start applications (yamerl for YAML, inets for HTTP)
     io:format("Step 2: Starting applications...~n"),
     _ = application:load(cre),
     case application:ensure_all_started(yamerl) of
@@ -136,7 +136,7 @@ find_and_complete_human_task(Pid, Executor, Marking) ->
             Place ->
                 Data = case zai_client:chat_json(
                     [#{role => <<"user">>, content => <<"Complete this workflow task. Reply JSON: {\"decision\":\"accept\"}">>}],
-                    #{model => <<"glm-4-plus">>, temperature => 0.3, max_tokens => 64}
+                    #{model => zai_client:get_model(), temperature => 0.3, max_tokens => 64}
                 ) of
                     {ok, Json} -> maps:get(<<"decision">>, Json, <<"accept">>);
                     _ -> <<"accept">>

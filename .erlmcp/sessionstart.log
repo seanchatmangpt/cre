@@ -268,3 +268,297 @@ src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
 
 [SUCCESS] Project compilation verified
 [SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T11:20:54-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     205 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T11:21:12-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     205 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T11:21:59-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     205 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T11:22:08-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     205 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T11:23:30-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     205 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T13:46:36-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     205 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete

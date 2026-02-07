@@ -596,6 +596,32 @@ validate_workflow_data(Data) when is_map(Data) ->
 validate_workflow_data(_) ->
     {error, <<"invalid workflow data">>}.
 
+%% ETS table for HTTP API backend (workflows, executions, patterns, tasks)
+-define(HTTP_BACKEND_TABLE, cre_yawl_http_backend).
+
+ensure_backend_table() ->
+    case ets:whereis(?HTTP_BACKEND_TABLE) of
+        undefined ->
+            ets:new(?HTTP_BACKEND_TABLE, [named_table, set, public]);
+        _ -> ok
+    end.
+
+backend_get(Type, Key) ->
+    ensure_backend_table(),
+    case ets:lookup(?HTTP_BACKEND_TABLE, {Type, Key}) of
+        [{_, Val}] -> {ok, Val};
+        [] -> {error, not_found}
+    end.
+
+backend_put(Type, Key, Val) ->
+    ensure_backend_table(),
+    ets:insert(?HTTP_BACKEND_TABLE, {{Type, Key}, Val}),
+    ok.
+
+backend_list(Type) ->
+    ensure_backend_table(),
+    [V || [V] <- ets:match(?HTTP_BACKEND_TABLE, {{Type, '_'}, '$1'})].
+
 %% @doc Create a new workflow
 -spec create_workflow(map()) -> {ok, workflow_id(), term()} | {error, term()}.
 create_workflow(WorkflowData) ->
@@ -605,74 +631,103 @@ create_workflow(WorkflowData) ->
         <<"created_at">> => erlang:system_time(millisecond),
         <<"status">> => <<"draft">>
     },
-    % TODO: Store in backend
+    backend_put(workflow, WorkflowId, Workflow),
     {ok, WorkflowId, Workflow}.
 
 %% @doc Get workflow by ID
 -spec get_workflow(workflow_id()) -> {ok, term()} | {error, term()}.
-get_workflow(_WorkflowId) ->
-    % TODO: Retrieve from backend
-    {error, not_found}.
+get_workflow(WorkflowId) ->
+    backend_get(workflow, WorkflowId).
 
 %% @doc Get all workflows
 -spec get_all_workflows() -> {ok, list()} | {error, term()}.
 get_all_workflows() ->
-    % TODO: Retrieve from backend
-    {ok, []}.
+    {ok, backend_list(workflow)}.
 
 %% @doc Update workflow
 -spec update_workflow(workflow_id(), map()) -> {ok, term()} | {error, term()}.
-update_workflow(_WorkflowId, _UpdateData) ->
-    % TODO: Update in backend
-    {error, not_found}.
+update_workflow(WorkflowId, UpdateData) ->
+    case backend_get(workflow, WorkflowId) of
+        {ok, Existing} ->
+            Merged = maps:merge(Existing, UpdateData),
+            backend_put(workflow, WorkflowId, Merged),
+            {ok, Merged};
+        {error, not_found} -> {error, not_found}
+    end.
 
 %% @doc Validate workflow structure
 -spec validate_workflow_structure(term()) -> {ok, list()} | {error, term()}.
-validate_workflow_structure(_Workflow) ->
-    % TODO: Implement validation logic
-    {ok, []}.
+validate_workflow_structure(Workflow) when is_map(Workflow) ->
+    case maps:is_key(<<"id">>, Workflow) of
+        true -> {ok, []};
+        false -> {ok, [<<"Missing required field: id">>]}
+    end;
+validate_workflow_structure(_) ->
+    {ok, [<<"Invalid workflow structure">>]}.
 
 %% @doc Execute workflow
 -spec execute_workflow(workflow_id(), map()) -> {ok, binary(), map()} | {error, term()}.
-execute_workflow(_WorkflowId, _Params) ->
-    % TODO: Execute in backend
-    ExecutionId = generate_id(),
-    ExecutionState = #{
-        <<"status">> => <<"started">>,
-        <<"timestamp">> => erlang:system_time(millisecond),
-        <<"progress">> => 0
-    },
-    {ok, ExecutionId, ExecutionState}.
+execute_workflow(WorkflowId, Params) ->
+    case backend_get(workflow, WorkflowId) of
+        {ok, _Workflow} ->
+            ExecutionId = generate_id(),
+            ExecutionState = #{
+                <<"status">> => <<"started">>,
+                <<"timestamp">> => erlang:system_time(millisecond),
+                <<"progress">> => 0,
+                <<"params">> => Params
+            },
+            backend_put(execution, ExecutionId, #{
+                <<"id">> => ExecutionId,
+                <<"workflow_id">> => WorkflowId,
+                <<"state">> => ExecutionState
+            }),
+            {ok, ExecutionId, ExecutionState};
+        {error, not_found} -> {error, not_found}
+    end.
 
 %% @doc Get available patterns
 -spec get_available_patterns() -> {ok, list()} | {error, term()}.
 get_available_patterns() ->
-    % TODO: Retrieve from backend
-    {ok, []}.
+    %% Return known pattern names from yawl_pattern_registry
+    Patterns = case yawl_pattern_registry:all_patterns() of
+        L when is_list(L) -> [#{<<"id">> => P, <<"name">> => P} || P <- L];
+        _ -> []
+    end,
+    {ok, Patterns}.
 
 %% @doc Instantiate a pattern
 -spec instantiate_pattern(pattern_name(), map()) -> {ok, map()} | {error, term()}.
-instantiate_pattern(_PatternName, _Data) ->
-    % TODO: Instantiate in backend
-    {error, not_found}.
+instantiate_pattern(PatternName, Data) ->
+    case yawl_pattern_registry:pattern_module(PatternName) of
+        undefined -> {error, not_found};
+        _Mod ->
+            Instance = #{<<"pattern">> => PatternName, <<"data">> => Data},
+            InstId = generate_id(),
+            backend_put(pattern_instance, InstId, Instance#{<<"id">> => InstId}),
+            {ok, Instance#{<<"id">> => InstId}}
+    end.
 
 %% @doc Get all tasks
 -spec get_all_tasks() -> {ok, list()} | {error, term()}.
 get_all_tasks() ->
-    % TODO: Retrieve from backend
-    {ok, []}.
+    {ok, backend_list(task)}.
 
 %% @doc Get task by ID
 -spec get_task(task_id()) -> {ok, term()} | {error, term()}.
-get_task(_TaskId) ->
-    % TODO: Retrieve from backend
-    {error, not_found}.
+get_task(TaskId) ->
+    backend_get(task, TaskId).
 
 %% @doc Complete a task
 -spec complete_task(task_id(), map()) -> {ok, term()} | {error, term()}.
-complete_task(_TaskId, _Data) ->
-    % TODO: Complete in backend
-    {error, not_found}.
+complete_task(TaskId, Data) ->
+    case backend_get(task, TaskId) of
+        {ok, Existing} ->
+            Completed = Existing#{<<"status">> => <<"completed">>, <<"completed_data">> => Data},
+            backend_put(task, TaskId, Completed),
+            {ok, Completed};
+        {error, not_found} -> {error, not_found}
+    end.
 
 %% @doc Generate unique ID
 -spec generate_id() -> binary().

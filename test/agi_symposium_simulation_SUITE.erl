@@ -177,13 +177,16 @@ test_zai_backed_run(_Config) ->
             ct:pal("Skipping test_zai_backed_run: ZAI_API_KEY not configured"),
             {skip, "ZAI_API_KEY not configured"};
         _ ->
-            Spec = agi_symposium_participants:agi_symposium_spec(),
-            Options = #{zai_enabled => true, model => <<"glm-4-plus">>},
+            Spec = agi_symposium_participants:agi_symposium_spec_full(),
+            Options = #{zai_enabled => true, model => zai_client:get_model()},
             case agi_symposium_simulator:run(Spec, Options) of
                 {ok, Result} ->
                     ?assert(maps:is_key(case_id, Result)),
                     ?assert(maps:is_key(status, Result)),
                     ?assertEqual(completed, maps:get(status, Result)),
+                    Rounds = maps:get(participant_rounds, Result, 0),
+                    ct:pal("AGI Symposium: ~p rounds, 5 LLMs (Program Chair, Reviewer, Ops, Venue, Press) simulated humans", [Rounds]),
+                    agi_symposium_otel:print_otel_script(Result),
                     ct:pal("ZAI-backed simulation completed: ~p", [Result]),
                     ok;
                 {error, Reason} ->

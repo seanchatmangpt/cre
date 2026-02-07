@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# YC Demo: AGI Symposium with LLMs simulating human participants.
+# Usage: ZAI_API_KEY=your_key ./demo
+#        ./demo --dry-run             (no Z.AI, fast rehearsal)
+#        ./demo --with-dashboard      (open trace at http://localhost:8081)
+exec "$(dirname "$0")/scripts/run_agi_symposium_demo.sh" "$@"

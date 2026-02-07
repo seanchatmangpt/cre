@@ -40,7 +40,7 @@
 %% @end
 %%--------------------------------------------------------------------
 setup() ->
-    application:ensure_all_started(bcrypt),
+    test_helper:ensure_app_started(bcrypt),
     {ok, Pid} = yawl_auth:start_auth([{session_timeout, 3600}]),
     Pid.
 

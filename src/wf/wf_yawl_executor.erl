@@ -128,7 +128,7 @@
 -export([execute_workflow/2, execute_workflow/3]).
 
 %% Executor info
--export([executor_info/1, get_root_module/1]).
+-export([executor_info/1, get_root_module/1, get_subnet_modules/1, get_subnet_info/2]).
 
 %%====================================================================
 %% Includes
@@ -371,6 +371,8 @@ load_compiled_modules(Modules, TmpDir) ->
                             {error, Reason} -> throw({load_failed, CompiledModule, Reason})
                         end;
                     {error, Errors} ->
+                        throw({compile_failed, ModuleName, Errors});
+                    {error, Errors, _Warnings} ->
                         throw({compile_failed, ModuleName, Errors})
                 end;
             {error, Reason} ->
@@ -968,6 +970,54 @@ execute_workflow(FilePath, InitialData, Options)
 %%--------------------------------------------------------------------
 -spec get_root_module(Executor :: executor()) -> atom().
 get_root_module(#yawl_executor{root_module = RootMod}) -> RootMod.
+
+%% @doc Returns list of {NetId, Module} for all subnet modules (excluding root).
+-spec get_subnet_modules(Executor :: executor()) -> [{binary(), atom()}].
+get_subnet_modules(#yawl_executor{spec = Spec, compiled = Compiled}) ->
+    RootNet = root_net_from_spec(Spec),
+    Prefix = <<"yawl_">>,
+    maps:fold(fun(NetId, _ModuleCode, Acc) ->
+        case NetId =:= RootNet of
+            true -> Acc;
+            false ->
+                ModAtom = net_id_to_module(NetId, Prefix),
+                [{NetId, ModAtom} | Acc]
+        end
+    end, [], maps:get(modules, Compiled, #{})).
+
+%% @doc Returns subnet info {entry, exit} for a net from YAML spec, or undefined.
+-spec get_subnet_info(Executor :: executor(), NetId :: binary()) -> #{entry := atom(), exit := atom()} | undefined.
+get_subnet_info(#yawl_executor{spec = Spec}, NetId) when is_tuple(Spec), element(1, Spec) =:= yawl_yaml_spec ->
+    RootNet = wf_yaml_spec:root_net(Spec),
+    Subnets = wf_yaml_spec:net_subnets(Spec, RootNet),
+    case lists:search(fun(S) -> subnet_id(S) =:= NetId end, Subnets) of
+        {value, Sub} ->
+            Entry = to_atom(maps:get(<<"entry">>, Sub, maps:get(entry, Sub, undefined))),
+            Exit = to_atom(maps:get(<<"exit">>, Sub, maps:get(exit, Sub, undefined))),
+            #{entry => Entry, exit => Exit};
+        false -> undefined
+    end;
+get_subnet_info(_, _) -> undefined.
+
+subnet_id(#{<<"id">> := Id}) -> Id;
+subnet_id(#{id := Id}) -> Id;
+subnet_id(_) -> undefined.
+
+to_atom(B) when is_binary(B) -> binary_to_atom(B, utf8);
+to_atom(A) when is_atom(A) -> A;
+to_atom(_) -> undefined.
+
+root_net_from_spec(Spec) when is_tuple(Spec) ->
+    case element(1, Spec) of
+        yawl_yaml_spec -> wf_yaml_spec:root_net(Spec);
+        yawl_spec -> wf_spec:root_net(Spec);
+        _ -> <<"main">>
+    end.
+
+net_id_to_module(NetId, Prefix) when is_binary(NetId) ->
+    list_to_atom(binary_to_list(<<Prefix/binary, NetId/binary>>));
+net_id_to_module(NetId, Prefix) when is_atom(NetId) ->
+    net_id_to_module(atom_to_binary(NetId, utf8), Prefix).
 
 -spec executor_info(Executor :: executor()) -> map().
 

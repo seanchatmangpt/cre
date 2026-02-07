@@ -56,12 +56,14 @@ middleware_test_() ->
 %%====================================================================
 
 setup() ->
+    _ = test_helper:ensure_app_started(bcrypt),
     case yawl_approval:start_link() of
         {ok, Pid} -> Pid;
         {error, {already_started, Pid}} -> Pid
     end.
 
 setup_middleware() ->
+    _ = test_helper:ensure_app_started(bcrypt),
     case yawl_approval:start_link() of
         {ok, Pid} -> Pid;
         {error, {already_started, Pid}} -> Pid

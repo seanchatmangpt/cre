@@ -453,6 +453,6 @@ get_latest_checkpoint(SpecId, CaseId) ->
 
 generate_checkpoint_id() ->
     Timestamp = erlang:system_time(millisecond),
-    %% Add a random suffix to avoid collisions in rapid succession
-    Random = rand:uniform(10000),
-    <<"cp_", (integer_to_binary(Timestamp))/binary, "_", (integer_to_binary(Random))/binary>>.
+    %% Use unique_integer for concurrent safety (avoids overwrites in rapid/concurrent creation)
+    Unique = erlang:unique_integer([positive]),
+    <<"cp_", (integer_to_binary(Timestamp))/binary, "_", (integer_to_binary(Unique))/binary>>.

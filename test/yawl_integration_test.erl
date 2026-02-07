@@ -1328,14 +1328,15 @@ create_parallel_workflow() ->
     cre_yawl:connect(W9, <<"b">>, <<"join">>).
 
 %%--------------------------------------------------------------------
-%% @doc Helper to set workflow boundaries.
+%% @doc Helper to set workflow boundaries via cre_yawl (validates boundaries).
 %%
 %% @end
 %%--------------------------------------------------------------------
-set_workflow_boundaries(#workflow{} = Workflow, StartTaskId, EndTaskIds) ->
-    Workflow#workflow{start_task_id = StartTaskId, end_task_ids = EndTaskIds};
-set_workflow_boundaries(Workflow, _StartTaskId, _EndTaskIds) ->
-    Workflow.
+set_workflow_boundaries(Workflow, StartTaskId, EndTaskIds) ->
+    case cre_yawl:set_workflow_boundaries(Workflow, StartTaskId, EndTaskIds) of
+        {error, Reason} -> erlang:error({set_workflow_boundaries_failed, Reason});
+        Wfl -> Wfl
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Helper to get user ID from session.

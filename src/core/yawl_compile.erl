@@ -110,7 +110,7 @@ Each YAWL decomposition becomes a gen_pnet behavior module.
 %% Internal helpers (exported for testing)
 -export([sanitize_atom_name/1, place_atom/2, transition_atom/2]).
 -export([build_flow_map/1, extract_net_tasks/2]).
--export([generate_preset_clauses/2, generate_fire_clause/3, generate_fire_clauses/3]).
+-export([generate_preset_clauses/2, generate_fire_clause/4, generate_fire_clauses/3]).
 
 %%====================================================================
 %% Includes
@@ -521,6 +521,23 @@ module_name(NetId, #{module_prefix := Prefix}) ->
     list_to_atom(binary_to_list(PrefixBin)).
 
 %% @private
+%% Format atom for Erlang source: quotes when needed (uppercase/special chars).
+atom_to_source(Atom) when is_atom(Atom) ->
+    Str = atom_to_list(Atom),
+    case needs_quoted_atom(Str) of
+        true ->
+            Escaped = lists:flatten([case C of $' -> "''"; _ -> [C] end || C <- Str]),
+            iolist_to_binary([$', Escaped, $']);
+        false ->
+            list_to_binary(Str)
+    end.
+
+needs_quoted_atom([C | _]) when C >= $A, C =< $Z -> true;
+needs_quoted_atom([C | _]) when C =:= $' -> true;
+needs_quoted_atom([_ | Rest]) -> needs_quoted_atom(Rest);
+needs_quoted_atom([]) -> false.
+
+%% @private
 escape_binary(Bin) ->
     escape_binary(Bin, <<>>).
 
@@ -542,7 +559,7 @@ escape_binary(<<C, Rest/binary>>, Acc) ->
 %% @private
 generate_place_lst(Places) ->
     PlaceList = lists:map(fun(P) ->
-        <<"  ", (atom_to_binary(P, utf8))/binary>>
+        <<"  ", (atom_to_source(P))/binary>>
     end, Places),
     Joined = iolist_to_binary(lists:join(<<",\n">>, PlaceList)),
     iolist_to_binary([
@@ -560,7 +577,7 @@ generate_place_lst(Places) ->
 %% @private
 generate_trsn_lst(Transitions) ->
     TrsnList = lists:map(fun(T) ->
-        <<"  ", (atom_to_binary(T, utf8))/binary>>
+        <<"  ", (atom_to_source(T))/binary>>
     end, Transitions),
     Joined = iolist_to_binary(lists:join(<<",\n">>, TrsnList)),
     iolist_to_binary([
@@ -580,7 +597,7 @@ generate_init_marking(#{input_condition := InputCond, tasks := Tasks}) ->
     InputPlace = sanitize_atom_name(InputCond),
 
     InitClauses = [
-        <<"\n        ", (atom_to_binary(InputPlace, utf8))/binary, " ->\n            [init]">>
+        <<"\n        ", (atom_to_source(InputPlace))/binary, " ->\n            [init]">>
     ] ++
     [ generate_init_marking_clause(Task) || Task <- Tasks ] ++
     [ <<"\n        _Place ->\n            []">> ],
@@ -598,7 +615,7 @@ generate_init_marking(#{input_condition := InputCond, tasks := Tasks}) ->
 generate_init_marking_clause(TaskId) ->
     Place = sanitize_atom_name(TaskId),
     <<
-        "\n        ", (atom_to_binary(Place, utf8))/binary, " ->\n            []"
+        "\n        ", (atom_to_source(Place))/binary, " ->\n            []"
     >>.
 
 %%====================================================================
@@ -628,9 +645,9 @@ generate_preset_clause(TaskId, InputPlace) ->
     Transition = transition_atom(TaskId, <<"t_">>),
     TaskPlace = sanitize_atom_name(TaskId),
     <<
-        "\n        ", (atom_to_binary(Transition, utf8))/binary,
-        " ->\n            [", (atom_to_binary(InputPlace, utf8))/binary,
-        ", ", (atom_to_binary(TaskPlace, utf8))/binary, "]"
+        "\n        ", (atom_to_source(Transition))/binary,
+        " ->\n            [", (atom_to_source(InputPlace))/binary,
+        ", ", (atom_to_source(TaskPlace))/binary, "]"
     >>.
 
 %%====================================================================
@@ -638,8 +655,9 @@ generate_preset_clause(TaskId, InputPlace) ->
 %%====================================================================
 
 %% @private
-generate_is_enabled(#{tasks := Tasks}) ->
-    Clauses = [ generate_is_enabled_clause(Task) || Task <- Tasks ] ++
+generate_is_enabled(#{input_condition := InputCond, tasks := Tasks}) ->
+    InputPlace = sanitize_atom_name(InputCond),
+    Clauses = [ generate_is_enabled_clause(Task, InputPlace) || Task <- Tasks ] ++
               [ <<"\n        {_Transition, _Mode, _UsrInfo} ->\n            false">> ],
 
     JoinedClauses = iolist_to_binary(lists:join(<<";">>, Clauses)),
@@ -654,9 +672,8 @@ generate_is_enabled(#{tasks := Tasks}) ->
     ]).
 
 %% @private
-generate_is_enabled_clause(TaskId) ->
+generate_is_enabled_clause(TaskId, InputPlace) ->
     Transition = transition_atom(TaskId, <<"t_">>),
-    InputPlace = place_atom(TaskId, <<"_input">>),
     TaskPlace = sanitize_atom_name(TaskId),
 
     %%
@@ -665,9 +682,9 @@ generate_is_enabled_clause(TaskId) ->
     %% 2. At least one token in the task place (task activation)
     %%
     Clause = <<
-        "\n        {", (atom_to_binary(Transition, utf8))/binary,
-        ", #{", (atom_to_binary(InputPlace, utf8))/binary, " := [InputToken | _],\n"
-        "           ", (atom_to_binary(TaskPlace, utf8))/binary, " := [TaskToken | _]}, _UsrInfo} ->\n"
+        "\n        {", (atom_to_source(Transition))/binary,
+        ", #{", (atom_to_source(InputPlace))/binary, " := [InputToken | _],\n"
+        "           ", (atom_to_source(TaskPlace))/binary, " := [TaskToken | _]}, _UsrInfo} ->\n"
         "            InputToken =/= undefined andalso TaskToken =/= undefined"
     >>,
     Clause.
@@ -677,33 +694,32 @@ generate_is_enabled_clause(TaskId) ->
 %%====================================================================
 
 %% @private
-generate_fire(#{input_condition := _InputCond,
+generate_fire(#{input_condition := InputCond,
                 output_condition := OutputCond,
                 tasks := Tasks,
                 split_types := SplitTypes}) ->
-    _InputPlace = sanitize_atom_name(_InputCond),
+    InputPlace = sanitize_atom_name(InputCond),
     OutputPlace = sanitize_atom_name(OutputCond),
 
-    Clauses = [ generate_fire_clause(Task, OutputPlace, SplitTypes) || Task <- Tasks ] ++
-              [ <<"\n    fire(_Transition, _Mode, _UsrInfo) ->\n        abort">> ],
+    Clauses = [ generate_fire_clause(Task, InputPlace, OutputPlace, SplitTypes) || Task <- Tasks ] ++
+              [ <<"\n        {_Transition, _Mode, _UsrInfo} ->\n            abort">> ],
 
-    JoinedClauses = iolist_to_binary(lists:join(<<>>, Clauses)),
+    JoinedClauses = iolist_to_binary(lists:join(<<";">>, Clauses)),
     iolist_to_binary([
         <<"%% @doc Fires a transition, consuming and producing tokens.\n"
            "%% @private\n"
            "-spec fire(atom(), #{atom() => [term()]}, term()) ->\n"
            "    {produce, #{atom() => [term()]}} | abort.\n"
            "fire(Transition, Mode, UsrInfo) ->\n"
-           "    case Transition of">>,
+           "    case {Transition, Mode, UsrInfo} of">>,
         JoinedClauses,
         <<"\n    end.\n">>
     ]).
 
 %% @private
--spec generate_fire_clause(task_id(), place(), #{task_id() => atom()}) -> binary().
-generate_fire_clause(TaskId, OutputPlace, SplitTypes) ->
+-spec generate_fire_clause(task_id(), place(), place(), #{task_id() => atom()}) -> binary().
+generate_fire_clause(TaskId, InputPlace, OutputPlace, SplitTypes) ->
     Transition = transition_atom(TaskId, <<"t_">>),
-    InputPlace = place_atom(TaskId, <<"_input">>),
     TaskPlace = sanitize_atom_name(TaskId),
 
     _SplitType = maps:get(TaskId, SplitTypes, ?XOR),
@@ -719,13 +735,13 @@ generate_fire_clause(TaskId, OutputPlace, SplitTypes) ->
     %%
 
     BaseClause = <<
-        "\n    fire(", (atom_to_binary(Transition, utf8))/binary,
-        ", #{", (atom_to_binary(InputPlace, utf8))/binary, " := [InputToken],\n"
-        "           ", (atom_to_binary(TaskPlace, utf8))/binary, " := [TaskToken]}, _UsrInfo) ->\n"
+        "\n        {", (atom_to_source(Transition))/binary,
+        ", #{", (atom_to_source(InputPlace))/binary, " := [InputToken],\n"
+        "           ", (atom_to_source(TaskPlace))/binary, " := [TaskToken]}, _UsrInfo} ->\n"
         "        %% Fire task '", (escape_binary(atom_to_binary(TaskId, utf8)))/binary, "'\n"
         "        {produce, #{\n"
-        "           ", (atom_to_binary(OutputPlace, utf8))/binary, " => [done]\n"
-        "        }};"
+        "           ", (atom_to_source(OutputPlace))/binary, " => [done]\n"
+        "        }}"
     >>,
 
     BaseClause.

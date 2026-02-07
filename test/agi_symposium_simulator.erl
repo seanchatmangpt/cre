@@ -25,16 +25,32 @@ run(Spec) when is_map(Spec) ->
 -spec run(Spec :: map(), Options :: map()) -> {ok, map()} | {error, term()}.
 run(Spec, Options) when is_map(Spec), is_map(Options) ->
     ok = test_helper:ensure_cre_gen_pnet_loaded(),
-    Now = erlang:monotonic_time(millisecond),
-    case wf_engine:start_link(#{spec => Spec, seed => 1, now => Now}) of
-        {ok, Engine} ->
-            try
-                run_simulation(Engine, Spec, Options, Now)
-            after
-                gen_server:stop(Engine)
+    OTelOk = case whereis(yawl_otel_logger) of
+        undefined ->
+            case yawl_otel_logger:start_link(#{}) of
+                {ok, _} -> ok;
+                {error, {already_started, _}} -> ok;
+                {error, E} ->
+                    error_logger:error_msg("yawl_otel_logger start failed: ~p~n", [E]),
+                    {error, {otel_logger_failed, E}}
             end;
-        {error, Reason} ->
-            {error, {engine_start_failed, Reason}}
+        _ -> ok
+    end,
+    case OTelOk of
+        ok ->
+            Now = erlang:monotonic_time(millisecond),
+            case wf_engine:start_link(#{spec => Spec, seed => 1, now => Now}) of
+                {ok, Engine} ->
+                    try
+                        run_simulation(Engine, Spec, Options, Now)
+                    after
+                        gen_server:stop(Engine)
+                    end;
+                {error, Reason} ->
+                    {error, {engine_start_failed, Reason}}
+            end;
+        {error, _} = Err ->
+            Err
     end.
 
 %%====================================================================
@@ -44,9 +60,11 @@ run(Spec, Options) when is_map(Spec), is_map(Options) ->
 run_simulation(Engine, _Spec, Options, Now) ->
     case wf_engine:start_case(Engine, #{data => #{}}, Now) of
         {ok, CaseId} ->
-            State = participant_state(Options),
+            agi_symposium_otel:log_workflow_start(CaseId, <<"agi_symposium_full">>),
+            State = participant_state(Options, CaseId),
             Result = run_participants(Engine, CaseId, State, Now, 0, 50),
             CaseState = wf_engine:case_state(Engine, CaseId),
+            agi_symposium_otel:log_workflow_complete(CaseId, CaseState),
             {ok, #{
                 case_id => CaseId,
                 status => CaseState,
@@ -57,15 +75,27 @@ run_simulation(Engine, _Spec, Options, Now) ->
             {error, {start_case_failed, Reason}}
     end.
 
-participant_state(Options) ->
-    case maps:get(zai_enabled, Options, false) of
+participant_state(Options, CaseId) ->
+    Base = #{case_id => CaseId},
+    WithZai = case maps:get(zai_enabled, Options, false) of
         true ->
-            #{
+            maps:merge(Base, #{
                 zai_enabled => true,
                 model => maps:get(model, Options, <<"glm-4-plus">>)
-            };
+            });
         _ ->
-            #{}
+            Base
+    end,
+    case maps:get(live_stream, Options, false) of
+        true ->
+            maps:put(on_llm_vote, fun(Role, Dec, Reason) ->
+                RoleStr = agi_symposium_otel:format_role_display(Role),
+                DecStr = case Dec of <<"reject">> -> agi_symposium_ansi:red("REJECT"); _ -> agi_symposium_ansi:green("ACCEPT") end,
+                ReasonStr = case Reason of <<>> -> ""; _ -> " \"" ++ binary_to_list(Reason) ++ "\"" end,
+                io:format(standard_error, "  ~s: ~s —~s~n", [agi_symposium_ansi:cyan(RoleStr), DecStr, ReasonStr])
+            end, WithZai);
+        _ ->
+            WithZai
     end.
 
 run_participants(Engine, CaseId, State, Now, Round, MaxRounds) when Round < MaxRounds ->

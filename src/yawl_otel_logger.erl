@@ -86,6 +86,7 @@
     get_events/0,
     get_events/1,
     get_events_by_trace/1,
+    get_trace_id_for_case/1,
     get_recent_events/2,
     get_traces/0,
     clear_events/0,
@@ -282,7 +283,7 @@ log_checkpoint(CheckpointId, PatternId, StepName, RequiredApprover, Context, Att
 -spec log_workflow_start(binary(), binary()) -> ok.
 log_workflow_start(CaseId, PatternId) ->
     TraceId = generate_trace_id(),
-    gen_server:cast(?SERVER, {workflow_start, TraceId, CaseId, PatternId}),
+    gen_server:call(?SERVER, {workflow_start, TraceId, CaseId, PatternId}),
     log_event(workflow_start, <<"Workflow started">>, #{
         trace_id => TraceId,
         case_id => CaseId,
@@ -310,11 +311,14 @@ log_workflow_start(CaseId, PatternId) ->
 -spec log_workflow_complete(binary(), binary()) -> ok.
 log_workflow_complete(CaseId, Status) ->
     gen_server:cast(?SERVER, {workflow_complete, CaseId, Status}),
+    TraceId = gen_server:call(?SERVER, {get_trace_id_for_case, CaseId}),
+    Attrs = #{case_id => CaseId, status => Status},
+    Attrs1 = case TraceId of
+        undefined -> Attrs;
+        _ -> maps:put(trace_id, TraceId, Attrs)
+    end,
     Message = io_lib:format("Workflow ~s", [Status]),
-    log_event(workflow_complete, list_to_binary(Message), #{
-        case_id => CaseId,
-        status => Status
-    }, info).
+    log_event(workflow_complete, list_to_binary(Message), Attrs1, info).
 
 %% @doc Log workitem start event.
 %%
@@ -431,6 +435,11 @@ get_events(EventType) ->
 -spec get_events_by_trace(binary()) -> [#otel_event{}].
 get_events_by_trace(TraceId) ->
     gen_server:call(?SERVER, {get_events_by_trace, TraceId}).
+
+%% @doc Get trace_id for a case (for correlating events).
+-spec get_trace_id_for_case(binary()) -> binary() | undefined.
+get_trace_id_for_case(CaseId) ->
+    gen_server:call(?SERVER, {get_trace_id_for_case, CaseId}).
 
 %% @doc Get recent events.
 %%
@@ -560,6 +569,26 @@ handle_call({get_events_by_trace, TraceId}, _From, State) ->
     Events = lists:filter(fun(E) -> E#otel_event.trace_id =:= TraceId end, AllEvents),
     {reply, Events, State};
 
+handle_call({get_trace_id_for_case, CaseId}, _From, State) ->
+    TraceId = maps:get(CaseId, State#otel_state.trace_index, undefined),
+    {reply, TraceId, State};
+
+handle_call({workflow_start, TraceId, CaseId, PatternId}, _From, State) ->
+    Trace = #otel_trace{
+        trace_id = TraceId,
+        case_id = CaseId,
+        pattern_id = PatternId,
+        start_time = erlang:system_time(millisecond),
+        end_time = undefined,
+        status = running,
+        span_count = 1
+    },
+    NewState = State#otel_state{
+        traces = maps:put(TraceId, Trace, State#otel_state.traces),
+        trace_index = maps:put(CaseId, TraceId, State#otel_state.trace_index)
+    },
+    {reply, ok, NewState};
+
 handle_call({get_recent_events, Limit, Level}, _From, State) ->
     AllEvents = ets:tab2list(?DEFAULT_OTEL_TABLE),
     Filtered = case Level of
@@ -602,21 +631,6 @@ handle_cast({log_event, EventType, Message, Attributes, Level}, State) ->
     Event = create_event(EventType, Message, Attributes, Level, State),
     ets:insert(?DEFAULT_OTEL_TABLE, Event),
     {noreply, maybe_cleanup_events(State)};
-
-handle_cast({workflow_start, TraceId, CaseId, PatternId}, State) ->
-    Trace = #otel_trace{
-        trace_id = TraceId,
-        case_id = CaseId,
-        pattern_id = PatternId,
-        start_time = erlang:system_time(millisecond),
-        end_time = undefined,
-        status = running,
-        span_count = 1
-    },
-    {noreply, State#otel_state{
-        traces = maps:put(TraceId, Trace, State#otel_state.traces),
-        trace_index = maps:put(CaseId, TraceId, State#otel_state.trace_index)
-    }};
 
 handle_cast({workflow_complete, CaseId, Status}, State) ->
     TraceId = maps:get(CaseId, State#otel_state.trace_index, undefined),

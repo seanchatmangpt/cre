@@ -565,12 +565,23 @@ normalize_yaml_data({yamerl_seq, Items}) ->
 normalize_yaml_data(Value) when is_map(Value) ->
     maps:map(fun(_K, V) -> normalize_yaml_data(V) end, Value);
 normalize_yaml_data(Value) when is_list(Value) ->
-    case io_lib:printable_list(Value) of
-        true -> list_to_binary(Value);
-        false -> [normalize_yaml_data(Item) || Item <- Value]
+    case is_proplist(Value) of
+        true ->
+            maps:from_list([{normalize_key(K), normalize_yaml_data(V)} || {K, V} <- Value]);
+        false ->
+            case io_lib:printable_list(Value) of
+                true -> list_to_binary(Value);
+                false -> [normalize_yaml_data(Item) || Item <- Value]
+            end
     end;
 normalize_yaml_data(Value) ->
     Value.
+
+%% @private
+%% Detect proplist format (yamerl 0.10+ returns maps as [{K,V}|_])
+is_proplist([]) -> true;
+is_proplist([{K, _} | Rest]) when is_list(K); is_atom(K) -> is_proplist(Rest);
+is_proplist(_) -> false.
 
 %% @private
 normalize_key(Atom) when is_atom(Atom) -> atom_to_binary(Atom, utf8);

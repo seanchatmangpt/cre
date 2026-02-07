@@ -479,8 +479,9 @@ W1 = cre_yawl:add_task(Workflow, <<"task1">>, [{name, <<"My Task">>}]),
 maps:is_key(<<"task1">>, Tasks).
 ```
 """.
--spec get_tasks(#workflow{}) -> {ok, #{element_id() => #task{}}}.
-get_tasks(#workflow{tasks = Tasks}) -> {ok, Tasks}.
+-spec get_tasks(#workflow{}) -> {ok, #{element_id() => #task{}}} | {error, invalid_workflow}.
+get_tasks(#workflow{tasks = Tasks}) when is_map(Tasks) -> {ok, Tasks};
+get_tasks(_) -> {error, invalid_workflow}.
 
 -doc """
 Gets the connections list from a workflow record.
