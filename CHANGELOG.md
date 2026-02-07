@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-02-06
+
+### Added
+
+#### New Pattern Modules (14 new modules, 40 of 43 YAWL patterns now implemented - 93%)
+- `arbitrary_cycles.erl` - P10: Arbitrary Cycles pattern for cycles with arbitrary entry/exit points
+- `transient_trigger.erl` - P23: Transient Trigger pattern for event-only triggers while task enabled
+- `persistent_trigger.erl` - P24: Persistent Trigger pattern for events that persist until consumed
+- `cancel_mi_activity.erl` - P26: Cancel MI Activity pattern for canceling all multiple instance activity instances
+- `complete_mi_activity.erl` - P27: Complete MI Activity pattern for early completion when condition met
+- `blocking_discriminator.erl` - P28: Blocking Discriminator pattern for first-trigger with blocking behavior
+- `cancelling_discriminator.erl` - P29: Cancelling Discriminator pattern for first-completion-wins with cancellation
+- `structured_partial_join.erl` - P30: Structured Partial Join (N-out-of-M) pattern
+- `blocking_partial_join.erl` - P31: Blocking Partial Join pattern for partial after N, final after all M
+- `cancelling_partial_join.erl` - P32: Cancelling Partial Join pattern to cancel remaining after N complete
+- `generalized_and_join.erl` - P33: Generalized AND-Join pattern for joining active branches only
+- `static_partial_join_mi.erl` - P34: Static Partial Join for MI pattern (fixed pool N of M)
+- `cancelling_partial_join_mi.erl` - P35: Cancelling Partial Join for MI pattern with instance cancellation
+- `dynamic_partial_join_mi.erl` - P36: Dynamic Partial Join for MI pattern with runtime threshold computation
+
 ## [0.2.1] - 2026-02-05
 
 ### 🚀 Major New Features
@@ -222,6 +242,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.3.0]: https://github.com/joergen7/cre/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/joergen7/cre/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/joergen7/cre/compare/v0.1.10...v0.2.0
 [0.1.10]: https://github.com/joergen7/cre/releases/tag/v0.1.10

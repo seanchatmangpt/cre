@@ -12,9 +12,9 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 
 1. **[QUICK_START.md](./QUICK_START.md)** - Get running in 5 minutes with basic setup and "Hello World" example
 2. **[WORKFLOW_PATTERNS_LEARNING_PATH.md](./WORKFLOW_PATTERNS_LEARNING_PATH.md)** - Understanding the 43 YAWL patterns structure
-3. **[YAWL_PATTERNS_SUMMARY.md](./YAWL_PATTERNS_SUMMARY.md)** - 80/20 learning principle overview
-4. **[CORE_YAWL_PATTERNS_QUICK_REFERENCE.md](./CORE_YAWL_PATTERNS_QUICK_REFERENCE.md)** - Essential patterns cheat sheet (6 core patterns)
-5. **[CLIENT_API_QUICK_REFERENCE.md](./CLIENT_API_QUICK_REFERENCE.md)** - Quick API reference for developers
+3. **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** - Complete pattern reference
+4. **[CORE_YAWL_PATTERNS_GUIDE.md](./CORE_YAWL_PATTERNS_GUIDE.md)** - Core patterns guide
+5. **[CLIENT_API_COMPLETE_REFERENCE.md](./CLIENT_API_COMPLETE_REFERENCE.md)** - Complete client API reference
 
 ---
 
@@ -35,7 +35,7 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 #### 📖 Comprehensive Guides
 | File | Description | Level | Focus |
 |------|-------------|-------|-------|
-| **[YAWL_PATTERNS_GUIDE.md](./YAWL_PATTERNS_GUIDE.md)** | Complete pattern implementation guide | Intermediate | Pattern implementation details |
+| **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** | Complete pattern reference | Intermediate | Pattern implementation details |
 | **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** | Detailed pattern specifications | Advanced | Pattern library reference |
 | **[CORE_YAWL_PATTERNS_GUIDE.md](./CORE_YAWL_PATTERNS_GUIDE.md)** | Core patterns deep dive | Intermediate | Essential patterns mastery |
 | **[YAWL_PATTERN_REFERENCE.md](./YAWL_PATTERN_REFERENCE.md)** | Pattern semantics and use cases | Intermediate | Pattern selection guide |
@@ -43,8 +43,8 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 #### 🎯 Quick References
 | File | Description | Level | Use Case |
 |------|-------------|-------|----------|
-| **[CORE_YAWL_PATTERNS_QUICK_REFERENCE.md](./CORE_YAWL_PATTERNS_QUICK_REFERENCE.md)** | 6 essential patterns cheat sheet | Beginner | Quick pattern lookup |
-| **[YAWL_PATTERNS_REFERENCE_CARD.md](./YAWL_PATTERNS_REFERENCE_CARD.md)** | Pattern reference card | Intermediate | Quick reminders |
+| **[QUICK_REFERENCE_CARD.md](./QUICK_REFERENCE_CARD.md)** | Quick reference card | Beginner | Quick reminders |
+| **[YAWL_PATTERN_REFERENCE.md](./YAWL_PATTERN_REFERENCE.md)** | Pattern reference card | Intermediate | Quick reminders |
 | **[YAWL_PATTERNS_WORKBOOK.md](./YAWL_PATTERNS_WORKBOOK.md)** | Practice exercises | Beginner | Hands-on learning |
 
 ### 3. Advanced Topics
@@ -215,7 +215,7 @@ These focus on the 20% of content that provides 80% of value:
 ### 📚 Comprehensive Documentation
 Complete coverage for deep understanding:
 
-- **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** - 26 of 43 patterns implemented (60.5%)
+- **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** - 40 of 43 patterns implemented (93.0%)
 - **[COMPLETE_API_REFERENCE.md](./COMPLETE_API_REFERENCE.md)** - All APIs
 - **[PNET_CORE_COMPREHENSIVE_REFERENCE.md](./PNET_CORE_COMPREHENSIVE_REFERENCE.md)** - Core internals
 
