@@ -97,7 +97,6 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 | **[pnet_marking_api_reference.md](./pnet_marking_api_reference.md)** | Marking API | Intermediate | State management |
 | **[pnet_marking_implementation.md](./pnet_marking_implementation.md)** | Marking implementation details | Advanced | Technical details |
 | **[PNET_MODE_GUIDE.md](./PNET_MODE_GUIDE.md)** | Mode enumeration concepts | Intermediate | Mode handling |
-| **[PNET_MODE_DOCTEST_REFERENCE.md](./PNET_MODE_DOCTEST_REFERENCE.md)** | Mode examples with tests | Beginner-Intermediate | Learning by example |
 
 ### 7. Integration and Deployment
 
@@ -133,7 +132,7 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 
 | File | Description | Level | Prerequisites |
 |------|-------------|-------|--------------|
-| **[YAWL_TELEMETRY.md](./YAWL_TELEMETRY.md)** | OpenTelemetry integration | Advanced | Monitoring concepts |
+| **[YAWL_TELEMETRY_GUIDE.md](./YAWL_TELEMETRY_GUIDE.md)** | OpenTelemetry integration | Advanced | Monitoring concepts |
 | **[YAWL_TIMEOUT_REFERENCE.md](./YAWL_TIMEOUT_REFERENCE.md)** | Timeout handling | Advanced | Basic workflows |
 | **[worklet_integration_summary.md](./worklet_integration_summary.md)** | Worklet integration | Advanced | External systems |
 
@@ -272,7 +271,7 @@ Hands-on practice with immediate feedback:
 ### Advanced Topics
 - [DIATAXIS_ARCHITECTURE.md](./DIATAXIS_ARCHITECTURE.md) - Architecture
 - [PNET_CORE_COMPREHENSIVE_REFERENCE.md](./PNET_CORE_COMPREHENSIVE_REFERENCE.md) - Core internals
-- [YAWL_TELEMETRY.md](./YAWL_TELEMETRY.md) - Monitoring
+- [YAWL_TELEMETRY_GUIDE.md](./YAWL_TELEMETRY_GUIDE.md) - Monitoring
 - [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) - Migration
 
 ---

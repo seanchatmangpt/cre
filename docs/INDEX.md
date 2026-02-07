@@ -47,9 +47,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [YAWL Patterns Summary](YAWL_PATTERNS_SUMMARY.md) | 80/20 learning principle overview of 43 patterns |
 | [Core YAWL Patterns Guide](CORE_YAWL_PATTERNS_GUIDE.md) | Essential patterns deep dive (6 core patterns) |
-| [YAWL Patterns Guide](YAWL_PATTERNS_GUIDE.md) | Complete pattern implementation guide |
 | [YAWL Pattern Reference](YAWL_PATTERN_REFERENCE.md) | Detailed pattern specifications |
 | [YAWL Patterns Reference](YAWL_PATTERNS_REFERENCE.md) | All 43 YAWL patterns catalog |
 
@@ -155,7 +153,6 @@
 | Document | Description |
 |----------|-------------|
 | [Human-in-the-Loop](HUMAN_IN_THE_LOOP.md) | Approval workflows with LLM integration |
-| [YAWL Telemetry](YAWL_TELEMETRY.md) | OpenTelemetry observability integration |
 | [YAWL Telemetry Guide](YAWL_TELEMETRY_GUIDE.md) | Monitoring and telemetry setup |
 | [YAWL Timeout Reference](YAWL_TIMEOUT_REFERENCE.md) | Timeout configuration |
 
@@ -271,7 +268,6 @@
 **Beginner:**
 - [Quick Start](QUICK_START.md)
 - [tutorials/getting_started.md](tutorials/getting_started.md)
-- [YAWL Patterns Summary](YAWL_PATTERNS_SUMMARY.md)
 
 **Intermediate:**
 - [tutorials/basic_patterns_tutorial.md](tutorials/basic_patterns_tutorial.md)
@@ -292,7 +288,7 @@
 - [Workflow Patterns Learning Path](WORKFLOW_PATTERNS_LEARNING_PATH.md) | [Tutorials Index](TUTORIALS_INDEX.md)
 
 **Build Workflows:**
-- [YAWL Patterns Guide](YAWL_PATTERNS_GUIDE.md) | [YAWL Compile Guide](YAWL_COMPILE_COMPLETE_GUIDE.md)
+- [YAWL Patterns Reference](YAWL_PATTERNS_REFERENCE.md) | [YAWL Compile Guide](YAWL_COMPILE_COMPLETE_GUIDE.md)
 
 **API Integration:**
 - [Client API Complete Reference](CLIENT_API_COMPLETE_REFERENCE.md) | [API Reference](API_REFERENCE.md)

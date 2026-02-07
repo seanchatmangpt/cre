@@ -24,7 +24,7 @@ For the latest documentation, see the parent directory:
 Most migration guides have been consolidated into the main documentation. For upgrading from v0.2.0 to v0.2.1, see the updated:
 
 - `YAWL_PATTERNS_REFERENCE.md` - Includes v0.2.1 pattern updates
-- `YAWL_TELEMETRY.md` - Includes OpenTelemetry migration guide
+- `YAWL_TELEMETRY_GUIDE.md` - Includes OpenTelemetry migration guide
 - `HUMAN_IN_THE_LOOP.md` - Includes approval workflow migration
 
 ---

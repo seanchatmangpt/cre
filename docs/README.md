@@ -42,7 +42,7 @@ CRE is a **YAWL (Yet Another Workflow Language)** workflow engine implemented in
 
 ### 📖 Specific Topics
 - **Human-in-the-Loop**: [Approval Workflows](./HUMAN_IN_THE_LOOP.md)
-- **Telemetry**: [OpenTelemetry Integration](./YAWL_TELEMETRY.md)
+- **Telemetry**: [OpenTelemetry Integration](./YAWL_TELEMETRY_GUIDE.md)
 - **Migration**: [v0.1 to v0.2 Migration](./old/MIGRATION_V0.1_TO_V0.2.md) (archived)
 
 ## 🔗 Documentation Map

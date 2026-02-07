@@ -144,7 +144,7 @@ Complete documentation is available in the `docs/` directory:
 - **[Contributing Guide](docs/CONTRIBUTING.md)** - How to contribute code
 - **[YAWL Patterns Reference](docs/YAWL_PATTERNS_REFERENCE.md)** - Complete pattern library
 - **[Human-in-the-Loop](docs/HUMAN_IN_THE_LOOP.md)** - Approval workflows with examples
-- **[Telemetry Integration](docs/YAWL_TELEMETRY.md)** - Monitoring and observability
+- **[Telemetry Integration](docs/YAWL_TELEMETRY_GUIDE.md)** - Monitoring and observability
 - **[Timeout Configuration](docs/YAWL_TIMEOUT_REFERENCE.md)** - Timeout management
 
 ## Examples
