@@ -749,7 +749,7 @@ Receipt = pnet_receipt:make(BeforeHash, AfterHash, Move)
 - **`/Users/sac/cre/src/wf_task.erl`** - Task lifecycle token constructors
 - **`/Users/sac/cre/src/yawl_engine.erl`** - Core workflow engine using helpers
 - **`/Users/sac/cre/src/yawl_control.erl`** - Control panel integration
-- **`/Users/sac/cre/src/yawl_patterns.erl`** - Pattern composition using helpers
+- **`/Users/sac/cre/src/yawl/yawl_patterns.erl`** - Pattern composition using helpers
 
 ---
 
