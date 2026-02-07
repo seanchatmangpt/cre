@@ -71,11 +71,11 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 #### 🎯 Quick API References
 | File | Description | Audience | Time |
 |------|-------------|----------|------|
-| **[CLIENT_API_QUICK_REFERENCE.md](./CLIENT_API_QUICK_REFERENCE.md)** | Quick API lookup | Developers | 5 min |
+| **[CLIENT_API_COMPLETE_REFERENCE.md](./CLIENT_API_COMPLETE_REFERENCE.md)** | Client API comprehensive guide | Developers | 5 min |
 | **[PNET_TYPES_QUICK_REFERENCE.md](./PNET_TYPES_QUICK_REFERENCE.md)** | Type system quick ref | Developers | 5 min |
 | **[pnet_marking_quick_reference.md](./pnet_marking_quick_reference.md)** | Marking operations | Developers | 5 min |
 | **[PNET_MODE_QUICK_REFERENCE.md](./PNET_MODE_QUICK_REFERENCE.md)** | Mode enumeration | Developers | 5 min |
-| **[GEN_PNET_QUICK_REFERENCE.md](./GEN_PNET_QUICK_REFERENCE.md)** | gen_pnet quick ref | Developers | 5 min |
+| **[GEN_PNET_USER_GUIDE.md](./GEN_PNET_USER_GUIDE.md)** | gen_pnet user guide | Developers | 5 min |
 
 ### 5. Tutorial Documentation
 
