@@ -1,0 +1,100 @@
+@startuml CRE C4 Level 2 - YAWL Engine Component Diagram
+
+!theme plain
+skinparam packageStyle rectangle
+skinparam componentStyle uml2
+
+title CRE YAWL Engine - C4 Level 2 (Component Diagram)
+
+legend right
+  <b>Rule:</b> Workflow Runtime uses gen_yawl ONLY.
+  All pattern modules implement gen_yawl behaviour.
+  No yawl_executor record dispatch. No cre_yawl_patterns monolithic.
+endlegend
+
+package "Workflow Runtime Container" {
+
+  package "Execution API" {
+    [wf_yawl_executor] as wf_exec
+    [yawl_execution] as yawl_exec
+    wf_exec -down-> yawl_exec : uses
+  }
+
+  package "gen_yawl Runtime" as gen_yawl_pkg #D4EDDA {
+    [gen_yawl] as gen_yawl
+    note right of gen_yawl
+      Wrapper around gen_pnet.
+      Supports 3-tuple fire/3:
+      {produce, Map, NewUsrInfo}
+    end note
+  }
+
+  package "Compiled Net Modules" {
+    [yawl_Symposium] as compiled_net
+    [yawl_ProgramThread] as compiled_sub
+    compiled_net -down-> compiled_sub : subnets
+  }
+
+  package "Pure Helpers" {
+    [pnet_marking] as pnet_mark
+    [pnet_mode] as pnet_mode
+    [wf_mi] as wf_mi
+    [wf_cancel] as wf_cancel
+    [wf_timerq] as wf_timer
+  }
+}
+
+package "Specification Pipeline Container" {
+
+  package "Parsing" {
+    [wf_spec] as wf_spec
+    [wf_yaml_spec] as wf_yaml
+    wf_spec : XML parsing
+    wf_yaml : YAML 0.2 parsing
+  }
+
+  package "Validation & Compilation" {
+    [yawl_validate] as yawl_val
+    [yawl_compile] as yawl_comp
+    [yawl_pattern_registry] as pattern_reg
+  }
+
+  package "Pattern Modules (43 total)" as patterns_pkg #E8F4FD {
+    [P1-P10 Basic] as p_basic
+    [P11-P17 MI] as p_mi
+    [P18-P20 State] as p_state
+    [P21-P43 Extended] as p_ext
+  }
+}
+
+' Relationships
+yawl_exec -down-> gen_yawl : gen_yawl:start_link\ngen_yawl:step\ngen_yawl:drain
+gen_yawl -down-> compiled_net : NetMod callbacks
+compiled_net -down-> p_basic : pattern expansion
+compiled_net -down-> p_ext : pattern expansion
+gen_yawl -down-> pnet_mark : marking ops
+gen_yawl -down-> pnet_mode : mode enum
+compiled_net -down-> wf_mi : MI logic
+compiled_net -down-> wf_cancel : cancellation
+compiled_net -down-> wf_timer : triggers
+
+wf_spec -down-> yawl_val : parsed spec
+wf_yaml -down-> yawl_val : parsed spec
+yawl_val -down-> yawl_comp : validated
+yawl_comp -down-> pattern_reg : macro lookup
+pattern_reg -down-> p_basic : P1-P10
+pattern_reg -down-> p_mi : P11-P17
+pattern_reg -down-> p_state : P18-P20
+pattern_reg -down-> p_ext : P21-P43
+yawl_comp -down-> compiled_net : generates
+
+' Anti-patterns (what NOT to do)
+note as N1 #FFE0E0
+  <b>DO NOT:</b>
+  • yawl_execution → gen_pnet
+  • yawl_executor record dispatch
+  • cre_yawl_patterns monolithic gen_pnet
+  • Mix pattern implementations
+end note
+
+@enduml

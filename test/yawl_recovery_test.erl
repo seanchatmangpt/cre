@@ -100,7 +100,7 @@ test_checkpoint_creates_valid() ->
     ?assertEqual(<<"cp_">>, binary_part(Cpid, {0, 3})),
 
     %% Verify we can read it back from Mnesia
-    [{_, Record}] = ets:lookup(yawl_checkpoint, Cpid),
+    {atomic, [Record]} = mnesia:transaction(fun() -> mnesia:read(yawl_checkpoint, Cpid) end),
     ?assertEqual(SpecId, Record#yawl_checkpoint.spec_id),
     ?assertEqual(CaseId, Record#yawl_checkpoint.case_id),
     ?assertEqual(Marking, Record#yawl_checkpoint.marking),
@@ -253,7 +253,7 @@ test_checkpoint_with_options() ->
     {ok, Cpid} = yawl_recovery:checkpoint(SpecId, CaseId, Marking, Data, #{version => 2}),
 
     %% Verify version is stored
-    [{_, Record}] = ets:lookup(yawl_checkpoint, Cpid),
+    {atomic, [Record]} = mnesia:transaction(fun() -> mnesia:read(yawl_checkpoint, Cpid) end),
     ?assertEqual(2, Record#yawl_checkpoint.version).
 
 %%--------------------------------------------------------------------
@@ -384,7 +384,8 @@ test_large_data_checkpoint() ->
     %% Create large marking with many tokens
     LargeMarking = lists:foldl(
         fun(N, Acc) ->
-            maps:put(list_to_existing_atom("p" ++ integer_to_list(N)), lists:seq(1, 100), Acc)
+            Key = list_to_atom("p" ++ integer_to_list(N)),
+            maps:put(Key, lists:seq(1, 100), Acc)
         end,
         #{},
         lists:seq(1, 10)
@@ -393,7 +394,8 @@ test_large_data_checkpoint() ->
     %% Create large data map
     LargeData = lists:foldl(
         fun(N, Acc) ->
-            maps:put(list_to_existing_atom("key" ++ integer_to_list(N)), lists:seq(1, 100), Acc)
+            Key = list_to_atom("key" ++ integer_to_list(N)),
+            maps:put(Key, lists:seq(1, 100), Acc)
         end,
         #{},
         lists:seq(1, 20)

@@ -4,7 +4,18 @@
 
 ## Overview
 
-This document provides a comprehensive reference to all architecture diagrams and visualizations in the CRE YAWL workflow engine. The diagrams illustrate the new architecture following Joe Armstrong's principle: **one real OTP runner (`gen_pnet`), everything else pure helpers/utilities + message contracts**.
+This document provides a comprehensive reference to all architecture diagrams and visualizations in the CRE YAWL workflow engine. The diagrams illustrate the architecture following Joe Armstrong's principle: **one real OTP runner (gen_yawl), everything else pure helpers/utilities**.
+
+## C4 Architecture (Authoritative)
+
+**Start here** for architecture decisions and anti-patterns:
+
+- [C4 Architecture Index](diagrams/c4/C4_ARCHITECTURE.md) — Complete C4 model, rules, migration checklist
+- Level 0: [System Context](diagrams/c4/level0-context-diagram.puml)
+- Level 1: [Container (gen_yawl-centric)](diagrams/c4/level1-container-diagram-v2.puml)
+- Level 2: [YAWL Engine Component](diagrams/c4/level2-yawl-engine-component.puml)
+- Level 3: [Pattern Execution Flow](diagrams/c4/level3-pattern-execution.puml)
+- [Execution Sequence](diagrams/c4/sequence-execution-flow.puml)
 
 ## Architecture Diagrams
 

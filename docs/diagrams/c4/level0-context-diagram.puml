@@ -1,0 +1,53 @@
+@startuml CRE C4 Level 0 - System Context Diagram
+
+!theme plain
+skinparam {
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+}
+
+title CRE YAWL Workflow Engine - C4 Level 0 (System Context Diagram)
+
+legend right
+  <b>Purpose:</b> Shows the CRE system and its relationships
+  with users and external systems.
+  <b>Use when:</b> Explaining system scope to stakeholders.
+endlegend
+
+rectangle "CRE YAWL Workflow Engine" as creSystem #E8F4FD {
+  <b>CRE System</b>
+  ==
+  Executes YAWL workflow specifications
+  using Petri net semantics and 43 workflow
+  control patterns. Single runtime: gen_yawl.
+}
+
+actor "Workflow Developer" as dev
+actor "Business User" as user
+actor "System Administrator" as admin
+
+' External systems
+rectangle "YAWL Client\n(Erlang/API)" as client #FFF2CC
+rectangle "External Applications" as extApps #FFF2CC
+rectangle "Monitoring Stack" as monitoring #FFF2CC
+rectangle "Persistence\n(Event Store)" as persistence #FFF2CC
+
+' Relationships
+dev -down-> creSystem : [Creates] YAWL specs\n(XML/YAML)
+user -down-> creSystem : [Uses] Workflow execution\nvia API
+admin -down-> creSystem : [Manages] Configuration\nDeployment
+
+creSystem -right-> client : [Provides] Workflow API\nCase management
+creSystem -right-> extApps : [Integrates] REST/HTTP\nWebhooks
+creSystem -down-> persistence : [Stores] State\nEvents\nCheckpoints
+creSystem -down-> monitoring : [Exports] Metrics\nTraces\nLogs
+
+note bottom of creSystem
+  <b>Joe Armstrong Principle:</b>
+  One real OTP runner (gen_yawl),
+  everything else pure utilities.
+  All 43 patterns use gen_yawl.
+end note
+
+@enduml

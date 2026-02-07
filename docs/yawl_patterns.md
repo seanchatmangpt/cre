@@ -2,7 +2,7 @@
 
 **Version:** CRE 0.2.0
 **Last Updated:** 2026-02-06
-**Total Patterns:** 36 implemented of 43 YAWL workflow patterns
+**Total Patterns:** 26 implemented of 43 YAWL workflow patterns (60.5%)
 
 ---
 
@@ -12,15 +12,15 @@ This document provides a comprehensive reference for all YAWL (Yet Another Workf
 
 ## Pattern Categories
 
-| Category | ID Range | Implemented | Description |
-|----------|----------|-------------|-------------|
+| Category | ID Range | Dedicated Modules | Description |
+|----------|----------|-------------------|-------------|
 | **Basic Control Flow** | WCP-01 to WCP-10 | 10/10 | Fundamental workflow structures |
-| **Advanced Synchronization** | WCP-11 to WCP-17 | 7/7 | Complex synchronization and multiple instances |
-| **State-Based Patterns** | WCP-18 to WCP-20 | 3/3 | State-dependent workflow behavior |
-| **Extended Control Flow** | WCP-21 to WCP-28 | 6/8 | Advanced flow control structures |
+| **Advanced Synchronization** | WCP-11 to WCP-17 | 3/7 | Complex synchronization and multiple instances |
+| **State-Based Patterns** | WCP-18 to WCP-20 | 1/3 | State-dependent workflow behavior |
+| **Extended Control Flow** | WCP-21 to WCP-28 | 2/8 | Advanced flow control structures |
 | **Data Flow Patterns** | WDP-01 to WDP-05 | 5/5 | Data transformation and movement |
 | **Resource Patterns** | WRP-01 to WRP-05 | 5/5 | Resource management and allocation |
-| **Exception Handling** | WHP-01 to WHP-05 | 5/5 | Error handling and recovery |
+| **Exception Handling** | WHP-01 to WHP-05 | 0/5 | Error handling and recovery |
 
 ---
 
@@ -802,19 +802,30 @@ p_cs_request -> t_cs_acquire -> p_cs_lock -> t_cs_execute -> p_cs_active -> t_cs
 
 ---
 
-## 8. Unimplemented Patterns (7 Remaining)
+## 8. Patterns Without Dedicated Modules (17)
 
-The following patterns from the YAWL specification are not yet implemented:
+The following patterns are implemented via the `cre_yawl_patterns` module helper functions, not as separate pattern module files in `src/patterns/`:
 
-| Pattern ID | Pattern Name | Category |
-|------------|--------------|----------|
-| WCP-29 | Structured Discriminator | Extended Control Flow |
-| WCP-30 | Structured N-out-of-M Join | Extended Control Flow |
-| WCP-31 | Arbitrary Cycle | Advanced Control Flow |
-| WCP-32 | Recursion with Previous State | Advanced Control Flow |
-| WCP-33 | Cancel Region | State-Based |
-| WCP-34 | Cancel Multiple Instance | State-Based |
-| WCP-35 | Advanced Cancel Activity | State-Based |
+| Pattern ID | Pattern Name | Implementation |
+|------------|--------------|----------------|
+| WCP-12 | Multiple Instances without Synchronization | cre_yawl_patterns |
+| WCP-14 | Multiple Instances with Runtime Knowledge | cre_yawl_patterns |
+| WCP-15 | Multiple Instances without Prior Knowledge | cre_yawl_patterns |
+| WCP-19 | Cancel Activity | cre_yawl_patterns |
+| WCP-20 | Cancel Case | cre_yawl_patterns |
+| WCP-21 | Structured Synchronization | cre_yawl_patterns |
+| WCP-22 | Partial Join | cre_yawl_patterns |
+| WCP-24 | Recursion | cre_yawl_patterns |
+| WCP-25 | Interleaved Loop | cre_yawl_patterns |
+| WCP-27 | Protocol Pattern | cre_yawl_patterns |
+| WCP-28 | Try-Catch | cre_yawl_patterns |
+| WHP-01 | Error Handler | cre_yawl_patterns |
+| WHP-02 | Retry | cre_yawl_patterns |
+| WHP-03 | Compensation | cre_yawl_patterns |
+| WHP-04 | Triggered Compensation | cre_yawl_patterns |
+| WHP-05 | Consecutive Compensation | cre_yawl_patterns |
+
+**Note:** These patterns are functionally implemented through the `cre_yawl_patterns` module API but do not have dedicated gen_pnet behavior modules in `src/patterns/`.
 
 ---
 

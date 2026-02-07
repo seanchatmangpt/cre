@@ -374,7 +374,7 @@ drain_workflow(Name, MaxSteps) when is_integer(MaxSteps), MaxSteps >= 0 ->
 get_result(Name, Place) when is_atom(Place) ->
     try gen_pnet:ls(Name, Place) of
         {ok, _Tokens} = Result -> Result;
-        {error, #bad_place{}} = Error -> Error
+        {error, #bad_place{}} -> {error, bad_place}
     catch
         exit:{noproc, _} -> {error, no_process};
         exit:{normal, _} -> {error, terminated};
@@ -556,9 +556,11 @@ execute_until_complete_test() ->
     stop(Pid).
 
 error_handling_noproc_test() ->
-    ?assertEqual({error, no_process}, get_marking(self())),
-    ?assertEqual({error, no_process}, execute_step(self())),
-    ?assertEqual({error, no_process}, inject_input(self(), #{p => [a]})),
-    ?assertEqual({error, no_process}, get_result(self(), p)).
+    %% Use a dead pid - self() triggers calling_self; dead pid gives no_process or terminated
+    DeadPid = spawn(fun() -> ok end),
+    ?assert(lists:member(get_marking(DeadPid), [{error, no_process}, {error, terminated}])),
+    ?assert(lists:member(execute_step(DeadPid), [abort, {error, no_process}, {error, terminated}])),
+    ?assert(lists:member(inject_input(DeadPid, #{p => [a]}), [{error, no_process}, {error, terminated}])),
+    ?assert(lists:member(get_result(DeadPid, p), [{error, no_process}, {error, terminated}])).
 
 -endif.

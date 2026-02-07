@@ -27,7 +27,7 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 | **[QUICK_START.md](./QUICK_START.md)** | Installation and first workflow example | Beginner | 5 min | Basic setup and execution |
 | **[TUTORIALS_INDEX.md](./TUTORIALS_INDEX.md)** | Complete tutorial roadmap | Beginner | 15 min | Learning path guidance |
 | **[tutorials/getting_started.md](./tutorials/getting_started.md)** | Step-by-step implementation tutorial | Beginner | 30 min | First YAWL workflow creation |
-| **[CLIENT_API_TUTORIAL.md](./CLIENT_API_TUTORIAL.md)** | Client API usage examples | Beginner | 45 min | Using CRE as a library |
+| **[CLIENT_API_COMPLETE_REFERENCE.md](./CLIENT_API_COMPLETE_REFERENCE.md)** | Client API comprehensive guide | Beginner | 45 min | Using CRE as a library |
 | **[YAWL_COMPILE_COMPLETE_GUIDE.md](./YAWL_COMPILE_COMPLETE_GUIDE.md)** | YAWL compilation to Petri nets | Intermediate | 60 min | Understanding compilation pipeline |
 
 ### 2. Core YAWL Patterns Documentation
@@ -64,7 +64,6 @@ This index serves as your central navigation point for all YAWL (Yet Another Wor
 |------|-------------|----------|-------|
 | **[COMPLETE_API_REFERENCE.md](./COMPLETE_API_REFERENCE.md)** | Complete API reference | Developers | All modules |
 | **[CLIENT_API_COMPLETE_REFERENCE.md](./CLIENT_API_COMPLETE_REFERENCE.md)** | Client API comprehensive guide | Application developers | Client-side APIs |
-| **[API_REFERENCE.md](./API_REFERENCE.md)** | Full API specification | Developers | All functions |
 | **[PNET_CORE_COMPREHENSIVE_REFERENCE.md](./PNET_CORE_COMPREHENSIVE_REFERENCE.md)** | Core net behaviors | System developers | Internal APIs |
 | **[GEN_PNET_USER_GUIDE.md](./GEN_PNET_USER_GUIDE.md)** | gen_pnet usage guide | Developers | Runtime usage |
 

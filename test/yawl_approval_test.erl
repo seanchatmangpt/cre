@@ -56,16 +56,22 @@ middleware_test_() ->
 %%====================================================================
 
 setup() ->
-    {ok, Pid} = yawl_approval:start_link(),
-    Pid.
+    case yawl_approval:start_link() of
+        {ok, Pid} -> Pid;
+        {error, {already_started, Pid}} -> Pid
+    end.
 
 setup_middleware() ->
-    {ok, Pid} = yawl_approval:start_link(),
-    Pid.
+    case yawl_approval:start_link() of
+        {ok, Pid} -> Pid;
+        {error, {already_started, Pid}} -> Pid
+    end.
 
 cleanup(_Pid) ->
-    gen_server:stop(yawl_approval),
-    ok.
+    case whereis(yawl_approval) of
+        undefined -> ok;
+        _P -> gen_server:stop(yawl_approval), ok
+    end.
 
 %%====================================================================
 %% Approval Tests
@@ -441,21 +447,10 @@ claude_bridge_mock_test_() ->
      ]}.
 
 setup_claude_mock() ->
-    {ok, Pid} = yawl_approval:start_link(),
-    %% Store original Claude bridge function (for future mocking with meck)
-    _OriginalPrompt = fun yawl_claude_bridge:prompt_claude/2,
-    %% Replace with mock that always approves (for future use with meck)
-    _MockPrompt = fun(_Prompt, _Schema) ->
-        {ok, #{
-            <<"approved">> => true,
-            <<"reason">> => <<"Mock approval for testing">>,
-            <<"metadata">> => #{<<"mock">> => true}
-        }
-    }
-    end,
-    %% Note: In a real scenario, you'd use meck or mock library here
-    %% For this test, we rely on the simulate_approval function handling errors gracefully
-    Pid.
+    case yawl_approval:start_link() of
+        {ok, Pid} -> Pid;
+        {error, {already_started, Pid}} -> Pid
+    end.
 
 cleanup_claude_mock(_Pid) ->
     gen_server:stop(yawl_approval),

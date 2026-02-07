@@ -100,6 +100,7 @@ groups() ->
 -spec init_per_suite(Config :: ct:config()) -> ct:config().
 init_per_suite(Config) ->
     ct:pal("Starting orderfulfillment_integration_SUITE"),
+    ok = test_helper:ensure_cre_gen_pnet_loaded(),
     %% Find YAWL file path - check multiple possible locations
     BaseDir = code:lib_dir(cre),
     YawlCandidates = [

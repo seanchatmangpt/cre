@@ -21,7 +21,7 @@ This document summarizes the consolidation of multiple remote branches into the 
 | Test Files (.erl) | 71 test suites |
 | Documentation Files | 101 markdown files |
 | Lines of Code | ~116,000 LOC |
-| YAWL Patterns Implemented | 26 of 43 pattern modules (60%) |
+| YAWL Patterns Implemented | 26 of 43 pattern modules (60.5%) |
 | OTP Support | 25.0, 26, 27, 28 |
 | Compilation Status | Clean (4 minor unused record warnings) |
 | Test Status | Passing with known integration test issues |
@@ -147,10 +147,9 @@ This document summarizes the consolidation of multiple remote branches into the 
 
 | Metric | Count | Percentage |
 |--------|-------|------------|
-| Total Tests | 760 | 100% |
-| Passing | 689 | 90.7% |
-| Failing | 13 | 1.7% |
-| Cancelled/Skipped | 58 | 7.6% |
+| Total Tests | 1,226 | 100% |
+| Passing | 1,199 | 97.8% |
+| Failing | 27 | 2.2% |
 
 ### Passing Test Modules
 
@@ -433,7 +432,7 @@ Your branch is ahead of 'origin/master' by 8 commits.
 1. All 7 relevant remote branches have been successfully merged
 2. GCP infrastructure branch deferred for separate evaluation
 3. Code compiles cleanly with only cosmetic warnings
-4. Tests pass at 90.7% with documented integration test gaps
+4. Tests pass at 97.8% with documented integration test gaps
 5. Documentation is comprehensive and up-to-date
 
 ---

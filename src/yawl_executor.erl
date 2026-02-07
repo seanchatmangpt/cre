@@ -1426,11 +1426,12 @@ get_stats_table() ->
     TableName = list_to_atom(atom_to_list(?MODULE) ++ "_stats"),
     case ets:whereis(TableName) of
         undefined ->
-            Heir = case get_heir_process() of
-                undefined -> none;
-                Pid -> {heir, Pid, []}
+            Opts = [named_table, public, {read_concurrency, true}],
+            OptsWithHeir = case get_heir_process() of
+                undefined -> Opts;
+                Pid when is_pid(Pid) -> Opts ++ [{heir, Pid, []}]
             end,
-            ets:new(TableName, [named_table, public, {read_concurrency, true}, Heir]),
+            ets:new(TableName, OptsWithHeir),
             TableName;
         Table ->
             Table

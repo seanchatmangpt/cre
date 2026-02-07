@@ -1,0 +1,41 @@
+@startuml CRE - Workflow Execution Sequence (gen_yawl)
+
+title Workflow Execution Sequence - gen_yawl Only
+
+actor Client
+participant "wf_yawl_executor" as WfExec
+participant "yawl_execution" as YawlExec
+participant "gen_yawl" as GenYawl
+participant "Compiled Net\n(gen_yawl callbacks)" as NetMod
+
+Client -> WfExec: load_workflow(SpecPath)
+WfExec -> WfExec: wf_spec:from_xml_file / wf_yaml_spec
+WfExec -> WfExec: yawl_compile:compile
+WfExec <-- WfExec: Executor with compiled modules
+
+Client -> WfExec: start_workflow(Executor, InitData)
+WfExec -> YawlExec: start_link(NetMod, InitData)
+YawlExec -> GenYawl: gen_yawl:start_link(NetMod, InitData, [])
+note right: NOT gen_pnet:start_link
+GenYawl -> NetMod: init(InitData)
+GenYawl -> NetMod: place_lst(), trsn_lst()
+GenYawl -> NetMod: init_marking(Place, UsrInfo)
+GenYawl <-- NetMod: Initial marking
+GenYawl -> GenYawl: continue (progress loop)
+GenYawl <-- YawlExec: {ok, Pid}
+YawlExec <-- WfExec: {ok, Pid, CaseId}
+WfExec <-- Client: {ok, Pid, CaseId}
+
+Client -> WfExec: execute_step(Pid) or drain(Pid, N)
+WfExec -> YawlExec: step(Pid) / drain(Pid, N)
+YawlExec -> GenYawl: gen_yawl:call(Pid, step)
+GenYawl -> NetMod: preset(Trsn)
+GenYawl -> NetMod: is_enabled(Trsn, Mode, UsrInfo)
+GenYawl -> NetMod: fire(Trsn, Mode, UsrInfo)
+NetMod --> GenYawl: {produce, Map} or {produce, Map, NewUsrInfo}
+GenYawl -> GenYawl: handle_trigger, prd, continue
+GenYawl <-- YawlExec: Receipt
+YawlExec <-- WfExec: {ok, Receipts}
+WfExec <-- Client: {ok, Receipts}
+
+@enduml

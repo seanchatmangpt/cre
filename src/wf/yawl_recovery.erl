@@ -236,11 +236,11 @@ checkpoint(SpecId, CaseId, Marking, Data, Options) when
         false ->
             {error, invalid_marking};
         true ->
-            %% Create checkpoint record
+            %% Create checkpoint record (checkpoint_id first = Mnesia key)
             CheckpointRecord = #yawl_checkpoint{
+                checkpoint_id = CheckpointId,
                 spec_id = SpecId,
                 case_id = CaseId,
-                checkpoint_id = CheckpointId,
                 marking = Marking,
                 data = Data,
                 timestamp = Timestamp,

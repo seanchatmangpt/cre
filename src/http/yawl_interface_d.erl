@@ -666,6 +666,12 @@ abort_worklet(ExecutionId) ->
 -spec doctest_test() -> ok.
 
 doctest_test() ->
+    %% Ensure server is running (cre may not start it)
+    _ = case start_link() of
+        {ok, _} -> ok;
+        {error, {already_started, _}} -> ok
+    end,
+
     %% Test 1: Register exception service
     {ok, SvcId} = register_exception_service(<<"doctest_handler">>,
         [{service_type, local}, {priority, 1}, {enabled, true}]),

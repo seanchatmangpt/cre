@@ -329,9 +329,9 @@ Clean up message handling in executor stats module.
 
 ---
 
-## Unimplemented YAWL Patterns (7 Remaining)
+## Unimplemented YAWL Patterns (17 Remaining)
 
-**Status:** 36 of 43 patterns implemented (83.7%)
+**Status:** 26 of 43 patterns implemented (60.5%)
 
 ### Missing by Category
 
@@ -370,10 +370,9 @@ Clean up message handling in executor stats module.
 
 | Metric | Count | Percentage |
 |--------|-------|------------|
-| Total Tests | 1,208 | 100% |
-| Passing | 1,178 | 97.5% |
-| Failing | 25 | 2.1% |
-| Cancelled | 5 | 0.4% |
+| Total Tests | 1,226 | 100% |
+| Passing | 1,199 | 97.8% |
+| Failing | 27 | 2.2% |
 
 ### Passing Test Modules
 
@@ -517,8 +516,8 @@ When fixing issues:
 | Date | Changes |
 |------|---------|
 | 2026-02-06 | Initial creation from FINAL_MERGE_SUMMARY.md data |
-| 2026-02-06 | Added current test results (1208 total, 25 failures) |
-| 2026-02-06 | Corrected unimplemented pattern count (7, not 17) |
+| 2026-02-06 | Added current test results (1226 total, 27 failures, 97.8% pass) |
+| 2026-02-06 | Corrected unimplemented pattern count (17 remaining, 26 of 43 implemented) |
 
 ---
 

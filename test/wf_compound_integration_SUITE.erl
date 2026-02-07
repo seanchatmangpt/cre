@@ -119,6 +119,7 @@ groups() ->
 -spec init_per_suite(Config :: ct:config()) -> ct:config().
 init_per_suite(Config) ->
     ct:pal("Starting wf_compound_integration_SUITE"),
+    ok = test_helper:ensure_cre_gen_pnet_loaded(),
     %% Clean slate - stop and delete any existing Mnesia schema
     application:stop(mnesia),
     timer:sleep(50),
