@@ -21,3 +21,4 @@ rebar.lock
 
 # OTP cache and session artifacts
 .erlmcp/
+Mnesia.nonode@nohost/
