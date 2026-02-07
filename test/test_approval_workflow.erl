@@ -171,7 +171,7 @@ execute_step(WorkflowId, complete) ->
     mark_workflow_completed(WorkflowId),
     {ok, workflow_completed};
 
-execute_step(WorkflowId, Step) ->
+execute_step(_WorkflowId, Step) ->
     {error, {unknown_step, Step}}.
 
 %%--------------------------------------------------------------------

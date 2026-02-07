@@ -658,7 +658,7 @@ get_destination(_) ->
 wait_for_completion(Pid, Timeout) ->
     wait_for_completion(Pid, Timeout, 0).
 
-wait_for_completion(Pid, Timeout, Elapsed) when Elapsed >= Timeout ->
+wait_for_completion(_Pid, Timeout, Elapsed) when Elapsed >= Timeout ->
     {error, timeout};
 wait_for_completion(Pid, Timeout, Elapsed) ->
     case get_state(Pid) of

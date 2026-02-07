@@ -224,7 +224,7 @@ prompt_claude(Prompt, Schema, Options) ->
     ClaudeCmd = get_claude_command(),
 
     %% Build command arguments
-    Timeout = maps:get(timeout, Options, 30000),
+    _Timeout = maps:get(timeout, Options, 30000),
     AllowedTools = maps:get(allowed_tools, Options, []),
     MaxTokens = maps:get(max_tokens, Options, 4096),
     Model = maps:get(model, Options, auto),

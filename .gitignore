@@ -19,6 +19,7 @@ rebar.lock
 .claude-flow/daemon-state.json
 .claude-flow/daemon.pid
 .claude-flow/metrics/
+.claude-flow/agents/store.json
 .swarm/
 
 # Wreckit local config (may contain secrets)
@@ -27,3 +28,24 @@ rebar.lock
 # OTP cache and session artifacts
 .erlmcp/
 Mnesia.nonode@nohost/
+
+# Build artifacts
+rebar3.crashdump
+
+# LaTeX build artifacts
+texput.log
+thesis/*.aux
+thesis/*.log
+thesis/*.blg
+thesis/*.bbl
+thesis/*.bcf
+thesis/*.lof
+thesis/*.lot
+thesis/*.out
+thesis/*.run.xml
+thesis/*.toc
+thesis/chapters/*.aux
+thesis/appendix/*.aux
+
+# Mnesia database files
+Mnesia.*/

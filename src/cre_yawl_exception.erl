@@ -1408,8 +1408,6 @@ preset(retry_exhausted) -> ['Retry'];
 
 % WHP-03: Compensation
 preset(push_compensator) -> ['Active'];
-preset(compensation_success) -> ['CompensationStack'];
-preset(compensation_failure) -> ['Failed'];
 
 % WHP-04: Triggered Compensation
 preset(trigger_compensation) -> ['ExceptionRaised'];
@@ -1497,7 +1495,7 @@ fire(handle_exception, #{'ExceptionRaised' := [Exception]}, #exception_state{han
 fire(error_handler_execute, #{'Handling' := [{Exception, Handler}]}, _UsrInfo) ->
     Now = erlang:system_time(millisecond),
     case execute_handler_with_circuit_breaker(Handler, Exception, Now) of
-        {ok, Result} ->
+        {ok, _Result} ->
             ?LOG(info, "Handler executed successfully", []),
             {produce, #{
               'Resolved' => [Exception],
@@ -1599,7 +1597,7 @@ fire(compensation_failure, #{'Compensating' := [Compensator]}, _UsrInfo) ->
       'Compensating' => []
      }};
 
-fire(push_compensator, #{'Active' := [ActivityId]}, #exception_state{workflow_id = WorkflowId}) ->
+fire(push_compensator, #{'Active' := [ActivityId]}, #exception_state{workflow_id = _WorkflowId}) ->
     HandlerFun = fun(_Input) -> {compensated, ActivityId} end,
     Compensator = new_compensator(ActivityId, HandlerFun, immediate),
     ?LOG(info, "Pushed compensator for activity: ~p", [ActivityId]),

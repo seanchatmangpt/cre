@@ -128,7 +128,7 @@
 %%====================================================================
 
 %% Timeout management API
--export([with_timeout/3, with_timeout/4, cancel_timeout/1]).
+-export([with_timeout/2, with_timeout/3, with_timeout/4, cancel_timeout/1]).
 -export([set_pattern_timeout/2, get_pattern_timeout/1]).
 -export([start_timeout_monitor/2, stop_timeout_monitor/1]).
 -export([extend_timeout/2, reset_timeout/1]).
@@ -252,10 +252,11 @@
 -type checkpoint_id() :: binary().
 -type timeout_ms() :: non_neg_integer() | infinity.
 -type cancellation_token() :: #cancellation_token{}.
--type timeout_ref() :: #timeout_ref{}.
--type resource_entry() :: #resource_entry{}.
--type wait_edge() :: #wait_edge{}.
--type checkpoint_entry() :: #checkpoint_entry{}.
+%% Types used in module API and records
+%% -type timeout_ref() :: #timeout_ref{}.
+%% -type resource_entry() :: #resource_entry{}.
+%% -type wait_edge() :: #wait_edge{}.
+%% -type checkpoint_entry() :: #checkpoint_entry{}.
 -type deadlock_info() :: #{cycle => [pid()], resources => [binary()]}.
 -type resource_usage() :: #{allocated => non_neg_integer(), leaked => non_neg_integer()}.
 
@@ -1288,8 +1289,8 @@ handle_call({break_deadlock, ContextId, Strategy}, _From, State) ->
 
             %% Remove all edges involving the killed process
             NewWaitGraph = lists:filter(
-                fun(#wait_edge{waiting_pid = P}) -> P =/= PidToKill;
-                   (#wait_edge{waiting_for = W}) when is_pid(W) -> W =/= PidToKill;
+                fun(#wait_edge{waiting_pid = P}) when P =:= PidToKill -> false;
+                   (#wait_edge{waiting_for = W}) when is_pid(W), W =:= PidToKill -> false;
                    (_) -> true
                 end,
                 State#timeout_state.wait_graph
@@ -1597,8 +1598,8 @@ handle_info(resource_check, State) ->
 handle_info({'EXIT', Pid, _Reason}, State) ->
     %% Clean up wait edges involving the exited process
     NewWaitGraph = lists:filter(
-        fun(#wait_edge{waiting_pid = P}) -> P =/= Pid;
-           (#wait_edge{waiting_for = W}) when is_pid(W) -> W =/= Pid;
+        fun(#wait_edge{waiting_pid = P}) when P =:= Pid -> false;
+           (#wait_edge{waiting_for = W}) when is_pid(W), W =:= Pid -> false;
            (_) -> true
         end,
         State#timeout_state.wait_graph

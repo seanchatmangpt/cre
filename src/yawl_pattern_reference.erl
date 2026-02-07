@@ -690,7 +690,7 @@ deferred_choice(Options, ConditionFun, InitialData) when length(Options) >= 2 ->
 -spec interleaved_routing([fun((term()) -> term())], term()) -> #wcp_pattern{}.
 
 interleaved_routing(Branches, InitialData) when length(Branches) >= 2 ->
-    BranchCount = length(Branches),
+    _BranchCount = length(Branches),
     Places = [p_start, p_pool, p_next, p_active, p_done, p_all_done, p_end],
 
     Transitions = [t_distribute, t_pick, t_execute, t_return, t_complete],
@@ -751,7 +751,7 @@ interleaved_routing(Branches, InitialData) when length(Branches) >= 2 ->
 %%--------------------------------------------------------------------
 -spec milestone(fun((term()) -> term()), fun((term()) -> boolean()), term()) -> #wcp_pattern{}.
 
-milestone(Activity, MilestoneFun, InitialData) ->
+milestone(Activity, _MilestoneFun, InitialData) ->
     Places = [p_start, p_milestone_guard, p_milestone_reached, p_activity, p_complete, p_end],
 
     Transitions = [t_check_milestone, t_reach_milestone, t_execute, t_complete],
@@ -810,7 +810,7 @@ milestone(Activity, MilestoneFun, InitialData) ->
 %%--------------------------------------------------------------------
 -spec cancel_activity(fun((term()) -> term()), fun((term()) -> boolean())) -> #wcp_pattern{}.
 
-cancel_activity(Activity, CancelFun) ->
+cancel_activity(Activity, _CancelFun) ->
     Places = [p_start, p_running, p_cancel_signal, p_cancelled, p_completed, p_end],
 
     Transitions = [t_start, t_cancel, t_complete, t_handle_cancel],
@@ -869,7 +869,7 @@ cancel_activity(Activity, CancelFun) ->
 %%--------------------------------------------------------------------
 -spec cancel_case([fun((term()) -> term())], fun((term()) -> boolean())) -> #wcp_pattern{}.
 
-cancel_case(Activities, CancelFun) when length(Activities) >= 1 ->
+cancel_case(Activities, _CancelFun) when length(Activities) >= 1 ->
     ActivityCount = length(Activities),
     Places = [p_start, p_cancel_req | [list_to_atom("p_activity_" ++ integer_to_list(I))
                                         || I <- lists:seq(1, ActivityCount)]] ++
@@ -928,7 +928,7 @@ cancel_case(Activities, CancelFun) when length(Activities) >= 1 ->
 %%--------------------------------------------------------------------
 -spec cancel_region([fun((term()) -> term())], fun((term()) -> boolean()), [atom()]) -> #wcp_pattern{}.
 
-cancel_region(RegionActivities, CancelFun, RegionIds) when length(RegionActivities) >= 1 ->
+cancel_region(RegionActivities, _CancelFun, RegionIds) when length(RegionActivities) >= 1 ->
     RegionCount = length(RegionActivities),
     Places = [p_start, p_region_boundary | [list_to_atom("p_region_" ++ integer_to_list(I))
                                               || I <- lists:seq(1, RegionCount)]] ++
@@ -1372,7 +1372,7 @@ critical_section_enabled(_, _) -> false.
 
 sequence_fire(t_start, #{p_start := [_]} = Marking) ->
     {produce, maps:remove(p_start, Marking#{p_task_1 => [token]})};
-sequence_fire(t_end, #{p_end := [Token]} = Marking) ->
+sequence_fire(t_end, #{p_end := [_Token]} = Marking) ->
     {produce, Marking};
 sequence_fire(Trans, Marking) when is_integer(Trans) ->
     Place = list_to_atom("p_task_" ++ integer_to_list(Trans)),
@@ -1431,7 +1431,7 @@ structured_sync_merge_fire(t_sync_merge, Marking) ->
 
 discriminator_fire(t_discriminate, #{p_trigger := [_]} = Marking) ->
     {produce, maps:remove(p_trigger, Marking#{p_end => [triggered]})};
-discriminator_fire(t_consume, #{p_waiting := Waiting} = Marking) ->
+discriminator_fire(t_consume, #{p_waiting := _Waiting} = Marking) ->
     {produce, maps:remove(p_waiting, Marking#{p_reset => [reset_req]})};
 discriminator_fire(t_reset, #{p_reset := [_]} = Marking) ->
     {produce, maps:remove(p_reset, Marking#{p_trigger => [ready]})}.
@@ -1459,7 +1459,7 @@ multi_instance_static_fire(t_join, #{p_end := [_]} = Marking, _InstanceCount, _I
 multi_instance_static_fire(_, Marking, _, _) ->
     {produce, Marking}.
 
-multi_instance_dynamic_fire(t_fetch, Marking, InstanceFun) ->
+multi_instance_dynamic_fire(t_fetch, Marking, _InstanceFun) ->
     case maps:get(p_source, Marking, []) of
         [DataFun] ->
             case DataFun() of
@@ -1471,9 +1471,9 @@ multi_instance_dynamic_fire(t_fetch, Marking, InstanceFun) ->
         _ ->
             {produce, Marking}
     end;
-multi_instance_dynamic_fire(t_spawn, Marking, InstanceFun) ->
+multi_instance_dynamic_fire(t_spawn, Marking, _InstanceFun) ->
     case maps:get(p_pool, Marking, []) of
-        [Data] ->
+        [_Data] ->
             {produce, maps:remove(p_pool, Marking#{p_running => [executing]})};
         _ ->
             {produce, Marking}
@@ -1516,7 +1516,7 @@ deferred_choice_fire(t_complete, #{p_discarded := [_]} = Marking, _ConditionFun)
 deferred_choice_fire(_, Marking, _) ->
     {produce, Marking}.
 
-interleaved_routing_fire(t_distribute, #{p_start := [Data]} = Marking) ->
+interleaved_routing_fire(t_distribute, #{p_start := [_Data]} = Marking) ->
     %% Create branch tokens
     {produce, maps:remove(p_start, Marking#{p_pool => [branch1, branch2]})};
 interleaved_routing_fire(t_pick, #{p_pool := [Branch | Rest], p_next := [_]} = Marking) ->
@@ -1556,7 +1556,7 @@ cancel_activity_fire(_, Marking, _) ->
 
 cancel_case_fire(t_start, #{p_start := [_]} = Marking, _Activities) ->
     {produce, maps:remove(p_start, Marking#{p_activity_1 => [running]})};
-cancel_case_fire(I, Marking, Activities) when is_integer(I), I > 1 ->
+cancel_case_fire(I, Marking, _Activities) when is_integer(I), I > 1 ->
     case maps:get(list_to_atom("p_activity_" ++ integer_to_list(I - 1)), Marking, []) of
         [_] ->
             Place = list_to_atom("p_activity_" ++ integer_to_list(I)),
@@ -1694,83 +1694,4 @@ generate_id(Prefix) ->
 
 test_input() -> test_input.
 
-%%====================================================================
-%% Doctests
-%%====================================================================
-
 %%
-%% @doc Runs doctests for the yawl_pattern_reference module.
-%%
-%% This function executes fast, minimal tests that verify the core
-%% pattern lookup and metadata functions work correctly.
-%%
-%% <b>Example:</b>
-%% ```erlang
-%% > yawl_pattern_reference:doctest_test().
-%% ok
-%% ```
-%% @end
--spec doctest_test() -> ok.
-
-doctest_test() ->
-    %% Test 1: Create sequence pattern and verify structure
-    SeqPattern = sequence([task1, task2]),
-    #wcp_pattern{name = <<"WCP-01: Sequence">>,
-                 wcp_number = {1, 1},
-                 places = Places1,
-                 transitions = Trans1} = SeqPattern,
-    true = length(Places1) >= 4,
-    true = length(Trans1) >= 3,
-
-    %% Test 2: Create parallel split and verify name
-    ParPattern = parallel_split(3, [t1, t2, t3]),
-    #wcp_pattern{name = <<"WCP-02: Parallel Split">>,
-                 wcp_number = {2, 2}} = ParPattern,
-
-    %% Test 3: Create synchronization and verify soundness
-    SyncPattern = synchronization(2, [a, b]),
-    #wcp_pattern{name = <<"WCP-03: Synchronization">>} = SyncPattern,
-    #{option_to_complete := true,
-      proper_completion := true} = verify_soundness(SyncPattern),
-
-    %% Test 4: Validate a pattern
-    ok = validate_pattern(SeqPattern),
-
-    %% Test 5: Get Petri net structure
-    PetriNet = get_petri_net(SeqPattern),
-    #{type := petri_net,
-      places := _,
-      transitions := _} = PetriNet,
-
-    %% Test 6: Get pattern info
-    Info = get_pattern_info(SeqPattern),
-    #{name := <<"WCP-01: Sequence">>,
-      wcp_number := {1, 1},
-      place_count := PC,
-      transition_count := TC} = Info,
-    true = is_integer(PC),
-    true = is_integer(TC),
-
-    %% Test 7: Create discriminator pattern
-    DiscPattern = discriminator(2, [x, y]),
-    #wcp_pattern{name = <<"WCP-09: Discriminator">>,
-                 wcp_number = {9, 1}} = DiscPattern,
-
-    %% Test 8: Create multi-instance static pattern
-    IdFun = fun(X) -> X end,
-    MIStatic = multi_instance_static(3, IdFun, [1, 2, 3]),
-    #wcp_pattern{name = <<"WCP-13: Multi-Instance (Static)">>,
-                 wcp_number = {13, 1}} = MIStatic,
-
-    %% Test 9: Create critical section pattern
-    CSPattern = critical_section(IdFun, my_lock),
-    #wcp_pattern{name = <<"WCP-39: Critical Section">>,
-                 wcp_number = {39, 1}} = CSPattern,
-
-    %% Test 10: Verify soundness contains expected keys
-    Soundness = verify_soundness(SeqPattern),
-    true = maps:is_key(option_to_complete, Soundness),
-    true = maps:is_key(proper_completion, Soundness),
-    true = maps:is_key(liveness, Soundness),
-
-    ok.

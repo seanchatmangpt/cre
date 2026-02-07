@@ -264,7 +264,7 @@ order_processing(Order) ->
 %%--------------------------------------------------------------------
 -spec generate_xes_log(binary()) -> ok.
 generate_xes_log(LogId) ->
-    {ok, XESContent} = yawl_xes:export_xes(LogId, "xes_logs"),
+    {ok, _XESContent} = yawl_xes:export_xes(LogId, "xes_logs"),
     io:format("XES log generated: xes_logs/~s.xes~n", [LogId]),
     ok.
 
@@ -1082,16 +1082,15 @@ complete_workflow(#workflow_state{order = Order, log_id = LogId, results = Resul
 %% @doc Executes workflow using the pattern executor.
 %% @end
 %%--------------------------------------------------------------------
-execute_workflow(State) ->
-    %% Execute each pattern through the workflow
-    %% Note: Using the order_processing flow which has full XES logging
-    State.
+%% execute_workflow/1 - reserved for future pattern executor integration
+%% execute_workflow(State) ->
+%%     State.
 
 %%====================================================================
 %% Helper Functions
 %%====================================================================
 
-verify_customer(CustomerId) ->
+verify_customer(_CustomerId) ->
     %% Simulate customer verification
     true.
 
@@ -1108,13 +1107,13 @@ verify_total(Total, Items) ->
     end, 0.0, Items),
     abs(Total - CalculatedTotal) < 0.01.
 
-warehouse_check(State) ->
+warehouse_check(_State) ->
     #{
         <<"warehouse_check">> => true,
         <<"inventory_available">> => true
     }.
 
-credit_check(State) ->
+credit_check(_State) ->
     #{
         <<"credit_check">> => true,
         <<"credit_score">> => 750
@@ -1124,21 +1123,21 @@ manager_approve(Manager, _State) ->
     %% Simulate manager approval (2/3 will approve)
     lists:member(Manager, [<<"manager_1">>, <<"manager_2">>]).
 
-is_suitable_shipper(_Order, Shipper) ->
+is_suitable_shipper(_Order, _Shipper) ->
     %% All shippers are suitable
     true.
 
 shipper_response(Shipper) ->
     #{<<"shipper">> => Shipper, <<"quote">> => (rand:uniform(151) + 49) / 1.0}.
 
-shipper_confirm(Shipper) ->
+shipper_confirm(_Shipper) ->
     %% 80% of shippers confirm
     case rand:uniform(10) of
         N when N =< 8 -> confirmed;
         _ -> pending
     end.
 
-supplier_confirm(Supplier) ->
+supplier_confirm(_Supplier) ->
     %% All suppliers confirm
     confirmed.
 
@@ -1250,7 +1249,8 @@ generate_order_id() ->
     Timestamp = erlang:unique_integer([positive, monotonic]),
     <<"ORDER-", (integer_to_binary(Timestamp))/binary>>.
 
-format_value(Binary) when is_binary(Binary) -> Binary;
-format_value(Integer) when is_integer(Integer) -> list_to_binary(integer_to_list(Integer));
-format_value(Float) when is_float(Float) -> float_to_binary(Float, [{decimals, 2}, compact]);
-format_value(Atom) when is_atom(Atom) -> atom_to_binary(Atom).
+%% format_value/1 - reserved for XES log formatting
+%% format_value(Binary) when is_binary(Binary) -> Binary;
+%% format_value(Integer) when is_integer(Integer) -> list_to_binary(integer_to_list(Integer));
+%% format_value(Float) when is_float(Float) -> float_to_binary(Float, [{decimals, 2}, compact]);
+%% format_value(Atom) when is_atom(Atom) -> atom_to_binary(Atom).

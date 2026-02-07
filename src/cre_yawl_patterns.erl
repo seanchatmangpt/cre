@@ -2117,7 +2117,7 @@ fire('t_milestone_check',
     end;
 
 fire('t_complete',
-     #{'p_active' := [Active], 'p_complete' := [Complete]},
+     #{'p_active' := [_Active], 'p_complete' := [_Complete]},
      _UsrInfo) ->
     {produce, #{
       'p_active' => [completed],
@@ -2147,7 +2147,7 @@ fire('t_work',
     end;
 
 fire('t_cancel_request',
-     #{'p_activity_running' := [Running]},
+     #{'p_activity_running' := [_Running]},
      _UsrInfo) ->
     {produce, #{
       'p_activity_running' => [],
@@ -2163,7 +2163,7 @@ fire('t_cancel_confirm',
      }};
 
 fire('t_complete',
-     #{'p_activity_running' := [Running], 'p_completed' := [Done]},
+     #{'p_activity_running' := [_Running], 'p_completed' := [_Done]},
      _UsrInfo) ->
     {produce, #{
       'p_activity_running' => [completed],
@@ -2188,7 +2188,7 @@ fire('t_work',
     end;
 
 fire('t_request_cancel',
-     #{'p_case_active' := [CaseActive]},
+     #{'p_case_active' := [_CaseActive]},
      _UsrInfo) ->
     {produce, #{
       'p_case_active' => [],
@@ -2212,7 +2212,7 @@ fire('t_execute_cancel',
      }};
 
 fire('t_complete',
-     #{'p_case_active' := [CaseActive], 'p_completed' := [Done]},
+     #{'p_case_active' := [_CaseActive], 'p_completed' := [_Done]},
      _UsrInfo) ->
     {produce, #{
       'p_case_active' => [completed],
@@ -3048,7 +3048,7 @@ instance_supervisor_loop(Ref, Parent, Subprocess, DataList, OnError,
                                                     Remaining, OnError,
                                                     MaxConcurrent, NewActive - 1, NewResults)
                     end;
-                {'EXIT', Pid, _Reason} ->
+                {'EXIT', _Pid, _Reason} ->
                     instance_supervisor_loop(Ref, Parent, Subprocess,
                                             Remaining, OnError,
                                             MaxConcurrent, NewActive - 1, Results)
@@ -3106,7 +3106,7 @@ dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
                      CurrentData, MaxConcurrent, OnError, Active, Results) when Active > 0 ->
     %% Wait for at least one instance to complete
     receive
-        {Ref, Pid, Result} ->
+        {Ref, _Pid, Result} ->
             NewResults = [Result | Results],
             case {Result, OnError} of
                 {{error, _}, stop} ->
@@ -3116,7 +3116,7 @@ dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
                                         CurrentData, MaxConcurrent, OnError,
                                         Active - 1, NewResults)
             end;
-        {'EXIT', Pid, _Reason} ->
+        {'EXIT', _Pid, _Reason} ->
             dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
                                 CurrentData, MaxConcurrent, OnError,
                                 Active - 1, Results)
@@ -3180,7 +3180,7 @@ collect_first_choice_loop(Ref, Pids, Deadline, OptionKeys) ->
         T -> max(0, T - erlang:monotonic_time(millisecond))
     end,
     receive
-        {Ref, {option, Key}, {error, _}} ->
+        {Ref, {option, _Key}, {error, _}} ->
             %% This option failed, continue waiting
             collect_first_choice_loop(Ref, Pids -- [self()], Deadline, OptionKeys);
         {Ref, {option, Key}, Result} ->
