@@ -1,2937 +1,916 @@
-# YAWL Workflow Patterns - Complete Reference
+# YAWL Pattern Reference Documentation
+
+**Version:** CRE 0.2.0
+**Last Updated:** 2026-02-06
+**Total Patterns:** 36 implemented of 43 YAWL workflow patterns
+
+---
 
 ## Overview
 
-YAWL (Yet Another Workflow Language) is a comprehensive workflow language based on Petri nets and Workflow Patterns. This document provides a complete reference to all 43 workflow patterns from the Workflow Patterns Initiative, organized into logical categories.
-
-The Workflow Patterns Initiative was established to formally define and catalog the range of control-flow, data-flow, and resource-oriented constructs required to support contemporary workflow processes. These patterns serve as a design resource for workflow system developers and as an evaluation framework for workflow languages.
-
-**Pattern Categories:**
-- Basic Control Flow Patterns (WCP 1-6)
-- Advanced Synchronization Patterns (WCP 7-10)
-- Structural Patterns (WCP 11-13)
-- Multiple Instance Patterns (WCP 14-17)
-- State-Based Patterns (WCP 18-20)
-- Extended Control Flow Patterns (WCP 21-28)
-- Data Flow Patterns (WDP 1-5)
-- Resource Patterns (WRP 1-5)
-- Exception Handling Patterns (WHP 1-5)
-
----
+This document provides a comprehensive reference for all YAWL (Yet Another Workflow Language) workflow control patterns implemented in the Common Runtime Environment (CRE). Patterns are organized by category with their pattern IDs, descriptions, module names, and API functions.
 
 ## Pattern Categories
 
----
-
-### 1. Basic Control Flow Patterns (1-6)
-
-#### WCP-1: Sequence
-
-**Description**: The most fundamental workflow pattern where activities are executed in a sequential order. An activity can only start when its predecessor has completed.
-
-**Petri Net Representation**:
-```
-     t1       t2       t3
-  p0 ---> p1 ---> p2 ---> p3
-```
-Where:
-- `p0`: Initial place (contains token)
-- `p1, p2`: Intermediate places
-- `p3`: Final place
-- `t1, t2, t3`: Transitions (activities)
-
-**YAWL Representation**:
-```yaml
-condition: p0
-task: t1 (condition: p0, output: p1)
-task: t2 (condition: p1, output: p2)
-task: t3 (condition: p2, output: p3)
-```
-
-**Use Case Example**:
-```erlang
-%% Order Processing Sequence
-process_order(Order) ->
-    Order1 = validate_order(Order),
-    Order2 = check_inventory(Order1),
-    Order3 = calculate_payment(Order2),
-    confirm_order(Order3).
-```
-
-**Related Patterns**: WCP-2 (Parallel Split), WCP-4 (Exclusive Choice)
+| Category | ID Range | Implemented | Description |
+|----------|----------|-------------|-------------|
+| **Basic Control Flow** | WCP-01 to WCP-10 | 10/10 | Fundamental workflow structures |
+| **Advanced Synchronization** | WCP-11 to WCP-17 | 7/7 | Complex synchronization and multiple instances |
+| **State-Based Patterns** | WCP-18 to WCP-20 | 3/3 | State-dependent workflow behavior |
+| **Extended Control Flow** | WCP-21 to WCP-28 | 6/8 | Advanced flow control structures |
+| **Data Flow Patterns** | WDP-01 to WDP-05 | 5/5 | Data transformation and movement |
+| **Resource Patterns** | WRP-01 to WRP-05 | 5/5 | Resource management and allocation |
+| **Exception Handling** | WHP-01 to WHP-05 | 5/5 | Error handling and recovery |
 
 ---
 
-#### WCP-2: Parallel Split
+## 1. Basic Control Flow Patterns (WCP-01 to WCP-10)
 
-**Description**: A point in the workflow where a single thread of control splits into multiple parallel threads that can execute concurrently. All outgoing branches are activated simultaneously.
+### WCP-01: Sequence
 
-**Petri Net Representation**:
+**Description:** Execute tasks in a strict sequential order where each task completes before the next begins.
+
+**Module:** `cre_yawl` (core)
+
+**API Functions:**
+- `cre_yawl:add_task/3` - Add tasks to workflow
+- `cre_yawl:connect/3` - Connect tasks in sequence
+
+**Petri Net Structure:**
 ```
-        t1
-      / | \
-     /  |  \
-   p1  p2  p3
-   |   |   |
-  t2  t3  t4
+p_start -> t_task1 -> p_task1 -> t_task2 -> p_task2 -> p_end
 ```
-
-**YAWL Representation**:
-```yaml
-task: split (type: AND-split)
-  outputs: [p1, p2, p3]
-```
-
-**Use Case Example**:
-```erlang
-%% Parallel order processing
-process_order_parallel(Order) ->
-    Parent = self(),
-    spawn(fun() -> Parent ! {inventory, check_inventory(Order)} end),
-    spawn(fun() -> Parent ! {payment, verify_payment(Order)} end),
-    spawn(fun() -> Parent ! {shipping, arrange_shipping(Order)} end),
-    collect_results().
-```
-
-**Related Patterns**: WCP-3 (Synchronization), WCP-22 (Structured Partial Join)
 
 ---
 
-#### WCP-3: Synchronization
+### WCP-02: Parallel Split
 
-**Description**: A point in the workflow where multiple parallel threads converge into a single thread. The workflow continues only after all incoming branches have completed.
+**Description:** Split workflow execution into multiple parallel branches that execute concurrently.
 
-**Petri Net Representation**:
+**Module:** `parallel_split`
+
+**API Functions:**
+- `parallel_split:place_lst/0` - List of Petri net places
+- `parallel_split:trsn_lst/0` - List of Petri net transitions
+- `parallel_split:preset/1` - Input places for transition
+- `parallel_split:is_enabled/3` - Check if transition enabled
+- `parallel_split:init_marking/2` - Initial token distribution
+- `parallel_split:fire/3` - Transition firing
+
+**Petri Net Structure:**
 ```
-   p1   p2   p3
-    |   |   |
-    \  |  /
-     \ | /
-       t1
-       |
-       p4
+p_start -> t_split -> p_branch1
+                     -> p_branch2
+                     -> p_branch3
+                     -> p_branch4
 ```
-
-**YAWL Representation**:
-```yaml
-task: join (type: AND-join)
-  inputs: [p1, p2, p3]
-  output: p4
-  join_code: all  % All incoming branches must complete
-```
-
-**Use Case Example**:
-```erlang
-%% Synchronize parallel order checks
-synchronize_checks() ->
-    receive
-        {inventory, ok} -> inventory_done();
-        {inventory, error} -> inventory_failed()
-    end,
-    receive
-        {payment, ok} -> payment_done();
-        {payment, error} -> payment_failed()
-    end,
-    receive
-        {shipping, ok} -> shipping_done();
-        {shipping, error} -> shipping_failed()
-    end,
-    proceed_to_fulfillment().
-```
-
-**Related Patterns**: WCP-2 (Parallel Split), WCP-22 (Structured Partial Join)
 
 ---
 
-#### WCP-4: Exclusive Choice
+### WCP-03: Synchronization
 
-**Description**: A point in the workflow where exactly one branch is chosen from multiple alternatives based on data-based or event-based selection criteria.
+**Description:** Wait for multiple parallel branches to complete before proceeding.
 
-**Petri Net Representation**:
+**Module:** `or_join`
+
+**API Functions:**
+- `or_join:place_lst/0` - List of Petri net places
+- `or_join:trsn_lst/0` - List of Petri net transitions
+- `or_join:preset/1` - Input places for transition
+- `or_join:is_enabled/3` - Check if transition enabled
+- `or_join:init_marking/2` - Initial token distribution
+- `or_join:fire/3` - Transition firing
+
+**Petri Net Structure:**
 ```
-       t1
-      / | \
-     /  |  \
-    c1 c2 c3  (conditions)
-    |  |  |
-   t2 t3 t4
+p_branch1 -> t_sync
+p_branch2 ->       -> p_merged
+p_branch3 ->
 ```
-
-**YAWL Representation**:
-```yaml
-task: choice (type: OR-split)
-  outputs: [p1, p2, p3]
-  predicate:
-    p1: amount > 1000
-    p2: amount > 500
-    p3: true
-```
-
-**Use Case Example**:
-```erlang
-%% Choose approval level based on amount
-select_approval_level(Order) ->
-    case Order#order.amount of
-        Amount when Amount > 10000 -> executive_approval();
-        Amount when Amount > 5000 -> manager_approval();
-        Amount when Amount > 1000 -> supervisor_approval();
-        _ -> auto_approve()
-    end.
-```
-
-**Related Patterns**: WCP-5 (Simple Merge), WCP-16 (Deferred Choice)
 
 ---
 
-#### WCP-5: Simple Merge
+### WCP-04: Exclusive Choice
 
-**Description**: A point in the workflow where multiple alternative branches converge without synchronization. The workflow continues as soon as ANY one incoming branch completes.
+**Description:** Select one branch from multiple alternatives based on conditions (XOR semantics).
 
-**Petri Net Representation**:
+**Module:** `exclusive_choice`
+
+**API Functions:**
+- `exclusive_choice:place_lst/0` - List of Petri net places
+- `exclusive_choice:trsn_lst/0` - List of Petri net transitions
+- `exclusive_choice:preset/1` - Input places for transition
+- `exclusive_choice:is_enabled/3` - Check if transition enabled
+- `exclusive_choice:init_marking/2` - Initial token distribution
+- `exclusive_choice:fire/3` - Transition firing
+
+**Petri Net Structure:**
 ```
-   p1   p2   p3
-    |   |   |
-    \  |  /
-     \ | /
-       t1
-       |
-       p4
+p_start -> t_choice -> p_branch1 (condition A)
+                  -> p_branch2 (condition B)
+                  -> p_branch3 (condition C)
 ```
-
-**YAWL Representation**:
-```yaml
-task: merge (type: XOR-join)
-  inputs: [p1, p2, p3]
-  output: p4
-  join_code: first  % First incoming branch to complete
-```
-
-**Use Case Example**:
-```erlang
-%% Merge after alternative payment methods
-merge_payment_result() ->
-    receive
-        {credit_card, Result} -> process_payment(Result);
-        {paypal, Result} -> process_payment(Result);
-        {bank_transfer, Result} -> process_payment(Result)
-    end.
-```
-
-**Related Patterns**: WCP-4 (Exclusive Choice), WCP-7 (Synchronizing Merge)
 
 ---
 
-#### WCP-6: Multi-Choice
+### WCP-05: Simple Merge
 
-**Description**: A point in the workflow where multiple branches can be activated simultaneously, but not necessarily all branches. The selection is based on data or events.
+**Description:** Merge multiple incoming paths into single output (XOR semantics).
 
-**Petri Net Representation**:
+**Module:** `simple_merge`
+
+**API Functions:**
+- `simple_merge:place_lst/0` - List of Petri net places
+- `simple_merge:trsn_lst/0` - List of Petri net transitions
+- `simple_merge:preset/1` - Input places for transition
+- `simple_merge:is_enabled/3` - Check if transition enabled
+- `simple_merge:init_marking/2` - Initial token distribution
+- `simple_merge:fire/3` - Transition firing
+
+**Petri Net Structure:**
 ```
-       t1
-      / | \
-     /  |  \
-    c1 c2 c3  (independent conditions)
-    |  |  |
-   t2 t3 t4
+p_branch1 -> t_merge -> p_output
+p_branch2 ->
+p_branch3 ->
 ```
-
-**YAWL Representation**:
-```yaml
-task: multi_choice (type: OR-split)
-  outputs: [p1, p2, p3, p4]
-  predicate:
-    p1: is_vip_customer()
-    p2: amount > 1000
-    p3: requires_shipping()
-    p4: true
-```
-
-**Use Case Example**:
-```erlang
-%% Multi-choice for order processing options
-select_order_processes(Order) ->
-    Processes = [],
-    Processes = case is_vip(Order) of
-        true -> [vip_handling | Processes];
-        false -> Processes
-    end,
-    Processes = case Order#order.amount > 1000 of
-        true -> [approval_required | Processes];
-        false -> Processes
-    end,
-    Processes = case needs_shipping(Order) of
-        true -> [shipping | Processes];
-        false -> Processes
-    end,
-    spawn_processes(Processes).
-```
-
-**Related Patterns**: WCP-4 (Exclusive Choice), WCP-8 (Multi-Merge)
 
 ---
 
-### 2. Advanced Synchronization Patterns (7-10)
+### WCP-06: Multi-Choice
 
-#### WCP-7: Synchronizing Merge
+**Description:** Enable multiple branches simultaneously (OR semantics).
 
-**Description**: Multiple threads converge into a single thread, but the merge only occurs when ALL active branches have completed. Inactive branches are ignored.
+**Module:** `multiple_choice`
 
-**Petri Net Representation**:
+**API Functions:**
+- `multiple_choice:place_lst/0` - List of Petri net places
+- `multiple_choice:trsn_lst/0` - List of Petri net transitions
+- `multiple_choice:preset/1` - Input places for transition
+- `multiple_choice:is_enabled/3` - Check if transition enabled
+- `multiple_choice:init_marking/2` - Initial token distribution
+- `multiple_choice:fire/3` - Transition firing
+
+**Petri Net Structure:**
 ```
-   p1   p2   p3
-    |   |   |
-    \  |  /
-     \ | /
-       t1
-     / | \
-    /  |  \
-   c1  c2  c3  (track active branches)
+p_start -> t_choice -> p_branch1
+                  -> p_branch2
+                  -> p_branch3
 ```
-
-**YAWL Representation**:
-```yaml
-task: sync_merge (type: OR-join)
-  inputs: [p1, p2, p3]
-  output: p4
-  join_code: all_active
-```
-
-**Use Case Example**:
-```erlang
-%% Synchronizing merge for optional order steps
--record(state, {expected = 0, completed = 0}).
-
-synchronizing_merge(ExpectedBranches) ->
-    State = #state{expected = ExpectedBranches},
-    sync_loop(State).
-
-sync_loop(#state{expected = E, completed = C} = State) when E =:= C ->
-    all_complete();
-sync_loop(State) ->
-    receive
-        {branch_complete, _} ->
-            sync_loop(State#state{completed = State#state.completed + 1})
-    end.
-```
-
-**Related Patterns**: WCP-3 (Synchronization), WCP-5 (Simple Merge)
 
 ---
 
-#### WCP-8: Multi-Merge
+### WCP-07: Synchronizing Merge
 
-**Description**: Multiple threads merge into a single thread without synchronization, but unlike simple merge, all incoming branches are processed independently and each triggers the subsequent activity.
+**Description:** Wait for all branches to complete (AND semantics) with intermediate result processing.
 
-**Petri Net Representation**:
+**Module:** `multiple_merge`
+
+**API Functions:**
+- `multiple_merge:place_lst/0` - List of Petri net places
+- `multiple_merge:trsn_lst/0` - List of Petri net transitions
+- `multiple_merge:preset/1` - Input places for transition
+- `multiple_merge:is_enabled/3` - Check if transition enabled
+- `multiple_merge:init_marking/2` - Initial token distribution
+- `multiple_merge:fire/3` - Transition firing
+
+**Petri Net Structure:**
 ```
-   p1   p2   p3
-    |   |   |
-    |   |   +--> t1a --> p4
-    |   +-------> t1b --> p5
-    +-----------> t1c --> p6
+p_branch1 -> t_sync -> p_partial1
+p_branch2 ->        -> p_partial2
+p_branch3 ->        -> p_final
 ```
-
-**YAWL Representation**:
-```yaml
-task: multi_merge (type: multi-instance)
-  inputs: [p1, p2, p3]
-  outputs: [p4, p5, p6]
-  merging: parallel
-```
-
-**Use Case Example**:
-```erlang
-%% Multi-merge for handling multiple notifications
-handle_notifications(NotificationStreams) ->
-    lists:foreach(
-        fun(Stream) ->
-            spawn(fun() -> process_notification(Stream) end)
-        end,
-        NotificationStreams
-    ).
-```
-
-**Related Patterns**: WCP-5 (Simple Merge), WCP-7 (Synchronizing Merge)
 
 ---
 
-#### WCP-9: Discriminator
+### WCP-08: Multi-Merge
 
-**Description**: After parallel execution, the workflow continues as soon as ONE of the incoming branches completes. Once triggered, the discriminator waits for ALL remaining branches to complete without allowing further execution.
+**Description:** Collect results from multiple paths and process them.
 
-**Petri Net Representation**:
+**Module:** `implicit_merge`
+
+**API Functions:**
+- `implicit_merge:place_lst/0` - List of Petri net places
+- `implicit_merge:trsn_lst/0` - List of Petri net transitions
+- `implicit_merge:preset/1` - Input places for transition
+- `implicit_merge:is_enabled/3` - Check if transition enabled
+- `implicit_merge:init_marking/2` - Initial token distribution
+- `implicit_merge:fire/3` - Transition firing
+- `implicit_merge:new/2` - Create new implicit merge state
+
+**Petri Net Structure:**
 ```
-   p1   p2   p3
-    |   |   |
-    +---+---+---> t1 (trigger on first complete)
-    |   |   |
-    d   d   d   (drain remaining tokens)
+p_branch1 -> t_merge -> p_results
+p_branch2 ->
+p_branch3 ->
 ```
-
-**YAWL Representation**:
-```yaml
-task: discriminator (type: discriminator)
-  inputs: [p1, p2, p3]
-  output: p4
-  behavior: first_triggers_then_wait_all
-```
-
-**Use Case Example**:
-```erlang
-%% Discriminator for quote collection
--record(discriminator, {triggered = false, remaining}).
-
-collect_quotes(Vendors) ->
-    Discriminator = #discriminator{remaining = length(Vendors)},
-    spawn_vendors(Vendors),
-    discriminator_loop(Discriminator).
-
-discriminator_loop(#discriminator{triggered = false} = D) ->
-    receive
-        {quote, Quote} ->
-            proceed_with_quote(Quote),
-            drain_remaining(D#discriminator{triggered = true, remaining = D#discriminator.remaining - 1})
-    end;
-discriminator_loop(#discriminator{triggered = true, remaining = 0}) ->
-    all_drained();
-discriminator_loop(#discriminator{triggered = true} = D) ->
-    receive
-        {quote, _} ->
-            discriminator_loop(D#discriminator{remaining = D#discriminator.remaining - 1})
-    end.
-```
-
-**Related Patterns**: WCP-3 (Synchronization), WCP-5 (Simple Merge)
 
 ---
 
-#### WCP-10: Arbitrary Cycles
+### WCP-09: Discriminator
 
-**Description**: A point in the workflow where a thread can return to a previous activity in the workflow, creating loops. Unlike structured loops, these cycles can be entered and exited at multiple points.
+**Description:** Accept first completion and discard subsequent branches.
 
-**Petri Net Representation**:
+**Module:** `discriminator`
+
+**API Functions:**
+- `discriminator:place_lst/0` - List of Petri net places
+- `discriminator:trsn_lst/0` - List of Petri net transitions
+- `discriminator:preset/1` - Input places for transition
+- `discriminator:is_enabled/3` - Check if transition enabled
+- `discriminator:init_marking/2` - Initial token distribution
+- `discriminator:fire/3` - Transition firing
+
+**Petri Net Structure:**
 ```
-    t1       t4
-    ^       ^
-    |       |
-    t2 ---> t3
-    |       |
-    +-------+
+p_branch1 -> t_discriminate -> p_selected
+p_branch2 ->                -> p_discarded
+p_branch3 ->
 ```
-
-**YAWL Representation**:
-```yaml
-task: loop (type: unstructured)
-  from: t2
-  to: t1
-  condition: retry_needed()
-```
-
-**Use Case Example**:
-```erlang
-%% Arbitrary cycle for document approval
-approve_document(Document) ->
-    case submit_for_approval(Document) of
-        approved ->
-            finalize_document(Document);
-        {rejected, Reason} ->
-            Revised = revise_document(Document, Reason),
-            approve_document(Revised);  % Loop back
-        {changes_requested, Changes} ->
-            Revised = apply_changes(Document, Changes),
-            approve_document(Revised)   % Loop back
-    end.
-```
-
-**Related Patterns**: WCP-23 (Structured Loop), WCP-25 (Arbitrary Interleaved Loop)
 
 ---
 
-### 3. Structural Patterns (11-13)
+### WCP-10: N-out-of-M
 
-#### WCP-11: Implicit Termination
+**Description:** Proceed when N out of M parallel branches complete.
 
-**Description**: A workflow terminates when there are no remaining activities to be executed. No explicit termination activity is required; the workflow ends "implicitly" when all active threads complete.
+**Module:** `n_out_of_m`
 
-**Petri Net Representation**:
+**API Functions:**
+- `n_out_of_m:place_lst/0` - List of Petri net places
+- `n_out_of_m:trsn_lst/0` - List of Petri net transitions
+- `n_out_of_m:preset/1` - Input places for transition
+- `n_out_of_m:is_enabled/3` - Check if transition enabled
+- `n_out_of_m:init_marking/2` - Initial token distribution
+- `n_out_of_m:fire/3` - Transition firing
+
+**Petri Net Structure:**
 ```
-   p1   p2   p3
-    |   |   |
-   t1  t2  t3
-    |   |   |
-    \   |   /
-     \  |  /
-      (implicit termination when no tokens remain)
+p_start -> t_split -> p_branch_pool
+         -> t_execute -> p_running
+         -> t_complete -> p_completed
+         -> t_check_quorum -> p_quorum_met
 ```
-
-**YAWL Representation**:
-```yaml
-workflow: auto_terminate
-  termination: implicit
-  condition: no_active_tasks
-```
-
-**Use Case Example**:
-```erlang
-%% Implicit termination with supervisor
-implicit_termination_supervisor() ->
-    process_flag(trap_exit, true),
-    spawn_children(),
-    terminate_when_all_done().
-
-terminate_when_all_done() ->
-    Children = get(children),
-    case Children of
-        [] ->
-            cleanup(),
-            exit(normal);
-        _ ->
-            receive
-                {'EXIT', _Pid, _Reason} ->
-                    remove_child(_Pid),
-                    terminate_when_all_done()
-            end
-    end.
-```
-
-**Related Patterns**: WCP-19 (Cancel Activity), WCP-20 (Cancel Case)
 
 ---
 
-#### WCP-12: Multiple Instances (without synchronization)
+## 2. Advanced Synchronization & Multiple Instances (WCP-11 to WCP-17)
 
-**Description**: An activity is instantiated multiple times without any synchronization between the instances. Each instance runs independently and the workflow continues immediately without waiting for all instances to complete.
+### WCP-11: Implicit Termination
 
-**Petri Net Representation**:
+**Description:** Terminate subprocess when no work remains and all inputs are satisfied.
+
+**Module:** `implicit_termination`
+
+**API Functions:**
+- `cre_yawl_patterns:implicit_termination/1` - Create pattern state
+- `cre_yawl_patterns:execute_implicit_termination/2` - Execute pattern
+
+**Petri Net Structure:**
 ```
-       t1
-       |
-       v
-    +--t2--+  (multiple concurrent instances)
-    |  |  |
-    t2 t2 t2
+p_start -> t_activate -> p_active
+         -> t_queue_work -> p_work_pending
+         -> t_dequeue_work -> p_work
+         -> t_implicit_term -> p_terminate
 ```
-
-**YAWL Representation**:
-```yaml
-task: multi_instance (type: deferred)
-  creation: dynamic
-  synchronization: none
-```
-
-**Use Case Example**:
-```erlang
-%% Fire-and-forget notifications
-send_notifications(Recipients, Message) ->
-    lists:foreach(
-        fun(Recipient) ->
-            spawn(fun() -> send_notification(Recipient, Message) end)
-        end,
-        Recipients
-    ),
-    continue_immediately().  % Don't wait for notifications
-```
-
-**Related Patterns**: WCP-13 (Multiple Instances with a priori knowledge), WCP-14 (Multiple Instances with runtime knowledge)
 
 ---
 
-#### WCP-13: Multiple Instances (with a priori design time knowledge)
+### WCP-12: Multiple Instances without Synchronization
 
-**Description**: An activity is instantiated multiple times where the number of instances is known at design time. All instances must complete before the workflow continues.
+**Description:** Create concurrent instances without synchronizing after completion.
 
-**Petri Net Representation**:
-```
-       t1
-       |
-       v
-    +--t2--+  (n instances, n known at design time)
-    |  |  |
-    v  v  v
-  (synchronization barrier)
-       |
-       v
-       t3
-```
+**Module:** `cre_yawl_patterns`
 
-**YAWL Representation**:
-```yaml
-task: multi_instance (type: static)
-  cardinality: 3  % Known at design time
-  synchronization: all
-```
+**API Functions:**
+- `cre_yawl_patterns:multiple_instances_no_sync/3` - Create pattern state
+- `cre_yawl_patterns:execute_multiple_instances_no_sync/3` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Fixed number of parallel approvals
-require_three_signatures(Document) ->
-    Approvers = [finance, legal, management],
-    Pids = [spawn_link(Approver, approve, [Document]) || Approver <- Approvers],
-    await_all_signatures(Pids).
-
-await_all_signatures(Pids) ->
-    [receive {Pid, signature} -> ok end || Pid <- Pids],
-    all_signatures_complete().
-```
-
-**Related Patterns**: WCP-12 (Multiple Instances without synchronization), WCP-14 (Multiple Instances with runtime knowledge)
+**Parameters:**
+- `Subprocess` - Module or function for each instance
+- `InstanceCount` - Number of instances to create
+- `InputData` - Data to distribute among instances
 
 ---
 
-### 4. Multiple Instance Patterns (14-17)
+### WCP-13: Multiple Instances with Design Time Knowledge
 
-#### WCP-14: Multiple Instances (with a priori runtime knowledge)
+**Description:** Create fixed number of instances known at design time, synchronized on completion.
 
-**Description**: An activity is instantiated multiple times where the number of instances is determined at runtime (before instances are created). All instances must complete before continuing.
+**Module:** `multiple_instances_sync`
 
-**Petri Net Representation**:
-```
-       t1
-       |
-       v
-    [determine n at runtime]
-       |
-       v
-    +--t2--+  (n instances)
-    |  |  |
-    v  v  v
-  (synchronization barrier)
-       |
-       v
-       t3
-```
+**API Functions:**
+- `cre_yawl_patterns:multiple_instances_static/3` - Create pattern state
+- `cre_yawl_patterns:execute_multiple_instances_static/3` - Execute pattern
 
-**YAWL Representation**:
-```yaml
-task: multi_instance (type: dynamic)
-  cardinality: evaluate_at_runtime
-  source: recipient_list
-  synchronization: all
-```
-
-**Use Case Example**:
-```erlang
-%% Runtime-determined parallel processing
-process_for_all_recipients(Recipients, Document) ->
-    NumInstances = length(Recipients),
-    Pids = [spawn_link(fun() -> process_recipient(R, Document) end)
-            || R <- Recipients],
-    await_completions(NumInstances, Pids).
-
-await_completions(N, Pids) when length(Pids) =:= N ->
-    [receive {Pid, done} -> ok end || Pid <- Pids],
-    all_complete().
-```
-
-**Related Patterns**: WCP-13 (Multiple Instances with design time knowledge), WCP-15 (Multiple Instances without runtime knowledge)
+**Parameters:**
+- `Subprocess` - Module or function for each instance
+- `InstanceCount` - Fixed number of instances
+- `InputData` - List of input data, one per instance
 
 ---
 
-#### WCP-15: Multiple Instances (without a priori runtime knowledge)
+### WCP-14: Multiple Instances with Runtime Knowledge
 
-**Description**: An activity is instantiated multiple times where the number of instances is NOT known at runtime. Instances may be created dynamically during execution. All instances must complete before continuing.
+**Description:** Create instances where count is determined at runtime but before creation.
 
-**Petri Net Representation**:
-```
-       t1
-       |
-       v
-    +--t2--+  (dynamic creation during execution)
-    |  |  |
-    +--+--+
-    |  |  |
-    v  v  v
-  (synchronization barrier)
-       |
-       v
-       t3
-```
+**Module:** `cre_yawl_patterns`
 
-**YAWL Representation**:
-```yaml
-task: multi_instance (type: dynamic)
-  cardinality: unknown
-  creation: during_execution
-  synchronization: all
-```
+**API Functions:**
+- `cre_yawl_patterns:multiple_instances_runtime/3` - Create pattern state
+- `cre_yawl_patterns:execute_multiple_instances_runtime/3` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Dynamic instance creation for quote requests
-request_quotes(Product) ->
-    % Start with known vendors
-    KnownVendors = get_known_vendors(Product),
-    [spawn_vendor_request(V, Product) || V <- KnownVendors],
-
-    % Additional vendors may be discovered during process
-    UnknownVendors = discover_vendors_during(Product),
-    [spawn_vendor_request(V, Product) || V <- UnknownVendors],
-
-    % We don't know total count upfront
-    await_all_quotes().
-
-await_all_quotes() ->
-    receive
-        {no_more_vendors} ->
-            all_quotes_collected();
-        {new_vendor, Vendor} ->
-            spawn_vendor_request(Vendor),
-            await_all_quotes()
-    end.
-```
-
-**Related Patterns**: WCP-14 (Multiple Instances with runtime knowledge), WCP-12 (Multiple Instances without synchronization)
+**Parameters:**
+- `Subprocess` - Module or function for each instance
+- `CountFun` - Function that determines instance count from input data
+- `InputData` - Data for evaluating count and distributing to instances
 
 ---
 
-#### WCP-16: Deferred Choice
+### WCP-15: Multiple Instances without Prior Knowledge
 
-**Description**: A point in the workflow where one branch is chosen from multiple alternatives based on events that occur at runtime, not on data. The first event to occur determines the chosen branch.
+**Description:** Dynamically create instances during execution based on data availability.
 
-**Petri Net Representation**:
-```
-       t1
-       |
-       v
-      / \
-     /   \
-   e1     e2  (competing events)
-   |      |
-  t2      t3
-```
+**Module:** `cre_yawl_patterns`
 
-**YAWL Representation**:
-```yaml
-task: deferred_choice (type: event-based)
-  alternatives:
-    - event: timeout
-      action: escalate
-    - event: response_received
-      action: proceed
-    - event: cancellation
-      action: terminate
-```
+**API Functions:**
+- `cre_yawl_patterns:multiple_instances_dynamic/3` - Create pattern state
+- `cre_yawl_patterns:execute_multiple_instances_dynamic/3` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Deferred choice for auction bidding
-deferred_auction_choice(Auction) ->
-    Ref = make_ref(),
-    Self = self(),
-
-    % Set up timeout
-    erlang:send_after(Auction#auction.timeout, Self, {Ref, timeout}),
-
-    % Wait for first event
-    receive
-        {Ref, timeout} ->
-            handle_timeout(Auction);
-        {Ref, {bid, Bid}} ->
-            handle_winning_bid(Auction, Bid);
-        {Ref, cancel} ->
-            handle_cancellation(Auction)
-    end.
-```
-
-**Related Patterns**: WCP-4 (Exclusive Choice), WCP-17 (Interleaved Parallel Routing)
+**Parameters:**
+- `Subprocess` - Module or function for each instance
+- `DataFun` - Function that returns stream of data for instance creation
+- `InitialData` - Initial data for the first instances
 
 ---
 
-#### WCP-17: Interleaved Parallel Routing
+### WCP-16: Deferred Choice
 
-**Description**: Multiple activities are enabled concurrently, but execution is restricted such that only one activity can be active at a time. Activities can interleave but not run in parallel.
+**Description:** Defer choice between alternatives until runtime based on data availability.
 
-**Petri Net Representation**:
-```
-       t1
-       |
-       v
-     [mutex]
-     / | \
-    v  v  v
-   t2 t3 t4  (only one active at a time)
-    ^  ^  ^
-     \ | /
-     [mutex]
-       |
-       v
-       t5
-```
+**Module:** `deferred_choice`
 
-**YAWL Representation**:
-```yaml
-task: interleaved (type: mutex)
-  activities: [t2, t3, t4]
-  constraint: single_instance
-  ordering: any
-```
+**API Functions:**
+- `cre_yawl_patterns:deferred_choice/3` - Create pattern state
+- `cre_yawl_patterns:execute_deferred_choice/3` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Interleaved document editing with mutex
-interleaved_editing(Editors, Document) ->
-    Mutex = spawn(fun() -> mutex_loop(locked) end),
-    [spawn(fun() -> editor_loop(Editor, Document, Mutex) end)
-     || Editor <- Editors].
-
-editor_loop(Editor, Document, Mutex) ->
-    request_access(Mutex),
-    edit_document(Editor, Document),
-    release_access(Mutex),
-    editor_loop(Editor, Document, Mutex).
-
-mutex_loop(State) ->
-    receive
-        {request, From} when State =:= free ->
-            From ! {granted, self()},
-            mutex_loop(locked);
-        {release, From} when State =:= locked ->
-            From ! {released, self()},
-            mutex_loop(free);
-        {request, From} ->
-            From ! {wait, self()},
-            mutex_loop(State)
-    end.
-```
-
-**Related Patterns**: WCP-2 (Parallel Split), WCP-26 (Critical Section)
+**Parameters:**
+- `Options` - Map of option identifiers to their subprocess modules/functions
+- `ConditionFun` - Function that evaluates which option to select
+- `InitialData` - Initial data for condition evaluation
 
 ---
 
-### 5. State-Based Patterns (18-20)
+### WCP-17: Interleaved Parallel Routing
 
-#### WCP-18: Milestone
+**Description:** Execute multiple branches in interleaved, non-deterministic order.
 
-**Description**: An activity can only execute if a specific milestone has been reached. The milestone represents a particular state in the workflow process.
+**Module:** `interleaved_routing`
 
-**Petri Net Representation**:
-```
-   [milestone_place]
-       |
-       v
-     guard
-       |
-       v
-       t1
-```
+**API Functions:**
+- `cre_yawl_patterns:interleaved_routing/2` - Create pattern state
+- `cre_yawl_patterns:execute_interleaved_routing/2` - Execute pattern
 
-**YAWL Representation**:
-```yaml
-task: milestone_reached
-  id: approval_obtained
-  guards:
-    - activity: t1
-      condition: milestone_reached(approval_obtained)
-```
-
-**Use Case Example**:
-```erlang
-%% Milestone-based activity execution
--record(state, {milestones = []}).
-
-execute_after_milestone(Activity, Milestone) ->
-    State = get_state(),
-    case lists:member(Milestone, State#state.milestones) of
-        true ->
-            execute_activity(Activity);
-        false ->
-            {error, milestone_not_reached, Milestone}
-    end.
-
-set_milestone(Milestone) ->
-    State = get_state(),
-    NewMilestones = [Milestone | State#state.milestones],
-    put_state(State#state{milestones = NewMilestones}).
-```
-
-**Related Patterns**: WCP-16 (Deferred Choice), WCP-26 (Critical Section)
+**Parameters:**
+- `Branches` - Map of branch identifiers to their subprocess modules
+- `InitialData` - Initial data for all branches
 
 ---
 
-#### WCP-19: Cancel Activity
+## 3. State-Based Patterns (WCP-18 to WCP-20)
 
-**Description**: A running activity can be cancelled (interrupted) before completion. The workflow continues with alternative processing.
+### WCP-18: Milestone
 
-**Petri Net Representation**:
+**Description:** Enable activity only if a specific milestone has been reached.
+
+**Module:** `milestone`
+
+**API Functions:**
+- `cre_yawl_patterns:milestone/2` - Create pattern state
+
+**Parameters:**
+- `Activity` - The activity module/function to guard with milestone
+- `MilestoneFun` - Function checking if milestone reached (returns boolean)
+
+**Petri Net Structure:**
 ```
-       t1
-       |
-       v
-   +---t2---+  (cancellable)
-   |        |
- cancel   complete
-   |        |
-   v        v
-  t3a      t3b
+p_milestone_guard -> t_set_milestone -> p_milestone_reached
+                  -> t_enable_activity -> p_activity_enabled -> t_complete -> p_activity_complete
 ```
-
-**YAWL Representation**:
-```yaml
-task: cancellable
-  id: t2
-  cancellation:
-    - event: user_cancel
-      target: t2
-    - event: timeout
-      target: t2
-```
-
-**Use Case Example**:
-```erlang
-%% Cancellable long-running task
-cancellable_task(Task) ->
-    Parent = self(),
-    TaskPid = spawn_link(fun() -> execute_task(Task, Parent) end),
-    cancellable_loop(TaskPid, Task).
-
-cancellable_loop(TaskPid, Task) ->
-    receive
-        {cancel, Reason} ->
-            exit(TaskPid, kill),
-            handle_cancellation(Task, Reason);
-        {TaskPid, complete, Result} ->
-            handle_completion(Task, Result);
-        {TaskPid, progress, P} ->
-            update_progress(P),
-            cancellable_loop(TaskPid, Task)
-    after
-        Task#task.timeout ->
-            exit(TaskPid, kill),
-            handle_timeout(Task)
-    end.
-```
-
-**Related Patterns**: WCP-20 (Cancel Case), WCP-28 (Try-Catch)
 
 ---
 
-#### WCP-20: Cancel Case
+### WCP-19: Cancel Activity
 
-**Description**: The entire workflow case (process instance) can be cancelled. All active activities are terminated and the workflow instance is removed.
+**Description:** Allow cancellation of a specific running activity based on external events.
 
-**Petri Net Representation**:
-```
-   t1    t2    t3
-    |    |    |
-    +----+----+
-         |
-    [cancel_case]
-         |
-         v
-    (termination)
-```
+**Module:** `cre_yawl_patterns`
 
-**YAWL Representation**:
-```yaml
-workflow: cancellable
-  cancellation:
-    - event: emergency_shutdown
-      scope: case
-      cleanup: terminate_all_activities
-```
+**API Functions:**
+- `cre_yawl_patterns:cancel_activity/2` - Create pattern state
 
-**Use Case Example**:
-```erlang
-%% Cancel entire workflow case
-cancel_case(CaseId, Reason) ->
-    case_registry:lookup(CaseId),
-    Activities = case_registry:get_activities(CaseId),
-    lists:foreach(
-        fun(ActivityPid) ->
-            exit(ActivityPid, {case_cancelled, Reason})
-        end,
-        Activities
-    ),
-    case_registry:cleanup(CaseId),
-    log_cancellation(CaseId, Reason).
-
-%% Supervisor that handles case cancellation
-case_supervisor(CaseId) ->
-    process_flag(trap_exit, true),
-    case_registry:register(CaseId, self()),
-    supervise_loop(CaseId).
-
-supervise_loop(CaseId) ->
-    receive
-        {cancel, Reason} ->
-            cancel_case(CaseId, Reason),
-            exit({case_cancelled, Reason});
-        {'EXIT', _Pid, _Reason} ->
-            handle_activity_exit(),
-            supervise_loop(CaseId)
-    end.
-```
-
-**Related Patterns**: WCP-19 (Cancel Activity), WCP-11 (Implicit Termination)
+**Parameters:**
+- `Activity` - The activity that can be cancelled
+- `CancelFun` - Function determining cancellation condition
 
 ---
 
-### 6. Extended Control Flow Patterns (21-28)
+### WCP-20: Cancel Case
 
-#### WCP-21: Structured Synchronization
+**Description:** Allow cancellation of the entire workflow case, terminating all activities.
 
-**Description**: Multiple parallel threads synchronize in a structured manner, maintaining proper nesting and avoiding non-structured jumps. This pattern enforces single-entry, single-exit blocks.
+**Module:** `cre_yawl_patterns`
 
-**Petri Net Representation**:
-```
-       split
-       / | \
-      v  v  v
-     t1 t2 t3
-      \ | /
-       v
-      join
-```
+**API Functions:**
+- `cre_yawl_patterns:cancel_case/2` - Create pattern state
 
-**YAWL Representation**:
-```yaml
-block: structured_sync
-  type: and_join
-  activities: [t1, t2, t3]
-  nesting: proper
-```
-
-**Use Case Example**:
-```erlang
-%% Structured synchronization with gen_server
--behaviour(gen_server).
-
-structured_sync(Activities) ->
-    gen_server:call(?MODULE, {sync_activities, Activities}).
-
-handle_call({sync_activities, Activities}, _From, State) ->
-    % Spawn all activities
-    Pids = [spawn_monitor(fun() -> A() end) || A <- Activities],
-    % Wait for all to complete
-    Results = await_all(Pids),
-    {reply, Results, State}.
-
-await_all([]) -> [];
-await_all([{Pid, MRef} | Rest]) ->
-    receive
-        {'DOWN', MRef, process, Pid, Result} ->
-            [Result | await_all(Rest)]
-    end.
-```
-
-**Related Patterns**: WCP-3 (Synchronization), WCP-22 (Structured Partial Join)
+**Parameters:**
+- `Activities` - List of activities in the case
+- `CancelFun` - Function determining case cancellation condition
 
 ---
 
-#### WCP-22: Structured Partial Join
+## 4. Extended Control Flow Patterns (WCP-21 to WCP-28)
 
-**Description**: A subset of parallel threads synchronize while others continue independently. The partial join maintains structure while allowing for selective synchronization.
+### WCP-21: Structured Synchronization
 
-**Petri Net Representation**:
-```
-       split
-       / | \
-      v  v  v
-     t1 t2 t3
-      \ |
-       v
-      partial_join
-       |
-       v
-      t4
-      /
-     t3 (continues)
-```
+**Description:** Define a synchronized block where multiple concurrent activities must complete before proceeding.
 
-**YAWL Representation**:
-```yaml
-block: partial_join
-  join_subset: [t1, t2]
-  continue: [t3]
-  next: t4
-```
+**Module:** `cre_yawl_patterns`
 
-**Use Case Example**:
-```erlang
-%% Partial join for order processing
-partial_join_order() ->
-    % Start parallel activities
-    InventoryPid = spawn(fun() -> check_inventory() end),
-    CreditPid = spawn(fun() -> check_credit() end),
-    ShippingPid = spawn(fun() -> arrange_shipping() end),
+**API Functions:**
+- `cre_yawl_patterns:structured_sync/2` - Create pattern state
 
-    % Join only inventory and credit before proceeding
-    await_both(InventoryPid, CreditPid),
-    confirm_order(),
-
-    % Shipping continues independently
-    receive
-        {ShippingPid, done} -> shipping_complete()
-    end.
-
-await_both(Pid1, Pid2) ->
-    Ref1 = erlang:monitor(process, Pid1),
-    Ref2 = erlang:monitor(process, Pid2),
-    await_both_loop(Ref1, Ref2, {false, false}).
-
-await_both_loop(Ref1, Ref2, {true, true}) ->
-    erlang:demonitor(Ref1),
-    erlang:demonitor(Ref2),
-    both_complete();
-await_both_loop(Ref1, Ref2, {Done1, Done2}) ->
-    receive
-        {'DOWN', Ref1, process, _, _} ->
-            await_both_loop(Ref1, Ref2, {true, Done2});
-        {'DOWN', Ref2, process, _, _} ->
-            await_both_loop(Ref1, Ref2, {Done1, true})
-    end.
-```
-
-**Related Patterns**: WCP-3 (Synchronization), WCP-21 (Structured Synchronization)
+**Parameters:**
+- `Activities` - List of activities to synchronize
+- `InitialData` - Initial data for all activities
 
 ---
 
-#### WCP-23: Structured Loop
+### WCP-22: Partial Join (Structured Partial Join)
 
-**Description**: A well-structured loop construct with explicit entry and exit conditions. The loop can repeat a set of activities until a condition is met.
+**Description:** Wait for a subset of parallel branches to complete before proceeding.
 
-**Petri Net Representation**:
-```
-       t1
-       |
-       v
-    +--t2--+
-    |      |
-    v      |
-   test    |
-    |      |
-   true    |
-    |      |
-    t2     |
-    |      |
-    v      |
-   false   |
-    |      |
-    v      |
-    t3     |
-    +------+
-```
+**Module:** `cre_yawl_patterns`
 
-**YAWL Representation**:
-```yaml
-block: structured_loop
-  activities: [t2]
-  condition: test
-  while: true
-```
+**API Functions:**
+- `cre_yawl_patterns:partial_join/2` - Create pattern state
 
-**Use Case Example**:
-```erlang
-%% Structured loop with clear entry/exit
-structured_loop(State) ->
-    structured_loop_init(State).
-
-structured_loop_init(State) ->
-    case should_continue(State) of
-        true ->
-            NewState = execute_loop_body(State),
-            structured_loop_init(NewState);
-        false ->
-            structured_loop_exit(State)
-    end.
-
-% Example: Retry pattern with max attempts
-retry_loop(Task, MaxAttempts) ->
-    retry_loop(Task, MaxAttempts, 0).
-
-retry_loop(_Task, MaxAttempts, Attempt) when Attempt >= MaxAttempts ->
-    {error, max_attempts_exceeded};
-retry_loop(Task, MaxAttempts, Attempt) ->
-    case execute_task(Task) of
-        {ok, Result} ->
-            {ok, Result};
-        {error, _Reason} when Attempt < MaxAttempts - 1 ->
-            retry_loop(Task, MaxAttempts, Attempt + 1)
-    end.
-```
-
-**Related Patterns**: WCP-10 (Arbitrary Cycles), WCP-25 (Arbitrary Interleaved Loop)
+**Parameters:**
+- `Activities` - List of activities in partial join
+- `Quorum` - Number of activities required for continuation
 
 ---
 
-#### WCP-24: Recursion
+### WCP-23: Structured Loop
 
-**Description**: An activity can invoke itself or a parent activity, creating recursive execution patterns. This allows for nested execution of the same workflow structure.
+**Description:** Implement while/until loop constructs with proper Petri net semantics.
 
-**Petri Net Representation**:
-```
-       t1
-       |
-       v
-      [t2]
-       |
-       v
-   (invoke t2)
-       |
-       v
-      [t2]
-       |
-       v
-    (return)
-```
+**Module:** `structured_loop`
 
-**YAWL Representation**:
-```yaml
-task: recursive
-  id: t2
-  recursion:
-    - invoke: self
-      condition: has_subitems()
-```
+**API Functions:**
+- `cre_yawl_patterns:structured_loop/3` - Create pattern state
 
-**Use Case Example**:
-```erlang
-%% Recursive workflow for tree processing
-process_tree(Tree) when is_list(Tree) ->
-    [process_node(Node) || Node <- Tree];
-process_tree({node, Value, Children}) ->
-    % Process current node
-    Result = process_value(Value),
-    % Recursively process children
-    ChildResults = process_tree(Children),
-    {node, Result, ChildResults};
-process_tree(Leaf) ->
-    process_leaf(Leaf).
-
-%% Recursive subprocess spawning
-recursive_subprocess(Depth) when Depth =< 0 ->
-    base_case();
-recursive_subprocess(Depth) ->
-    spawn_subprocess(fun() -> recursive_subprocess(Depth - 1) end).
-```
-
-**Related Patterns**: WCP-23 (Structured Loop), WCP-12 (Multiple Instances)
+**Parameters:**
+- `BodyTask` - The task to execute in each iteration
+- `LoopType` - 'while' or 'until'
+- `ConditionFun` - Function returning true/false for loop control
 
 ---
 
-#### WCP-25: Arbitrary Interleaved Loop
+### WCP-24: Recursion
 
-**Description**: Multiple activities can be executed in an interleaved manner within a loop. The loop allows for complex execution ordering where activities may be revisited in various sequences.
+**Description:** Enable recursive workflow invocation with base case detection.
 
-**Petri Net Representation**:
-```
-    +-----t1-----+
-    |     |      |
-    v     v      |
-   t2<--->t3<-->t4  (interleaved execution)
-    ^     ^      ^
-    |     |      |
-    +-----|------+
-          |
-      (exit condition)
-```
+**Module:** `cre_yawl_patterns`
 
-**YAWL Representation**:
-```yaml
-block: interleaved_loop
-  activities: [t1, t2, t3, t4]
-  ordering: arbitrary
-  condition: continue_processing
-```
+**API Functions:**
+- `cre_yawl_patterns:recursion/2` - Create pattern state
+- `cre_yawl_patterns:execute_recursion/2` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Interleaved loop for collaborative editing
-interleaved_collaboration(Users, Document) ->
-    ActiveUsers = Users,
-    interleaved_loop(ActiveUsers, Document).
-
-interleaved_loop([], Document) ->
-    {complete, Document};
-interleaved_loop(ActiveUsers, Document) ->
-    receive
-        {edit, User, Edit} ->
-            case lists:member(User, ActiveUsers) of
-                true ->
-                    NewDoc = apply_edit(Document, Edit),
-                    broadcast_update(ActiveUsers, NewDoc),
-                    interleaved_loop(ActiveUsers, NewDoc);
-                false ->
-                    interleaved_loop(ActiveUsers, Document)
-            end;
-        {join, User} ->
-            interleaved_loop([User | ActiveUsers], Document);
-        {leave, User} ->
-            interleaved_loop(ActiveUsers -- [User], Document);
-        {complete} ->
-            {complete, Document}
-    end.
-```
-
-**Related Patterns**: WCP-17 (Interleaved Parallel Routing), WCP-23 (Structured Loop)
+**Parameters:**
+- `RecursiveFun` - The recursive function implementing the workflow
+- `BaseCaseFun` - Function detecting base case for termination
 
 ---
 
-#### WCP-26: Critical Section
+### WCP-25: Interleaved Loop
 
-**Description**: A critical section ensures that only one thread can execute a specific set of activities at a time. Other threads must wait until the critical section is released.
+**Description:** Combine looping with parallel execution in interleaved fashion.
 
-**Petri Net Representation**:
-```
-    t1      t3
-     |       |
-     v       v
-  [mutex] [mutex]
-     |       |
-     v       v
-    t2      t2  (critical section)
-     |       |
-     v       v
-  [mutex] [mutex]
-     |       |
-     v       v
-    t3      t4
-```
+**Module:** `cre_yawl_patterns`
 
-**YAWL Representation**:
-```yaml
-resource: mutex
-  scope: critical_section
-  activities: [t2]
-  constraint: exclusive_access
-```
+**API Functions:**
+- `cre_yawl_patterns:interleaved_loop/2` - Create pattern state
+- `cre_yawl_patterns:execute_interleaved_loop/2` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Critical section using gen_server for mutual exclusion
--module(critical_section).
--behaviour(gen_server).
-
-%% API
-enter_critical_section(Request) ->
-    gen_server:call(?MODULE, {enter, Request}, infinity).
-
-leave_critical_section() ->
-    gen_server:cast(?MODULE, leave).
-
-%% Callbacks
-init([]) ->
-    {ok, #{available => true, queue => []}}.
-
-handle_call({enter, Request}, From, State = #{available := true}) ->
-    {reply, ok, State#{available => false, current => From}};
-handle_call({enter, Request}, From, State = #{available := false, queue := Q}) ->
-    {noreply, State#{queue => Q ++ [{From, Request}]}}.
-
-handle_cast(leave, State = #{queue := []}) ->
-    {noreply, State#{available => true, current => undefined}};
-handle_cast(leave, State = #{queue := [{Next, Request} | Rest]}) ->
-    gen_server:reply(Next, ok),
-    {noreply, State#{queue => Rest, current => Next}}.
-
-%% Usage
-critical_task(Task) ->
-    ok = enter_critical_section(Task),
-    try
-        execute_critical_work(Task)
-    after
-        leave_critical_section()
-    end.
-```
-
-**Related Patterns**: WCP-17 (Interleaved Parallel Routing), WCP-18 (Milestone)
+**Parameters:**
+- `Activities` - List of activities for interleaved parallel execution
+- `ConditionFun` - Function determining loop continuation
 
 ---
 
-#### WCP-27: Protocol Pattern
+### WCP-26: Critical Section
 
-**Description**: A protocol pattern enforces a specific sequence of interactions between parties. Messages must follow a defined protocol with specific ordering constraints.
+**Description:** Ensure mutually exclusive access to a shared resource.
 
-**Petri Net Representation**:
+**Module:** `critical_section`
+
+**API Functions:**
+- `cre_yawl_patterns:critical_section/2` - Create pattern state
+- `cre_yawl_patterns:execute_critical_section/2` - Execute pattern
+
+**Parameters:**
+- `CriticalActivity` - The activity requiring mutual exclusion
+- `LockId` - Identifier for the lock/semaphore
+
+**Petri Net Structure:**
 ```
-  Client          Server
-    |               |
-    |---request---->|
-    |               | t1: process
-    |               |
-    |<--response----|
-    |               |
-  (optional)
-    |---ack-------->|
-    |               | t2: confirm
+p_cs_request -> t_cs_acquire -> p_cs_lock -> t_cs_execute -> p_cs_active -> t_cs_release -> p_cs_release
 ```
-
-**YAWL Representation**:
-```yaml
-protocol: request_response
-  steps:
-    - from: client
-      action: send_request
-      to: server
-    - from: server
-      action: process_request
-      to: client
-    - from: client
-      action: send_acknowledgment
-      to: server
-      optional: true
-```
-
-**Use Case Example**:
-```erlang
-%% Protocol pattern for client-server communication
--module(protocol).
--export([client/2, server/0]).
-
-% Server protocol
-server() ->
-    server_loop(awaiting_request).
-
-server_loop(awaiting_request) ->
-    receive
-        {request, From, Payload} ->
-            process_request(Payload),
-            From ! {response, self(), process_result(Payload)},
-            server_loop(awaiting_ack)
-    end;
-server_loop(awaiting_ack) ->
-    receive
-        {ack, _From} ->
-            server_loop(awaiting_request);
-        {request, From, Payload} ->  % Early next request
-            process_request(Payload),
-            From ! {response, self(), process_result(Payload)},
-            server_loop(awaiting_ack)
-    after 5000 ->
-        server_loop(awaiting_request)
-    end.
-
-% Client protocol
-client(ServerPid, Payload) ->
-    ServerPid ! {request, self(), Payload},
-    receive
-        {response, ServerPid, Result} ->
-            ServerPid ! {ack, self()},
-            {ok, Result}
-    end.
-```
-
-**Related Patterns**: WCP-21 (Structured Synchronization), WCP-26 (Critical Section)
 
 ---
 
-#### WCP-28: Try-Catch
+### WCP-27: Protocol Pattern
 
-**Description**: An exception handling pattern where a block of activities is attempted, and if an exception occurs, an alternative exception handling block is executed.
+**Description:** Implement request-response communication between workflow participants.
 
-**Petri Net Representation**:
-```
-       try
-        |
-        v
-       t1
-       |
-       v
-   [error_check]
-       |
-   +---+---+
-   |       |
-error    normal
-   |       |
-   v       v
-  catch    v
-   |       t2
-   t3
-```
+**Module:** `cre_yawl_patterns`
 
-**YAWL Representation**:
-```yaml
-block: try_catch
-  try: [t1, t2]
-  catch:
-    - exception: error_type1
-      handler: t3
-    - exception: error_type2
-      handler: t4
-  finally: t5
-```
+**API Functions:**
+- `cre_yawl_patterns:protocol_pattern/3` - Create pattern state
 
-**Use Case Example**:
-```erlang
-%% Try-catch pattern in Erlang
-try_catch_pattern(RiskyOperation) ->
-    try
-        % Try block
-        Result = execute_risky_operation(RiskyOperation),
-        process_result(Result),
-        {success, Result}
-    catch
-        throw:Term ->
-            % Catch thrown exceptions
-            handle_thrown_exception(Term);
-        exit:Reason ->
-            % Catch exit signals
-            handle_exit_exception(Reason);
-        error:Reason:Stacktrace ->
-            % Catch runtime errors
-            handle_error_exception(Reason, Stacktrace)
-    after
-        % Finally block (always executes)
-        cleanup_resources()
-    end.
-
-%% Usage example
-safe_file_operation(File) ->
-    try
-        {ok, Content} = file:read_file(File),
-        Processed = process_content(Content),
-        file:write_file(File ++ ".processed", Processed),
-        {ok, processed}
-    catch
-        error:enoent ->
-            {error, file_not_found};
-        error:eacces ->
-            {error, permission_denied}
-    after
-        io:format("Operation completed for ~p~n", [File])
-    end.
-```
-
-**Related Patterns**: WCP-19 (Cancel Activity), WHP-1 (Error Handler)
+**Parameters:**
+- `RequestFun` - Function generating the request
+- `ResponseHandlerFun` - Function handling the response
+- `Timeout` - Timeout in milliseconds (or 'infinity')
 
 ---
 
-### 7. Data Flow Patterns (29-33)
+### WCP-28: Try-Catch
 
-#### WDP-1: Parameter Passing
+**Description:** Implement exception handling with protected region (try) and exception handling region (catch).
 
-**Description**: Data is passed between activities in the workflow. Parameters can be passed as input to an activity and received as output from an activity.
+**Module:** `cre_yawl_patterns`
 
-**Petri Net Representation**:
-```
-   p1(data=d1)   p2(data=d2)
-       |            |
-       v            v
-       t1(x=d1)    t2(y=d2)
-       |            |
-       v            v
-   p3(data=d1')  p4(data=d2')
-```
+**API Functions:**
+- `cre_yawl_patterns:try_catch/3` - Create pattern state
 
-**YAWL Representation**:
-```yaml
-task: t1
-  input:
-    - name: x
-      source: p1.data
-  output:
-    - name: result
-      target: p3.data
-```
-
-**Use Case Example**:
-```erlang
-%% Parameter passing between functions
--module(parameter_passing).
-
-% Activity with input/output parameters
-process_order(InputData) ->
-    % Extract parameters
-    OrderId = InputData#input.order_id,
-    Customer = InputData#input.customer,
-    Items = InputData#input.items,
-
-    % Process
-    Result = calculate_total(Items),
-
-    % Output parameters
-    #output{
-        order_id = OrderId,
-        total = Result,
-        status = processed
-    }.
-
-% Workflow with parameter passing
-workflow(InitialData) ->
-    Step1Result = step1(InitialData),
-    Step2Result = step2(Step1Result),
-    Step3Result = step3(Step2Result),
-    finalize_workflow(Step3Result).
-```
-
-**Related Patterns**: WDP-2 (Data Transformation), WDP-3 (Data Distribution)
+**Parameters:**
+- `TryFun` - The protected function to attempt
+- `CatchFun` - Function handling exceptions
+- `ExceptionTypes` - List of exception types to catch ('_' for all)
 
 ---
 
-#### WDP-2: Data Transformation
+## 5. Data Flow Patterns (WDP-01 to WDP-05)
 
-**Description**: Data is transformed from one format or structure to another as it passes through the workflow. Transformations may include format conversion, aggregation, filtering, or enrichment.
+### WDP-01: Parameter Passing
 
-**Petri Net Representation**:
-```
-   p1(data=A)          p2(data=A')
-       |                   |
-       v                   v
-       t1(transform: A->B)
-       |                   |
-       v                   v
-   p3(data=B)
-```
+**Description:** Pass parameters between tasks in a workflow.
 
-**YAWL Representation**:
-```yaml
-task: transform
-  input: A
-  transformation: convert_A_to_B
-  output: B
-```
+**Module:** `param_pass`
 
-**Use Case Example**:
-```erlang
-%% Data transformation pipeline
-transform_data(RawData) ->
-    Parsed = parse_raw(RawData),
-    Validated = validate(Parsed),
-    Enriched = enrich(Validated),
-    Formatted = format_output(Enriched),
-    Formatted.
+**API Functions:**
+- `cre_yawl_patterns:param_pass/1` - Create pattern state
+- `cre_yawl_patterns:execute_param_pass/2` - Execute pattern
 
-% Specific transformations
-parse_raw(Raw) ->
-    json:decode(Raw).
-
-validate(Parsed) ->
-    lists:filter(fun is_valid_record/1, Parsed).
-
-validate_record(Record) ->
-    maps:is_key(<<"id">>, Record) andalso maps:is_key(<<"value">>, Record).
-
-enrich(Records) ->
-    [enrich_record(R) || R <- Records].
-
-enrich_record(R) ->
-    R#{<<"timestamp">> => erlang:system_time(millisecond),
-      <<"processed">> => true}.
-
-format_output(Records) ->
-    json:encode(Records).
-```
-
-**Related Patterns**: WDP-1 (Parameter Passing), WDP-4 (Data Accumulation)
+**Parameters:**
+- `Params` - Map of parameter names to values
 
 ---
 
-#### WDP-3: Data Distribution
+### WDP-02: Data Transformation
 
-**Description**: Data from a single source is distributed to multiple destination activities or branches. Each recipient may receive all or part of the data.
+**Description:** Transform data between tasks with custom logic.
 
-**Petri Net Representation**:
-```
-       p1(data=D)
-           |
-           v
-       +---+---+
-       |       |
-       v       v
-       t1      t2      t3
-       |       |       |
-   (D)  (D1)  (D2)   (D3)
-```
+**Module:** `data_transform`
 
-**YAWL Representation**:
-```yaml
-task: distribute
-  input: D
-  outputs:
-    - target: t1
-      data: D
-    - target: t2
-      data: filter(D, type1)
-    - target: t3
-      data: filter(D, type2)
-```
+**API Functions:**
+- `cre_yawl_patterns:data_transform/2` - Create pattern state
+- `cre_yawl_patterns:execute_data_transform/2` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Data distribution to multiple consumers
-distribute_data(Data, Consumers) ->
-    lists:foreach(
-        fun(Consumer) ->
-            ConsumerPid = get_consumer(Consumer),
-            ConsumerPid ! {data, self(), Data}
-        end,
-        Consumers
-    ).
-
-%% Selective distribution based on data type
-distribute_by_type(Data, Routes) ->
-    lists:foreach(
-        fun({Route, FilterFn}) ->
-            case FilterFn(Data) of
-                true ->
-                    Route ! {data, Data};
-                false ->
-                    ok
-            end
-        end,
-        Routes
-    ).
-
-%% Usage example
-route_order(Order) ->
-    Routes = [
-        {finance_route(), fun is_payment_required/1},
-        {shipping_route(), fun requires_shipping/1},
-        {inventory_route(), fun needs_inventory/1}
-    ],
-    distribute_by_type(Order, Routes).
-```
-
-**Related Patterns**: WDP-1 (Parameter Passing), WDP-5 (Data Visibility)
+**Parameters:**
+- `TransformFun` - Function for data transformation
+- `InputData` - Data to transform
 
 ---
 
-#### WDP-4: Data Accumulation
+### WDP-03: Data Distribution
 
-**Description**: Data from multiple sources is accumulated into a single data structure. Results from parallel or sequential activities are collected and combined.
+**Description:** Distribute data to multiple tasks.
 
-**Petri Net Representation**:
-```
-   p1    p2    p3
-    |     |     |
-    v     v     v
-    t1    t2    t3
-    |     |     |
-    +--+--+--+--+
-       |
-       v
-   accumulator(D1+D2+D3)
-```
+**Module:** `data_distribute`
 
-**YAWL Representation**:
-```yaml
-task: accumulate
-  sources: [p1, p2, p3]
-  accumulation: merge
-  output: combined_data
-```
+**API Functions:**
+- `cre_yawl_patterns:data_distribute/2` - Create pattern state
+- `cre_yawl_patterns:execute_data_distribute/2` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Data accumulation from multiple sources
-accumulate_results(Sources) ->
-    Refs = [spawn_monitor(fun() -> fetch_from_source(S) end) || S <- Sources],
-    accumulate_loop(Refs, []).
-
-accumulate_loop([], Accumulated) ->
-    {ok, lists:flatten(Accumulated)};
-accumulate_loop([{Pid, MRef} | Rest], Accumulated) ->
-    receive
-        {'DOWN', MRef, process, Pid, {ok, Data}} ->
-            accumulate_loop(Rest, [Data | Accumulated]);
-        {'DOWN', MRef, process, Pid, {error, Reason}} ->
-            accumulate_loop(Rest, Accumulated)
-    end.
-
-%% Aggregator for parallel results
-aggregate_parallel_results(TaskFun, Inputs) ->
-    Parent = self(),
-    Pids = [spawn(fun() -> Parent ! {self(), TaskFun(I)} end) || I <- Inputs],
-    collect_results(length(Pids), []).
-
-collect_results(0, Results) ->
-    lists:reverse(Results);
-collect_results(Remaining, Results) ->
-    receive
-        {Pid, Result} ->
-            collect_results(Remaining - 1, [Result | Results])
-    end.
-```
-
-**Related Patterns**: WDP-2 (Data Transformation), WDP-3 (Data Distribution)
+**Parameters:**
+- `Data` - Data to distribute
+- `Recipients` - List of recipient identifiers
 
 ---
 
-#### WDP-5: Data Visibility
+### WDP-04: Data Accumulation
 
-**Description**: Defines the scope and visibility of data within the workflow. Data may be local to an activity, shared between specific activities, or globally accessible across the entire workflow.
+**Description:** Accumulate data from multiple tasks.
 
-**Petri Net Representation**:
-```
-   [global_scope: D1]
-          |
-    +-----+-----+
-    |     |     |
-   [L1]  [L2]  [L3]
-   D2    D3    D4
-    |     |     |
-    v     v     v
-   t1    t2    t3
-```
+**Module:** `data_accumulate`
 
-**YAWL Representation**:
-```yaml
-data_scopes:
-  global: [D1]
-  local:
-    t1: [D2]
-    t2: [D3]
-    t3: [D4]
-  shared:
-    - activities: [t1, t2]
-      data: [D5]
-```
+**API Functions:**
+- `cre_yawl_patterns:data_accumulate/2` - Create pattern state
+- `cre_yawl_patterns:execute_data_accumulate/2` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Data visibility with process dictionary and ETS
--module(data_visibility).
-
-%% Global data - stored in ETS table
-init_global_data() ->
-    ets:new(global_data, [named_table, public, set]),
-    ets:insert(global_data, {config, get_config()}),
-    ets:insert(global_data, {schema, get_schema()}).
-
-%% Local data - passed as function arguments
-local_task(LocalData) ->
-    Result = process_with_local_data(LocalData),
-    Result.
-
-%% Shared data - shared between related tasks
-create_shared_scope(OwnerId) ->
-    ets:new(shared_scope(OwnerId), [named_table, protected, set]),
-    ets:insert(shared_scope(OwnerId), [{counter, 0}, {status, init}]).
-
-update_shared_data(OwnerId, Key, Value) ->
-    ets:insert(shared_scope(OwnerId), {Key, Value}).
-
-%% Workflow with scoped data
-workflow_scoped(GlobalConfig) ->
-    % Global scope
-    init_global_data(GlobalConfig),
-
-    % Local scope for task1
-    Task1Local = #{input => input1, temp => temp1},
-    Task1Result = task1(Task1Local),
-
-    % Shared scope between task2 and task3
-    SharedId = make_ref(),
-    create_shared_scope(SharedId),
-    task2(SharedId, Task1Result),
-    task3(SharedId),
-    cleanup_shared_scope(SharedId).
-```
-
-**Related Patterns**: WDP-3 (Data Distribution), WRP-4 (Role-Based Distribution)
+**Parameters:**
+- `DataList` - List of data items to accumulate
+- `AggregateFun` - Function for data aggregation
 
 ---
 
-### 8. Resource Patterns (34-38)
+### WDP-05: Data Visibility
 
-#### WRP-1: Creation
+**Description:** Control data visibility scope within the workflow.
 
-**Description**: Defines how and when workflow resources (agents, users, systems) are created or initialized for workflow execution.
+**Module:** `data_visibility`
 
-**Petri Net Representation**:
-```
-       t1
-       |
-       v
-   [create_resource]
-       |
-       v
-   resource(R)
-       |
-       v
-       t2
-```
+**API Functions:**
+- `cre_yawl_patterns:data_visibility/2` - Create pattern state
+- `cre_yawl_patterns:execute_data_visibility/2` - Execute pattern
 
-**YAWL Representation**:
-```yaml
-resource: creation
-  strategy: dynamic
-  initialization:
-    - type: user
-      creation: on_demand
-    - type: system
-      creation: at_workflow_start
-```
-
-**Use Case Example**:
-```erlang
-%% Resource creation using supervisors
--module(resource_manager).
-
-%% Create a new resource (worker process)
-create_resource(ResourceType, Config) ->
-    {ok, Pid} = resource_sup:start_child(ResourceType, Config),
-    {ok, Pid}.
-
-%% Supervisor for resource management
-init_resource_supervisor() ->
-    ChildSpecs = [
-        #{
-            id => worker_resource,
-            start => {worker_resource, start_link, []},
-            restart => transient,
-            shutdown => 5000,
-            type => worker,
-            modules => [worker_resource]
-        },
-        #{
-            id => system_resource,
-            start => {system_resource, start_link, []},
-            restart => permanent,
-            shutdown => 5000,
-            type => worker,
-            modules => [system_resource]
-        }
-    ],
-    {ok, {{one_for_one, 10, 60}, ChildSpecs}}.
-
-%% Dynamic resource creation
-allocate_task_resource(TaskType) ->
-    case resource_pool:checkout(TaskType) of
-        {ok, Resource} ->
-            {ok, Resource};
-        {error, no_resource} ->
-            {ok, NewResource} = create_resource(TaskType, #{}),
-            {ok, NewResource}
-    end.
-```
-
-**Related Patterns**: WRP-2 (Role-Based Allocation), WRP-3 (Start)
+**Parameters:**
+- `Data` - Data to control visibility for
+- `VisibilityFun` - Function determining visibility rules
 
 ---
 
-#### WRP-2: Role-Based Allocation
+## 6. Resource Patterns (WRP-01 to WRP-05)
 
-**Description**: Workflow tasks are allocated to resources based on their roles or capabilities. A task specifies required role(s), and resources with matching roles are eligible.
+### WRP-01: Direct Resource Creation
 
-**Petri Net Representation**:
-```
-       task(T)
-         |
-         v
-   [check_role(R)]
-         |
-    +----+----+
-    |        |
-   has      no
-   role     role
-    |        |
-    v        v
- allocate  error
-    |
-    v
-resource(R in role)
-```
+**Description:** Create resources on-demand within workflow.
 
-**YAWL Representation**:
-```yaml
-task: allocate_by_role
-  allocation_strategy: role_based
-  required_roles:
-    - manager
-    - supervisor
-  resources:
-    - id: user1
-      roles: [manager, admin]
-    - id: user2
-      roles: [supervisor]
-```
+**Module:** `direct_resource_creation`
 
-**Use Case Example**:
-```erlang
-%% Role-based allocation system
--module(role_allocation).
+**API Functions:**
+- `cre_yawl_patterns:direct_resource_creation/1` - Create pattern state
+- `cre_yawl_patterns:execute_direct_resource_creation/1` - Execute pattern
 
--record(resource, {
-    id,
-    roles = [],
-    capabilities = [],
-    current_task = undefined
-}).
-
--record(task, {
-    id,
-    required_roles = [],
-    required_capabilities = [],
-    priority = normal
-}).
-
-%% Allocate task to resource based on role
-allocate_by_role(Task, AvailableResources) ->
-    Eligible = find_eligible_resources(Task, AvailableResources),
-    select_best_resource(Task, Eligible).
-
-find_eligible_resources(Task, Resources) ->
-    RequiredRoles = Task#task.required_roles,
-    lists:filter(
-        fun(Resource) ->
-            has_required_roles(Resource, RequiredRoles)
-        end,
-        Resources
-    ).
-
-has_required_roles(Resource, RequiredRoles) ->
-    ResourceRoles = Resource#resource.roles,
-    lists:all(fun(Role) -> lists:member(Role, ResourceRoles) end, RequiredRoles).
-
-%% Select resource (could be based on load, capability, etc.)
-select_best_resource(_Task, []) ->
-    {error, no_eligible_resource};
-select_best_resource(Task, [Resource | _]) ->
-    {ok, Resource}.
-
-%% Usage
-approve_document(Document) ->
-    Task = #task{
-        id = Document#document.id,
-        required_roles = [manager],
-        priority = urgent
-    },
-    Managers = get_resources_by_role(manager),
-    case allocate_by_role(Task, Managers) of
-        {ok, Manager} ->
-            Manager ! {approve, Document};
-        {error, Reason} ->
-            escalate_to_admin(Document)
-    end.
-```
-
-**Related Patterns**: WRP-1 (Creation), WRP-4 (Role-Based Distribution)
+**Parameters:**
+- `CreateFun` - Function that creates the resource
 
 ---
 
-#### WRP-3: Start
+### WRP-02: Role-Based Allocation
 
-**Description**: Defines how and when resources are started or activated to begin working on workflow tasks. A resource may be started explicitly or triggered by events.
+**Description:** Allocate resources based on role definitions.
 
-**Petri Net Representation**:
-```
-       task
-        |
-        v
-   [start_resource]
-        |
-    +---+---+
-    |       |
-  ready  not_ready
-    |       |
-    v       v
-  begin   wait
-    |
-    v
-execution
-```
+**Module:** `role_based_allocation`
 
-**YAWL Representation**:
-```yaml
-resource: start
-  trigger: automatic
-  modes:
-    - mode: manual
-      action: user_initiates
-    - mode: automatic
-      action: on_assignment
-    - mode: scheduled
-      action: at_specific_time
-```
+**API Functions:**
+- `cre_yawl_patterns:role_based_allocation/2` - Create pattern state
+- `cre_yawl_patterns:execute_role_based_allocation/2` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Resource start patterns
--module(resource_starter).
-
-%% Manual start - resource waits for explicit start signal
-manual_start(Resource) ->
-    Resource ! {init, self()},
-    receive
-        {Resource, ready} ->
-            Resource ! {start, self()},
-            {ok, started};
-        {Resource, error, Reason} ->
-            {error, Reason}
-    end.
-
-%% Automatic start - resource starts immediately upon assignment
-automatic_start(Resource, Task) ->
-    Resource ! {assign_and_start, Task},
-    receive
-        {Resource, started} ->
-            {ok, started};
-        {Resource, error, Reason} ->
-            {error, Reason}
-    end.
-
-%% Scheduled start - resource starts at specified time
-scheduled_start(Resource, Task, StartTime) ->
-    TimerRef = erlang:send_after(StartTime, Resource, {start, Task}),
-    {ok, TimerRef}.
-
-%% Resource implementation
-resource_loop(State) ->
-    receive
-        {init, From} ->
-            From ! {self(), ready},
-            resource_loop(State#{status => ready});
-        {start, From} ->
-            From ! {self(), started},
-            resource_loop(State#{status => running});
-        {assign_and_start, Task} ->
-            execute_task(Task),
-            resource_loop(State#{status => running});
-        {complete, Result} ->
-            handle_completion(Result),
-            resource_loop(State#{status => idle})
-    end.
-```
-
-**Related Patterns**: WRP-1 (Creation), WRP-2 (Role-Based Allocation)
+**Parameters:**
+- `Role` - Role identifier to allocate
+- `RoleRegistry` - Map of roles to available resources
 
 ---
 
-#### WRP-4: Role-Based Distribution
+### WRP-03: Resource Initialization
 
-**Description**: Work items or tasks are distributed to resources based on their roles. This pattern manages how tasks are routed to appropriate resources within a role.
+**Description:** Initialize and configure resources before use.
 
-**Petri Net Representation**:
-```
-        task_queue
-             |
-             v
-        [distributor]
-        /    |    \
-       v     v     v
-     R1     R2     R3  (resources in role)
-      |     |     |
-     [work distribution]
-```
+**Module:** `resource_initialization`
 
-**YAWL Representation**:
-```yaml
-distribution: role_based
-  strategy: round_robin
-  role: processor
-  resources:
-    - id: processor1
-      load: 2
-    - id: processor2
-      load: 3
-    - id: processor3
-      load: 1
-```
+**API Functions:**
+- `cre_yawl_patterns:resource_initialization/2` - Create pattern state
+- `cre_yawl_patterns:execute_resource_initialization/2` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Role-based task distribution
--module(role_distribution).
-
-%% Distribute tasks using round-robin within a role
-distribute_round_robin(Role, Task) ->
-    Resources = get_resources_by_role(Role),
-    NextIndex = get_next_index(Role),
-    Resource = lists:nth(NextIndex + 1, Resources),
-    assign_task(Resource, Task),
-    increment_next_index(Role).
-
-%% Distribute based on current load
-distribute_least_loaded(Role, Task) ->
-    Resources = get_resources_by_role(Role),
-    SortedResources = lists:keysort(#resource.current_load, Resources),
-    [#resource{id = LeastLoaded} | _] = SortedResources,
-    assign_task(LeastLoaded, Task).
-
-%% Distribute based on capability matching
-distribute_by_capability(Role, Task) ->
-    Resources = get_resources_by_role(Role),
-    Capable = lists:filter(
-        fun(R) -> has_capability(R, Task#task.required_capability) end,
-        Resources
-    ),
-    case Capable of
-        [] -> {error, no_capable_resource};
-        _ -> assign_task(hd(Capable), Task)
-    end.
-
-%% Distributor gen_server
--behaviour(gen_server).
-
-init([]) ->
-    {ok, #{
-        role_indices => #{},
-        resource_loads => #{}
-    }}.
-
-handle_call({distribute, Role, Task}, _From, State) ->
-    Result = distribute_least_loaded(Role, Task),
-    {reply, Result, State};
-
-handle_cast({task_complete, ResourceId}, State) ->
-    #{resource_loads := Loads} = State,
-    CurrentLoad = maps:get(ResourceId, Loads, 0),
-    NewLoads = Loads#{ResourceId => CurrentLoad - 1},
-    {noreply, State#{resource_loads => NewLoads}}.
-```
-
-**Related Patterns**: WRP-2 (Role-Based Allocation), WDP-3 (Data Distribution)
+**Parameters:**
+- `InitFun` - Function that initializes the resource
+- `Resource` - Resource to initialize
 
 ---
 
-#### WRP-5: Capability Allocation
+### WRP-04: Resource Allocation
 
-**Description**: Resources are allocated based on their specific capabilities or skills rather than just roles. This allows for more fine-grained matching of tasks to resources.
+**Description:** Assign resources to tasks and track availability.
 
-**Petri Net Representation**:
-```
-        task(required_capability=C)
-                  |
-                  v
-           [match_capability]
-                  |
-         +--------+--------+
-         |                 |
-      match            no_match
-         |                 |
-         v                 v
-    allocate           escalate
-         |
-         v
-resource(with_capability=C)
-```
+**Module:** `resource_allocation`
 
-**YAWL Representation**:
-```yaml
-allocation: capability_based
-  task_requirements:
-    - capability: java_development
-      level: senior
-    - capability: code_review
-      level: intermediate
-  resource_capabilities:
-    - id: dev1
-      capabilities:
-        - name: java_development
-          level: senior
-        - name: code_review
-          level: expert
-```
+**API Functions:**
+- `cre_yawl_patterns:resource_allocation/2` - Create pattern state
+- `cre_yawl_patterns:execute_resource_allocation/2` - Execute pattern
 
-**Use Case Example**:
-```erlang
-%% Capability-based allocation
--module(capability_allocation).
-
--record(capability, {
-    name,
-    level  % beginner, intermediate, senior, expert
-}).
-
--record(resource, {
-    id,
-    capabilities = []  % list of capability records
-}).
-
-%% Find resources with required capability
-find_by_capability(Resources, CapabilityName, MinLevel) ->
-    lists:filter(
-        fun(R) -> has_capability_at_level(R, CapabilityName, MinLevel) end,
-        Resources
-    ).
-
-has_capability_at_level(Resource, CapabilityName, MinLevel) ->
-    Capabilities = Resource#resource.capabilities,
-    case lists:keyfind(CapabilityName, #capability.name, Capabilities) of
-        false -> false;
-        #capability{level = Level} ->
-            level_at_least(Level, MinLevel)
-    end.
-
-level_at_least(CapLevel, MinLevel) ->
-    Levels = [beginner, intermediate, senior, expert],
-    CapIndex = index_of(CapLevel, Levels),
-    MinIndex = index_of(MinLevel, Levels),
-    CapIndex >= MinIndex.
-
-%% Score-based allocation
-allocate_best_fit(Resources, RequiredCapabilities) ->
-    Scored = score_resources(Resources, RequiredCapabilities),
-    case lists:reverse(lists:keysort(1, Scored)) of
-        [{_Score, Resource} | _] -> {ok, Resource};
-        [] -> {error, no_suitable_resource}
-    end.
-
-score_resources(Resources, RequiredCapabilities) ->
-    lists:map(
-        fun(R) -> {calculate_score(R, RequiredCapabilities), R} end,
-        Resources
-    ).
-
-calculate_score(Resource, RequiredCapabilities) ->
-    lists:foldl(
-        fun(Cap, Acc) ->
-            case find_capability(Resource, Cap) of
-                {ok, Level} -> Acc + level_score(Level);
-                no_match -> Acc - 100
-            end
-        end,
-        0,
-        RequiredCapabilities
-    ).
-
-level_score(beginner) -> 1;
-level_score(intermediate) -> 2;
-level_score(senior) -> 3;
-level_score(expert) -> 4.
-
-%% Usage
-assign_code_review(ReviewTask) ->
-    RequiredCaps = [
-        #capability{name = code_review, level = intermediate},
-        #capability{name = language_expertise, level = senior}
-    ],
-    Developers = get_all_developers(),
-    case allocate_best_fit(Developers, RequiredCaps) of
-        {ok, Reviewer} ->
-            Reviewer ! {review, ReviewTask};
-        {error, _} ->
-            escalate_to_lead(ReviewTask)
-    end.
-```
-
-**Related Patterns**: WRP-2 (Role-Based Allocation), WRP-4 (Role-Based Distribution)
+**Parameters:**
+- `ResourcePool` - List of available resources
+- `TaskId` - Task requiring resource allocation
 
 ---
 
-### 9. Exception Handling Patterns (39-43)
+### WRP-05: Resource Deallocation
 
-#### WHP-1: Error Handler
+**Description:** Release resources after task completion.
 
-**Description**: A designated activity or handler is invoked when an error occurs in the workflow. The error handler can correct the error, log it, or initiate alternative processing.
+**Module:** `resource_deallocation`
 
-**Petri Net Representation**:
-```
-       t1
-       |
-       v
-   [error_check]
-       |
-   +---+---+
-   |       |
-error    normal
-   |       |
-   v       v
-  handler  t2
-   |
-   v
-recover/retry
-```
+**API Functions:**
+- `cre_yawl_patterns:resource_deallocation/2` - Create pattern state
+- `cre_yawl_patterns:execute_resource_deallocation/2` - Execute pattern
 
-**YAWL Representation**:
-```yaml
-task: with_error_handler
-  activity: t1
-  handlers:
-    - exception: connection_error
-      handler: h1
-      action: retry
-    - exception: validation_error
-      handler: h2
-      action: compensate
-```
-
-**Use Case Example**:
-```erlang
-%% Error handler pattern
--module(error_handler).
-
-%% Execute with error handler
-with_error_handler(Task, ErrorHandler) ->
-    try
-        Task()
-    catch
-        Type:Reason:Stacktrace ->
-            ErrorHandler(Type, Reason, Stacktrace)
-    end.
-
-%% Specific error handlers
-handle_connection_error(error, Reason, _Stacktrace) ->
-    log_error(connection, Reason),
-    attempt_reconnect();
-
-handle_validation_error(error, Reason, _Stacktrace) ->
-    log_error(validation, Reason),
-    return_validation_error(Reason);
-
-handle_timeout_error(exit, timeout, _Stacktrace) ->
-    log_error(timeout, "Operation timed out"),
-    escalate_to_human();
-
-handle_unexpected(Type, Reason, Stacktrace) ->
-    log_error(unexpected, {Type, Reason, Stacktrace}),
-    notify_admins(Type, Reason, Stacktrace).
-
-%% Usage example with try/catch/after
-safe_api_call(ApiFunction) ->
-    try
-        case ApiFunction() of
-            {ok, Result} -> Result;
-            {error, Reason} -> error(api_error, [Reason])
-        end
-    catch
-        error:{api_error, Reason} ->
-            handle_api_error(Reason);
-        exit:timeout ->
-            handle_timeout();
-        Type:Reason:Stacktrace ->
-            handle_unexpected(Type, Reason, Stacktrace)
-    after
-        cleanup_resources()
-    end.
-```
-
-**Related Patterns**: WHP-2 (Retry), WHP-3 (Compensate)
+**Parameters:**
+- `CleanupFun` - Function that cleanup/releases the resource
+- `Resource` - Resource to deallocate
 
 ---
 
-#### WHP-2: Retry
+## 7. Exception Handling Patterns (WHP-01 to WHP-05)
 
-**Description**: When an activity fails, it is retried a specified number of times before giving up. Retries may include delays or exponential backoff.
+### WHP-01: Error Handler
 
-**Petri Net Representation**:
-```
-       t1
-       |
-       v
-   [attempt]
-       |
-   +---+---+
-   |       |
-success  failure
-   |       |
-   v       v
-   next  [retry_count]
-          |
-       +--+--+
-       |     |
-     under over
-     limit limit
-       |     |
-       v     v
-     retry  fail
-       |
-       +--> t1
-```
+**Description:** Provide catch-all mechanism for handling unexpected errors.
 
-**YAWL Representation**:
-```yaml
-task: retry_on_failure
-  activity: t1
-  retry:
-    max_attempts: 3
-    backoff: exponential
-    base_delay: 1000ms
-    on_exhausted: escalate
-```
+**Module:** `cre_yawl_patterns`
 
-**Use Case Example**:
-```erlang
-%% Retry pattern with exponential backoff
--module(retry).
+**API Functions:**
+- `cre_yawl_patterns:error_handler/2` - Create pattern state
 
-retry(Task, Options) ->
-    MaxAttempts = maps:get(max_attempts, Options, 3),
-    BaseDelay = maps:get(base_delay, Options, 1000),
-    MaxDelay = maps:get(max_delay, Options, 30000),
-    retry_loop(Task, 1, MaxAttempts, BaseDelay, MaxDelay).
-
-retry_loop(Task, Attempt, MaxAttempts, BaseDelay, MaxDelay) when Attempt > MaxAttempts ->
-    {error, max_attempts_exceeded};
-retry_loop(Task, Attempt, MaxAttempts, BaseDelay, MaxDelay) ->
-    case Task() of
-        {ok, Result} ->
-            {ok, Result};
-        {error, Reason} ->
-            Delay = calculate_delay(Attempt, BaseDelay, MaxDelay),
-            log_retry_attempt(Attempt, Reason, Delay),
-            timer:sleep(Delay),
-            retry_loop(Task, Attempt + 1, MaxAttempts, BaseDelay, MaxDelay)
-    end.
-
-%% Calculate exponential backoff with jitter
-calculate_delay(Attempt, BaseDelay, MaxDelay) ->
-    Exponential = min(BaseDelay * trunc(math:pow(2, Attempt - 1)), MaxDelay),
-    Jitter = rand:uniform(Exponential div 4),
-    Exponential + Jitter.
-
-%% Usage examples
-%% Simple retry
-retry_database_query(Query) ->
-    retry(
-        fun() -> database:execute(Query) end,
-        #{max_attempts => 3, base_delay => 500}
-    ).
-
-%% Retry with circuit breaker
-retry_with_circuit_breaker(Task, Options) ->
-    case circuit_breaker:check_state(service_name) of
-        closed ->
-            case retry(Task, Options) of
-                {ok, Result} -> {ok, Result};
-                {error, Reason} ->
-                    circuit_breaker:record_failure(service_name),
-                    {error, Reason}
-            end;
-        open ->
-            {error, circuit_breaker_open}
-    end.
-```
-
-**Related Patterns**: WHP-1 (Error Handler), WHP-4 (Triggered Compensation)
+**Parameters:**
+- `ProtectedActivity` - The activity to protect with error handling
+- `ErrorHandlerFun` - Function to call when error occurs
 
 ---
 
-#### WHP-3: Compensate
+### WHP-02: Retry
 
-**Description**: When an activity cannot be completed or needs to be undone, a compensating activity is invoked to reverse the effects of the original activity.
+**Description:** Automatically retry failed activities with configurable retry limits and backoff.
 
-**Petri Net Representation**:
-```
-        t1
-        |
-        v
-    (execute)
-        |
-        v
-   [check_result]
-        |
-    +---+---+
-    |       |
-success  failure
-    |       |
-    v       v
-    t2    compensate(t1)
-    |
-    v
-complete
-```
+**Module:** `cre_yawl_patterns`
 
-**YAWL Representation**:
-```yaml
-task: compensatable
-  activity: book_flight
-  compensation: cancel_booking
-  compensation_scope: full
-```
+**API Functions:**
+- `cre_yawl_patterns:retry/3` - Create pattern state
 
-**Use Case Example**:
-```erlang
-%% Compensation pattern for transactions
--module(compensation).
-
--record(compensation, {
-    activity_id,
-    compensate_fun,
-    context
-}).
-
-%% Execute with compensation
-with_compensation(ActivityFun, CompensateFun) ->
-    ActivityId = make_ref(),
-    try
-        Result = ActivityFun(),
-        register_compensation(ActivityId, CompensateFun),
-        {ok, Result, ActivityId}
-    catch
-        Type:Reason:Stacktrace ->
-            execute_compensation(ActivityId),
-            {error, {Type, Reason, Stacktrace}}
-    end.
-
-%% Execute compensation chain
-execute_compensation(ActivityId) ->
-    Compensations = get_compensations_since(ActivityId),
-    execute_compensations(lists:reverse(Compensations)).
-
-execute_compensations([]) ->
-    ok;
-execute_compensations([#compensation{compensate_fun = Fun, context = Ctx} | Rest]) ->
-    case Fun(Ctx) of
-        ok -> execute_compensations(Rest);
-        {error, Reason} ->
-            log_compensation_failure(Reason),
-            execute_compensations(Rest)
-    end.
-
-%% Business transaction with compensation
-book_trip_itinerary(Itinerary) ->
-    % Step 1: Book flight
-    {ok, FlightBooking, FwdId} = with_compensation(
-        fun() -> flight_service:book(Itinerary#itinerary.flight) end,
-        fun(Ctx) -> flight_service:cancel(Ctx#booking.confirmation) end
-    ),
-
-    % Step 2: Book hotel
-    {ok, HotelBooking, HotId} = with_compensation(
-        fun() -> hotel_service:book(Itinerary#itinerary.hotel) end,
-        fun(Ctx) -> hotel_service:cancel(Ctx#booking.confirmation) end
-    ),
-
-    % Step 3: Book rental car (may fail, triggering compensation)
-    case with_compensation(
-        fun() -> rental_service:book(Itinerary#itinerary.rental) end,
-        fun(Ctx) -> rental_service:cancel(Ctx#booking.confirmation) end
-    ) of
-        {ok, RentalBooking, _} ->
-            {ok, #{flight => FlightBooking, hotel => HotelBooking, rental => RentalBooking}};
-        {error, _Reason} ->
-            % This will trigger compensation for flight and hotel
-            {error, booking_failed}
-    end.
-
-%% Simplified transaction with compensation
-book_trip(Itinerary) ->
-    Compensations = [],
-    try
-        {FlightRef, Booking1} = book_with_comp(Itinerary#itinerary.flight,
-                                               fun flight:cancel/1),
-        Compensations1 = [{flight, FlightRef, fun flight:cancel/1} | Compensations],
-
-        {HotelRef, Booking2} = book_with_comp(Itinerary#itinerary.hotel,
-                                              fun hotel:cancel/1),
-        Compensations2 = [{hotel, HotelRef, fun hotel:cancel/1} | Compensations1],
-
-        {CarRef, Booking3} = book_with_comp(Itinerary#itinerary.rental,
-                                             fun rental:cancel/1),
-
-        {ok, #{flight => Booking1, hotel => Booking2, rental => Booking3}}
-    catch
-        throw:Error ->
-            execute_compensations(Compensations),
-            {error, Error}
-    end.
-```
-
-**Related Patterns**: WHP-1 (Error Handler), WHP-5 (Consecutive Compensation)
+**Parameters:**
+- `Activity` - The activity to retry on failure
+- `MaxRetries` - Maximum number of retry attempts
+- `BackoffFun` - Function calculating delay before next retry
 
 ---
 
-#### WHP-4: Triggered Compensation
+### WHP-03: Compensation
 
-**Description**: Compensation is triggered by an external event or condition, not just by failure. This allows for proactive compensation based on business rules or events.
+**Description:** Allow undoing of completed activities when downstream error occurs.
 
-**Petri Net Representation**:
-```
-        t1        t2
-         |         |
-         v         v
-    (execute)  (execute)
-         |         |
-         v         v
-    [registered] [registered]
-         |         |
-         +----+----+
-              |
-      [trigger_event]
-              |
-              v
-         compensate_all
-```
+**Module:** `cre_yawl_patterns`
 
-**YAWL Representation**:
-```yaml
-task: triggered_compensation
-  triggers:
-    - event: customer_cancellation
-      compensate: [book_flight, book_hotel]
-    - event: deadline_exceeded
-      compensate: [reserve_item]
-```
+**API Functions:**
+- `cre_yawl_patterns:compensate/2` - Create pattern state
 
-**Use Case Example**:
-```erlang
-%% Triggered compensation for cancellation
--module(triggered_compensation).
-
--record(transaction, {
-    id,
-    activities = [],
-    status = active
-}).
-
--record(activity, {
-    id,
-    compensate_fun,
-    completed = false
-}).
-
-%% Start a transaction with compensatable activities
-start_transaction() ->
-    TxId = make_ref(),
-    Tx = #transaction{id = TxId},
-    register_transaction(TxId, Tx),
-    TxId.
-
-%% Register compensatable activity
-register_activity(TxId, ActivityId, CompensateFun) ->
-    Activity = #activity{id = ActivityId, compensate_fun = CompensateFun},
-    add_activity_to_transaction(TxId, Activity).
-
-%% Trigger compensation externally
-trigger_compensation(TxId, Reason) ->
-    case get_transaction(TxId) of
-        #transaction{activities = Activities} ->
-            execute_compensations(Activities, Reason),
-            mark_transaction_compensated(TxId);
-        undefined ->
-            {error, transaction_not_found}
-    end.
-
-%% Event-based compensation handlers
-handle_cancellation_event(CustomerId, OrderId) ->
-    TxId = get_transaction_for_order(OrderId),
-    trigger_compensation(TxId, {customer_cancellation, CustomerId}).
-
-handle_deadline_event(OrderId) ->
-    TxId = get_transaction_for_order(OrderId),
-    trigger_compensation(TxId, deadline_exceeded).
-
-%% Business example: Order with triggered compensation
-process_order(Order) ->
-    TxId = start_transaction(),
-
-    % Book items
-    {ok, ItemBooking} = inventory:book(Order#order.items),
-    register_activity(TxId, item_booking,
-                      fun(_) -> inventory:release(ItemBooking) end),
-
-    % Process payment
-    {ok, PaymentId} = payment:charge(Order#order.payment_info),
-    register_activity(TxId, payment,
-                      fun(_) -> payment:refund(PaymentId) end),
-
-    % Arrange shipping
-    {ok, ShipmentId} = shipping:arrange(Order#order.shipping),
-    register_activity(TxId, shipping,
-                      fun(_) -> shipping:cancel(ShipmentId) end),
-
-    % If customer cancels within 24 hours, compensate everything
-    schedule_cancellation_check(OrderId, TxId, 24 * 60 * 60 * 1000),
-
-    {ok, Order#order{transaction_id = TxId}}.
-
-check_and_compensate_if_needed(OrderId, TxId, Deadline) ->
-    case get_order_status(OrderId) of
-        {shipped, _} ->
-            ok;  % Already shipped, cannot compensate
-        {pending, _} ->
-            Now = erlang:system_time(millisecond),
-            if
-                Now > Deadline ->
-                    trigger_compensation(TxId, auto_cancellation);
-                true ->
-                    ok
-            end
-    end.
-```
-
-**Related Patterns**: WHP-3 (Compensate), WHP-5 (Consecutive Compensation)
+**Parameters:**
+- `CompensableActivity` - The activity that can be compensated
+- `CompensatorFun` - Function that undoes the activity
 
 ---
 
-#### WHP-5: Consecutive Compensation
+### WHP-04: Triggered Compensation
 
-**Description**: Multiple compensating activities are executed in a specific order. The compensation activities themselves may have dependencies on each other.
+**Description:** Allow explicit triggering of compensation based on specific events.
 
-**Petri Net Representation**:
-```
-        t1    t2    t3
-         |     |     |
-         v     v     v
-    (executed in order)
-         |     |     |
-         v     v     v
-    [compensation_trigger]
-         |
-         v
-    c3(t3) -> c2(t2) -> c1(t1)  (reverse order)
-```
+**Module:** `cre_yawl_patterns`
 
-**YAWL Representation**:
-```yaml
-task: consecutive_compensation
-  activities: [t1, t2, t3]
-  compensations:
-    - for: t1
-      activity: c1
-      order: 3
-    - for: t2
-      activity: c2
-      order: 2
-    - for: t3
-      activity: c3
-      order: 1
-```
+**API Functions:**
+- `cre_yawl_patterns:triggered_compensation/3` - Create pattern state
 
-**Use Case Example**:
-```erlang
-%% Consecutive compensation with ordering
--module(consecutive_compensation).
-
--record(compensation_step, {
-    id,
-    activity_id,
-    compensate_fun,
-    order  % Determines execution order
-}).
-
-%% Execute compensations in consecutive order
-execute_consecutive_compensations(Compensations) ->
-    % Sort by order (ascending: lower numbers execute first)
-    Sorted = lists:keysort(#compensation_step.order, Compensations),
-    execute_compensations_sequential(Sorted).
-
-execute_compensations_sequential([]) ->
-    {ok, all_compensated};
-execute_compensations_sequential([Step | Rest]) ->
-    case Step#compensation_step.compensate_fun() of
-        ok ->
-            log_compensation_success(Step#compensation_step.id),
-            execute_compensations_sequential(Rest);
-        {error, Reason} ->
-            log_compensation_failure(Step#compensation_step.id, Reason),
-            case should_continue_on_failure() of
-                true ->
-                    execute_compensations_sequential(Rest);
-                false ->
-                    {error, {compensation_failed, Step#compensation_step.id, Reason}}
-            end
-    end.
-
-%% Business example: Order cancellation with consecutive compensation
-cancel_order(Order) ->
-    % Compensations in LIFO order (last in, first compensated)
-    Compensations = [
-        #compensation_step{
-            id = cancel_shipment,
-            activity_id = arrange_shipping,
-            compensate_fun = fun() -> shipping:cancel(Order#order.shipment_id) end,
-            order = 1  % Execute first
-        },
-        #compensation_step{
-            id = refund_payment,
-            activity_id = process_payment,
-            compensate_fun = fun() -> payment:refund(Order#order.payment_id) end,
-            order = 2  % Execute second
-        },
-        #compensation_step{
-            id = restock_inventory,
-            activity_id = reserve_inventory,
-            compensate_fun = fun() -> inventory:restock(Order#order.items) end,
-            order = 3  % Execute last
-        }
-    ],
-
-    case execute_consecutive_compensations(Compensations) of
-        {ok, all_compensated} ->
-            notify_order_cancelled(Order),
-            {ok, compensated};
-        {error, Reason} ->
-            notify_compensation_failure(Order, Reason),
-            {error, partial_compensation}
-    end.
-
-%% Saga pattern for distributed transactions
-saga_execute(Steps) ->
-    saga_execute(Steps, []).
-
-saga_execute([], Compensations) ->
-    {ok, lists:reverse(Compensations)};
-saga_execute([{Action, Compensate} | Rest], Compensations) ->
-    case Action() of
-        {ok, Result} ->
-            saga_execute(Rest, [{Compensate, Result} | Compensations]);
-        {error, Reason} ->
-            % Execute compensations in reverse order
-            execute_saga_compensations(Compensations),
-            {error, Reason}
-    end.
-
-execute_saga_compensations([]) ->
-    ok;
-execute_saga_compensations([{Compensate, Result} | Rest]) ->
-    case Compensate(Result) of
-        ok ->
-            execute_saga_compensations(Rest);
-        {error, CompReason} ->
-            log_error("Compensation failed: ~p", [CompReason]),
-            execute_saga_compensations(Rest)
-    end.
-```
-
-**Related Patterns**: WHP-3 (Compensate), WHP-4 (Triggered Compensation)
+**Parameters:**
+- `Activity` - The compensable activity
+- `CompensatorFun` - Function that undoes the activity
+- `TriggerFun` - Function determining when to trigger compensation
 
 ---
 
-## Pattern Summary Table
+### WHP-05: Consecutive Compensation
 
-| ID | Name | Category | YAWL Support |
-|----|------|----------|--------------|
-| WCP-1 | Sequence | Basic Control | Native |
-| WCP-2 | Parallel Split | Basic Control | Native (AND-split) |
-| WCP-3 | Synchronization | Basic Control | Native (AND-join) |
-| WCP-4 | Exclusive Choice | Basic Control | Native (OR-split) |
-| WCP-5 | Simple Merge | Basic Control | Native (XOR-join) |
-| WCP-6 | Multi-Choice | Basic Control | Native (OR-split) |
-| WCP-7 | Synchronizing Merge | Advanced Sync | Native (OR-join) |
-| WCP-8 | Multi-Merge | Advanced Sync | Extended |
-| WCP-9 | Discriminator | Advanced Sync | Extended |
-| WCP-10 | Arbitrary Cycles | Advanced Sync | Native |
-| WCP-11 | Implicit Termination | Structural | Native |
-| WCP-12 | MI without Sync | Structural | Native (MI) |
-| WCP-13 | MI with Design Time Knowledge | Structural | Native (MI) |
-| WCP-14 | MI with Runtime Knowledge | Multiple Instance | Native (MI) |
-| WCP-15 | MI without Runtime Knowledge | Multiple Instance | Native (MI) |
-| WCP-16 | Deferred Choice | Multiple Instance | Native |
-| WCP-17 | Interleaved Parallel Routing | Multiple Instance | Extended |
-| WCP-18 | Milestone | State-Based | Extended |
-| WCP-19 | Cancel Activity | State-Based | Native |
-| WCP-20 | Cancel Case | State-Based | Native |
-| WCP-21 | Structured Synchronization | Extended Control | Native |
-| WCP-22 | Structured Partial Join | Extended Control | Extended |
-| WCP-23 | Structured Loop | Extended Control | Native |
-| WCP-24 | Recursion | Extended Control | Extended |
-| WCP-25 | Arbitrary Interleaved Loop | Extended Control | Extended |
-| WCP-26 | Critical Section | Extended Control | Extended |
-| WCP-27 | Protocol Pattern | Extended Control | Extended |
-| WCP-28 | Try-Catch | Extended Control | Native |
-| WDP-1 | Parameter Passing | Data Flow | Native |
-| WDP-2 | Data Transformation | Data Flow | Native |
-| WDP-3 | Data Distribution | Data Flow | Extended |
-| WDP-4 | Data Accumulation | Data Flow | Extended |
-| WDP-5 | Data Visibility | Data Flow | Extended |
-| WRP-1 | Creation | Resource | Extended |
-| WRP-2 | Role-Based Allocation | Resource | Native |
-| WRP-3 | Start | Resource | Native |
-| WRP-4 | Role-Based Distribution | Resource | Extended |
-| WRP-5 | Capability Allocation | Resource | Extended |
-| WHP-1 | Error Handler | Exception Handling | Native |
-| WHP-2 | Retry | Exception Handling | Extended |
-| WHP-3 | Compensate | Exception Handling | Extended |
-| WHP-4 | Triggered Compensation | Exception Handling | Extended |
-| WHP-5 | Consecutive Compensation | Exception Handling | Extended |
+**Description:** Execute multiple compensation handlers in reverse order.
+
+**Module:** `cre_yawl_patterns`
+
+**API Functions:**
+- `cre_yawl_patterns:consecutive_compensate/1` - Create pattern state
+
+**Parameters:**
+- `ActivityCompensatorPairs` - List of {Activity, Compensator} tuples
+
+---
+
+## 8. Unimplemented Patterns (7 Remaining)
+
+The following patterns from the YAWL specification are not yet implemented:
+
+| Pattern ID | Pattern Name | Category |
+|------------|--------------|----------|
+| WCP-29 | Structured Discriminator | Extended Control Flow |
+| WCP-30 | Structured N-out-of-M Join | Extended Control Flow |
+| WCP-31 | Arbitrary Cycle | Advanced Control Flow |
+| WCP-32 | Recursion with Previous State | Advanced Control Flow |
+| WCP-33 | Cancel Region | State-Based |
+| WCP-34 | Cancel Multiple Instance | State-Based |
+| WCP-35 | Advanced Cancel Activity | State-Based |
+
+---
+
+## Quick Reference Table
+
+| ID | Name | Module | Category |
+|----|------|--------|----------|
+| WCP-01 | Sequence | cre_yawl | Basic Control |
+| WCP-02 | Parallel Split | parallel_split | Basic Control |
+| WCP-03 | Synchronization | or_join | Basic Control |
+| WCP-04 | Exclusive Choice | exclusive_choice | Basic Control |
+| WCP-05 | Simple Merge | simple_merge | Basic Control |
+| WCP-06 | Multi-Choice | multiple_choice | Basic Control |
+| WCP-07 | Synchronizing Merge | multiple_merge | Advanced Sync |
+| WCP-08 | Multi-Merge | implicit_merge | Advanced Sync |
+| WCP-09 | Discriminator | discriminator | Advanced Sync |
+| WCP-10 | N-out-of-M | n_out_of_m | Advanced Sync |
+| WCP-11 | Implicit Termination | implicit_termination | Multiple Instance |
+| WCP-12 | MI without Sync | cre_yawl_patterns | Multiple Instance |
+| WCP-13 | MI Static | multiple_instances_sync | Multiple Instance |
+| WCP-14 | MI Runtime | cre_yawl_patterns | Multiple Instance |
+| WCP-15 | MI Dynamic | cre_yawl_patterns | Multiple Instance |
+| WCP-16 | Deferred Choice | deferred_choice | Multiple Instance |
+| WCP-17 | Interleaved Routing | interleaved_routing | Multiple Instance |
+| WCP-18 | Milestone | milestone | State-Based |
+| WCP-19 | Cancel Activity | cre_yawl_patterns | State-Based |
+| WCP-20 | Cancel Case | cre_yawl_patterns | State-Based |
+| WCP-21 | Structured Sync | cre_yawl_patterns | Extended Control |
+| WCP-22 | Partial Join | cre_yawl_patterns | Extended Control |
+| WCP-23 | Structured Loop | structured_loop | Extended Control |
+| WCP-24 | Recursion | cre_yawl_patterns | Extended Control |
+| WCP-25 | Interleaved Loop | cre_yawl_patterns | Extended Control |
+| WCP-26 | Critical Section | critical_section | Extended Control |
+| WCP-27 | Protocol | cre_yawl_patterns | Extended Control |
+| WCP-28 | Try-Catch | cre_yawl_patterns | Extended Control |
+| WDP-01 | Parameter Passing | param_pass | Data Flow |
+| WDP-02 | Data Transform | data_transform | Data Flow |
+| WDP-03 | Data Distribute | data_distribute | Data Flow |
+| WDP-04 | Data Accumulate | data_accumulate | Data Flow |
+| WDP-05 | Data Visibility | data_visibility | Data Flow |
+| WRP-01 | Resource Creation | direct_resource_creation | Resource |
+| WRP-02 | Role Allocation | role_based_allocation | Resource |
+| WRP-03 | Resource Init | resource_initialization | Resource |
+| WRP-04 | Resource Alloc | resource_allocation | Resource |
+| WRP-05 | Resource Dealloc | resource_deallocation | Resource |
+| WHP-01 | Error Handler | cre_yawl_patterns | Exception |
+| WHP-02 | Retry | cre_yawl_patterns | Exception |
+| WHP-03 | Compensation | cre_yawl_patterns | Exception |
+| WHP-04 | Triggered Comp | cre_yawl_patterns | Exception |
+| WHP-05 | Consecutive Comp | cre_yawl_patterns | Exception |
+
+---
+
+## Module Index
+
+- `cre_yawl` - Core YAWL engine and basic patterns
+- `cre_yawl_patterns` - Advanced pattern implementations
+- `parallel_split` - WCP-02 Parallel Split
+- `or_join` - WCP-03 Synchronization
+- `exclusive_choice` - WCP-04 Exclusive Choice
+- `simple_merge` - WCP-05 Simple Merge
+- `multiple_choice` - WCP-06 Multi-Choice
+- `multiple_merge` - WCP-07 Synchronizing Merge
+- `implicit_merge` - WCP-08 Multi-Merge
+- `discriminator` - WCP-09 Discriminator
+- `n_out_of_m` - WCP-10 N-out-of-M
+- `implicit_termination` - WCP-11 Implicit Termination
+- `multiple_instances_sync` - WCP-13 MI Static
+- `deferred_choice` - WCP-16 Deferred Choice
+- `interleaved_routing` - WCP-17 Interleaved Routing
+- `milestone` - WCP-18 Milestone
+- `structured_loop` - WCP-23 Structured Loop
+- `critical_section` - WCP-26 Critical Section
+- `param_pass` - WDP-01 Parameter Passing
+- `data_transform` - WDP-02 Data Transform
+- `data_distribute` - WDP-03 Data Distribute
+- `data_accumulate` - WDP-04 Data Accumulate
+- `data_visibility` - WDP-05 Data Visibility
+- `direct_resource_creation` - WRP-01 Resource Creation
+- `role_based_allocation` - WRP-02 Role Allocation
+- `resource_initialization` - WRP-03 Resource Init
+- `resource_allocation` - WRP-04 Resource Allocation
+- `resource_deallocation` - WRP-05 Resource Deallocation
 
 ---
 
 ## References
 
-1. van der Aalst, W.M.P., ter Hofstede, A.H.M., Kiepuszewski, B., & Barros, A.P. (2003). "Workflow Patterns". Distributed and Parallel Databases, 14(3), 5-51.
+1. van der Aalst, W. M. P., ter Hofstede, A. H. M., Kiepuszewski, B., & Barros, A. P. (2003). Workflow patterns. *Distributed and Parallel Databases*, 14(1), 5-51.
 
-2. Russell, N., ter Hofstede, A.H.M., van der Aalst, W.M.P., & Mulyar, N. (2006). "Workflow Control-Flow Patterns: A Revised View". BPM Center Report BPM-06-22.
+2. Russell, N., ter Hofstede, A. H. M., van der Aalst, W. M. P., & Mulyar, N. (2006). *Workflow control-flow patterns: A revised view*. BPM Center Report.
 
-3. Russell, N., van der Aalst, W.M.P., ter Hofstede, A.H.M., & Mulyar, N. (2006). "Workflow Resource Patterns". BPM Center Report BPM-06-23.
-
-4. Russell, N., ter Hofstede, A.H.M., & van der Aalst, W.M.P. (2006). "Workflow Data Patterns". BPM Center Report BPM-06-24.
-
-5. Adams, M., ter Hofstede, A.H.M., Edmond, D., & van der Aalst, W.M.P. (2006). "Workflow Exception Patterns". BPM Center Report BPM-06-10.
+3. Workflow Patterns Initiative: https://www.workflowpatterns.com
 
 ---
 
-*This document is part of the YAWL Workflow Patterns reference documentation for the CRE project.*
+**Document Version:** 1.0
+**Generated:** 2026-02-06
+**CRE Version:** 0.2.0
