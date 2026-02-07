@@ -930,7 +930,7 @@ do_list_all(State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-do_get_receipt(CheckpointId, State) ->
+do_get_receipt(CheckpointId, _State) ->
     case ets:whereis(yawl_approval_receipts) of
         undefined -> {error, receipts_table_not_found};
         _Table ->
@@ -946,7 +946,7 @@ do_get_receipt(CheckpointId, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-do_list_receipts(State) ->
+do_list_receipts(_State) ->
     case ets:whereis(yawl_approval_receipts) of
         undefined -> [];
         _Table ->
@@ -1179,25 +1179,6 @@ get_decision(CheckpointId) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc Records a decision.
-%%
-%% @end
-%%--------------------------------------------------------------------
-record_decision(CheckpointId, Approved, DecisionMaker, Reason) ->
-    Decision = #approval_decision{
-        checkpoint_id = CheckpointId,
-        approved = Approved,
-        decision_maker = DecisionMaker,
-        reason = to_binary(Reason),
-        metadata = #{},
-        decided_at = erlang:system_time(millisecond)
-    },
-    Table = ensure_ets_table(),
-    ets:insert(Table, {{decision, CheckpointId}, Decision}),
-    ok.
-
-%%--------------------------------------------------------------------
-%% @private
 %% @doc Generates an approval prompt for Claude.
 %%
 %% @end
@@ -1246,20 +1227,6 @@ to_binary(A) when is_atom(A) -> atom_to_binary(A, utf8);
 to_binary(L) when is_list(L) -> list_to_binary(L);
 to_binary(I) when is_integer(I) -> integer_to_binary(I);
 to_binary(_) -> <<"">>.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc Ensures the ETS table exists.
-%%
-%% @end
-%%--------------------------------------------------------------------
-ensure_ets_table() ->
-    case ets:whereis(?MODULE) of
-        undefined ->
-            ets:new(?MODULE, [named_table, public, {read_concurrency, true}]);
-        Table ->
-            Table
-    end.
 
 %%--------------------------------------------------------------------
 %% @private

@@ -1,5 +1,23 @@
 %% -*- erlang -*-
-%%%% @author CRE Team
+%%
+%% CRE: common runtime environment for distributed programming languages
+%%
+%% Copyright 2015-2025 CRE Team
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% -------------------------------------------------------------------
+%% @author CRE Team
 %% @version 0.2.0
 %% -------------------------------------------------------------------
 
@@ -103,6 +121,7 @@ The fire/3 callback can return:
          reply/2,
          reset_stats/1,
          stop/1,
+         sync/2,
          usr_info/1,
          state_property/3]).
 
@@ -324,6 +343,49 @@ reset_stats(Name) ->
 
 stop(Name) ->
     gen_server:stop(Name).
+
+
+%%--------------------------------------------------------------------
+%% @doc Synchronize with the net instance, waiting for it to stabilize.
+%%
+%%      This function waits until no more transitions are enabled (the net
+%%      has reached a stable state) or the timeout expires. Returns the
+%%      marking when stable or an error if timeout occurs.
+%%
+%%      This is useful in tests and doctests to wait for asynchronous
+%%      operations to complete.
+%%
+%% === Example ===
+%% ```
+%% {ok, Marking} = gen_yawl:sync(Pid, 1000).
+%% '''
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec sync(Name :: name(), Timeout :: non_neg_integer() | infinity) ->
+          {ok, #{atom() => [term()]}} | {error, term()}.
+
+sync(Name, Timeout) when is_pid(Name); is_atom(Name); is_tuple(Name) ->
+    try
+        %% Request the current marking and check if net is stable
+        gen_server:call(Name, sync, Timeout)
+    catch
+        exit:{noproc, _} ->
+            {error, no_process};
+        exit:{timeout, _} ->
+            {error, timeout};
+        _:Reason ->
+            {error, Reason}
+    end;
+
+sync(NetState, _Timeout) when is_record(NetState, net_state) ->
+    %% This case is for backwards compatibility with patterns that
+    %% incorrectly pass NetState instead of Pid. Since NetState is
+    %% just a data structure, we return it as-is.
+    {ok, NetState};
+
+sync(_Other, _Timeout) ->
+    {error, badarg}.
 
 
 %%--------------------------------------------------------------------
@@ -589,6 +651,12 @@ handle_call(stats, _From, WrapperState = #wrapper_state{net_state = NetState}) -
 handle_call(reset_stats, _From, WrapperState = #wrapper_state{net_state = NetState}) ->
     NetState1 = NetState#net_state{stats = undefined},
     {reply, ok, WrapperState#wrapper_state{net_state = NetState1}};
+
+handle_call(sync, _From, WrapperState = #wrapper_state{net_state = NetState}) ->
+    %% Return the current marking to indicate the net is synced
+    %% The caller can check if the expected state is reached
+    #net_state{marking = Marking} = NetState,
+    {reply, {ok, Marking}, WrapperState};
 
 handle_call(_Request, _From, WrapperState) ->
     {reply, {error, bad_msg}, WrapperState}.

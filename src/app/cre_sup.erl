@@ -218,7 +218,7 @@ init(_Args) ->
 
     ChildSpec = #{
                   id => cre_master,
-                  start => {cre_master, start_link, [{local, cre_master}]},
+                  start => {cre_master, start_link, [cre_master]},
                   restart => temporary,
                   shutdown => 5000,
                   type => worker,
@@ -330,7 +330,7 @@ doctest_test() ->
     {ok, {_, Children2}} = init([]),
     CreMasterSpec = lists:keyfind(cre_master, 1, [{maps:get(id, C), C} || C <- Children2]),
     {cre_master, CreMasterMap} = CreMasterSpec,
-    {cre_master, start_link, [{local, cre_master}]} = maps:get(start, CreMasterMap),
+    {cre_master, start_link, [cre_master]} = maps:get(start, CreMasterMap),
     temporary = maps:get(restart, CreMasterMap),
     5000 = maps:get(shutdown, CreMasterMap),
     worker = maps:get(type, CreMasterMap),

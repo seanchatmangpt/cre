@@ -56,17 +56,28 @@ yawl_recovery_test_() ->
      end}.
 
 %%--------------------------------------------------------------------
-%% @doc Setup function - creates the Mnesia table.
+%% @doc Setup function - creates the Mnesia schema.
 %%--------------------------------------------------------------------
 setup() ->
-    ok = ensure_table(),
+    %% Stop and delete any existing Mnesia schema to ensure clean state
+    application:stop(mnesia),
+    timer:sleep(100),
+    mnesia:delete_schema([node()]),
+    timer:sleep(100),
+
+    %% Initialize schema with yawl_recovery
+    ok = yawl_recovery:init_schema(),
     ok.
 
 %%--------------------------------------------------------------------
 %% @doc Cleanup function - deletes the Mnesia table.
 %%--------------------------------------------------------------------
 cleanup(_Ctx) ->
-    ok = mnesia:delete_table(yawl_checkpoint),
+    %% Delete the checkpoint table
+    case mnesia:delete_table(yawl_checkpoint) of
+        {atomic, ok} -> ok;
+        {aborted, {no_exists, _}} -> ok
+    end,
     ok.
 
 %%====================================================================
@@ -441,25 +452,3 @@ test_concurrent_checkpoints() ->
 %%====================================================================
 %% Helper Functions
 %%====================================================================
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc Ensures the yawl_checkpoint table exists.
-%%--------------------------------------------------------------------
-ensure_table() ->
-    case mnesia:system_info(is_running) of
-        no -> mnesia:start();
-        yes -> ok
-    end,
-
-    case mnesia:create_table(
-        yawl_checkpoint,
-        [
-            {attributes, record_info(fields, yawl_checkpoint)},
-            {ram_copies, [node()]},
-            {type, set}
-        ]
-    ) of
-        {atomic, ok} -> ok;
-        {aborted, {already_exists, yawl_checkpoint}} -> ok
-    end.

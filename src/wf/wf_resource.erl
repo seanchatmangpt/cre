@@ -39,12 +39,10 @@ performed by different users to prevent fraud and ensure proper oversight.
 .. }).
 _
 
-> %% Alice cannot both approve and authorize - blocked
 > wf_resource:check_separation(Org, <<"case1">>, alice, authorize_payment,
 ..                             [{task, approve_request, alice}]).
 {error, separation_violation}
 
-> %% Bob can authorize since Alice approved - allowed
 > wf_resource:check_separation(Org, <<"case1">>, bob, authorize_payment,
 ..                             [{task, approve_request, alice}]).
 ok
@@ -84,6 +82,7 @@ false
 %% Separation of duties (four-eyes principle)
 -export([separation_of_duty/2, check_separation/5, record_completion/3,
          get_completion_history/2, who_completed/3]).
+-export([doctest_test/0]).
 
 %%====================================================================
 %% Types
@@ -975,3 +974,10 @@ integration_full_workflow_test() ->
                                               pay_invoice, [])).
 
 -endif.
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests from moduledoc.
+%%--------------------------------------------------------------------
+-spec doctest_test() -> ok.
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).

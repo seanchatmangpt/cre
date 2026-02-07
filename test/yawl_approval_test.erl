@@ -340,8 +340,8 @@ e2e_approve_workflow_test() ->
     ?assert(is_binary(CheckpointId)),
     ?assertMatch(<<"approval_", _/binary>>, CheckpointId),
 
-    %% Step 2: Request approval (should return pending for human approver)
-    ?assertEqual({ok, pending}, yawl_approval:request_approval(CheckpointId)),
+    %% Step 2: Request approval (should return awaiting_human for human approver)
+    ?assertEqual({ok, awaiting_human}, yawl_approval:request_approval(CheckpointId)),
 
     %% Step 3: Check status before approval
     ?assertEqual({ok, pending}, yawl_approval:check_status(CheckpointId)),
@@ -377,8 +377,8 @@ e2e_deny_workflow_test() ->
 
     {ok, CheckpointId} = yawl_approval:create_checkpoint(PatternId, StepName, Options),
 
-    %% Step 2: Request approval
-    ?assertEqual({ok, pending}, yawl_approval:request_approval(CheckpointId)),
+    %% Step 2: Request approval (should return awaiting_human for human approver)
+    ?assertEqual({ok, awaiting_human}, yawl_approval:request_approval(CheckpointId)),
 
     %% Step 3: Deny the checkpoint
     Approver = <<"cfo">>,

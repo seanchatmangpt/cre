@@ -117,8 +117,11 @@ true = is_record(Log, xes_log).
 %% Event Recording for Patterns
 -export([log_pattern_start/3, log_pattern_complete/4]).
 -export([log_token_move/4, log_transition_fire/4]).
--export([log_case_start/2, log_case_complete/3]).
+-export([log_case_start/2, log_case_complete/3, log_case_end/1]).
 -export([log_workitem_start/3, log_workitem_complete/4]).
+
+%% Log Management
+-export([close_log/1]).
 
 %% Petri Net Receipt Integration
 -export([log_receipt/1, log_receipt/2]).
@@ -470,6 +473,48 @@ log_case_complete(LogId, CaseId, Stats) ->
         data = Stats
     },
     gen_server:cast(?MODULE, {add_event, LogId, Event}).
+
+%%--------------------------------------------------------------------
+%% @doc Logs case end - alias for log_case_complete with empty stats.
+%% @end
+%%--------------------------------------------------------------------
+-doc """
+Logs the end of a workflow case.
+
+This is a convenience function that logs case completion with minimal metadata.
+Equivalent to calling log_case_complete(LogId, CaseId, #{}).
+
+Example:
+```erlang
+ok = yawl_xes:log_case_end(LogId).
+```
+""".
+-spec log_case_end(log_id()) -> ok.
+log_case_end(LogId) ->
+    log_case_complete(LogId, LogId, #{
+        <<"ended_at">> => erlang:system_time(millisecond)
+    }).
+
+%%--------------------------------------------------------------------
+%% @doc Closes a log and exports it.
+%% @end
+%%--------------------------------------------------------------------
+-doc """
+Closes a XES log and optionally exports it to file.
+
+This function finalizes a log, typically exporting it to XES format
+for process mining analysis.
+
+Example:
+```erlang
+ok = yawl_xes:close_log(LogId).
+```
+""".
+-spec close_log(log_id()) -> ok.
+close_log(LogId) ->
+    %% Export the log to the default directory
+    catch export_xes(LogId, "xes_logs"),
+    ok.
 
 %%--------------------------------------------------------------------
 %% @doc Logs workitem start.

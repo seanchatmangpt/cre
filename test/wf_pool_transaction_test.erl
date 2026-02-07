@@ -22,6 +22,53 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
+%% @doc Main test generator with setup/cleanup.
+%%--------------------------------------------------------------------
+wf_pool_transaction_test_() ->
+    {setup,
+     fun setup/0,
+     fun cleanup/1,
+     fun(_Ctx) ->
+         [
+          {"bounded concurrency claim", fun bounded_concurrency_claim_test/0},
+          {"multiple work items pool", fun multiple_work_items_pool_test/0},
+          {"pool overflow config", fun pool_overflow_config_test/0},
+          {"store transaction isolation", fun store_transaction_isolation_test/0},
+          {"pool resilience after error", fun pool_resilience_after_error_test/0},
+          {"specification doctest", fun specification_doctest_test/0}
+         ]
+     end}.
+
+%%--------------------------------------------------------------------
+%% @doc Setup function - ensures clean Mnesia state.
+%%--------------------------------------------------------------------
+setup() ->
+    %% Stop and delete any existing Mnesia schema to ensure clean state
+    application:stop(mnesia),
+    timer:sleep(50),
+    mnesia:delete_schema([node()]),
+    timer:sleep(50),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Cleanup function - cleans up Mnesia tables.
+%%--------------------------------------------------------------------
+cleanup(_Ctx) ->
+    %% Clean up any wf_store tables that may exist
+    Tables = [wf_store_instance, wf_store_workitem],
+    lists:foreach(
+        fun(Table) ->
+            case mnesia:delete_table(Table) of
+                {atomic, ok} -> ok;
+                {aborted, {no_exists, _}} -> ok;
+                _ -> ok
+            end
+        end,
+        Tables
+    ),
+    ok.
+
+%%--------------------------------------------------------------------
 %% @doc Test bounded concurrency with store transactions.
 %%
 %% Verifies that:

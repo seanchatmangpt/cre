@@ -180,7 +180,7 @@ test_wdp01_validation() ->
 
 test_wdp01_type_error() ->
     Data = #{value => <<"string">>},
-    ?assertFalse(validate_param(Data, #{value => integer})).
+    ?assertNot(validate_param(Data, #{value => integer})).
 
 test_wdp01_optional_params() ->
     Data = #{required => value},
@@ -244,7 +244,7 @@ wdp02_data_transformation_test_() ->
 
 test_wdp02_basic_transform() ->
     Data = #{value => 10},
-    TransformFn = fun(D) -> maps:put(value, D#{value} * 2, D) end,
+    TransformFn = fun(D) -> maps:put(value, maps:get(value, D) * 2, D) end,
     Result = transform_data(Data, TransformFn),
     ?assertEqual(20, maps:get(value, Result)).
 
@@ -680,7 +680,7 @@ test_wdp05_inheritance() ->
 
 test_wdp05_read_only() ->
     Data = #{value => 10},
-    ?assertFalse(can_modify_read_only(Data)).
+    ?assertNot(can_modify_read_only(Data)).
 
 test_wdp05_write_only() ->
     ?assert(can_write_without_reading()).
@@ -707,7 +707,7 @@ test_wdp05_cleanup() ->
     ?assert(can_cleanup_scope(Scope)).
 
 test_wdp05_security() ->
-    ?assertFalse(can_escalate_privileges()).
+    ?assertNot(can_escalate_privileges()).
 
 %%====================================================================
 %% Test Utility Functions

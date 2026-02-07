@@ -392,7 +392,7 @@ handle_info(update_location, NetState) ->
                 {_, Idx} -> Idx;
                 false -> 0
             end,
-            _NextLocation = case CurrentIdx + 1 > length(Locations) of
+            NextLocation = case CurrentIdx + 1 > length(Locations) of
                 true -> NetState#transit_state.shipment#shipment.destination;
                 false -> lists:nth(CurrentIdx + 1, Locations)
             end,
@@ -495,7 +495,7 @@ update_location(#transit_state{shipment = Shipment, current_location = Current})
 %% @end
 %%--------------------------------------------------------------------
 -spec check_delays(State :: #transit_state{}) -> map().
-check_delays(#transit_state{shipment = _Shipment, started_at = StartedAt}) ->
+check_delays(#transit_state{shipment = Shipment, started_at = StartedAt}) ->
     %% Simulate delay detection based on estimated vs actual time
     Elapsed = erlang:system_time(millisecond) - StartedAt,
     EstimatedTime = 3600000,  %% 1 hour in ms
@@ -568,7 +568,7 @@ maps_get_default(Map, Key, Default) ->
 wait_for_completion(Pid, Timeout) ->
     wait_for_completion(Pid, Timeout, 0).
 
-wait_for_completion(_Pid, Timeout, Elapsed) when Elapsed >= Timeout ->
+wait_for_completion(Pid, Timeout, Elapsed) when Elapsed >= Timeout ->
     {error, timeout};
 wait_for_completion(Pid, Timeout, Elapsed) ->
     case get_state(Pid) of

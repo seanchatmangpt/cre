@@ -349,7 +349,7 @@ is_enabled('t_complete', #{'p_running' := Tokens}, _UsrInfo) when length(Tokens)
     true;
 is_enabled('t_check_quorum', #{'p_completed' := Completed}, #n_out_of_m_state{n = N}) when length(Completed) >= N ->
     true;
-is_enabled('t_proceed', #{'p_quorum_met' := [quorum | _]}, _UsrInfo) ->
+is_enabled('t_proceed', #{'p_quorum_met' := [_]}, _UsrInfo) ->
     true;
 is_enabled('t_complete_all', #{'p_remaining' := Remaining}, #n_out_of_m_state{m = M, completed = Completed}) when length(Remaining) + length(Completed) =:= M ->
     true;
@@ -361,7 +361,7 @@ is_enabled(_Trsn, _Mode, _UsrInfo) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec fire(Trsn :: atom(), Mode :: map(), UsrInfo :: n_out_of_m_state()) ->
-          {produce, map()} | {produce, map(), n_out_of_m_state()} | abort.
+          {produce, map()} | abort.
 
 fire('t_split', #{'p_start' := [start]}, #n_out_of_m_state{m = M, branch_funs = Funs} = State) ->
     %% Create branch tokens
@@ -370,7 +370,7 @@ fire('t_split', #{'p_start' := [start]}, #n_out_of_m_state{m = M, branch_funs = 
     {produce, #{
         'p_start' => [],
         'p_branch_pool' => BranchTokens
-    }, State};
+    }};
 
 fire('t_execute', #{'p_branch_pool' := [Token | Rest]}, State) ->
     %% Execute a branch
@@ -380,7 +380,7 @@ fire('t_execute', #{'p_branch_pool' := [Token | Rest]}, State) ->
             {produce, #{
                 'p_branch_pool' => Rest,
                 'p_running' => [{{branch, Index}, Fun}]
-            }, State}
+            }}
     end;
 
 fire('t_complete', #{'p_running' := [{{branch, Index}, _Fun} | Rest]}, #n_out_of_m_state{results = Results} = State) ->
@@ -395,7 +395,7 @@ fire('t_complete', #{'p_running' := [{{branch, Index}, _Fun} | Rest]}, #n_out_of
     {produce, #{
         'p_running' => Rest,
         'p_completed' => [Index]
-    }, NewState};
+    }};
 
 fire('t_check_quorum', #{'p_completed' := Completed}, #n_out_of_m_state{n = N, m = M, quorum_met = false} = State) when length(Completed) >= N ->
     %% Quorum met
@@ -412,13 +412,13 @@ fire('t_check_quorum', #{'p_completed' := Completed}, #n_out_of_m_state{n = N, m
             {produce, #{
                 'p_completed' => [],
                 'p_output' => [{quorum_met, Completed}]
-            }, NewState};
+            }};
         _ ->
             {produce, #{
                 'p_completed' => [],
                 'p_quorum_met' => [quorum, Completed],
                 'p_remaining' => [remaining, RemainingCount]
-            }, NewState}
+            }}
     end;
 
 fire('t_proceed', #{'p_quorum_met' := [quorum, Completed]}, State) ->
@@ -429,7 +429,7 @@ fire('t_proceed', #{'p_quorum_met' := [quorum, Completed]}, State) ->
     {produce, #{
         'p_quorum_met' => [],
         'p_output' => [{quorum_met, Completed}]
-    }, State};
+    }};
 
 fire('t_complete_all', #{'p_remaining' := [remaining, _Count]}, #n_out_of_m_state{completed = Completed} = State) ->
     %% Wait for all remaining (optional behavior)
@@ -439,7 +439,7 @@ fire('t_complete_all', #{'p_remaining' := [remaining, _Count]}, #n_out_of_m_stat
     {produce, #{
         'p_remaining' => [],
         'p_output' => [{all_complete, Completed}]
-    }, State};
+    }};
 
 fire(_Trsn, _Mode, _UsrInfo) ->
     abort.
@@ -650,8 +650,6 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-%% @doc Runs all doctests for the module.
-%% @private
 doctest_test() ->
     {module, ?MODULE} = code:ensure_loaded(?MODULE),
     ok.

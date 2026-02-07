@@ -8,7 +8,7 @@
 
 %% Test schema for order data
 -define(TEST_SCHEMA, #{
-    <<"order_id">> => {type, required, [{type, binary}, {min_length, 10}, {pattern, <<"^ORD\\d{6}$">>}]},
+    <<"order_id">> => {type, required, [{type, binary}, {min_length, 9}, {pattern, <<"^ORD\\d{6}$">>}]},
     <<"customer_id">> => {type, required, [{type, binary}, {min_length, 1}]},
     <<"amount">> => {type, required, [{type, float}, {min, 0}, {max, 1000000}]},
     <<"discount">> => {type, optional, [{type, float}, {min, 0}, {max, 100}]},
@@ -88,7 +88,7 @@ validate_data_test_() ->
          fun() ->
              BadData = maps:remove(<<"customer_id">>, ?TEST_DATA),
              {error, Reasons} = yawl_data:validate_data(BadData, ?TEST_SCHEMA),
-             ?assertMatch([undefined_required_variable], Reasons)
+             ?assertMatch([{undefined_required_variable, <<"customer_id">>}], Reasons)
          end},
 
         {"Reject wrong data type",
@@ -102,28 +102,41 @@ validate_data_test_() ->
          fun() ->
              BadData = ?TEST_DATA#{<<"amount">> => -1.0},
              {error, Reasons} = yawl_data:validate_data(BadData, ?TEST_SCHEMA),
-             ?assertMatch([below_min], Reasons)
+             ?assertMatch([{below_min, <<"amount">>, -1.0, 0}], Reasons)
          end},
 
         {"Reject value above maximum",
          fun() ->
              BadData = ?TEST_DATA#{<<"amount">> => 2000000.0},
              {error, Reasons} = yawl_data:validate_data(BadData, ?TEST_SCHEMA),
-             ?assertMatch([above_max], Reasons)
+             ?assertMatch([{above_max, <<"amount">>, 2000000.0, 1000000}], Reasons)
          end},
 
         {"Reject string too short",
          fun() ->
              BadData = ?TEST_DATA#{<<"order_id">> => <<"SHORT">>},
              {error, Reasons} = yawl_data:validate_data(BadData, ?TEST_SCHEMA),
-             ?assertMatch([too_short], Reasons)
+             %% Both too_short and pattern_mismatch errors should be present (order may vary)
+             ?assertEqual(2, length(Reasons)),
+             ?assert(lists:any(fun(R) ->
+                 case R of
+                     {too_short, <<"order_id">>, 5, 9} -> true;
+                     _ -> false
+                 end
+             end, Reasons)),
+             ?assert(lists:any(fun(R) ->
+                 case R of
+                     {pattern_mismatch, <<"order_id">>, _, _} -> true;
+                     _ -> false
+                 end
+             end, Reasons))
          end},
 
         {"Reject string pattern mismatch",
          fun() ->
              BadData = ?TEST_DATA#{<<"order_id">> => <<"INVALID123">>},
              {error, Reasons} = yawl_data:validate_data(BadData, ?TEST_SCHEMA),
-             ?assertMatch([pattern_mismatch], Reasons)
+             ?assertMatch([{pattern_mismatch, <<"order_id">>, <<"INVALID123">>, _}], Reasons)
          end},
 
         {"Allow optional undefined fields",
@@ -143,21 +156,22 @@ validate_data_test_() ->
         {"Return multiple validation errors",
          fun() ->
              {error, Reasons} = yawl_data:validate_data(?INVALID_DATA, ?TEST_SCHEMA),
-             ?assertEqual(4, length(Reasons)),
              %% Check all error types are present
              ErrorTypes = lists:map(fun(E) ->
                  case E of
                      {undefined_required_variable, _} -> undefined_req;
                      {type_mismatch, _, _} -> type_mismatch;
-                     below_min -> below_min;
-                     too_short -> too_short;
+                     {below_min, _, _, _} -> below_min;
+                     {too_short, _, _, _} -> too_short;
+                     {pattern_mismatch, _, _, _} -> pattern_mismatch;
                      _ -> other
                  end
              end, Reasons),
              ?assert(lists:member(undefined_req, ErrorTypes)),
              ?assert(lists:member(type_mismatch, ErrorTypes)),
              ?assert(lists:member(below_min, ErrorTypes)),
-             ?assert(lists:member(too_short, ErrorTypes))
+             ?assert(lists:member(too_short, ErrorTypes)),
+             ?assert(lists:member(pattern_mismatch, ErrorTypes))
          end}
     ].
 

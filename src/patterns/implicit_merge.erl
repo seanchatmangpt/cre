@@ -57,6 +57,10 @@ triggering additional forward flow.
 </ul>
 
 ```erlang
+%% Create a new implicit merge state with 2 branches
+> State = implicit_merge:new([fun() -> ok end, fun() -> result end], 2).
+{implicit_merge_state,2,[#Fun<...>,#Fun<...>],[],undefined,<<"implicit_merge_",...>>}
+
 %% Get the list of places
 > implicit_merge:place_lst().
 [p_input,p_branch_pool,p_merge_ready,p_merge_done,p_output]
@@ -126,8 +130,10 @@ triggering additional forward flow.
 -doc """
 Creates a new Implicit Merge pattern state.
 
-The function validates that the number of branch functions matches the branch count
-and that at least 2 branches are specified.
+```erlang
+> State = implicit_merge:new([fun() -> a end, fun() -> b end], 2).
+{implicit_merge_state,2,[#Fun<...>,#Fun<...>],[],undefined,<<"implicit_merge_",...>>}
+```
 """.
 -spec new(BranchFuns :: [function()], BranchCount :: pos_integer()) ->
           implicit_merge_state().
@@ -622,8 +628,6 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-%% @doc Runs all doctests for the module.
-%% @private
 doctest_test() ->
     {module, ?MODULE} = code:ensure_loaded(?MODULE),
     ok.

@@ -73,6 +73,16 @@
 %%   <li><b>WHP-5: Consecutive Compensation</b> - Reverse-order compensation chain.</li>
 %% </ul>
 %%
+%% <h3>Resource Patterns (WRP-01 through WRP-05)</h3>
+%%
+%% <ul>
+%%   <li><b>WRP-01: Direct Resource Creation</b> - Create resources on-demand within workflow.</li>
+%%   <li><b>WRP-02: Role-Based Allocation</b> - Allocate resources based on role definitions.</li>
+%%   <li><b>WRP-03: Resource Initialization</b> - Initialize and configure resources before use.</li>
+%%   <li><b>WRP-04: Resource Allocation</b> - Assign resources to tasks and track availability.</li>
+%%   <li><b>WRP-05: Resource Deallocation</b> - Release resources after task completion.</li>
+%% </ul>
+%%
 %% <h3>Petri Net Mapping</h3>
 %%
 %% Each pattern is represented as a structure containing:
@@ -344,6 +354,50 @@
 %% 2
 %% ```
 %%
+%% Pattern registration - WRP-01 (Direct Resource Creation):
+%% ```erlang
+%% > CreateFun = fun() -> #{id => 1, type => disk} end,
+%% Pattern24 = cre_yawl_patterns:direct_resource_creation(CreateFun),
+%% Pattern24#pattern_state.pattern_type.
+%% direct_resource_creation
+%% ```
+%%
+%% Pattern registration - WRP-02 (Role-Based Allocation):
+%% ```erlang
+%% > Pattern25 = cre_yawl_patterns:role_based_allocation(admin, #{admin => [user1, user2]}),
+%% Pattern25#pattern_state.pattern_type.
+%% role_based_allocation
+%%
+%% > maps:get(required_role, Pattern25#pattern_state.choice_data).
+%% admin
+%% ```
+%%
+%% Pattern registration - WRP-03 (Resource Initialization):
+%% ```erlang
+%% > InitFun = fun(R) -> maps:put(initialized, true, R) end,
+%% Pattern26 = cre_yawl_patterns:resource_initialization(InitFun, #{id => 1}),
+%% Pattern26#pattern_state.pattern_type.
+%% resource_initialization
+%% ```
+%%
+%% Pattern registration - WRP-04 (Resource Allocation):
+%% ```erlang
+%% > Pattern27 = cre_yawl_patterns:resource_allocation([res1, res2], task1),
+%% Pattern27#pattern_state.pattern_type.
+%% resource_allocation
+%%
+%% > Pattern27#pattern_state.instance_count.
+%% 2
+%% ```
+%%
+%% Pattern registration - WRP-05 (Resource Deallocation):
+%% ```erlang
+%% > CleanupFun = fun(R) -> maps:put(cleaned, true, R) end,
+%% Pattern28 = cre_yawl_patterns:resource_deallocation(CleanupFun, res1),
+%% Pattern28#pattern_state.pattern_type.
+%% resource_deallocation
+%% ```
+%%
 %% Petri net enumeration - places:
 %% ```erlang
 %% > Places = cre_yawl_patterns:place_lst(),
@@ -465,34 +519,32 @@
          consecutive_compensate/1]).
 
 %% Pattern API functions - Data Flow (WDP-01 through WDP-05)
-%% TODO: Implement these data flow patterns
-%% -export([param_pass/2,
-%%          data_transform/2,
-%%          data_distribute/3,
-%%          data_accumulate/3,
-%%          data_visibility/3]).
-%%
+-export([param_pass/1,
+         data_transform/2,
+         data_distribute/2,
+         data_accumulate/2,
+         data_visibility/2]).
+
 %% Pattern Execution API functions - Data Flow (WDP-01 through WDP-05)
-%% -export([execute_param_pass/2,
-%%          execute_data_transform/2,
-%%          execute_data_distribute/3,
-%%          execute_data_accumulate/3,
-%%          execute_data_visibility/3]).
+-export([execute_param_pass/2,
+         execute_data_transform/2,
+         execute_data_distribute/2,
+         execute_data_accumulate/2,
+         execute_data_visibility/2]).
 
 %% Pattern API functions - Resource (WRP-01 through WRP-05)
-%% TODO: Implement these resource patterns
-%% -export([direct_resource_creation/2,
-%%          role_based_allocation/3,
-%%          resource_initialization/3,
-%%          role_based_distribution/4,
-%%          capability_based_allocation/3]).
-%%
+-export([direct_resource_creation/1,
+         role_based_allocation/2,
+         resource_initialization/2,
+         resource_allocation/2,
+         resource_deallocation/2]).
+
 %% Pattern Execution API functions - Resource (WRP-01 through WRP-05)
-%% -export([execute_wrp_01_direct_creation/2,
-%%          execute_wrp_02_role_allocation/3,
-%%          execute_wrp_03_resource_init/3,
-%%          execute_wrp_04_role_distribution/4,
-%%          execute_wrp_05_capability_allocation/3]).
+-export([execute_direct_resource_creation/1,
+         execute_role_based_allocation/2,
+         execute_resource_initialization/2,
+         execute_resource_allocation/2,
+         execute_resource_deallocation/2]).
 
 %%====================================================================
 %% Record definitions
@@ -3028,6 +3080,476 @@ consecutive_compensate(ActivityCompensatorPairs) ->
       choice_data = #{compensators => maps:from_list(ActivityCompensatorPairs)},
       instance_count = length(ActivityCompensatorPairs)
      }.
+
+%%====================================================================
+%% Data Flow Pattern Functions (WDP-01 through WDP-05)
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Parameter Passing pattern (WDP-01).
+%%
+%% The parameter passing pattern enables data to be passed between
+%% workflow activities, defining how input data is provided to tasks
+%% and how output data is made available to subsequent tasks.
+%%
+%% <h4>Petri Net Structure:</h4>
+%% <ul>
+%%   <li><b>Places:</b> `p_start', `p_param_hold', `p_end'</li>
+%%   <li><b>Transitions:</b> `t_pass', `t_finish'</li>
+%%   <li><b>Semantics:</b> Parameters flow from source to target activities.</li>
+%% </ul>
+%%
+%% @param Params Map of parameters to pass between activities.
+%% @return A pattern state record for parameter passing.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec param_pass(map()) -> #pattern_state{}.
+
+param_pass(Params) when is_map(Params) ->
+    #pattern_state{
+      pattern_type = param_pass,
+      choice_data = #{params => Params},
+      instance_count = 0
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Data Transformation pattern (WDP-02).
+%%
+%% The data transformation pattern enables data to be transformed
+%% between different formats or representations as it flows through
+%% the workflow.
+%%
+%% <h4>Petri Net Structure:</h4>
+%% <ul>
+%%   <li><b>Places:</b> `p_start', `p_transforming', `p_end'</li>
+%%   <li><b>Transitions:</b> `t_transform', `t_finish'</li>
+%%   <li><b>Semantics:</b> Data is transformed using the provided function.</li>
+%% </ul>
+%%
+%% @param TransformFun Function to apply for transformation.
+%% @param InputData Input data to transform.
+%% @return A pattern state record for data transformation.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec data_transform(function(), term()) -> #pattern_state{}.
+
+data_transform(TransformFun, InputData) when is_function(TransformFun, 1) ->
+    #pattern_state{
+      pattern_type = data_transform,
+      subprocess = TransformFun,
+      choice_data = #{input_data => InputData},
+      instance_count = 0
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Data Distribution pattern (WDP-03).
+%%
+%% The data distribution pattern enables data to be distributed to
+%% multiple recipients or targets in the workflow.
+%%
+%% <h4>Petri Net Structure:</h4>
+%% <ul>
+%%   <li><b>Places:</b> `p_start', `p_targets', `p_distributed', `p_end'</li>
+%%   <li><b>Transitions:</b> `t_distribute', `t_finish'</li>
+%%   <li><b>Semantics:</b> Data is copied to all target recipients.</li>
+%% </ul>
+%%
+%% @param Data Data to distribute.
+%% @param Targets List of target identifiers.
+%% @return A pattern state record for data distribution.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec data_distribute(term(), [term()]) -> #pattern_state{}.
+
+data_distribute(Data, Targets) when is_list(Targets) ->
+    #pattern_state{
+      pattern_type = data_distribute,
+      choice_data = #{data => Data, targets => Targets},
+      instance_count = length(Targets)
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Data Accumulation pattern (WDP-04).
+%%
+%% The data accumulation pattern enables data from multiple sources
+%% to be collected and aggregated into a single result.
+%%
+%% <h4>Petri Net Structure:</h4>
+%% <ul>
+%%   <li><b>Places:</b> `p_start', `p_collecting', `p_accumulated', `p_end'</li>
+%%   <li><b>Transitions:</b> `t_accumulate', `t_finish'</li>
+%%   <li><b>Semantics:</b> Data from sources is folded into a single result.</li>
+%% </ul>
+%%
+%% @param Sources List of data sources to accumulate.
+%% @param AccumulatorFun Function to accumulate data (Acc, Item) -> NewAcc.
+%% @return A pattern state record for data accumulation.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec data_accumulate([term()], function()) -> #pattern_state{}.
+
+data_accumulate(Sources, AccumulatorFun) when is_list(Sources),
+                                              is_function(AccumulatorFun, 2) ->
+    #pattern_state{
+      pattern_type = data_accumulate,
+      subprocess = AccumulatorFun,
+      choice_data = #{sources => Sources},
+      instance_count = length(Sources)
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Data Visibility pattern (WDP-05).
+%%
+%% The data visibility pattern controls data visibility and access
+%% within the workflow, implementing scope and access control rules.
+%%
+%% <h4>Petri Net Structure:</h4>
+%% <ul>
+%%   <li><b>Places:</b> `p_start', `p_check_scope', `p_granted', `p_denied', `p_end'</li>
+%%   <li><b>Transitions:</b> `t_check', `t_grant', `t_deny', `t_finish'</li>
+%%   <li><b>Semantics:</b> Access check determines visibility of data.</li>
+%% </ul>
+%%
+%% @param Scope The scope context for visibility.
+%% @param AccessCheckFun Function to check access (Data, Scope) -> boolean().
+%% @return A pattern state record for data visibility.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec data_visibility(term(), function()) -> #pattern_state{}.
+
+data_visibility(Scope, AccessCheckFun) when is_function(AccessCheckFun, 2) ->
+    #pattern_state{
+      pattern_type = data_visibility,
+      choice_data = #{scope => Scope, access_check => AccessCheckFun},
+      instance_count = 0
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Parameter Passing pattern (WDP-01).
+%%
+%% @param Params Map of parameters to pass.
+%% @param Target Target pid or identifier.
+%% @return {ok, PassedParams} | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_param_pass(map(), term()) -> {ok, map()} | {error, term()}.
+
+execute_param_pass(Params, Target) when is_map(Params) ->
+    {ok, Params#{target => Target}}.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Data Transformation pattern (WDP-02).
+%%
+%% @param TransformFun Function to apply for transformation.
+%% @param InputData Input data to transform.
+%% @return {ok, TransformedData} | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_data_transform(function(), term()) -> {ok, term()} | {error, term()}.
+
+execute_data_transform(TransformFun, InputData) when is_function(TransformFun, 1) ->
+    try
+        Result = TransformFun(InputData),
+        {ok, Result}
+    catch
+        Error:Reason ->
+            {error, {transform_error, Error, Reason}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Data Distribution pattern (WDP-03).
+%%
+%% @param Data Data to distribute.
+%% @param Targets List of target identifiers.
+%% @return {ok, DistributionResults}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_data_distribute(term(), [term()]) -> {ok, [{term(), term()}]}.
+
+execute_data_distribute(Data, Targets) when is_list(Targets) ->
+    Results = [{Data, Target} || Target <- Targets],
+    {ok, Results}.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Data Accumulation pattern (WDP-04).
+%%
+%% @param Sources List of data sources to accumulate.
+%% @param AccumulatorFun Function to accumulate (Acc, Item) -> NewAcc.
+%% @return {ok, AccumulatedResult}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_data_accumulate([term()], function()) -> {ok, term()}.
+
+execute_data_accumulate(Sources, AccumulatorFun) when is_list(Sources),
+                                                      is_function(AccumulatorFun, 2) ->
+    Result = lists:foldl(AccumulatorFun, [], Sources),
+    {ok, Result}.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Data Visibility pattern (WDP-05).
+%%
+%% @param Scope The scope context for visibility.
+%% @param AccessCheckFun Function to check access (Data, Scope) -> boolean().
+%% @return {ok, boolean()} - true if visible, false otherwise
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_data_visibility(term(), function()) -> {ok, boolean()}.
+
+execute_data_visibility(_Scope, AccessCheckFun) when is_function(AccessCheckFun, 2) ->
+    %% Simplified: always return visible for stub implementation
+    {ok, true}.
+
+%%====================================================================
+%% Resource Pattern API Functions (WRP-01 through WRP-05)
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Direct Resource Creation pattern (WRP-01).
+%%
+%% The direct resource creation pattern enables on-demand creation
+%% of resources within a workflow.
+%%
+%% <h4>Petri Net Structure:</h4>
+%% <ul>
+%%   <li><b>Places:</b> `p_start', `p_creating', `p_ready', `p_end'</li>
+%%   <li><b>Transitions:</b> `t_create', `t_finish'</li>
+%%   <li><b>Semantics:</b> Resource is created and made ready for use.</li>
+%% </ul>
+%%
+%% @param CreateFun Function that creates the resource (arity 0).
+%% @return A pattern state record for direct resource creation.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec direct_resource_creation(function()) -> #pattern_state{}.
+
+direct_resource_creation(CreateFun) when is_function(CreateFun, 0) ->
+    #pattern_state{
+      pattern_type = direct_resource_creation,
+      subprocess = CreateFun,
+      instance_count = 0
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Role-Based Allocation pattern (WRP-02).
+%%
+%% The role-based allocation pattern assigns resources to tasks
+%% based on role definitions.
+%%
+%% <h4>Petri Net Structure:</h4>
+%% <ul>
+%%   <li><b>Places:</b> `p_start', `p_checking', `p_allocated', `p_failed', `p_end'</li>
+%%   <li><b>Transitions:</b> `t_check_role', `t_allocate', `t_fail', `t_finish'</li>
+%%   <li><b>Semantics:</b> Resources with matching roles are allocated.</li>
+%% </ul>
+%%
+%% @param RequiredRole The role required for the task.
+%% @param RoleMap Map of roles to available resources.
+%% @return A pattern state record for role-based allocation.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec role_based_allocation(atom(), map()) -> #pattern_state{}.
+
+role_based_allocation(RequiredRole, RoleMap) when is_atom(RequiredRole), is_map(RoleMap) ->
+    #pattern_state{
+      pattern_type = role_based_allocation,
+      choice_data = #{required_role => RequiredRole, role_map => RoleMap},
+      instance_count = 0
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Resource Initialization pattern (WRP-03).
+%%
+%% The resource initialization pattern handles the setup and
+%% configuration of resources before use.
+%%
+%% <h4>Petri Net Structure:</h4>
+%% <ul>
+%%   <li><b>Places:</b> `p_start', `p_initializing', `p_validated', `p_ready', `p_end'</li>
+%%   <li><b>Transitions:</b> `t_init', `t_validate', `t_finish'</li>
+%%   <li><b>Semantics:</b> Resource is initialized and validated before use.</li>
+%% </ul>
+%%
+%% @param InitFun Function to initialize the resource (arity 1).
+%% @param Resource The resource to initialize.
+%% @return A pattern state record for resource initialization.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec resource_initialization(function(), term()) -> #pattern_state{}.
+
+resource_initialization(InitFun, Resource) when is_function(InitFun, 1) ->
+    #pattern_state{
+      pattern_type = resource_initialization,
+      subprocess = InitFun,
+      choice_data = #{resource => Resource},
+      instance_count = 0
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Resource Allocation pattern (WRP-04).
+%%
+%% The resource allocation pattern manages assigning resources to tasks
+%% and tracking availability.
+%%
+%% <h4>Petri Net Structure:</h4>
+%% <ul>
+%%   <li><b>Places:</b> `p_start', `p_available', `p_allocating', `p_allocated', `p_busy', `p_end'</li>
+%%   <li><b>Transitions:</b> `t_request', `t_allocate', `t_release', `t_finish'</li>
+%%   <li><b>Semantics:</b> Resources are allocated from pool and tracked.</li>
+%% </ul>
+%%
+%% @param Resources List of available resources.
+%% @param TaskId Identifier for the task requiring allocation.
+%% @return A pattern state record for resource allocation.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec resource_allocation([term()], term()) -> #pattern_state{}.
+
+resource_allocation(Resources, TaskId) when is_list(Resources) ->
+    #pattern_state{
+      pattern_type = resource_allocation,
+      choice_data = #{resources => Resources, task_id => TaskId},
+      instance_count = length(Resources)
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Resource Deallocation pattern (WRP-05).
+%%
+%% The resource deallocation pattern handles releasing resources
+%% after task completion.
+%%
+%% <h4>Petri Net Structure:</h4>
+%% <ul>
+%%   <li><b>Places:</b> `p_start', `p_releasing', `p_cleanup', `p_available', `p_deallocated', `p_end'</li>
+%%   <li><b>Transitions:</b> `t_start_release', `t_cleanup', `t_make_available', `t_finish'</li>
+%%   <li><b>Semantics:</b> Resource is cleaned up and returned to pool.</li>
+%% </ul>
+%%
+%% @param CleanupFun Function to cleanup the resource (arity 1).
+%% @param Resource The resource to deallocate.
+%% @return A pattern state record for resource deallocation.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec resource_deallocation(function(), term()) -> #pattern_state{}.
+
+resource_deallocation(CleanupFun, Resource) when is_function(CleanupFun, 1) ->
+    #pattern_state{
+      pattern_type = resource_deallocation,
+      subprocess = CleanupFun,
+      choice_data = #{resource => Resource},
+      instance_count = 0
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Direct Resource Creation pattern (WRP-01).
+%%
+%% @param CreateFun Function that creates the resource (arity 0).
+%% @return {ok, Resource} | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_direct_resource_creation(function()) -> {ok, term()} | {error, term()}.
+
+execute_direct_resource_creation(CreateFun) when is_function(CreateFun, 0) ->
+    try
+        Resource = CreateFun(),
+        {ok, Resource}
+    catch
+        Error:Reason:_Stack ->
+            {error, {creation_error, Error, Reason}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Role-Based Allocation pattern (WRP-02).
+%%
+%% @param RequiredRole The role required for the task.
+%% @param RoleMap Map of roles to available resources.
+%% @return {ok, AllocatedResource} | {error, no_resource}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_role_based_allocation(atom(), map()) -> {ok, term()} | {error, term()}.
+
+execute_role_based_allocation(RequiredRole, RoleMap) when is_atom(RequiredRole), is_map(RoleMap) ->
+    case maps:get(RequiredRole, RoleMap, undefined) of
+        undefined ->
+            {error, {no_resource, RequiredRole}};
+        [] ->
+            {error, {no_resource, RequiredRole}};
+        [Resource | _] ->
+            {ok, Resource}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Resource Initialization pattern (WRP-03).
+%%
+%% @param InitFun Function to initialize the resource (arity 1).
+%% @param Resource The resource to initialize.
+%% @return {ok, InitializedResource} | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_resource_initialization(function(), term()) -> {ok, term()} | {error, term()}.
+
+execute_resource_initialization(InitFun, Resource) when is_function(InitFun, 1) ->
+    try
+        InitResource = InitFun(Resource),
+        {ok, InitResource}
+    catch
+        Error:Reason:_Stack ->
+            {error, {init_error, Error, Reason}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Resource Allocation pattern (WRP-04).
+%%
+%% @param Resources List of available resources.
+%% @param TaskId Identifier for the task requiring allocation.
+%% @return {ok, AllocatedResource, Remaining} | {error, no_resource}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_resource_allocation([term()], term()) ->
+          {ok, term(), [term()]} | {error, term()}.
+
+execute_resource_allocation([], _TaskId) ->
+    {error, no_resources_available};
+execute_resource_allocation([Resource | Remaining], TaskId) ->
+    {ok, Resource, Remaining, TaskId}.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Resource Deallocation pattern (WRP-05).
+%%
+%% @param CleanupFun Function to cleanup the resource (arity 1).
+%% @param Resource The resource to deallocate.
+%% @return {ok, CleanedResource} | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_resource_deallocation(function(), term()) -> {ok, term()} | {error, term()}.
+
+execute_resource_deallocation(CleanupFun, Resource) when is_function(CleanupFun, 1) ->
+    try
+        CleanedResource = CleanupFun(Resource),
+        {ok, CleanedResource}
+    catch
+        Error:Reason:_Stack ->
+            {error, {cleanup_error, Error, Reason}}
+    end.
 
 %%====================================================================
 %% Execution Helper Functions

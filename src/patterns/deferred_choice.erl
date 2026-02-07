@@ -645,8 +645,6 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-%% @doc Runs all doctests for the module.
-%% @private
 doctest_test() ->
     {module, ?MODULE} = code:ensure_loaded(?MODULE),
     ok.

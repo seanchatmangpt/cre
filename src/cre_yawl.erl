@@ -199,9 +199,6 @@ Transform = cre_yawl:data_transform(<<"input_task">>, <<"output_task">>,
 -record(synchronizing_merge, {merge_task_id :: element_id(), incoming_task_ids :: [element_id()]}).
 -record(multi_merge, {merge_task_id :: element_id(), incoming_task_ids :: [element_id()]}).
 -record(discriminator, {merge_task_id :: element_id(), incoming_task_ids :: [element_id()]}).
--record(parallel_merge, {merge_task_id :: element_id(), incoming_task_ids :: [element_id()], required_count :: pos_integer() | all}).
--record(blocking_discriminator, {merge_task_id :: element_id(), incoming_task_ids :: [element_id()], blocking_mode :: block_subsequent | reset_on_first}).
--record(arb_cycles, {loop_task_id :: element_id(), back_edge_targets :: [element_id()], condition_fun :: function(), max_iterations :: pos_integer() | unlimited}).
 -record(arbitration, {merge_task_id :: element_id(), incoming_task_ids :: [element_id()], required_count :: pos_integer()}).
 
 %% Data Flow Pattern Records (WDP-1 to WDP-5)
