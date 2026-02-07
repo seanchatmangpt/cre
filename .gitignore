@@ -49,3 +49,8 @@ thesis/appendix/*.aux
 
 # Mnesia database files
 Mnesia.*/
+
+# Temp files
+*.bak
+*_temp.erl
+*temp.erl

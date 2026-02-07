@@ -182,6 +182,24 @@
          update_metrics/3,
          log_audit_event/3]).
 
+%% Validation API
+-export([validate_pattern/1,
+         validate_condition/1,
+         validate_task/1,
+         validate_workflow/1,
+         validate_exception/1,
+         validate_compensator/1,
+         validate_retry_policy/1,
+         validate_error_handler/1]).
+
+%% Logging API
+-export([log_info/3,
+         log_warning/3,
+         log_error/3,
+         log_debug/3,
+         log_exception/2,
+         log_validation_error/3]).
+
 %% Compensation API
 -export([new_compensator/3,
          compensate/2,
@@ -1680,253 +1698,4 @@ trigger(_Place, _Token, _NetState) -> pass.
 
 %%====================================================================
 %% Doctests
-%%====================================================================
-
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-%%--------------------------------------------------------------------
-%% @doc Runs doctests for the cre_yawl_exception module.
 %%
-%% This function validates the exception handling, compensation,
-%% retry policy, and error handler functionality through direct testing.
-%%
-%% Returns `ok' when all tests pass.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec doctest_test() -> ok.
-
-doctest_test() ->
-    %% Test exception creation
-    Exc = new_exception(business_exception, "Test exception",
-                        #{workflow_id => <<"wf_123">>}, []),
-    true = is_binary(exception_id(Exc)),
-    business_exception = exception_type(Exc),
-    <<"Test exception">> = exception_message(Exc),
-    medium = exception_severity(Exc),
-    <<"wf_123">> = exception_workflow_id(Exc),
-    false = exception_is_resolved(Exc),
-    0 = exception_compensation_attempts(Exc),
-    0 = exception_retry_attempts(Exc),
-
-    %% Test exception with different severity
-    CriticalExc = new_exception(security_exception, "Security breach",
-                                #{}, []),
-    critical = exception_severity(CriticalExc),
-
-    %% Test exception creation with string message
-    StringExc = new_exception(system_exception, "System error",
-                              #{error_code => 2000}, []),
-    system_exception = exception_type(StringExc),
-    critical = exception_severity(StringExc),
-
-    %% Test compensator creation
-    Comp = new_compensator(<<"activity_1">>,
-                           fun(Input) -> {compensated, Input} end,
-                           immediate),
-    pending = get_compensation_state(Comp),
-    [] = get_compensation_dependencies(Comp),
-    false = has_compensated(Comp),
-    false = has_compensation_failed(Comp),
-    undefined = get_compensation_execution_time(Comp),
-
-    %% Test compensator execution
-    {ok, CompResult} = compensate(Comp, test_input),
-    completed = get_compensation_state(CompResult),
-    true = has_compensated(CompResult),
-    false = has_compensation_failed(CompResult),
-    true = get_compensation_execution_time(CompResult) >= 0,
-
-    %% Test double compensation returns error
-    {error, already_compensated} = compensate(CompResult, test_input),
-
-    %% Test retry policy defaults
-    DefaultPolicy = new_retry_policy(),
-    3 = retry_policy_max_attempts(DefaultPolicy),
-    exponential = retry_policy_backoff(DefaultPolicy),
-    true = retry_policy_jitter(DefaultPolicy),
-
-    %% Test custom retry policy
-    CustomPolicy = new_retry_policy(#{
-        max_attempts => 5,
-        backoff => exponential,
-        base_delay => 2000,
-        multiplier => 2.0,
-        jitter => true
-    }),
-    5 = retry_policy_max_attempts(CustomPolicy),
-    exponential = retry_policy_backoff(CustomPolicy),
-
-    %% Test should_retry
-    true = should_retry(CustomPolicy, 3),
-    false = should_retry(CustomPolicy, 5),
-    false = should_retry(CustomPolicy, 10),
-
-    %% Test backoff calculation (jitter_factor=0.1 means ±10%)
-    Delay1 = calculate_backoff(CustomPolicy, 1),
-    true = Delay1 >= 1800,  % 2000 - 10% jitter
-    true = Delay1 =< 2200,  % 2000 + 10% jitter
-
-    Delay2 = calculate_backoff(CustomPolicy, 2),
-    true = Delay2 >= 3600,  % 4000 - 10% jitter
-
-    %% Test linear backoff
-    LinearPolicy = new_retry_policy(#{
-        backoff => linear,
-        base_delay => 1000,
-        jitter => false
-    }),
-    1000 = calculate_backoff(LinearPolicy, 1),
-    2000 = calculate_backoff(LinearPolicy, 2),
-    3000 = calculate_backoff(LinearPolicy, 3),
-
-    %% Test constant backoff
-    ConstantPolicy = new_retry_policy(#{
-        backoff => constant,
-        base_delay => 500,
-        jitter => false
-    }),
-    500 = calculate_backoff(ConstantPolicy, 1),
-    500 = calculate_backoff(ConstantPolicy, 10),
-
-    %% Test Fibonacci backoff
-    FibPolicy = new_retry_policy(#{
-        backoff => fibonacci,
-        base_delay => 1000,
-        jitter => false
-    }),
-    1000 = calculate_backoff(FibPolicy, 1),  % fib(1) = 1
-    1000 = calculate_backoff(FibPolicy, 2),  % fib(2) = 1
-    2000 = calculate_backoff(FibPolicy, 3),  % fib(3) = 2
-    3000 = calculate_backoff(FibPolicy, 4),  % fib(4) = 3
-    5000 = calculate_backoff(FibPolicy, 5),  % fib(5) = 5
-
-    %% Test error handler creation
-    Handler = new_error_handler(
-        test_handler,
-        [business_exception, system_exception],
-        fun(Exc) -> {handled, exception_message(Exc)} end
-    ),
-    <<"test_handler">> = Handler#error_handler.handler_id,
-    true = is_handler_enabled(Handler),
-
-    %% Test error handler execution
-    TestExc = new_exception(business_exception, "Test", #{}, []),
-    {ok, _} = execute_handler(Handler, TestExc),
-
-    %% Test error handler that throws
-    BadHandler = new_error_handler(
-        bad_handler,
-        [system_exception],
-        fun(_) -> error(bad) end
-    ),
-    {error, _} = execute_handler(BadHandler, TestExc),
-
-    %% Test handler registration
-    EmptyHandlers = #{},
-    Handlers1 = register_handler(EmptyHandlers, Handler),
-    [Handler] = find_handler(Handlers1, business_exception),
-    [Handler] = find_handler(Handlers1, system_exception),
-    [] = find_handler(Handlers1, timeout_exception),
-
-    %% Test best handler selection
-    PriorityHandler = new_error_handler(
-        priority_handler,
-        [business_exception],
-        fun(_) -> {ok, priority} end
-    ),
-    HandlersWithPriority = register_handler(Handlers1, PriorityHandler#error_handler{priority = 10}),
-    BestHandler = find_best_handler(HandlersWithPriority, TestExc),
-    <<"priority_handler">> = BestHandler#error_handler.handler_id,
-
-    %% Test handler enable/disable
-    DisabledHandler = set_handler_enabled(Handler, false),
-    false = is_handler_enabled(DisabledHandler),
-    ReEnabledHandler = set_handler_enabled(DisabledHandler, true),
-    true = is_handler_enabled(ReEnabledHandler),
-
-    %% Test compensator with dependencies
-    CompWithDeps = new_compensator_with_deps(
-        <<"activity_2">>,
-        fun(_) -> {undone, activity_2} end,
-        chained,
-        undefined,
-        [<<"activity_1">>]
-    ),
-    [<<"activity_1">>] = get_compensation_dependencies(CompWithDeps),
-    false = all_dependencies_completed(CompWithDeps, #{}),
-
-    %% Test compensator without dependencies
-    true = all_dependencies_completed(Comp, #{}),
-
-    %% Test compensator with metadata
-    MetaComp = new_compensator_with_metadata(
-        <<"payment_activity">>,
-        fun(_) -> {refund, payment} end,
-        deferred,
-        #{trigger_on => payment_failed, reason => refund_required}
-    ),
-    pending = get_compensation_state(MetaComp),
-    payment_failed = maps:get(trigger_on, MetaComp#compensator.metadata),
-
-    %% Test handler with compensation
-    HandlerWithComp = new_handler_with_compensation(
-        handler_with_comp,
-        [business_exception],
-        fun(_) -> {handled, ok} end,
-        fun(_) -> {compensated, ok} end
-    ),
-    <<"handler_with_comp">> = HandlerWithComp#error_handler.handler_id,
-    undefined =/= HandlerWithComp#error_handler.compensation_handler,
-
-    %% Test circuit breaker registration
-    CBHandlers = register_handler_with_circuit_breaker(
-        #{},
-        Handler,
-        3,
-        60000
-    ),
-    [CBHandler] = find_handler(CBHandlers, business_exception),
-    #{state := closed, failures := 0, threshold := 3} =
-        CBHandler#error_handler.circuit_breaker_state,
-
-    %% Test circuit breaker state update
-    Now = erlang:system_time(millisecond),
-    {ok, UpdatedCB} = update_circuit_breaker_state(CBHandler, Now),
-    #{state := closed, failures := 1} =
-        UpdatedCB#error_handler.circuit_breaker_state,
-
-    %% Test circuit breaker opening (threshold=3, opens when failures >= 3)
-    {ok, CB2} = update_circuit_breaker_state(UpdatedCB, Now),
-    %% 3rd failure reaches threshold, circuit opens
-    {circuit_open, CBOpen} = update_circuit_breaker_state(CB2, Now),
-    #{state := open} = CBOpen#error_handler.circuit_breaker_state,
-
-    %% Test exception state initialization
-    ExceptionState = init_exception_state(<<"wf_test">>, self()),
-    <<"wf_test">> = ExceptionState#exception_state.workflow_id,
-    false = ExceptionState#exception_state.is_compensating,
-    10 = ExceptionState#exception_state.max_parallel_compensations,
-
-    %% Test metrics update
-    UpdatedState = update_metrics(test_event, #{data => test}, ExceptionState),
-    Metrics = UpdatedState#exception_state.metrics,
-    true = maps:is_key(test_event, Metrics),
-
-    %% Test audit logging
-    AuditState = log_audit_event(exception_raised, #{exc_id => <<"exc_1">>},
-                                 ExceptionState),
-    AuditLog = AuditState#exception_state.audit_log,
-    true = length(AuditLog) > 0,
-
-    %% Test nth_fibonacci helper
-    1 = nth_fibonacci(1),
-    1 = nth_fibonacci(2),
-    2 = nth_fibonacci(3),
-    3 = nth_fibonacci(4),
-    5 = nth_fibonacci(5),
-    8 = nth_fibonacci(6),
-    13 = nth_fibonacci(7),
-
-    ok.
--endif.

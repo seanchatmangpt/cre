@@ -464,6 +464,34 @@
          triggered_compensation/3,
          consecutive_compensate/1]).
 
+%% Pattern API functions - Data Flow (WDP-01 through WDP-05)
+-export([param_pass/2,
+         data_transform/2,
+         data_distribute/3,
+         data_accumulate/3,
+         data_visibility/3]).
+
+%% Pattern Execution API functions - Data Flow (WDP-01 through WDP-05)
+-export([execute_param_pass/2,
+         execute_data_transform/2,
+         execute_data_distribute/3,
+         execute_data_accumulate/3,
+         execute_data_visibility/3]).
+
+%% Pattern API functions - Resource (WRP-01 through WRP-05)
+-export([direct_resource_creation/2,
+         role_based_allocation/3,
+         resource_initialization/3,
+         role_based_distribution/4,
+         capability_based_allocation/3]).
+
+%% Pattern Execution API functions - Resource (WRP-01 through WRP-05)
+-export([execute_wrp_01_direct_creation/2,
+         execute_wrp_02_role_allocation/3,
+         execute_wrp_03_resource_init/3,
+         execute_wrp_04_role_distribution/4,
+         execute_wrp_05_capability_allocation/3]).
+
 %%====================================================================
 %% Record definitions
 %%====================================================================
@@ -520,6 +548,94 @@
           exception_type :: atom(),
           exception_reason :: term(),
           handled :: boolean()
+         }).
+
+%% Data Flow Pattern Records (WDP-01 through WDP-05)
+
+-record(param_pass_state, {
+          source_task :: atom() | function(),
+          target_task :: atom() | function(),
+          param_type :: term(),
+          param_schema :: map() | undefined,
+          validation_rules = [] :: list()
+         }).
+
+-record(data_transform_state, {
+          transform_fn :: function() | {module(), atom()},
+          input_type :: term(),
+          output_type :: term(),
+          schema_in :: map() | undefined,
+          schema_out :: map() | undefined,
+          validation_mode = strict :: atom()
+         }).
+
+-record(data_distribute_state, {
+          distribution_strategy :: broadcast | round_robin | partitioned,
+          source_data :: term(),
+          target_tasks :: list(),
+          partition_fn :: function() | undefined,
+          batch_size :: pos_integer() | unlimited
+         }).
+
+-record(data_accumulate_state, {
+          accumulation_fn :: sum | avg | count | max | min | custom,
+          custom_accumulator :: function() | undefined,
+          initial_value :: term(),
+          collected_values = [] :: list(),
+          intermediate_results = [] :: list()
+         }).
+
+-record(data_visibility_state, {
+          scope :: local | branch | global,
+          variable_name :: atom(),
+          variable_value :: term(),
+          accessible_contexts = [] :: list(),
+          visibility_rules = #{} :: map()
+         }).
+
+%% Resource Pattern Records (WRP-01 through WRP-05)
+-record(resource, {
+          resource_id :: reference() | atom(),
+          name :: atom(),
+          status :: available | busy | unavailable,
+          capabilities = [] :: list(),
+          roles = [] :: list(),
+          workload = 0 :: non_neg_integer(),
+          parameters = #{} :: map(),
+          created_at :: non_neg_integer(),
+          metadata = #{} :: map()
+         }).
+
+-record(resource_registry, {
+          resources = #{} :: map(),
+          role_index = #{} :: map(),
+          capability_index = #{} :: map(),
+          allocation_history = [] :: list(),
+          total_allocations = 0 :: non_neg_integer()
+         }).
+
+-record(resource_allocation, {
+          allocation_id :: reference(),
+          resource_id :: reference(),
+          work_item_id :: reference(),
+          allocated_at :: non_neg_integer(),
+          allocated_by :: atom(),
+          strategy :: atom(),
+          criteria = #{} :: map(),
+          status :: pending | active | completed,
+          result :: term(),
+          completed_at :: non_neg_integer() | undefined
+         }).
+
+-record(work_item, {
+          work_item_id :: reference(),
+          activity_id :: atom(),
+          required_capabilities = [] :: list(),
+          required_roles = [] :: list(),
+          parameters = #{} :: map(),
+          affinity :: atom() | undefined,
+          created_at :: non_neg_integer(),
+          data :: term()
          }).
 
 %%====================================================================
