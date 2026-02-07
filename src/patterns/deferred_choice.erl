@@ -147,7 +147,6 @@ Getting the preset for a transition:
 %% @end
 %%--------------------------------------------------------------------
 -spec new(Options :: map(), OptionCount :: pos_integer()) -> deferred_choice_state().
-
 new(Options, OptionCount) when is_map(Options),
                                 map_size(Options) =:= OptionCount,
                                 OptionCount >= 2 ->
@@ -167,7 +166,6 @@ new(Options, OptionCount) when is_map(Options),
 %% @end
 %%--------------------------------------------------------------------
 -spec start(Options :: map()) -> {ok, pid()} | {error, term()}.
-
 start(Options) when is_map(Options), map_size(Options) >= 2 ->
     OptionCount = map_size(Options),
     ChoiceState = new(Options, OptionCount),
@@ -182,7 +180,6 @@ start(Options) when is_map(Options), map_size(Options) >= 2 ->
 %% @end
 %%--------------------------------------------------------------------
 -spec run(Options :: map()) -> {ok, {atom(), term()}} | {error, term()}.
-
 run(Options) when is_map(Options), map_size(Options) >= 2 ->
     case start(Options) of
         {ok, Pid} ->
@@ -207,7 +204,6 @@ run(Options) when is_map(Options), map_size(Options) >= 2 ->
 %% @end
 %%--------------------------------------------------------------------
 -spec get_state(Pid :: pid()) -> {ok, deferred_choice_state()} | {error, term()}.
-
 get_state(Pid) ->
     gen_yawl:call(Pid, get_state).
 
@@ -222,7 +218,6 @@ get_state(Pid) ->
 %%--------------------------------------------------------------------
 -spec execute(Options :: map(), EvalData :: term()) ->
           {ok, {atom(), term()}} | {error, term()}.
-
 execute(Options, EvalData) when is_map(Options), map_size(Options) >= 2 ->
     Ref = make_ref(),
     Parent = self(),
@@ -267,7 +262,6 @@ execute(Options, EvalData) when is_map(Options), map_size(Options) >= 2 ->
 %% @end
 %%--------------------------------------------------------------------
 -spec select_option(Pid :: pid(), OptionId :: atom()) -> ok | {error, term()}.
-
 select_option(Pid, OptionId) ->
     gen_yawl:cast(Pid, {select_option, OptionId}).
 
@@ -280,7 +274,6 @@ select_option(Pid, OptionId) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec place_lst() -> [atom()].
-
 place_lst() ->
     [
         'p_start',
@@ -296,7 +289,6 @@ place_lst() ->
 %% @end
 %%--------------------------------------------------------------------
 -spec trsn_lst() -> [atom()].
-
 trsn_lst() ->
     [
         't_offer',
@@ -312,7 +304,6 @@ trsn_lst() ->
 %%--------------------------------------------------------------------
 -spec init_marking(Place :: atom(), UsrInfo :: deferred_choice_state()) ->
           [term()].
-
 init_marking('p_start', _UsrInfo) ->
     [start];
 init_marking(_, _UsrInfo) ->
@@ -323,7 +314,6 @@ init_marking(_, _UsrInfo) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec preset(Trsn :: atom()) -> [atom()].
-
 preset('t_offer') -> ['p_start'];
 preset('t_evaluate_option') -> ['p_option_pool'];
 preset('t_select') -> ['p_offer_pending'];
@@ -337,7 +327,6 @@ preset(_) -> [].
 %%--------------------------------------------------------------------
 -spec is_enabled(Trsn :: atom(), Mode :: map(), UsrInfo :: deferred_choice_state()) ->
           boolean().
-
 is_enabled('t_offer', _Mode, _UsrInfo) ->
     true;
 is_enabled('t_evaluate_option', #{'p_option_pool' := Tokens}, _UsrInfo) ->
@@ -357,7 +346,6 @@ is_enabled(_Trsn, _Mode, _UsrInfo) ->
 %%--------------------------------------------------------------------
 -spec fire(Trsn :: atom(), Mode :: map(), UsrInfo :: deferred_choice_state()) ->
           {produce, map()} | {produce, map(), deferred_choice_state()} | abort.
-
 fire('t_offer', #{'p_start' := [start]}, #deferred_choice_state{options = Options} = State) ->
     %% Create option tokens
     OptionTokens = [{option, Key, maps:get(Key, Options)} || Key <- maps:keys(Options)],
@@ -434,7 +422,6 @@ fire(_Trsn, _Mode, _UsrInfo) ->
 %%--------------------------------------------------------------------
 -spec trigger(Place :: atom(), Token :: term(), UsrInfo :: deferred_choice_state()) ->
           pass | {consume, [term()]}.
-
 trigger(_Place, _Token, _UsrInfo) ->
     pass.
 
@@ -444,7 +431,6 @@ trigger(_Place, _Token, _UsrInfo) ->
 %%--------------------------------------------------------------------
 -spec init(UsrInfo :: deferred_choice_state()) ->
           {ok, deferred_choice_state()}.
-
 init(DeferredChoiceState) ->
     case yawl_xes:new_log(#{<<"process">> => <<"DeferredChoice">>}) of
         {ok, LogId} ->
@@ -461,7 +447,6 @@ init(DeferredChoiceState) ->
 %%--------------------------------------------------------------------
 -spec handle_call(Request :: term(), From :: {pid(), term()}, NetState :: term()) ->
           {reply, term(), term()}.
-
 handle_call(get_state, _From, NetState) ->
     UsrInfo = gen_yawl:get_usr_info(NetState),
     {reply, {ok, UsrInfo}, NetState};
@@ -474,7 +459,6 @@ handle_call(_Request, _From, NetState) ->
 %%--------------------------------------------------------------------
 -spec handle_cast(Request :: term(), NetState :: term()) ->
           {noreply, term()}.
-
 handle_cast({select_option, OptionId}, NetState) ->
     UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
@@ -494,7 +478,6 @@ handle_cast(_Request, NetState) ->
 %%--------------------------------------------------------------------
 -spec handle_info(Request :: term(), NetState :: term()) ->
           {noreply, term()}.
-
 handle_info(_Request, NetState) ->
     {noreply, NetState}.
 
@@ -504,7 +487,6 @@ handle_info(_Request, NetState) ->
 %%--------------------------------------------------------------------
 -spec code_change(OldVsn :: term(), NetState :: term(), Extra :: term()) ->
           {ok, term()}.
-
 code_change(_OldVsn, NetState, _Extra) ->
     {ok, NetState}.
 
@@ -514,7 +496,6 @@ code_change(_OldVsn, NetState, _Extra) ->
 %%--------------------------------------------------------------------
 -spec terminate(Reason :: term(), NetState :: term()) ->
           ok.
-
 terminate(_Reason, NetState) ->
     UsrInfo = gen_yawl:get_usr_info(NetState),
     case UsrInfo of
@@ -537,7 +518,6 @@ terminate(_Reason, NetState) ->
 %%--------------------------------------------------------------------
 -spec wait_for_completion(Pid :: pid(), Timeout :: timeout()) ->
           {ok, {atom(), term()}} | {error, term()}.
-
 wait_for_completion(Pid, Timeout) ->
     Ref = make_ref(),
     Pid ! {trigger, 'p_complete', Ref},

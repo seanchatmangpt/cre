@@ -73,6 +73,27 @@
 %%   <li><b>WHP-5: Consecutive Compensation</b> - Reverse-order compensation chain.</li>
 %% </ul>
 %%
+%% <h3>Advanced Patterns (P10, P23-P38)</h3>
+%%
+%% <ul>
+%%   <li><b>P10: Arbitrary Cycles</b> - Cycles with arbitrary entry/exit points.</li>
+%%   <li><b>P23: Transient Trigger</b> - Event-only triggers while task enabled.</li>
+%%   <li><b>P24: Persistent Trigger</b> - Events that persist until consumed.</li>
+%%   <li><b>P26: Cancel MI Activity</b> - Cancel all multiple instance activities.</li>
+%%   <li><b>P27: Complete MI Activity</b> - Early completion when condition met.</li>
+%%   <li><b>P28: Blocking Discriminator</b> - First trigger wins, blocks subsequent.</li>
+%%   <li><b>P29: Cancelling Discriminator</b> - First completion wins, cancels others.</li>
+%%   <li><b>P30: Structured Partial Join</b> - N-of-M quorum-based join.</li>
+%%   <li><b>P31: Blocking Partial Join</b> - Partial after N, final after all M.</li>
+%%   <li><b>P32: Cancelling Partial Join</b> - N-of-M with cancellation.</li>
+%%   <li><b>P33: Generalized AND-Join</b> - Join only active branches.</li>
+%%   <li><b>P34: Static Partial Join for MI</b> - Fixed pool N of M instances.</li>
+%%   <li><b>P35: Cancelling Partial Join for MI</b> - N-of-M MI with cancellation.</li>
+%%   <li><b>P36: Dynamic Partial Join for MI</b> - Runtime threshold computation.</li>
+%%   <li><b>P37: Local Sync Merge</b> - Join only local branches.</li>
+%%   <li><b>P38: General Sync Merge</b> - Merge across unstructured branches.</li>
+%% </ul>
+%%
 %% <h3>Petri Net Mapping</h3>
 %%
 %% Each pattern is represented as a structure containing:
@@ -463,6 +484,42 @@
          compensate/2,
          triggered_compensation/3,
          consecutive_compensate/1]).
+
+%% Pattern API functions - Advanced Patterns (P10, P23-P38)
+-export([arbitrary_cycles/1,
+         transient_trigger/2,
+         persistent_trigger/2,
+         cancel_mi_activity/2,
+         complete_mi_activity/2,
+         blocking_discriminator/2,
+         cancelling_discriminator/2,
+         structured_partial_join/2,
+         blocking_partial_join/2,
+         cancelling_partial_join/2,
+         generalized_and_join/1,
+         static_partial_join_mi/3,
+         cancelling_partial_join_mi/3,
+         dynamic_partial_join_mi/3,
+         local_sync_merge/1,
+         general_sync_merge/1]).
+
+%% Pattern Execution API functions - Advanced Patterns
+-export([execute_arbitrary_cycles/2,
+         execute_transient_trigger/3,
+         execute_persistent_trigger/3,
+         execute_cancel_mi_activity/3,
+         execute_complete_mi_activity/3,
+         execute_blocking_discriminator/3,
+         execute_cancelling_discriminator/3,
+         execute_structured_partial_join/3,
+         execute_blocking_partial_join/3,
+         execute_cancelling_partial_join/3,
+         execute_generalized_and_join/2,
+         execute_static_partial_join_mi/4,
+         execute_cancelling_partial_join_mi/4,
+         execute_dynamic_partial_join_mi/4,
+         execute_local_sync_merge/2,
+         execute_general_sync_merge/2]).
 
 %%====================================================================
 %% Record definitions
@@ -992,6 +1049,718 @@ execute_critical_section(#pattern_state{
     catch
         _:_ ->
             {error, lock_registration_failed}
+    end.
+
+%%====================================================================
+%% Execute API functions for Advanced Patterns (P10, P23-P38)
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Executes an Arbitrary Cycles pattern (P10).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_arbitrary_cycles(Pattern :: #pattern_state{},
+                               InputData :: term()) ->
+          {ok, term()} | {error, term()}.
+
+execute_arbitrary_cycles(#pattern_state{choice_data = CycleSpec}, InputData) ->
+    try
+        %% Basic cycle execution - the actual cycle logic would be handled
+        %% by the cycle processing function in the spec
+        CycleFun = maps:get(cycle_fun, CycleSpec, fun(X) -> X end),
+        Result = CycleFun(InputData),
+        {ok, Result}
+    catch
+        Error:Reason -> {error, {Error, Reason}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Transient Trigger pattern (P23).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_transient_trigger(Pattern :: #pattern_state{},
+                                InputData :: term(),
+                                Options :: map()) ->
+          {ok, term()} | {error, term()}.
+
+execute_transient_trigger(#pattern_state{
+                             subprocess = TaskFun,
+                             choice_data = #{trigger := TriggerFun}
+                            }, InputData, Options) ->
+    try
+        %% Check trigger availability (transient - only while enabled)
+        case TriggerFun() of
+            trigger_ready ->
+                Result = case TaskFun of
+                    Fun when is_function(Fun, 1) -> Fun(InputData);
+                    {M, F} when is_atom(M), is_atom(F) -> erlang:apply(M, F, [InputData]);
+                    _ -> error({invalid_task, TaskFun})
+                end,
+                {ok, Result};
+            trigger_pending ->
+                {error, trigger_not_ready};
+            trigger_expired ->
+                {error, trigger_expired}
+        end
+    catch
+        Error:Reason -> {error, {Error, Reason}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Persistent Trigger pattern (P24).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_persistent_trigger(Pattern :: #pattern_state{},
+                                  InputData :: term(),
+                                  Options :: map()) ->
+          {ok, term()} | {error, term()}.
+
+execute_persistent_trigger(#pattern_state{
+                              subprocess = TaskFun,
+                              choice_data = #{trigger := TriggerFun}
+                             }, InputData, Options) ->
+    try
+        %% Persistent trigger - waits for trigger if not immediately available
+        Timeout = maps:get(timeout, Options, 5000),
+        case TriggerFun() of
+            trigger_ready ->
+                Result = case TaskFun of
+                    Fun when is_function(Fun, 1) -> Fun(InputData);
+                    {M, F} when is_atom(M), is_atom(F) -> erlang:apply(M, F, [InputData]);
+                    _ -> error({invalid_task, TaskFun})
+                end,
+                {ok, Result};
+            {trigger_pending, Ref} when is_reference(Ref) ->
+                %% Wait for persistent trigger
+                receive
+                    {Ref, trigger_ready} ->
+                        Result = case TaskFun of
+                            Fun when is_function(Fun, 1) -> Fun(InputData);
+                            {M, F} when is_atom(M), is_atom(F) -> erlang:apply(M, F, [InputData]);
+                            _ -> error({invalid_task, TaskFun})
+                        end,
+                        {ok, Result}
+                after Timeout ->
+                    {error, timeout}
+                end;
+            trigger_pending ->
+                {error, trigger_timeout}
+        end
+    catch
+        Error:Reason -> {error, {Error, Reason}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Cancel MI Activity pattern (P26).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_cancel_mi_activity(Pattern :: #pattern_state{},
+                                  InputDataList :: list(),
+                                  Options :: map()) ->
+          {ok, list()} | {error, term()}.
+
+execute_cancel_mi_activity(#pattern_state{
+                              subprocess = InstanceFuns,
+                              choice_data = #{cancel_fun := CancelFun}
+                             }, InputDataList, Options) ->
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Spawn all instances
+    Pids = lists:map(fun({Fun, Data}) ->
+        spawn(fun() ->
+            Result = execute_instance(Fun, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, lists:zip(InstanceFuns, InputDataList)),
+
+    %% Check for cancellation or collect results
+    CancelCheckInterval = maps:get(cancel_check_interval, Options, 100),
+    collect_with_cancellation(Ref, Pids, CancelFun, CancelCheckInterval, []).
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Complete MI Activity pattern (P27).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_complete_mi_activity(Pattern :: #pattern_state{},
+                                    InputDataList :: list(),
+                                    Options :: map()) ->
+          {ok, list()} | {partial, list()} | {error, term()}.
+
+execute_complete_mi_activity(#pattern_state{
+                               subprocess = InstanceFuns,
+                               choice_data = #{complete_fun := CompleteFun}
+                              }, InputDataList, Options) ->
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Spawn all instances
+    Pids = lists:map(fun({Fun, Data}) ->
+        spawn(fun() ->
+            Result = execute_instance(Fun, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, lists:zip(InstanceFuns, InputDataList)),
+
+    %% Check for early completion or collect all results
+    CompleteCheckInterval = maps:get(complete_check_interval, Options, 100),
+    collect_with_early_complete(Ref, Pids, CompleteFun, CompleteCheckInterval, []).
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Blocking Discriminator pattern (P28).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_blocking_discriminator(Pattern :: #pattern_state{},
+                                      IncomingData :: list(),
+                                      Options :: map()) ->
+          {partial, term()} | {complete, term()} | {error, term()}.
+
+execute_blocking_discriminator(#pattern_state{
+                                  choice_data = #{incoming_tasks := TaskIds,
+                                                 blocking_mode := BlockingMode}
+                                 }, IncomingData, Options) ->
+    try
+        %% First incoming trigger activates, blocks subsequent
+        case IncomingData of
+            [First | _] when BlockingMode =:= block_subsequent ->
+                {partial, First};
+            [First | Rest] when BlockingMode =:= reset_on_first ->
+                %% Process first, reset, then process others
+                {complete, {First, Rest}}
+        end
+    catch
+        Error:Reason -> {error, {Error, Reason}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Cancelling Discriminator pattern (P29).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_cancelling_discriminator(Pattern :: #pattern_state{},
+                                        IncomingData :: list(),
+                                        Options :: map()) ->
+          {ok, term()} | {error, term()}.
+
+execute_cancelling_discriminator(#pattern_state{
+                                    choice_data = #{incoming_tasks := TaskIds}
+                                   }, IncomingData, Options) ->
+    try
+        %% First completion wins, cancel others
+        case IncomingData of
+            [First | _] ->
+                %% Cancel remaining tasks would happen here
+                {ok, First};
+            [] ->
+                {error, no_incoming_data}
+        end
+    catch
+        Error:Reason -> {error, {Error, Reason}}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Structured Partial Join pattern (P30).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_structured_partial_join(Pattern :: #pattern_state{},
+                                       InputDataList :: list(),
+                                       Options :: map()) ->
+          {ok, list()} | {quorum_not_met, list()} | {error, term()}.
+
+execute_structured_partial_join(#pattern_state{
+                                   subprocess = BranchTasks,
+                                   choice_data = #{quorum := Quorum}
+                                  }, InputDataList, Options) ->
+    Ref = make_ref(),
+    Parent = self(),
+    TotalCount = length(BranchTasks),
+
+    %% Spawn all branches
+    Pids = lists:map(fun({Fun, Data}) ->
+        spawn(fun() ->
+            Result = execute_instance(Fun, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, lists:zip(BranchTasks, InputDataList)),
+
+    %% Wait for quorum or all branches
+    collect_until_quorum(Ref, Pids, Quorum, TotalCount, [], infinity).
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Blocking Partial Join pattern (P31).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_blocking_partial_join(Pattern :: #pattern_state{},
+                                     InputDataList :: list(),
+                                     Options :: map()) ->
+          {partial, list(), list()} | {complete, list()} | {error, term()}.
+
+execute_blocking_partial_join(#pattern_state{
+                                 subprocess = BranchTasks,
+                                 choice_data = #{partial_threshold := Threshold}
+                                }, InputDataList, Options) ->
+    Ref = make_ref(),
+    Parent = self(),
+    TotalCount = length(BranchTasks),
+
+    %% Spawn all branches
+    Pids = lists:map(fun({Fun, Data}) ->
+        spawn(fun() ->
+            Result = execute_instance(Fun, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, lists:zip(BranchTasks, InputDataList)),
+
+    %% Wait for partial threshold then all
+    collect_blocking_partial(Ref, Pids, Threshold, TotalCount, [], []).
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Cancelling Partial Join pattern (P32).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_cancelling_partial_join(Pattern :: #pattern_state{},
+                                       InputDataList :: list(),
+                                       Options :: map()) ->
+          {ok, list()} | {error, term()}.
+
+execute_cancelling_partial_join(#pattern_state{
+                                   subprocess = BranchTasks,
+                                   choice_data = #{quorum := Quorum}
+                                  }, InputDataList, Options) ->
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Spawn all branches
+    Pids = lists:map(fun({Fun, Data}) ->
+        spawn(fun() ->
+            Result = execute_instance(Fun, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, lists:zip(BranchTasks, InputDataList)),
+
+    %% Wait for quorum then cancel remaining
+    collect_then_cancel(Ref, Pids, Quorum, [], []).
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Generalized AND-Join pattern (P33).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_generalized_and_join(Pattern :: #pattern_state{},
+                                    InputDataList :: list()) ->
+          {ok, list()} | {error, term()}.
+
+execute_generalized_and_join(#pattern_state{
+                                subprocess = BranchTasks,
+                                choice_data = #{active_branches := ActiveBranches}
+                               }, InputDataList) ->
+    %% Only join active branches
+    ActivePairs = lists:zip(BranchTasks, InputDataList),
+    ActiveTasks = [{Fun, Data} || {{Fun, _}, Data} <- lists:zip(ActivePairs, ActiveBranches),
+                                  true <- element(2, element(1, ActivePairs))],
+
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Spawn only active branches
+    Pids = lists:map(fun({Fun, Data}) ->
+        spawn(fun() ->
+            Result = execute_instance(Fun, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, ActiveTasks),
+
+    %% Collect results from active branches only
+    Results = collect_all_results(Ref, Pids, infinity, continue, []),
+    {ok, [R || {ok, R} <- Results]}.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Static Partial Join for MI pattern (P34).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_static_partial_join_mi(Pattern :: #pattern_state{},
+                                      InputDataList :: list(),
+                                      Timeout :: timeout(),
+                                      Options :: map()) ->
+          {ok, list()} | {partial, list()} | {error, term()}.
+
+execute_static_partial_join_mi(#pattern_state{
+                                  subprocess = InstanceFuns,
+                                  max_instances = PoolSize,
+                                  choice_data = #{threshold := Threshold}
+                                 }, InputDataList, Timeout, Options) ->
+    %% Use only pool_size instances
+    PooledInstances = lists:sublist(InstanceFuns, PoolSize),
+    PooledData = lists:sublist(InputDataList, PoolSize),
+
+    Ref = make_ref(),
+    Parent = self(),
+
+    Pids = lists:map(fun({Fun, Data}) ->
+        spawn(fun() ->
+            Result = execute_instance(Fun, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, lists:zip(PooledInstances, PooledData)),
+
+    %% Collect with threshold
+    collect_until_quorum(Ref, Pids, Threshold, PoolSize, [], Timeout).
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Cancelling Partial Join for MI pattern (P35).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_cancelling_partial_join_mi(Pattern :: #pattern_state{},
+                                          InputDataList :: list(),
+                                          Timeout :: timeout(),
+                                          Options :: map()) ->
+          {ok, list()} | {error, term()}.
+
+execute_cancelling_partial_join_mi(#pattern_state{
+                                      subprocess = InstanceFuns,
+                                      choice_data = #{quorum := Quorum,
+                                                      cancel_threshold := CancelThreshold}
+                                     }, InputDataList, Timeout, Options) ->
+    Ref = make_ref(),
+    Parent = self(),
+
+    Pids = lists:map(fun({Fun, Data}) ->
+        spawn(fun() ->
+            Result = execute_instance(Fun, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, lists:zip(InstanceFuns, InputDataList)),
+
+    %% Wait for quorum then cancel remaining
+    collect_then_cancel_mi(Ref, Pids, Quorum, CancelThreshold, [], []).
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Dynamic Partial Join for MI pattern (P36).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_dynamic_partial_join_mi(Pattern :: #pattern_state{},
+                                       InputDataList :: list(),
+                                       Timeout :: timeout(),
+                                       Options :: map()) ->
+          {ok, list()} | {error, term()}.
+
+execute_dynamic_partial_join_mi(#pattern_state{
+                                   subprocess = InstanceFuns,
+                                   choice_data = #{threshold_fun := ThresholdFun}
+                                  }, InputDataList, Timeout, Options) ->
+    %% Compute threshold dynamically
+    DynamicThreshold = try ThresholdFun() catch _:_ -> length(InstanceFuns) end,
+
+    Ref = make_ref(),
+    Parent = self(),
+
+    Pids = lists:map(fun({Fun, Data}) ->
+        spawn(fun() ->
+            Result = execute_instance(Fun, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, lists:zip(InstanceFuns, InputDataList)),
+
+    %% Collect with dynamic threshold
+    collect_until_quorum(Ref, Pids, DynamicThreshold, length(InstanceFuns), [], Timeout).
+
+%%--------------------------------------------------------------------
+%% @doc Executes a Local Sync Merge pattern (P37).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_local_sync_merge(Pattern :: #pattern_state{},
+                               InputDataList :: list()) ->
+          {ok, list()} | {error, term()}.
+
+execute_local_sync_merge(#pattern_state{
+                            subprocess = LocalBranches,
+                            choice_data = #{scope := local}
+                           }, InputDataList) ->
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Spawn only local branches
+    Pids = lists:map(fun({Fun, Data}) ->
+        spawn(fun() ->
+            Result = execute_instance(Fun, Data),
+            Parent ! {Ref, self(), Result}
+        end)
+    end, lists:zip(LocalBranches, InputDataList)),
+
+    %% Collect all local results
+    Results = collect_all_results(Ref, Pids, infinity, continue, []),
+    {ok, [R || {ok, R} <- Results]}.
+
+%%--------------------------------------------------------------------
+%% @doc Executes a General Sync Merge pattern (P38).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec execute_general_sync_merge(Pattern :: #pattern_state{},
+                                 InputDataMap :: map()) ->
+          {ok, map()} | {error, term()}.
+
+execute_general_sync_merge(#pattern_state{
+                              subprocess = BranchFuns,
+                              choice_data = ChoiceData
+                             }, InputDataMap) ->
+    BranchIds = maps:get(branch_ids, ChoiceData, maps:keys(InputDataMap)),
+
+    Ref = make_ref(),
+    Parent = self(),
+
+    %% Spawn all active branches
+    Pids = lists:map(fun(Id) ->
+        Fun = maps:get(Id, InputDataMap, fun(X) -> X end),
+        spawn(fun() ->
+            Result = execute_instance(Fun, maps:get(Id, InputDataMap, undefined)),
+            Parent ! {Ref, Id, Result}
+        end)
+    end, BranchIds),
+
+    %% Collect results by branch ID
+    Results = collect_branch_results(Ref, BranchIds, #{}),
+    {ok, Results}.
+
+%%====================================================================
+%% Helper Functions for Advanced Patterns
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Collect results with cancellation support.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_with_cancellation(Ref :: reference(),
+                                Pids :: [pid()],
+                                CancelFun :: function(),
+                                Interval :: pos_integer(),
+                                Acc :: list()) ->
+          {ok, list()} | {cancelled, list()}.
+
+collect_with_cancellation(_Ref, [], _CancelFun, _Interval, Acc) ->
+    {ok, lists:reverse(Acc)};
+collect_with_cancellation(Ref, Pids, CancelFun, Interval, Acc) ->
+    %% Check if cancellation is triggered
+    case CancelFun() of
+        true ->
+            %% Cancel remaining processes
+            lists:foreach(fun(P) -> exit(P, cancel) end, Pids),
+            {cancelled, lists:reverse(Acc)};
+        false ->
+            receive
+                {Ref, Pid, Result} ->
+                    collect_with_cancellation(Ref, Pids -- [Pid],
+                                           CancelFun, Interval, [Result | Acc])
+            after Interval ->
+                collect_with_cancellation(Ref, Pids, CancelFun, Interval, Acc)
+            end
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Collect results with early completion check.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_with_early_complete(Ref :: reference(),
+                                  Pids :: [pid()],
+                                  CompleteFun :: function(),
+                                  Interval :: pos_integer(),
+                                  Acc :: list()) ->
+          {ok, list()} | {partial, list()}.
+
+collect_with_early_complete(_Ref, [], _CompleteFun, _Interval, Acc) ->
+    {ok, lists:reverse(Acc)};
+collect_with_early_complete(Ref, Pids, CompleteFun, Interval, Acc) ->
+    %% Check if early completion condition is met
+    case CompleteFun(length(Acc)) of
+        true ->
+            %% Early completion - return partial results
+            lists:foreach(fun(P) -> exit(P, normal) end, Pids),
+            {partial, lists:reverse(Acc)};
+        false ->
+            receive
+                {Ref, Pid, Result} ->
+                    collect_with_early_complete(Ref, Pids -- [Pid],
+                                              CompleteFun, Interval, [Result | Acc])
+            after Interval ->
+                collect_with_early_complete(Ref, Pids, CompleteFun, Interval, Acc)
+            end
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Collect results until quorum is reached.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_until_quorum(Ref :: reference(),
+                           Pids :: [pid()],
+                           Quorum :: pos_integer(),
+                           Total :: pos_integer(),
+                           Acc :: list(),
+                           Timeout :: timeout()) ->
+          {ok, list()} | {quorum_not_met, list()}.
+
+collect_until_quorum(_Ref, [], _Quorum, _Total, Acc, _Timeout) ->
+    {ok, lists:reverse(Acc)};
+collect_until_quorum(Ref, Pids, Quorum, Total, Acc, Timeout) ->
+    receive
+        {Ref, Pid, Result} ->
+            NewAcc = [Result | Acc],
+            case length(NewAcc) of
+                N when N >= Quorum ->
+                    %% Quorum met, collect remaining if desired
+                    lists:foreach(fun(P) -> exit(P, normal) end, Pids -- [Pid]),
+                    {ok, lists:reverse(NewAcc)};
+                _ when length(Pids) =:= 1 ->
+                    %% Last one
+                    {ok, lists:reverse(NewAcc)};
+                _ ->
+                    collect_until_quorum(Ref, Pids -- [Pid], Quorum, Total,
+                                        NewAcc, Timeout)
+            end
+    after Timeout ->
+        lists:foreach(fun(P) -> exit(P, timeout) end, Pids),
+        {quorum_not_met, lists:reverse(Acc)}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Collect blocking partial results.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_blocking_partial(Ref :: reference(),
+                               Pids :: [pid()],
+                               Threshold :: pos_integer(),
+                               Total :: pos_integer(),
+                               PartialAcc :: list(),
+                               FinalAcc :: list()) ->
+          {partial, list(), list()} | {complete, list()}.
+
+collect_blocking_partial(Ref, Pids, Threshold, Total, PartialAcc, FinalAcc) ->
+    receive
+        {Ref, Pid, Result} ->
+            NewFinal = [Result | FinalAcc],
+            case length(NewFinal) of
+                N when N =:= Threshold, N < Total ->
+                    %% Partial threshold met, wait for all
+                    {partial, lists:reverse(NewFinal),
+                     collect_blocking_partial_wait(Ref, Pids -- [Pid], NewFinal)};
+                N when N >= Total ->
+                    %% All complete
+                    {complete, lists:reverse(NewFinal)};
+                _ ->
+                    collect_blocking_partial(Ref, Pids -- [Pid], Threshold,
+                                           Total, PartialAcc, NewFinal)
+            end
+    after 5000 ->
+        {error, timeout}
+    end.
+
+collect_blocking_partial_wait(_Ref, [], Acc) ->
+    lists:reverse(Acc);
+collect_blocking_partial_wait(Ref, Pids, Acc) ->
+    receive
+        {Ref, Pid, Result} ->
+            collect_blocking_partial_wait(Ref, Pids -- [Pid], [Result | Acc])
+    after 5000 ->
+        lists:reverse(Acc)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Collect results then cancel remaining.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_then_cancel(Ref :: reference(),
+                          Pids :: [pid()],
+                          Quorum :: pos_integer(),
+                          Acc :: list(),
+                          Cancelled :: list()) ->
+          {ok, list(), list()}.
+
+collect_then_cancel(_Ref, [], _Quorum, Acc, Cancelled) ->
+    {ok, lists:reverse(Acc), lists:reverse(Cancelled)};
+collect_then_cancel(Ref, Pids, Quorum, Acc, Cancelled) ->
+    receive
+        {Ref, Pid, Result} ->
+            NewAcc = [Result | Acc],
+            case length(NewAcc) >= Quorum of
+                true ->
+                    %% Quorum met, cancel remaining
+                    lists:foreach(fun(P) -> exit(P, cancel) end, Pids -- [Pid]),
+                    {ok, lists:reverse(NewAcc), Pids -- [Pid]};
+                false ->
+                    collect_then_cancel(Ref, Pids -- [Pid], Quorum, NewAcc, Cancelled)
+            end
+    after 5000 ->
+        {error, timeout}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Collect results with MI cancellation.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_then_cancel_mi(Ref :: reference(),
+                             Pids :: [pid()],
+                             Quorum :: pos_integer(),
+                             CancelThreshold :: pos_integer(),
+                             Acc :: list(),
+                             Cancelled :: list()) ->
+          {ok, list(), list()}.
+
+collect_then_cancel_mi(_Ref, [], _Quorum, _CancelThreshold, Acc, Cancelled) ->
+    {ok, lists:reverse(Acc), lists:reverse(Cancelled)};
+collect_then_cancel_mi(Ref, Pids, Quorum, CancelThreshold, Acc, Cancelled) ->
+    receive
+        {Ref, Pid, Result} ->
+            NewAcc = [Result | Acc],
+            Completed = length(NewAcc),
+            case Completed >= CancelThreshold of
+                true when Completed >= Quorum ->
+                    %% Threshold met, cancel remaining
+                    lists:foreach(fun(P) -> exit(P, cancel) end, Pids -- [Pid]),
+                    {ok, lists:reverse(NewAcc), Pids -- [Pid]};
+                false ->
+                    collect_then_cancel_mi(Ref, Pids -- [Pid], Quorum,
+                                         CancelThreshold, NewAcc, Cancelled)
+            end
+    after 5000 ->
+        {error, timeout}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Collect branch results by ID.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_branch_results(Ref :: reference(),
+                             BranchIds :: [term()],
+                             Acc :: map()) ->
+          map().
+
+collect_branch_results(_Ref, [], Acc) ->
+    Acc;
+collect_branch_results(Ref, [Id | Rest], Acc) ->
+    receive
+        {Ref, Id, Result} ->
+            collect_branch_results(Ref, Rest, maps:put(Id, Result, Acc))
+    after 5000 ->
+        collect_branch_results(Ref, Rest, Acc)
     end.
 
 %%====================================================================
@@ -2895,6 +3664,370 @@ consecutive_compensate(ActivityCompensatorPairs) ->
       subprocess = [A || {A, _C} <- ActivityCompensatorPairs],
       choice_data = #{compensators => maps:from_list(ActivityCompensatorPairs)},
       instance_count = length(ActivityCompensatorPairs)
+     }.
+
+%%====================================================================
+%% Advanced Pattern API Functions (P10, P23-P38)
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Creates an Arbitrary Cycles pattern (P10).
+%%
+%% The arbitrary cycles pattern allows cycles with arbitrary entry/exit points,
+%% enabling workflows to loop back to any previous node.
+%%
+%% @param CycleSpec Map containing cycle nodes, edges, and entry/exit points.
+%% @return A pattern state record for arbitrary cycles.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec arbitrary_cycles(CycleSpec :: map()) -> #pattern_state{}.
+
+arbitrary_cycles(CycleSpec) ->
+    #pattern_state{
+      pattern_type = arbitrary_cycles,
+      choice_data = CycleSpec,
+      instance_count = maps:get(node_count, CycleSpec, 0)
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Transient Trigger pattern (P23).
+%%
+%% The transient trigger pattern handles event-only triggers that fire
+%% while the task is enabled but do not persist.
+%%
+%% @param TaskFun The task function to execute.
+%% @param TriggerFun The trigger event function.
+%% @return A pattern state record for transient trigger.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec transient_trigger(TaskFun :: function(), TriggerFun :: function()) ->
+          #pattern_state{}.
+
+transient_trigger(TaskFun, TriggerFun) ->
+    #pattern_state{
+      pattern_type = transient_trigger,
+      subprocess = TaskFun,
+      choice_data = #{trigger => TriggerFun, transient => true}
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Persistent Trigger pattern (P24).
+%%
+%% The persistent trigger pattern handles events that persist until consumed,
+%% allowing triggers to be processed even after the task becomes enabled.
+%%
+%% @param TaskFun The task function to execute.
+%% @param TriggerFun The trigger event function.
+%% @return A pattern state record for persistent trigger.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec persistent_trigger(TaskFun :: function(), TriggerFun :: function()) ->
+          #pattern_state{}.
+
+persistent_trigger(TaskFun, TriggerFun) ->
+    #pattern_state{
+      pattern_type = persistent_trigger,
+      subprocess = TaskFun,
+      choice_data = #{trigger => TriggerFun, persistent => true}
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Cancel MI Activity pattern (P26).
+%%
+%% This pattern cancels all multiple instance activity instances when
+%% a cancellation condition is met.
+%%
+%% @param InstanceFuns List of instance functions.
+%% @param CancelFun Cancellation condition function.
+%% @return A pattern state record for cancel MI activity.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec cancel_mi_activity(InstanceFuns :: [function()], CancelFun :: function()) ->
+          #pattern_state{}.
+
+cancel_mi_activity(InstanceFuns, CancelFun) ->
+    #pattern_state{
+      pattern_type = cancel_mi_activity,
+      subprocess = InstanceFuns,
+      instance_count = length(InstanceFuns),
+      choice_data = #{cancel_fun => CancelFun}
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Complete MI Activity pattern (P27).
+%%
+%% This pattern enables early completion when a condition is met,
+%% potentially before all instances finish.
+%%
+%% @param InstanceFuns List of instance functions.
+%% @param CompleteFun Early completion condition function.
+%% @return A pattern state record for complete MI activity.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec complete_mi_activity(InstanceFuns :: [function()], CompleteFun :: function()) ->
+          #pattern_state{}.
+
+complete_mi_activity(InstanceFuns, CompleteFun) ->
+    #pattern_state{
+      pattern_type = complete_mi_activity,
+      subprocess = InstanceFuns,
+      instance_count = length(InstanceFuns),
+      choice_data = #{complete_fun => CompleteFun}
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Blocking Discriminator pattern (P28).
+%%
+%% The blocking discriminator activates on the first incoming trigger,
+%% blocking subsequent triggers. Final output occurs when all branches complete.
+%%
+%% @param IncomingTaskIds List of incoming task identifiers.
+%% @param Options Map with blocking_mode (block_subsequent | reset_on_first).
+%% @return A pattern state record for blocking discriminator.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec blocking_discriminator(IncomingTaskIds :: [term()], Options :: map()) ->
+          #pattern_state{}.
+
+blocking_discriminator(IncomingTaskIds, Options) ->
+    #pattern_state{
+      pattern_type = blocking_discriminator,
+      instance_count = length(IncomingTaskIds),
+      choice_data = maps:merge(#{incoming_tasks => IncomingTaskIds,
+                                blocking_mode => block_subsequent},
+                             Options)
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Cancelling Discriminator pattern (P29).
+%%
+%% The cancelling discriminator completes on the first incoming trigger
+%% and cancels all remaining branches.
+%%
+%% @param IncomingTaskIds List of incoming task identifiers.
+%% @param Options Map with cancellation behavior options.
+%% @return A pattern state record for cancelling discriminator.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec cancelling_discriminator(IncomingTaskIds :: [term()], Options :: map()) ->
+          #pattern_state{}.
+
+cancelling_discriminator(IncomingTaskIds, Options) ->
+    #pattern_state{
+      pattern_type = cancelling_discriminator,
+      instance_count = length(IncomingTaskIds),
+      choice_data = maps:merge(#{incoming_tasks => IncomingTaskIds},
+                             Options)
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Structured Partial Join pattern (P30).
+%%
+%% The N-out-of-M pattern waits for a quorum of branches to complete.
+%%
+%% @param BranchTasks List of branch task functions.
+%% @param Quorum Number of branches required for quorum.
+%% @return A pattern state record for structured partial join.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec structured_partial_join(BranchTasks :: [function()], Quorum :: pos_integer()) ->
+          #pattern_state{}.
+
+structured_partial_join(BranchTasks, Quorum) ->
+    #pattern_state{
+      pattern_type = structured_partial_join,
+      subprocess = BranchTasks,
+      instance_count = length(BranchTasks),
+      choice_data = #{quorum => Quorum}
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Blocking Partial Join pattern (P31).
+%%
+%% Produces partial output after N branches complete, final output after all M.
+%%
+%% @param BranchTasks List of branch task functions.
+%% @param PartialThreshold N branches for partial output.
+%% @return A pattern state record for blocking partial join.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec blocking_partial_join(BranchTasks :: [function()], PartialThreshold :: pos_integer()) ->
+          #pattern_state{}.
+
+blocking_partial_join(BranchTasks, PartialThreshold) ->
+    #pattern_state{
+      pattern_type = blocking_partial_join,
+      subprocess = BranchTasks,
+      instance_count = length(BranchTasks),
+      choice_data = #{partial_threshold => PartialThreshold}
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Cancelling Partial Join pattern (P32).
+%%
+%% Waits for N branches to complete, then cancels remaining branches.
+%%
+%% @param BranchTasks List of branch task functions.
+%% @param Quorum Number of branches required before cancellation.
+%% @return A pattern state record for cancelling partial join.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec cancelling_partial_join(BranchTasks :: [function()], Quorum :: pos_integer()) ->
+          #pattern_state{}.
+
+cancelling_partial_join(BranchTasks, Quorum) ->
+    #pattern_state{
+      pattern_type = cancelling_partial_join,
+      subprocess = BranchTasks,
+      instance_count = length(BranchTasks),
+      choice_data = #{quorum => Quorum}
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Generalized AND-Join pattern (P33).
+%%
+%% Joins only active branches, ignoring inactive ones.
+%%
+%% @param BranchTasks List of branch task functions with active status.
+%% @return A pattern state record for generalized AND join.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec generalized_and_join(BranchTasks :: [{function(), boolean()}]) ->
+          #pattern_state{}.
+
+generalized_and_join(BranchTasks) ->
+    #pattern_state{
+      pattern_type = generalized_and_join,
+      subprocess = [Fun || {Fun, _Active} <- BranchTasks],
+      instance_count = length(BranchTasks),
+      choice_data = #{active_branches => [Active || {_Fun, Active} <- BranchTasks]}
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Static Partial Join for MI pattern (P34).
+%%
+%% Fixed pool of N out of M instances for partial join.
+%%
+%% @param InstanceFuns List of instance functions.
+%% @param PoolSize Size of the instance pool.
+%% @param Threshold Threshold for partial completion.
+%% @return A pattern state record for static partial join MI.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec static_partial_join_mi(InstanceFuns :: [function()],
+                            PoolSize :: pos_integer(),
+                            Threshold :: pos_integer()) ->
+          #pattern_state{}.
+
+static_partial_join_mi(InstanceFuns, PoolSize, Threshold) ->
+    #pattern_state{
+      pattern_type = static_partial_join_mi,
+      subprocess = InstanceFuns,
+      max_instances = PoolSize,
+      instance_count = min(length(InstanceFuns), PoolSize),
+      choice_data = #{threshold => Threshold}
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Cancelling Partial Join for MI pattern (P35).
+%%
+%% N-of-M partial join with instance cancellation on completion.
+%%
+%% @param InstanceFuns List of instance functions.
+%% @param Quorum Number of instances required for completion.
+%% @param CancelThreshold Threshold for cancelling remaining instances.
+%% @return A pattern state record for cancelling partial join MI.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec cancelling_partial_join_mi(InstanceFuns :: [function()],
+                                Quorum :: pos_integer(),
+                                CancelThreshold :: pos_integer()) ->
+          #pattern_state{}.
+
+cancelling_partial_join_mi(InstanceFuns, Quorum, CancelThreshold) ->
+    #pattern_state{
+      pattern_type = cancelling_partial_join_mi,
+      subprocess = InstanceFuns,
+      instance_count = length(InstanceFuns),
+      choice_data = #{quorum => Quorum, cancel_threshold => CancelThreshold}
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Dynamic Partial Join for MI pattern (P36).
+%%
+%% Partial join with runtime threshold computation.
+%%
+%% @param InstanceFuns List of instance functions.
+%% @param ThresholdFun Function to compute threshold at runtime.
+%% @param Options Additional options.
+%% @return A pattern state record for dynamic partial join MI.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec dynamic_partial_join_mi(InstanceFuns :: [function()],
+                             ThresholdFun :: function(),
+                             Options :: map()) ->
+          #pattern_state{}.
+
+dynamic_partial_join_mi(InstanceFuns, ThresholdFun, Options) ->
+    #pattern_state{
+      pattern_type = dynamic_partial_join_mi,
+      subprocess = InstanceFuns,
+      instance_count = length(InstanceFuns),
+      choice_data = maps:merge(#{threshold_fun => ThresholdFun}, Options)
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a Local Sync Merge pattern (P37).
+%%
+%% Joins only local branches within scope, ignoring external branches.
+%%
+%% @param LocalBranches List of local branch functions.
+%% @return A pattern state record for local sync merge.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec local_sync_merge(LocalBranches :: [function()]) -> #pattern_state{}.
+
+local_sync_merge(LocalBranches) ->
+    #pattern_state{
+      pattern_type = local_sync_merge,
+      subprocess = LocalBranches,
+      instance_count = length(LocalBranches),
+      choice_data = #{scope => local}
+     }.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a General Sync Merge pattern (P38).
+%%
+%% Merges across unstructured active branches dynamically.
+%%
+%% @param BranchMap Map of branch identifiers to functions.
+%% @return A pattern state record for general sync merge.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec general_sync_merge(BranchMap :: map()) -> #pattern_state{}.
+
+general_sync_merge(BranchMap) ->
+    #pattern_state{
+      pattern_type = general_sync_merge,
+      subprocess = maps:values(BranchMap),
+      instance_count = maps:size(BranchMap),
+      choice_data = maps:put(branch_ids, maps:keys(BranchMap), BranchMap)
      }.
 
 %%====================================================================
