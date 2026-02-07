@@ -2083,6 +2083,11 @@ fire('t_complete_interleaved',
      }};
 
 %% WCP-18: Milestone Pattern
+%% Guard: abort if milestone function is undefined
+fire('t_work',
+     #{'p_active' := [_Active]},
+     #pattern_state{choice_data = #{milestone_check := undefined}}) ->
+    abort;
 fire('t_work',
      #{'p_active' := [Active]},
      _UsrInfo) ->
@@ -2091,6 +2096,10 @@ fire('t_work',
       'p_milestone_guard' => [milestone_required]
      }};
 
+fire('t_milestone_check',
+     _Mode,
+     #pattern_state{choice_data = #{milestone_check := undefined}}) ->
+    abort;
 fire('t_milestone_check',
      #{'p_active' := [Active], 'p_milestone_guard' := [milestone_required]},
      #pattern_state{choice_data = #{milestone_check := MilestoneFun}}) ->
@@ -2116,6 +2125,11 @@ fire('t_complete',
      }};
 
 %% WCP-19: Cancel Activity Pattern
+%% Guard: abort if cancel function is undefined
+fire('t_work',
+     #{'p_activity_running' := [_Running]},
+     #pattern_state{choice_data = #{cancel_check := undefined}}) ->
+    abort;
 fire('t_work',
      #{'p_activity_running' := [Running]},
      #pattern_state{choice_data = #{cancel_check := CancelFun}}) ->

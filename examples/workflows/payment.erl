@@ -60,6 +60,7 @@
 
 %% Include shared types
 -include_lib("order_fulfillment_types.hrl").
+-include_lib("gen_pnet/include/gen_pnet.hrl").
 
 %%====================================================================
 %% Records
@@ -147,7 +148,7 @@ run(Order, PaymentDetails) ->
     case start(Order, PaymentDetails) of
         {ok, Pid} ->
             case wait_for_completion(Pid, 30000) of
-                {ok, State = #payment_state{payment = Payment}} ->
+                {ok, _State = #payment_state{payment = Payment}} ->
                     gen_pnet:stop(Pid),
                     case Payment#payment.status of
                         completed -> {ok, Payment};
@@ -280,31 +281,15 @@ fire('t_receive_payment', #{'p_input' := [start]}, State) ->
 fire('t_validate_payment', #{'p_payment_received' := [start]}, State) ->
     Payment = State#payment_state.payment,
     #{valid := Valid} = validate_payment(State),
-    UpdatedPayment = Payment#payment{status = processing},
-    State1 = State#payment_state{payment = UpdatedPayment},
     log_event(State, <<"Payment">>, <<"PaymentValidated">>, #{
         <<"payment_id">> => Payment#payment.payment_id,
         <<"valid">> => Valid
     }),
-    {produce, #{'p_validated' => [start]}, State1};
+    {produce, #{'p_validated' => [start]}};
 
 fire('t_process_cc', #{'p_validated' := [start]}, State) ->
     Payment = State#payment_state.payment,
     #{success := Success, transaction_id := TxId} = process_credit_card(State),
-    UpdatedPayment = case Success of
-        true ->
-            Payment#payment{
-                status = completed,
-                transaction_id = TxId,
-                completed_at = erlang:system_time(millisecond)
-            };
-        false ->
-            Payment#payment{
-                status = failed,
-                failure_reason = <<"Card declined">>
-            }
-    end,
-    State1 = State#payment_state{payment = UpdatedPayment},
     TargetPlace = case Success of
         true -> 'p_confirmed';
         false -> 'p_failure_handled'
@@ -314,25 +299,11 @@ fire('t_process_cc', #{'p_validated' := [start]}, State) ->
         <<"success">> => Success,
         <<"transaction_id">> => TxId
     }),
-    {produce, #{TargetPlace => [start]}, State1};
+    {produce, #{TargetPlace => [start]}};
 
 fire('t_process_pp', #{'p_validated' := [start]}, State) ->
     Payment = State#payment_state.payment,
     #{success := Success, transaction_id := TxId} = process_paypal(State),
-    UpdatedPayment = case Success of
-        true ->
-            Payment#payment{
-                status = completed,
-                transaction_id = TxId,
-                completed_at = erlang:system_time(millisecond)
-            };
-        false ->
-            Payment#payment{
-                status = failed,
-                failure_reason = <<"PayPal transaction failed">>
-            }
-    end,
-    State1 = State#payment_state{payment = UpdatedPayment},
     TargetPlace = case Success of
         true -> 'p_confirmed';
         false -> 'p_failure_handled'
@@ -342,25 +313,11 @@ fire('t_process_pp', #{'p_validated' := [start]}, State) ->
         <<"success">> => Success,
         <<"transaction_id">> => TxId
     }),
-    {produce, #{TargetPlace => [start]}, State1};
+    {produce, #{TargetPlace => [start]}};
 
 fire('t_process_bt', #{'p_validated' := [start]}, State) ->
     Payment = State#payment_state.payment,
     #{success := Success, transaction_id := TxId} = process_bank_transfer(State),
-    UpdatedPayment = case Success of
-        true ->
-            Payment#payment{
-                status = completed,
-                transaction_id = TxId,
-                completed_at = erlang:system_time(millisecond)
-            };
-        false ->
-            Payment#payment{
-                status = failed,
-                failure_reason = <<"Bank transfer failed">>
-            }
-    end,
-    State1 = State#payment_state{payment = UpdatedPayment},
     TargetPlace = case Success of
         true -> 'p_confirmed';
         false -> 'p_failure_handled'
@@ -370,7 +327,7 @@ fire('t_process_bt', #{'p_validated' := [start]}, State) ->
         <<"success">> => Success,
         <<"transaction_id">> => TxId
     }),
-    {produce, #{TargetPlace => [start]}, State1};
+    {produce, #{TargetPlace => [start]}};
 
 fire('t_send_confirmation', #{'p_confirmed' := [start]}, State) ->
     Payment = State#payment_state.payment,
@@ -381,7 +338,7 @@ fire('t_send_confirmation', #{'p_confirmed' := [start]}, State) ->
         <<"order_id">> => Order#order.order_id,
         <<"customer_email">> => Order#order.customer_email
     }),
-    {produce, #{'p_output' => [start]}, State};
+    {produce, #{'p_output' => [start]}};
 
 fire('t_handle_failure', #{'p_failure_handled' := [start]}, State) ->
     %% WHP-01: Error Handler
@@ -391,7 +348,7 @@ fire('t_handle_failure', #{'p_failure_handled' := [start]}, State) ->
         <<"payment_id">> => Payment#payment.payment_id,
         <<"reason">> => Payment#payment.failure_reason
     }),
-    {produce, #{'p_failure_handled' => [start]}, State};
+    {produce, #{'p_failure_handled' => [start]}};
 
 fire('t_retry_payment', #{'p_failure_handled' := [start]}, State) ->
     %% WCP-23: Structured Loop - Retry payment
@@ -401,23 +358,17 @@ fire('t_retry_payment', #{'p_failure_handled' := [start]}, State) ->
     #{success := Success} = retry_payment(State1),
     case Success of
         true ->
-            UpdatedPayment = Payment#payment{
-                status = completed,
-                transaction_id = generate_transaction_id(),
-                completed_at = erlang:system_time(millisecond)
-            },
-            State2 = State1#payment_state{payment = UpdatedPayment},
             log_event(State, <<"Payment">>, <<"RetrySuccessful">>, #{
                 <<"payment_id">> => Payment#payment.payment_id,
                 <<"attempt">> => NewRetryCount
             }),
-            {produce, #{'p_confirmed' => [start]}, State2};
+            {produce, #{'p_confirmed' => [start]}};
         false ->
             log_event(State, <<"Payment">>, <<"RetryFailed">>, #{
                 <<"payment_id">> => Payment#payment.payment_id,
                 <<"attempt">> => NewRetryCount
             }),
-            {produce, #{'p_failure_handled' => [start]}, State1}
+            {produce, #{'p_failure_handled' => [start]}}
     end;
 
 fire('t_complete', #{'p_output' := [start]}, State) ->
@@ -426,7 +377,7 @@ fire('t_complete', #{'p_output' := [start]}, State) ->
         <<"payment_id">> => Payment#payment.payment_id,
         <<"status">> => atom_to_binary(Payment#payment.status, utf8)
     }),
-    {produce, #{}, State};
+    {produce, #{}};
 
 fire(_Trsn, _Mode, _State) ->
     abort.
@@ -435,8 +386,9 @@ fire(_Trsn, _Mode, _State) ->
 %% @doc Trigger callback for custom processing.
 %% @end
 %%--------------------------------------------------------------------
-trigger(Place, _Token, State) ->
-    log_event(State, <<"Payment">>, <<"PlaceEntered">>, #{
+trigger(Place, _Token, NetState) ->
+    UsrInfo = NetState#net_state.usr_info,
+    log_event(UsrInfo, <<"Payment">>, <<"PlaceEntered">>, #{
         <<"place">> => atom_to_binary(Place, utf8)
     }),
     pass.
@@ -454,9 +406,9 @@ init(PaymentState) ->
                 P -> P#payment.payment_id
             end,
             yawl_xes:log_case_start(LogId, PaymentId),
-            {ok, State1};
+            State1;
         _ ->
-            {ok, PaymentState}
+            PaymentState
     end.
 
 %%--------------------------------------------------------------------
@@ -493,22 +445,22 @@ code_change(_OldVsn, NetState, _Extra) ->
 %% @doc Terminates the gen_pnet.
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, State) ->
-    LogId = State#payment_state.log_id,
-    case LogId of
-        undefined -> ok;
-        _ ->
-            PaymentId = case State#payment_state.payment of
+terminate(_Reason, NetState) ->
+    case NetState of
+        #net_state{usr_info = #payment_state{log_id = LogId} = UsrInfo}
+          when LogId =/= undefined ->
+            PaymentId = case UsrInfo#payment_state.payment of
                 undefined -> <<"UNKNOWN">>;
                 P -> P#payment.payment_id
             end,
-            Status = case State#payment_state.payment of
+            Status = case UsrInfo#payment_state.payment of
                 undefined -> <<"unknown">>;
                 Pay -> atom_to_binary(Pay#payment.status, utf8)
             end,
             yawl_xes:log_case_complete(LogId, PaymentId, #{
                 <<"status">> => Status
-            })
+            });
+        _ -> ok
     end,
     ok.
 

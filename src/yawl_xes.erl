@@ -798,10 +798,10 @@ handle_call(_Request, _From, State) ->
     {reply, {error, bad_msg}, State}.
 
 handle_cast({add_event, LogId, Event}, State) ->
-    case maps:get(LogId, State#state.logs) of
-        undefined ->
+    case maps:find(LogId, State#state.logs) of
+        error ->
             {noreply, State};
-        Log ->
+        {ok, Log} ->
             Log1 = Log#xes_log{events = Log#xes_log.events ++ [Event]},
             State1 = State#state{logs = maps:put(LogId, Log1, State#state.logs)},
             {noreply, State1}

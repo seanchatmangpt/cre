@@ -52,6 +52,7 @@
 
 %% Include shared types
 -include_lib("order_fulfillment_types.hrl").
+-include_lib("gen_pnet/include/gen_pnet.hrl").
 
 %%====================================================================
 %% Records
@@ -248,31 +249,27 @@ fire('t_reserve_items', #{'p_inventory_checked' := [start]}, State) ->
 fire('t_calculate_total', #{'p_items_reserved' := [start]}, State) ->
     Order = State#ordering_state.order,
     #{total := Total} = calculate_total(State),
-    UpdatedOrder = Order#order{total = Total, status = confirmed},
-    State1 = State#ordering_state{order = UpdatedOrder, total_calculated = true},
     log_event(State, <<"Ordering">>, <<"TotalCalculated">>, #{
         <<"order_id">> => Order#order.order_id,
         <<"total">> => Total
     }),
-    {produce, #{'p_total_calculated' => [start]}, State1};
+    {produce, #{'p_total_calculated' => [start]}};
 
 fire('t_confirm_order', #{'p_total_calculated' := [start]}, State) ->
     Order = State#ordering_state.order,
     confirm_order(State),
-    UpdatedOrder = Order#order{status = confirmed},
-    State1 = State#ordering_state{order = UpdatedOrder},
     log_event(State, <<"Ordering">>, <<"OrderConfirmed">>, #{
         <<"order_id">> => Order#order.order_id,
         <<"status">> => <<"confirmed">>
     }),
-    {produce, #{'p_order_confirmed' => [start]}, State1};
+    {produce, #{'p_order_confirmed' => [start]}};
 
 fire('t_complete', #{'p_order_confirmed' := [start]}, State) ->
     Order = State#ordering_state.order,
     log_event(State, <<"Ordering">>, <<"OrderingComplete">>, #{
         <<"order_id">> => Order#order.order_id
     }),
-    {produce, #{'p_output' => [start]}, State};
+    {produce, #{'p_output' => [start]}};
 
 fire(_Trsn, _Mode, _State) ->
     abort.
@@ -281,8 +278,9 @@ fire(_Trsn, _Mode, _State) ->
 %% @doc Trigger callback for custom processing.
 %% @end
 %%--------------------------------------------------------------------
-trigger(Place, _Token, State) ->
-    log_event(State, <<"Ordering">>, <<"PlaceEntered">>, #{
+trigger(Place, _Token, NetState) ->
+    UsrInfo = NetState#net_state.usr_info,
+    log_event(UsrInfo, <<"Ordering">>, <<"PlaceEntered">>, #{
         <<"place">> => atom_to_binary(Place, utf8)
     }),
     pass.
@@ -296,9 +294,9 @@ init(OrderingState) ->
         {ok, LogId} ->
             State1 = OrderingState#ordering_state{log_id = LogId},
             yawl_xes:log_case_start(LogId, State1#ordering_state.order#order.order_id),
-            {ok, State1};
+            State1;
         _ ->
-            {ok, OrderingState}
+            OrderingState
     end.
 
 %%--------------------------------------------------------------------
@@ -335,18 +333,19 @@ code_change(_OldVsn, NetState, _Extra) ->
 %% @doc Terminates the gen_pnet.
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, State) ->
-    LogId = State#ordering_state.log_id,
-    case LogId of
-        undefined -> ok;
-        _ ->
-            OrderId = case State#ordering_state.order of
+terminate(_Reason, NetState) ->
+    %% NetState is a #net_state{} record; user state is in usr_info field
+    case NetState of
+        #net_state{usr_info = #ordering_state{log_id = LogId} = UsrInfo}
+          when LogId =/= undefined ->
+            OrderId = case UsrInfo#ordering_state.order of
                 undefined -> <<"UNKNOWN">>;
                 Order -> Order#order.order_id
             end,
             yawl_xes:log_case_complete(LogId, OrderId, #{
                 <<"status">> => <<"completed">>
-            })
+            });
+        _ -> ok
     end,
     ok.
 
