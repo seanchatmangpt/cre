@@ -213,7 +213,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [Release Notes 2.1.0](RELEASE_NOTES_2.1.0.md) | Version 2.1.0 release notes |
+| [Release Notes 0.3.0](RELEASE_NOTES_0.3.0.md) | Version 0.3.0 release notes |
 
 ### Development
 
