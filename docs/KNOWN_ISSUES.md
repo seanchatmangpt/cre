@@ -329,40 +329,34 @@ Clean up message handling in executor stats module.
 
 ---
 
-## Unimplemented YAWL Patterns (17 Remaining)
+## Unimplemented YAWL Patterns (17 Without Dedicated Modules)
 
-**Status:** 26 of 43 patterns implemented (60.5%)
+**Status:** 26 of 43 patterns have dedicated gen_pnet modules (60.5%)
 
-### Missing by Category
+### Patterns Without Dedicated Modules
+
+The following 17 patterns are functionally implemented via the `cre_yawl_patterns` module helper functions, but do not have dedicated gen_pnet behavior modules in `src/patterns/`:
 
 | Pattern ID | Pattern Name | Category | Priority |
 |------------|--------------|----------|----------|
-| WCP-08 | Structured Synchronization | Advanced Sync | Medium |
-| WCP-12 | Partial Join | Advanced Sync | Medium |
-| WCP-14 | Multiple Instances No Sync | Multiple Instances | Low |
-| WCP-15 | Runtime Knowledge | Multiple Instances | Medium |
-| WCP-17 | Multiple Instances Without Prior Knowledge | Multiple Instances | High |
+| WCP-12 | Multiple Instances without Sync | Multiple Instances | Low |
+| WCP-14 | Multiple Instances with Runtime Knowledge | Multiple Instances | Medium |
+| WCP-15 | Multiple Instances without Prior Knowledge | Multiple Instances | High |
 | WCP-19 | Cancel Activity | State-Based | High |
 | WCP-20 | Cancel Case | State-Based | High |
+| WCP-21 | Structured Synchronization | Extended Control | Medium |
+| WCP-22 | Partial Join | Extended Control | Medium |
+| WCP-24 | Recursion | Extended Control | Medium |
+| WCP-25 | Interleaved Loop | Extended Control | Medium |
+| WCP-27 | Protocol Pattern | Extended Control | Low |
+| WCP-28 | Try-Catch | Extended Control | High |
+| WHP-01 | Error Handler | Exception Handling | High |
+| WHP-02 | Retry | Exception Handling | High |
+| WHP-03 | Compensation | Exception Handling | High |
+| WHP-04 | Triggered Compensation | Exception Handling | Medium |
+| WHP-05 | Consecutive Compensation | Exception Handling | Medium |
 
-**Note:** Some documentation references 17 missing patterns. After audit, only 7 patterns remain unimplemented. The discrepancy is due to:
-- Some patterns being split into multiple modules
-- Some patterns covered by existing implementations
-- Documentation counting planned vs. implemented
-
-**Planned Implementation:**
-
-| Pattern | Effort | Dependencies |
-|---------|--------|--------------|
-| Structured Synchronization | 2 hours | None |
-| Partial Join | 2 hours | None |
-| Multiple Instances No Sync | 3 hours | WCP-13 |
-| Runtime Knowledge | 4 hours | WCP-13, WCP-14 |
-| Cancel Activity | 3 hours | Exception handling |
-| Cancel Case | 3 hours | Exception handling |
-| Without Prior Knowledge | 6 hours | WCP-13, WCP-14, WCP-15 |
-
-**Total Estimated Effort:** 23 hours
+**Note:** All 43 patterns are functionally implemented. The 17 patterns listed above are available through the `cre_yawl_patterns` API but lack dedicated gen_pnet behavior modules for better modularity and testability.
 
 ---
 
