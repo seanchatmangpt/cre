@@ -12,9 +12,14 @@ rel/example_project
 doc
 _build
 rebar.lock
+# Claude Flow runtime state files
 .claude-flow/
 .hive-mind/
 .mcp.json
+.claude-flow/daemon-state.json
+.claude-flow/daemon.pid
+.claude-flow/metrics/
+.swarm/
 
 # Wreckit local config (may contain secrets)
 .wreckit/config.local.json
