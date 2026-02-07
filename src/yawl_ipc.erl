@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 %% @author YAWL IPC Implementation
-%% @copyright 2025
+%%
 %%
 %% @doc YAWL Inter-Process Communication Module for CRE
 %%

@@ -1,23 +1,5 @@
 %% -*- erlang -*-
-%%
-%% CRE: common runtime environment for distributed programming languages
-%%
-%% Copyright 2015-2025 CRE Team
-%%
-%% Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
-%%
-%% -------------------------------------------------------------------
-%% @author CRE Team
+%%%% @author CRE Team
 %% @version 0.2.0
 %% @doc YAWL Specification Validator
 %%
@@ -1050,6 +1032,16 @@ format_errors(Errors) ->
 -include_lib("eunit/include/eunit.hrl").
 
 %%--------------------------------------------------------------------
+%% @doc Runs doctests for this module.
+%%
+%% Invoked via `rebar3 as test eunit --module=yawl_validate`.
+%%
+%% @end
+%%--------------------------------------------------------------------
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%%--------------------------------------------------------------------
 %% Test: validate accepts a valid specification
 %%--------------------------------------------------------------------
 validate_valid_spec_test() ->
@@ -1081,7 +1073,7 @@ validate_missing_id_test() ->
     },
     {error, Errors} = validate(Spec),
     ?assert(length(Errors) > 0),
-    #{type := required} = lists:keyfind(type, 1, Errors).
+    ?assert(lists:any(fun(#{type := Type}) -> Type =:= required end, Errors)).
 
 %%--------------------------------------------------------------------
 %% Test: check_tasks validates task types

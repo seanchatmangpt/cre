@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 %% @author CRE Performance Optimization Team
-%% @copyright 2025
+%%
 %%
 %% @doc CRE Persistent Term Configuration Module (OTP 21+)
 %%

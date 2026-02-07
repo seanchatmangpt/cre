@@ -1,23 +1,5 @@
 %% -*- erlang -*-
-%%
-%% CRE: common runtime environment for distributed programming languages
-%%
-%% Copyright 2015-2025 CRE Team
-%%
-%% Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
-%%
-%% -------------------------------------------------------------------
-%% @doc Common Test Suite for pnet_receipt Coverage
+%%%% @doc Common Test Suite for pnet_receipt Coverage
 %%
 %% Comprehensive test suite for pnet_receipt module targeting 70% coverage.
 %%
@@ -147,7 +129,7 @@ effects_multiple_multiple_places(_Config) ->
 
 make_creates_valid_receipt(_Config) ->
     BeforeHash = crypto:hash(sha256, term_to_binary(before)),
-    AfterHash = crypto:hash(sha256, term_to_binary(after)),
+    AfterHash = crypto:hash(sha256, term_to_binary('after')),
     Move = #{
         trsn => my_transition,
         mode => #{input => [token]},
@@ -165,10 +147,8 @@ make_validates_move_structure(_Config) ->
     AfterHash = <<2>>,
     %% Invalid move - missing fields
     InvalidMove1 = #{trsn => t1},
-    ?error(badmatch),
-    _ = pnet_receipt:make(BeforeHash, AfterHash, InvalidMove1),
+    ?assertError({badmatch, _}, pnet_receipt:make(BeforeHash, AfterHash, InvalidMove1)),
 
     InvalidMove2 = #{mode => #{}},
-    ?error(badmatch),
-    _ = pnet_receipt:make(BeforeHash, AfterHash, InvalidMove2),
+    ?assertError({badmatch, _}, pnet_receipt:make(BeforeHash, AfterHash, InvalidMove2)),
     ok.

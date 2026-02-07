@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 %% @author YAWL SMS Notification Implementation
-%% @copyright 2025
+%%
 %%
 %% @doc YAWL SMS Notification Module for CRE
 %%

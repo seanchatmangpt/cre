@@ -3,6 +3,8 @@
 -module(schema_demo).
 -export([run/0]).
 
+-include("yawl_schema.hrl").
+
 run() ->
     io:format("=== YAWL Schema Validation Demo ===~n~n"),
 

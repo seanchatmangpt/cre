@@ -1,0 +1,404 @@
+%% -*- erlang -*-
+%%%% @doc Common Test Suite for gen_yawl Coverage
+%%
+%% Comprehensive test suite for gen_yawl module targeting 80% coverage.
+%%
+%% @end
+%% -------------------------------------------------------------------
+
+-module(gen_yawl_SUITE).
+-compile([export_all, nowarn_export_all]).
+
+%% Include Common Test header
+-include_lib("common_test/include/ct.hrl").
+-include_lib("eunit/include/eunit.hrl").
+
+%%====================================================================
+%% Suite Callbacks
+%%====================================================================
+
+suite() ->
+    [{timetrap, {seconds, 30}}].
+
+all() ->
+    [
+        start_link_creates_process,
+        fire_produce_updates_marking,
+        fire_abort_halts_progress,
+        three_tuple_fire_updates_usr_info,
+        error_in_fire_doesnt_crash_gen_server,
+        timeout_during_fire_returns_error,
+        graceful_shutdown_persists_state,
+        concurrent_handle_call_ordering,
+        ls_returns_place_tokens,
+        marking_returns_map,
+        usr_info_returns_state,
+        stats_returns_statistics,
+        reset_stats_clears_data,
+        cast_sends_message,
+        call_with_timeout_works
+    ].
+
+init_per_suite(Config) ->
+    Config.
+
+end_per_suite(_Config) ->
+    ok.
+
+init_per_testcase(_TestCase, Config) ->
+    Config.
+
+end_per_testcase(_TestCase, _Config) ->
+    ok.
+
+%%====================================================================
+%% Test Cases
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Test that start_link/3 creates a gen_yawl process
+%%--------------------------------------------------------------------
+start_link_creates_process(_Config) ->
+    %% Create a simple test workflow module
+    NetMod = test_sequence_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    true = is_pid(Pid),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that fire/3 producing tokens updates the marking
+%%--------------------------------------------------------------------
+fire_produce_updates_marking(_Config) ->
+    NetMod = test_sequence_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    timer:sleep(100),  %% Let progress loop run
+    Marking = gen_yawl:marking(Pid),
+    true = is_map(Marking),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that fire/3 returning abort halts progress
+%%--------------------------------------------------------------------
+fire_abort_halts_progress(_Config) ->
+    NetMod = test_abort_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    timer:sleep(100),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that 3-tuple fire return updates usr_info
+%%--------------------------------------------------------------------
+three_tuple_fire_updates_usr_info(_Config) ->
+    NetMod = test_stateful_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, #{count => 0}, []),
+    timer:sleep(100),
+    UsrInfo = gen_yawl:usr_info(Pid),
+    true = is_map(UsrInfo),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that errors in fire/3 don't crash the gen_server
+%%--------------------------------------------------------------------
+error_in_fire_doesnt_crash_gen_server(_Config) ->
+    NetMod = test_error_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    timer:sleep(100),
+    %% Process should still be alive despite errors
+    true = is_process_alive(Pid),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that timeout during fire/3 is handled
+%%--------------------------------------------------------------------
+timeout_during_fire_returns_error(_Config) ->
+    NetMod = test_timeout_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, [{fire_timeout, 100}]),
+    timer:sleep(200),
+    %% Process should handle timeout gracefully
+    true = is_process_alive(Pid),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test graceful shutdown persists state
+%%--------------------------------------------------------------------
+graceful_shutdown_persists_state(_Config) ->
+    NetMod = test_sequence_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    timer:sleep(100),
+    %% Shutdown should be graceful
+    ok = gen_yawl:stop(Pid),
+    %% Give time for shutdown cleanup
+    timer:sleep(50),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test concurrent handle_call ordering
+%%--------------------------------------------------------------------
+concurrent_handle_call_ordering(_Config) ->
+    NetMod = test_sequence_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    %% Make multiple concurrent calls
+    Results = [gen_yawl:marking(Pid) || _ <- lists:seq(1, 10)],
+    10 = length(Results),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that ls/2 returns place tokens
+%%--------------------------------------------------------------------
+ls_returns_place_tokens(_Config) ->
+    NetMod = test_sequence_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    {ok, Tokens} = gen_yawl:ls(Pid, start),
+    true = is_list(Tokens),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that marking/1 returns the marking map
+%%--------------------------------------------------------------------
+marking_returns_map(_Config) ->
+    NetMod = test_sequence_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    Marking = gen_yawl:marking(Pid),
+    true = is_map(Marking),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that usr_info/1 returns user info
+%%--------------------------------------------------------------------
+usr_info_returns_state(_Config) ->
+    NetMod = test_stateful_workflow,
+    InitState = #{counter => 0},
+    {ok, Pid} = gen_yawl:start_link(NetMod, InitState, []),
+    UsrInfo = gen_yawl:usr_info(Pid),
+    true = is_map(UsrInfo),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that stats/1 returns statistics
+%%--------------------------------------------------------------------
+stats_returns_statistics(_Config) ->
+    NetMod = test_sequence_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    Stats = gen_yawl:stats(Pid),
+    true = is_record(Stats, stats),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that reset_stats/1 clears statistics
+%%--------------------------------------------------------------------
+reset_stats_clears_data(_Config) ->
+    NetMod = test_sequence_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    timer:sleep(100),
+    ok = gen_yawl:reset_stats(Pid),
+    StatsAfter = gen_yawl:stats(Pid),
+    undefined = StatsAfter,
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that cast/2 sends message
+%%--------------------------------------------------------------------
+cast_sends_message(_Config) ->
+    NetMod = test_sequence_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    ok = gen_yawl:cast(Pid, test_message),
+    timer:sleep(50),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that call/3 with timeout works
+%%--------------------------------------------------------------------
+call_with_timeout_works(_Config) ->
+    NetMod = test_sequence_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    Result = gen_yawl:call(Pid, marking, 1000),
+    true = is_map(Result),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%====================================================================
+%% Test Workflow Modules
+%%====================================================================
+
+%% Simple sequence workflow for testing
+-module(test_sequence_workflow).
+-behaviour(gen_yawl).
+
+-export([
+    place_lst/0, trsn_lst/0,
+    init_marking/2, preset/1, is_enabled/3, fire/3,
+    init/1, handle_call/3, handle_cast/2, handle_info/2,
+    code_change/3, terminate/2, trigger/3
+]).
+
+place_lst() -> [start, done].
+trsn_lst() -> [t1].
+
+init_marking(start, _UsrInfo) -> [init];
+init_marking(done, _UsrInfo) -> [];
+init_marking(_, _UsrInfo) -> [].
+
+preset(t1) -> [start].
+
+is_enabled(t1, #{start := [init]}, _UsrInfo) -> true;
+is_enabled(_, _, _) -> false.
+
+fire(t1, #{start := []}, _UsrInfo) -> {produce, #{done => [complete]}};
+fire(t1, _Mode, _UsrInfo) -> {produce, #{done => [complete]}}.
+
+init(_Arg) -> #{}.
+handle_call(_Request, _From, _State) -> {reply, ok}.
+handle_cast(_Request, _State) -> noreply.
+handle_info(_Info, _State) -> noreply.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+terminate(_Reason, _State) -> ok.
+trigger(_Place, _Token, _State) -> pass.
+
+%% Abort workflow for testing
+-module(test_abort_workflow).
+-behaviour(gen_yawl).
+
+-export([
+    place_lst/0, trsn_lst/0,
+    init_marking/2, preset/1, is_enabled/3, fire/3,
+    init/1, handle_call/3, handle_cast/2, handle_info/2,
+    code_change/3, terminate/2, trigger/3
+]).
+
+place_lst() -> [start].
+trsn_lst() -> [t1].
+
+init_marking(start, _UsrInfo) -> [init];
+init_marking(_, _UsrInfo) -> [].
+
+preset(t1) -> [start].
+
+is_enabled(t1, #{start := [init]}, _UsrInfo) -> true;
+is_enabled(_, _, _) -> false.
+
+fire(t1, #{start := [init]}, _UsrInfo) -> abort.
+
+init(_Arg) -> #{}.
+handle_call(_Request, _From, _State) -> {reply, ok}.
+handle_cast(_Request, _State) -> noreply.
+handle_info(_Info, _State) -> noreply.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+terminate(_Reason, _State) -> ok.
+trigger(_Place, _Token, _State) -> pass.
+
+%% Stateful workflow for testing
+-module(test_stateful_workflow).
+-behaviour(gen_yawl).
+
+-export([
+    place_lst/0, trsn_lst/0,
+    init_marking/2, preset/1, is_enabled/3, fire/3,
+    init/1, handle_call/3, handle_cast/2, handle_info/2,
+    code_change/3, terminate/2, trigger/3
+]).
+
+place_lst() -> [start, done].
+trsn_lst() -> [t1].
+
+init_marking(start, _UsrInfo) -> [init];
+init_marking(done, _UsrInfo) -> [];
+init_marking(_, _UsrInfo) -> [].
+
+preset(t1) -> [start].
+
+is_enabled(t1, #{start := [init]}, _UsrInfo) -> true;
+is_enabled(_, _, _) -> false.
+
+fire(t1, #{start := []}, UsrInfo) ->
+    Count = maps:get(count, UsrInfo, 0) + 1,
+    {produce, #{done => [ok]}, UsrInfo#{count => Count}}.
+
+init(Arg) -> Arg.
+handle_call(_Request, _From, State) -> {reply, State, State}.
+handle_cast(_Request, State) -> {noreply, State}.
+handle_info(_Info, State) -> {noreply, State}.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+terminate(_Reason, _State) -> ok.
+trigger(_Place, _Token, _State) -> pass.
+
+%% Error workflow for testing
+-module(test_error_workflow).
+-behaviour(gen_yawl).
+
+-export([
+    place_lst/0, trsn_lst/0,
+    init_marking/2, preset/1, is_enabled/3, fire/3,
+    init/1, handle_call/3, handle_cast/2, handle_info/2,
+    code_change/3, terminate/2, trigger/3
+]).
+
+place_lst() -> [start].
+trsn_lst() -> [t1].
+
+init_marking(start, _UsrInfo) -> [init];
+init_marking(_, _UsrInfo) -> [].
+
+preset(t1) -> [start].
+
+is_enabled(t1, #{start := [init]}, _UsrInfo) -> true;
+is_enabled(_, _, _) -> false.
+
+fire(t1, #{start := [init]}, _UsrInfo) ->
+    error(simulated_error);
+fire(_, _, _) ->
+    abort.
+
+init(_Arg) -> #{}.
+handle_call(_Request, _From, _State) -> {reply, ok}.
+handle_cast(_Request, _State) -> noreply.
+handle_info(_Info, _State) -> noreply.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+terminate(_Reason, _State) -> ok.
+trigger(_Place, _Token, _State) -> pass.
+
+%% Timeout workflow for testing
+-module(test_timeout_workflow).
+-behaviour(gen_yawl).
+
+-export([
+    place_lst/0, trsn_lst/0,
+    init_marking/2, preset/1, is_enabled/3, fire/3,
+    init/1, handle_call/3, handle_cast/2, handle_info/2,
+    code_change/3, terminate/2, trigger/3
+]).
+
+place_lst() -> [start].
+trsn_lst() -> [t1].
+
+init_marking(start, _UsrInfo) -> [init];
+init_marking(_, _UsrInfo) -> [].
+
+preset(t1) -> [start].
+
+is_enabled(t1, #{start := [init]}, _UsrInfo) -> true;
+is_enabled(_, _, _) -> false.
+
+fire(t1, #{start := [init]}, _UsrInfo) ->
+    timer:sleep(5000),  %% Sleep longer than timeout
+    abort.
+
+init(_Arg) -> #{}.
+handle_call(_Request, _From, _State) -> {reply, ok}.
+handle_cast(_Request, _State) -> noreply.
+handle_info(_Info, _State) -> noreply.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+terminate(_Reason, _State) -> ok.
+trigger(_Place, _Token, _State) -> pass.

@@ -687,6 +687,79 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+%% @doc Runs all doctests for the module.
+%% @private
 doctest_test() ->
     doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%% Test basic place_lst callback
+place_lst_test() ->
+    Expected = ['p_input','p_branch_pool','p_trigger_ready','p_triggered',
+                'p_consume','p_reset','p_output'],
+    ?assertEqual(Expected, place_lst()).
+
+%% Test basic trsn_lst callback
+trsn_lst_test() ->
+    Expected = ['t_split','t_complete_branch','t_trigger','t_consume_remaining',
+                't_reset','t_output'],
+    ?assertEqual(Expected, trsn_lst()).
+
+%% Test preset for various transitions
+preset_t_split_test() ->
+    ?assertEqual(['p_input'], preset('t_split')).
+
+preset_t_complete_branch_test() ->
+    ?assertEqual(['p_branch_pool'], preset('t_complete_branch')).
+
+preset_t_trigger_test() ->
+    ?assertEqual(['p_trigger_ready'], preset('t_trigger')).
+
+preset_t_consume_remaining_test() ->
+    ?assertEqual(['p_consume'], preset('t_consume_remaining')).
+
+preset_t_reset_test() ->
+    ?assertEqual(['p_reset'], preset('t_reset')).
+
+preset_t_output_test() ->
+    ?assertEqual(['p_triggered'], preset('t_output')).
+
+preset_unknown_test() ->
+    ?assertEqual([], preset(unknown)).
+
+%% Test new/2 constructor
+new_2_branches_test() ->
+    Fun1 = fun(_) -> ok end,
+    Fun2 = fun(_) -> ok end,
+    State = new([Fun1, Fun2], 2),
+    ?assertEqual(2, State#discriminator_state.branch_count),
+    ?assertEqual(2, length(State#discriminator_state.branch_funs)),
+    ?assertEqual(undefined, State#discriminator_state.triggered_by),
+    ?assertEqual([], State#discriminator_state.completed),
+    ?assertEqual(0, State#discriminator_state.cycle_count).
+
+new_3_branches_test() ->
+    Fun1 = fun(_) -> ok end,
+    Fun2 = fun(_) -> ok end,
+    Fun3 = fun(_) -> ok end,
+    State = new([Fun1, Fun2, Fun3], 3),
+    ?assertEqual(3, State#discriminator_state.branch_count),
+    ?assertEqual(3, length(State#discriminator_state.branch_funs)).
+
+%% Test init_marking callback
+init_marking_p_input_test() ->
+    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
+    ?assertEqual([start], init_marking('p_input', State)).
+
+init_marking_p_trigger_ready_test() ->
+    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
+    ?assertEqual([ready], init_marking('p_trigger_ready', State)).
+
+init_marking_other_place_test() ->
+    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
+    ?assertEqual([], init_marking('p_branch_pool', State)),
+    ?assertEqual([], init_marking('p_triggered', State)),
+    ?assertEqual([], init_marking('p_consume', State)),
+    ?assertEqual([], init_marking('p_reset', State)),
+    ?assertEqual([], init_marking('p_output', State)).
+
 -endif.

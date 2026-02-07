@@ -37,9 +37,6 @@ true
 0
 > wf_timerq:peek(Q0).
 undefined
-```
-
-```erlang
 > Q1 = wf_timerq:arm(Q0, k1, 1100, {inject, p1, a}),
 .. Q2 = wf_timerq:arm(Q1, k2, 1200, {inject, p2, b}).
 _
@@ -47,27 +44,18 @@ _
 2
 > wf_timerq:peek(Q2).
 {1100,{inject,p1,a}}
-```
-
-```erlang
 > {E0, Qx} = wf_timerq:poll(Q2, 1000).
 _
 > E0.
 []
 > wf_timerq:size(Qx).
 2
-```
-
-```erlang
 > {E1, Q3} = wf_timerq:poll(Q2, 1100).
 _
 > E1.
 [{inject,p1,a}]
 > wf_timerq:peek(Q3).
 {1200,{inject,p2,b}}
-```
-
-```erlang
 > Q4 = wf_timerq:disarm(Q2, k2).
 _
 > wf_timerq:size(Q4).

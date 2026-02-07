@@ -114,10 +114,12 @@ true
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec seed(integer()) -> rand_state().
+-spec seed(integer() | {integer(), integer(), integer()}) -> rand_state().
 
 seed(Seed) when is_integer(Seed) ->
-    rand:seed_s(exrop, {Seed, 0, 0}).
+    rand:seed_s(exrop, {Seed, 0, 0});
+seed({A, B, C}) when is_integer(A), is_integer(B), is_integer(C) ->
+    rand:seed_s(exrop, {A, B, C}).
 
 %%--------------------------------------------------------------------
 %% @doc Uniformly picks a random element from a non-empty list.

@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 %% @author YAWL Demo Service Implementation
-%% @copyright 2025
+%%
 %%
 %% @doc YAWL Demo Service Module for CRE
 %%

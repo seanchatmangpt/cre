@@ -1,24 +1,5 @@
 %% -*- erlang -*-
 %%
-%% CRE: common runtime environment for distributed programming languages
-%%
-%% Copyright 2015-2025 CRE Team
-%%
-%% Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
-%%
-%% -------------------------------------------------------------------
-%% @author CRE Team
-%% @copyright 2025
 %% @doc Workflow Engine - Core workflow execution engine
 %%
 %% This module provides the core workflow engine that manages workflow case
@@ -84,6 +65,7 @@
 
 %% API
 -export([start_link/1]).
+-export([doctest_spec/0]).
 -export([start_case/3]).
 -export([case_state/2]).
 -export([worklist/2]).
@@ -216,7 +198,52 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
+%% @doc Returns a minimal workflow spec for doctests.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > is_map(Spec).
+%% true
+%% > maps:get(places, Spec).
+%% [p_start,p_end]
+%% ```
+%%
+%% @return Minimal workflow spec map
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec doctest_spec() -> map().
+
+doctest_spec() ->
+    #{
+        places => [p_start, p_end],
+        transitions => #{},
+        init_marking => #{p_start => []},
+        end_place => p_end,
+        start_token => start
+    }.
+
+%%--------------------------------------------------------------------
 %% @doc Starts the workflow engine.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{
+%% ..   spec => Spec,
+%% ..   org => #{},
+%% ..   seed => 1,
+%% ..   now => 0
+%% .. }), is_pid(Eng).
+%% true
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
 %%
 %% @param Config Configuration map with spec, org, seed, now
 %% @return {ok, Pid} | {error, Reason}
@@ -230,6 +257,21 @@ start_link(Config) ->
 
 %%--------------------------------------------------------------------
 %% @doc Starts a new workflow case.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > {ok, CaseId} = wf_engine:start_case(Eng, #{data => #{}}, 0), byte_size(CaseId) > 4.
+%% true
+%% > wf_engine:case_state(Eng, CaseId).
+%% running
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
 %%
 %% @param Engine Engine pid or name
 %% @param Options Case options including data
@@ -246,6 +288,23 @@ start_case(Engine, Options, Now) ->
 
 %%--------------------------------------------------------------------
 %% @doc Gets the current state of a case.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > {ok, CaseId} = wf_engine:start_case(Eng, #{data => #{}}, 0).
+%% _
+%% > wf_engine:case_state(Eng, CaseId).
+%% running
+%% > wf_engine:case_state(Eng, <<"nonexistent">>).
+%% {error,not_found}
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
 %%
 %% @param Engine Engine pid or name
 %% @param CaseId Case identifier
@@ -264,6 +323,19 @@ case_state(Engine, CaseId) ->
 %%
 %% Returns list of work items allocated to the user.
 %%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > wf_engine:worklist(Eng, alice).
+%% []
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
+%%
 %% @param Engine Engine pid or name
 %% @param User User identifier
 %% @return [work_item()]
@@ -277,6 +349,13 @@ worklist(Engine, User) ->
 
 %%--------------------------------------------------------------------
 %% @doc Allocates a work item to a user.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > wf_engine:allocate(eng, <<"wi_nonexistent">>, alice, 0).
+%% {error,not_found}
+%% ```
 %%
 %% @param Engine Engine pid or name
 %% @param WiId Work item identifier
@@ -295,6 +374,13 @@ allocate(Engine, WiId, User, Now) ->
 %%--------------------------------------------------------------------
 %% @doc Starts work on a work item.
 %%
+%% == Example
+%%
+%% ```erlang
+%% > wf_engine:start_work(eng, <<"wi_nonexistent">>, alice, 0).
+%% {error,not_found}
+%% ```
+%%
 %% @param Engine Engine pid or name
 %% @param WiId Work item identifier
 %% @param User User identifier
@@ -311,6 +397,13 @@ start_work(Engine, WiId, User, Now) ->
 
 %%--------------------------------------------------------------------
 %% @doc Completes a work item with result data.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > wf_engine:complete(eng, <<"wi_nonexistent">>, alice, #{}, 0).
+%% {error,not_found}
+%% ```
 %%
 %% @param Engine Engine pid or name
 %% @param WiId Work item identifier
@@ -333,6 +426,19 @@ complete(Engine, WiId, User, Data, Now) ->
 %%
 %% Returns list of receipts with before_hash, after_hash, move.
 %%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > wf_engine:drain_receipts(Eng, <<"nonexistent">>).
+%% {error,not_found}
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
+%%
 %% @param Engine Engine pid or name
 %% @param CaseId Case identifier
 %% @return [receipt()]
@@ -346,6 +452,23 @@ drain_receipts(Engine, CaseId) ->
 
 %%--------------------------------------------------------------------
 %% @doc Suspends a running case.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > {ok, CaseId} = wf_engine:start_case(Eng, #{data => #{}}, 0).
+%% _
+%% > wf_engine:suspend_case(Eng, CaseId, 1).
+%% ok
+%% > wf_engine:case_state(Eng, CaseId).
+%% suspended
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
 %%
 %% @param Engine Engine pid or name
 %% @param CaseId Case identifier
@@ -363,6 +486,25 @@ suspend_case(Engine, CaseId, Now) ->
 %%--------------------------------------------------------------------
 %% @doc Resumes a suspended case.
 %%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > {ok, CaseId} = wf_engine:start_case(Eng, #{data => #{}}, 0).
+%% _
+%% > wf_engine:suspend_case(Eng, CaseId, 1).
+%% ok
+%% > wf_engine:resume_case(Eng, CaseId, 2).
+%% ok
+%% > wf_engine:case_state(Eng, CaseId).
+%% running
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
+%%
 %% @param Engine Engine pid or name
 %% @param CaseId Case identifier
 %% @param Now Current time
@@ -378,6 +520,23 @@ resume_case(Engine, CaseId, Now) ->
 
 %%--------------------------------------------------------------------
 %% @doc Cancels a case.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > {ok, CaseId} = wf_engine:start_case(Eng, #{data => #{}}, 0).
+%% _
+%% > wf_engine:cancel_case(Eng, CaseId, 1).
+%% ok
+%% > wf_engine:case_state(Eng, CaseId).
+%% cancelled
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
 %%
 %% @param Engine Engine pid or name
 %% @param CaseId Case identifier
@@ -395,6 +554,19 @@ cancel_case(Engine, CaseId, Now) ->
 %%--------------------------------------------------------------------
 %% @doc Advances time for delayed starts.
 %%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > wf_engine:tick(Eng, 100).
+%% ok
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
+%%
 %% @param Engine Engine pid or name
 %% @param Delta Time delta in milliseconds
 %% @return ok
@@ -408,6 +580,21 @@ tick(Engine, Delta) ->
 
 %%--------------------------------------------------------------------
 %% @doc Gets enabled transitions for a case.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > {ok, CaseId} = wf_engine:start_case(Eng, #{data => #{}}, 0).
+%% _
+%% > wf_engine:enabled(Eng, CaseId).
+%% []
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
 %%
 %% @param Engine Engine pid or name
 %% @param CaseId Case identifier
@@ -425,6 +612,19 @@ enabled(Engine, CaseId) ->
 %%
 %% Returns list of service_request and service_timeout events.
 %%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > wf_engine:drain_events(Eng).
+%% []
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
+%%
 %% @param Engine Engine pid or name
 %% @return [term()]
 %%
@@ -437,6 +637,21 @@ drain_events(Engine) ->
 
 %%--------------------------------------------------------------------
 %% @doc Replies to a service request.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > {ok, CaseId} = wf_engine:start_case(Eng, #{data => #{}}, 0).
+%% _
+%% > wf_engine:service_reply(Eng, <<"req_nonexistent">>, CaseId, #{result => ok}, 1).
+%% ok
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
 %%
 %% @param Engine Engine pid or name
 %% @param ReqId Request identifier
@@ -457,6 +672,21 @@ service_reply(Engine, ReqId, CaseId, Reply, Now) ->
 %%--------------------------------------------------------------------
 %% @doc Publishes a message to an IPC channel.
 %%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > {ok, CaseId} = wf_engine:start_case(Eng, #{data => #{}}, 0).
+%% _
+%% > wf_engine:publish(Eng, CaseId, notifications, #{msg => hello}).
+%% ok
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
+%%
 %% @param Engine Engine pid or name
 %% @param CaseId Case identifier
 %% @param Channel Channel name
@@ -474,6 +704,23 @@ publish(Engine, CaseId, Channel, Message) ->
 %%--------------------------------------------------------------------
 %% @doc Gets the event log for a case.
 %%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > {ok, CaseId} = wf_engine:start_case(Eng, #{data => #{}}, 0).
+%% _
+%% > wf_engine:case_log(Eng, CaseId).
+%% []
+%% > wf_engine:case_log(Eng, <<"nonexistent">>).
+%% {error,not_found}
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
+%%
 %% @param Engine Engine pid or name
 %% @param CaseId Case identifier
 %% @return [term()] List of logged events
@@ -488,17 +735,40 @@ case_log(Engine, CaseId) ->
 %%--------------------------------------------------------------------
 %% @doc Runs doctests for the module.
 %%
+%% == Example
+%%
+%% ```erlang
+%% > wf_engine:doctest_test().
+%% ok
+%% ```
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec doctest_test() -> ok.
 
 doctest_test() ->
-    ok.
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
 %%--------------------------------------------------------------------
 %% @doc Sets a worklet for dynamic task replacement.
 %%
 %% The worklet rules will be checked before executing tasks. If a rule
 %% matches, the task will be replaced with the specified workflow.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > Spec = wf_engine:doctest_spec().
+%% _
+%% > {ok, Eng} = wf_engine:start_link(#{spec => Spec, seed => 1, now => 0}).
+%% _
+%% > Rules = [#{task => t1, 'when' => any, choose => replacement_wf}],
+%% .. Worklet = wf_worklet:new(Rules).
+%% _
+%% > wf_engine:set_worklet(Eng, Worklet).
+%% ok
+%% > gen_server:stop(Eng).
+%% ok
+%% ```
 %%
 %% @param Engine Engine pid or name
 %% @param Worklet Worklet containing rules for task replacement
@@ -516,6 +786,23 @@ set_worklet(Engine, Worklet) ->
 %%
 %% Evaluates worklet rules against case data to determine if a replacement
 %% workflow should be executed instead of the original task.
+%%
+%% == Example
+%%
+%% ```erlang
+%% > Rules = [
+%% ..   #{task => approve, 'when' => {gt, amount, 1000}, choose => approve_big},
+%% ..   #{task => approve, 'when' => any, choose => approve_small}
+%% .. ],
+%% .. Worklet = wf_worklet:new(Rules).
+%% _
+%% > wf_engine:apply_worklet(Worklet, approve, #{amount => 10}, 0).
+%% {ok,approve_small}
+%% > wf_engine:apply_worklet(Worklet, approve, #{amount => 5000}, 0).
+%% {ok,approve_big}
+%% > wf_engine:apply_worklet(Worklet, other_task, #{}, 0).
+%% {error,no_matching_rule}
+%% ```
 %%
 %% @param Worklet The worklet containing rules
 %% @param Task The task name to check for replacement

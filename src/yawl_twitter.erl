@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 %% @author YAWL Twitter/X Integration Implementation
-%% @copyright 2025
+%%
 %%
 %% @doc YAWL Twitter/X Social Media Integration Module for CRE
 %%

@@ -349,7 +349,7 @@ is_enabled('t_complete', #{'p_running' := Tokens}, _UsrInfo) when length(Tokens)
     true;
 is_enabled('t_check_quorum', #{'p_completed' := Completed}, #n_out_of_m_state{n = N}) when length(Completed) >= N ->
     true;
-is_enabled('t_proceed', #{'p_quorum_met' := [_]}, _UsrInfo) ->
+is_enabled('t_proceed', #{'p_quorum_met' := [quorum | _]}, _UsrInfo) ->
     true;
 is_enabled('t_complete_all', #{'p_remaining' := Remaining}, #n_out_of_m_state{m = M, completed = Completed}) when length(Remaining) + length(Completed) =:= M ->
     true;
@@ -650,6 +650,186 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+%% @doc Runs all doctests for the module.
+%% @private
 doctest_test() ->
     doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+
+%% Test basic place_lst callback
+place_lst_test() ->
+    Expected = [p_start, p_branch_pool, p_running, p_completed, p_quorum_met, p_remaining, p_output],
+    ?assertEqual(Expected, place_lst()).
+
+%% Test basic trsn_lst callback
+trsn_lst_test() ->
+    Expected = [t_split, t_execute, t_complete, t_check_quorum, t_proceed, t_complete_all],
+    ?assertEqual(Expected, trsn_lst()).
+
+%% Test preset for various transitions
+preset_t_split_test() ->
+    ?assertEqual([p_start], preset(t_split)).
+
+preset_t_execute_test() ->
+    ?assertEqual([p_branch_pool], preset(t_execute)).
+
+preset_t_complete_test() ->
+    ?assertEqual([p_running], preset(t_complete)).
+
+preset_t_check_quorum_test() ->
+    ?assertEqual([p_completed], preset(t_check_quorum)).
+
+preset_t_proceed_test() ->
+    ?assertEqual([p_quorum_met], preset(t_proceed)).
+
+preset_t_complete_all_test() ->
+    ?assertEqual([p_remaining], preset(t_complete_all)).
+
+preset_unknown_test() ->
+    ?assertEqual([], preset(unknown)).
+
+%% Test new/3 constructor
+new_2_out_of_3_test() ->
+    BranchFuns = [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end],
+    State = new(2, 3, BranchFuns),
+    ?assertEqual(3, State#n_out_of_m_state.m),
+    ?assertEqual(2, State#n_out_of_m_state.n),
+    ?assertEqual(3, length(State#n_out_of_m_state.branch_funs)),
+    ?assertEqual([], State#n_out_of_m_state.completed),
+    ?assertEqual(false, State#n_out_of_m_state.quorum_met).
+
+new_1_out_of_1_test() ->
+    BranchFun = fun(_) -> only end,
+    State = new(1, 1, [BranchFun]),
+    ?assertEqual(1, State#n_out_of_m_state.m),
+    ?assertEqual(1, State#n_out_of_m_state.n),
+    ?assertEqual(false, State#n_out_of_m_state.wait_for_all).
+
+new_all_out_of_m_test() ->
+    BranchFuns = [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end, fun(_) -> d end],
+    State = new(4, 4, BranchFuns),
+    ?assertEqual(4, State#n_out_of_m_state.m),
+    ?assertEqual(4, State#n_out_of_m_state.n).
+
+%% Test init_marking callback
+init_marking_p_start_test() ->
+    State = new(2, 3, [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end]),
+    ?assertEqual([start], init_marking(p_start, State)).
+
+init_marking_other_places_test() ->
+    State = new(2, 3, [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end]),
+    ?assertEqual([], init_marking(p_branch_pool, State)),
+    ?assertEqual([], init_marking(p_running, State)),
+    ?assertEqual([], init_marking(p_completed, State)),
+    ?assertEqual([], init_marking(p_quorum_met, State)),
+    ?assertEqual([], init_marking(p_remaining, State)),
+    ?assertEqual([], init_marking(p_output, State)).
+
+%% Test is_enabled callback
+is_enabled_t_split_test() ->
+    State = new(2, 3, [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end]),
+    Mode = #{p_start => [start]},
+    ?assert(is_enabled(t_split, Mode, State)).
+
+is_enabled_t_execute_with_tokens_test() ->
+    State = new(2, 3, [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end]),
+    Mode = #{p_branch_pool => [{{branch, 1}, fun(_) -> a end}]},
+    ?assert(is_enabled(t_execute, Mode, State)).
+
+is_enabled_t_execute_empty_test() ->
+    State = new(2, 3, [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end]),
+    Mode = #{p_branch_pool => []},
+    ?assertNot(is_enabled(t_execute, Mode, State)).
+
+is_enabled_t_complete_with_tokens_test() ->
+    State = new(2, 3, [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end]),
+    Mode = #{p_running => [{{branch, 1}, fun(_) -> a end}]},
+    ?assert(is_enabled(t_complete, Mode, State)).
+
+is_enabled_t_check_quorum_met_test() ->
+    State = new(2, 3, [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end]),
+    Mode = #{p_completed => [1, 2]},
+    ?assert(is_enabled(t_check_quorum, Mode, State)).
+
+is_enabled_t_check_quorum_not_met_test() ->
+    State = new(2, 3, [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end]),
+    Mode = #{p_completed => [1]},
+    ?assertNot(is_enabled(t_check_quorum, Mode, State)).
+
+is_enabled_t_proceed_test() ->
+    State = new(2, 3, [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end]),
+    Mode = #{p_quorum_met => [quorum, [1, 2]]},
+    ?assert(is_enabled(t_proceed, Mode, State)).
+
+is_enabled_t_proceed_empty_test() ->
+    State = new(2, 3, [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end]),
+    Mode = #{p_quorum_met => []},
+    ?assertNot(is_enabled(t_proceed, Mode, State)).
+
+%% Test fire/3 callback
+fire_t_split_test() ->
+    BranchFuns = [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end],
+    State = new(2, 3, BranchFuns),
+    Mode = #{p_start => [start]},
+    Result = fire(t_split, Mode, State),
+    ?assertMatch({produce, #{p_start := [], p_branch_pool := BranchTokens}, _}, Result),
+    {produce, ProducedMap, _NewState} = Result,
+    ?assertEqual(3, length(maps:get(p_branch_pool, ProducedMap))).
+
+fire_t_execute_test() ->
+    BranchFuns = [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end],
+    State = new(2, 3, BranchFuns),
+    Token = {{branch, 1}, fun(_) -> a end},
+    Mode = #{p_branch_pool => [Token]},
+    Result = fire(t_execute, Mode, State),
+    ?assertMatch({produce, #{p_branch_pool := [], p_running := [{{branch, 1}, _}]}, _}, Result).
+
+fire_t_complete_test() ->
+    BranchFuns = [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end],
+    State = new(2, 3, BranchFuns),
+    Token = {{branch, 1}, fun(_) -> a end},
+    Mode = #{p_running => [Token]},
+    Result = fire(t_complete, Mode, State),
+    ?assertMatch({produce, #{p_running := [], p_completed := [1]}, _}, Result),
+    {produce, _, NewState} = Result,
+    ?assertEqual([1], NewState#n_out_of_m_state.completed).
+
+fire_t_check_quorum_met_test() ->
+    BranchFuns = [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end],
+    State = new(2, 3, BranchFuns),
+    Mode = #{p_completed => [1, 2]},
+    Result = fire(t_check_quorum, Mode, State),
+    {produce, ProducedMap, NewState} = Result,
+    ?assertEqual(true, NewState#n_out_of_m_state.quorum_met),
+    ?assert(maps:is_key(p_quorum_met, ProducedMap)).
+
+fire_t_proceed_test() ->
+    BranchFuns = [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end],
+    State = new(2, 3, BranchFuns),
+    Mode = #{p_quorum_met => [quorum, [1, 2]]},
+    Result = fire(t_proceed, Mode, State),
+    ?assertMatch({produce, #{p_quorum_met := [], p_output := [{quorum_met, [1, 2]}]}, _}, Result).
+
+%% Test execute/3
+execute_2_out_of_3_test() ->
+    BranchFuns = [
+        fun(X) -> {1, X * 2} end,
+        fun(X) -> {2, X * 3} end,
+        fun(X) -> {3, X * 4} end
+    ],
+    Result = execute(2, BranchFuns, 5),
+    ?assertMatch({ok, _}, Result),
+    {ok, Results} = Result,
+    ?assertEqual(2, length(Results)).
+
+execute_1_out_of_1_test() ->
+    BranchFun = fun(X) -> {only, X * 10} end,
+    Result = execute(1, [BranchFun], 7),
+    ?assertMatch({ok, [{1, {only, 70}}]}, Result).
+
+%% Test trigger/3 - always returns pass
+trigger_pass_test() ->
+    State = new(2, 3, [fun(_) -> a end, fun(_) -> b end, fun(_) -> c end]),
+    ?assertEqual(pass, trigger(p_start, start, State)),
+    ?assertEqual(pass, trigger(p_output, result, State)).
+
 -endif.

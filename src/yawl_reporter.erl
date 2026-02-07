@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 %% @author YAWL Reporter Implementation
-%% @copyright 2025
+%%
 %%
 %% @doc YAWL Reporting and Data Export Module for CRE
 %%
@@ -438,8 +438,8 @@ to_json(Data) when is_map(Data); is_list(Data) ->
         jsone:encode(Data, [use_utf8, {float_format, [{decimals, 4}]}])
     catch
         _:_ ->
-            %% Fallback encoding
-            encode_json(Data)
+            %% Fallback encoding (encode_json returns iolist)
+            iolist_to_binary(encode_json(Data))
     end;
 to_json(Data) ->
     to_json(#{data => Data}).
@@ -804,15 +804,22 @@ escape_json(Bin) ->
 encode_xml(Data, RootTag, Indent) when is_map(Data) ->
     IndentStr = lists:duplicate(Indent, $ ),
     Items = [
-        [IndentStr, "<", K, ">", encode_xml(V, <<>>, 0), "</", K, ">\n"]
+        [IndentStr, "<", tag_to_iolist(K), ">", encode_xml(V, <<>>, 0), "</", tag_to_iolist(K), ">\n"]
         || {K, V} <- maps:to_list(Data)
     ],
     iolist_to_binary(["<", RootTag, ">\n", Items, "</", RootTag, ">"]);
 encode_xml(Data, _Tag, _Indent) when is_list(Data) ->
-    %% Simple list encoding
-    encode_json(Data);
+    %% Simple list encoding - must return binary for iolist_to_binary
+    iolist_to_binary(encode_json(Data));
 encode_xml(Data, _Tag, _Indent) ->
     to_string(Data).
+
+tag_to_iolist(K) when is_atom(K) ->
+    atom_to_binary(K, utf8);
+tag_to_iolist(K) when is_binary(K) ->
+    K;
+tag_to_iolist(K) when is_integer(K) ->
+    integer_to_binary(K).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -928,7 +935,9 @@ generate_html_content(Data) ->
 
 generate_summary_section(Data) ->
     ExportedAt = maps:get(exported_at, Data, 0),
-    DateStr = httpd_util:rfc1123_date(ExportedAt div 1000),
+    %% rfc1123_date expects {{Y,M,D},{H,Min,S}}; convert ms to datetime
+    DateTime = calendar:system_time_to_universal_time(ExportedAt div 1000, second),
+    DateStr = httpd_util:rfc1123_date(DateTime),
 
     Items = [
         {case_id, maps:get(case_id, Data, <<"N/A">>)},
@@ -1158,11 +1167,12 @@ doctest_test() ->
     true = byte_size(Id1) > 8,
     true = (Id1 =/= Id2),
 
-    %% Test 18: encode_json with nested map
+    %% Test 18: encode_json with nested map (returns iolist)
     NestedJson = encode_json(#{outer => #{inner => <<"value">>}}),
     true = is_list(NestedJson),
-    true = lists:member(<<"outer">>, NestedJson) orelse
-            lists:member("\"outer\"", NestedJson),
+    NestedBin = iolist_to_binary(NestedJson),
+    true = byte_size(NestedBin) > 0,
+    true = binary:match(NestedBin, <<"outer">>) =/= nomatch,
 
     %% Test 19: list_schedules when scheduler not running
     %% Returns empty list when scheduler process is not available

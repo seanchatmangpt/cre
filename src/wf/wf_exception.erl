@@ -1,26 +1,8 @@
 %% -*- erlang -*-
 %%
-%% CRE: common runtime environment for distributed programming languages
-%%
-%% Copyright 2015-2025 CRE Team
-%%
-%% Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
-%%
-%%     http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
-%%
-%% -------------------------------------------------------------------
-
 -module(wf_exception).
 
--moduledoc "
+-moduledoc """
 Exception handling constructs for workflow engine.
 
 Provides try-catch regions, compensation tracking, and exception propagation
@@ -34,33 +16,31 @@ Exception types:
 - `validation_error`: Input validation failures
 
 ```erlang
-> %% Create an application error exception
 > E = wf_exception:new(application_error, payment_failed, #{amount => 100}).
+_  %% exception map created
+
 > wf_exception:type(E).
 application_error
+
 > wf_exception:data(E).
 #{amount => 100}
 
-> %% Create compensation action
 > C = wf_exception:compensation(refund_payment, #{txn_id => tx123}).
+_  %% compensation map created
+
 > wf_exception:comp_action(C).
 refund_payment
+
 > wf_exception:comp_data(C).
 #{txn_id => tx123}
 
-> %% Handle exception by type
-> Handler = wf_exception:handler(fun(E) -> wf_exception:type(E) =:= application_error end,
->                                 fun(_, _) -> {error_handled, app} end).
-> wf_exception:handle(E, Handler).
-{error_handled, app}
+> wf_exception:is_bubbleable(E).
+false
 
-> %% Unhandled exception propagates
-> Handler2 = wf_exception:handler(fun(E) -> wf_exception:type(E) =:= system_error end,
->                                  fun(_, _) -> {error_handled, sys} end).
-> wf_exception:handle(E, Handler2).
-{unhandled, E}
+> wf_exception:is_bubbleable(wf_exception:bubble(E)).
+true
 ```
-".
+""".
 
 %%====================================================================
 %% Exports
@@ -568,5 +548,13 @@ set_source_test() ->
     Exc = new(application_error, foo),
     Exc2 = set_source(Exc, task_123),
     ?assertEqual(task_123, source(Exc2)).
+
+%%--------------------------------------------------------------------
+%% @doc Runs doctests for the module.
+%%
+%% Tests all examples in the module documentation and function specs.
+%%--------------------------------------------------------------------
+doctest_test() ->
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
 
 -endif.

@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 %% @author YAWL Timeout and Cancellation Team
-%% @copyright 2025
+%%
 %%
 %% @doc YAWL Timeout and Cancellation Infrastructure
 %%

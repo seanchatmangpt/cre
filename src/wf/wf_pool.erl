@@ -168,7 +168,7 @@ transaction(Pool, Fun, Timeout) when is_integer(Timeout), Timeout > 0 ->
         full ->
             logger:warning("wf_pool: Pool ~p is full, returning busy", [Pool]),
             {error, busy};
-        {ok, Worker} ->
+        Worker when is_pid(Worker) ->
             try
                 Result = Fun(Worker),
                 poolboy:checkin(Pool, Worker),
@@ -179,9 +179,6 @@ transaction(Pool, Fun, Timeout) when is_integer(Timeout), Timeout > 0 ->
                                 [Type, Error, Stack]),
                     poolboy:checkin(Pool, Worker),
                     {error, exception}
-            after
-                %% Ensure worker is checked in even on timeout
-                poolboy:checkin(Pool, Worker)
             end;
         {error, Reason} ->
             logger:error("wf_pool: Checkout error: ~p", [Reason]),

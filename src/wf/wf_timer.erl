@@ -327,7 +327,7 @@ day_ms() -> 86400000.
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_test() ->
-    doctest:module(?MODULE, #{modledoc => true, doc => true}).
+    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
 
 %% Basic day duration test
 parse_day_test() ->
@@ -403,10 +403,10 @@ parse_no_number_test() ->
 parse_invalid_chars_test() ->
     ?assertEqual({error, invalid_format}, parse_duration(<<"P1X">>)).
 
-%% To seconds test
+%% To seconds test (PT1H30M = 5400 seconds)
 to_seconds_test() ->
     ?assertEqual(300, to_seconds(<<"PT5M">>)),
-    ?assertEqual(90, to_seconds(<<"PT1H30M">>)),
+    ?assertEqual(5400, to_seconds(<<"PT1H30M">>)),
     ?assertEqual(86400, to_seconds(<<"P1D">>)).
 
 %% Large duration test
@@ -426,9 +426,9 @@ parse_time_only_test() ->
 parse_date_only_test() ->
     ?assertEqual({ok, 950400000}, parse_duration(<<"P11D">>)).
 
-%% All date components
+%% All date components (1Y=365d, 2M=60d, 3D=3d => 428d = 36979200000 ms)
 parse_all_date_test() ->
-    ?assertEqual({ok, 36993600000}, parse_duration(<<"P1Y2M3D">>)).
+    ?assertEqual({ok, 36979200000}, parse_duration(<<"P1Y2M3D">>)).
 
 %% All time components
 parse_all_time_test() ->

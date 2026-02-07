@@ -58,6 +58,7 @@
              wf_services,
              wf_spec,
              wf_task,
+             wf_timer,
              wf_timerq,
              wf_verify,
              wf_worklet,

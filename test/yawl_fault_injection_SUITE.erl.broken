@@ -1,0 +1,385 @@
+%% -*- erlang -*-
+%%%% @doc Fault Injection Test Suite for YAWL Workflows
+%%
+%% This test suite validates the system's ability to recover from
+%% various failure scenarios including process crashes, network
+%% partitions, resource exhaustion, and data corruption.
+%%
+%% @end
+%% -------------------------------------------------------------------
+
+-module(yawl_fault_injection_SUITE).
+-compile([export_all, nowarn_export_all]).
+
+-include_lib("common_test/include/ct.hrl").
+-include_lib("eunit/include/eunit.hrl").
+
+%%====================================================================
+%% Suite Callbacks
+%%====================================================================
+
+suite() ->
+    [{timetrap, {seconds, 60}}].
+
+all() ->
+    [
+        kill_gen_yawl_during_transition_recovers,
+        callback_crash_isolated,
+        memory_exhaustion_handled_gracefully,
+        disk_write_failure_during_checkpoint,
+        invalid_marking_data_handled,
+        timeout_on_fire_handled,
+        concurrent_start_link_errors,
+        stale_message_handling
+    ].
+
+init_per_suite(Config) ->
+    %% Ensure yawl_persistence is initialized
+    application:start(mnesia),
+    yawl_persistence:init_schema(),
+    Config.
+
+end_per_suite(_Config) ->
+    application:stop(mnesia),
+    ok.
+
+init_per_testcase(_TestCase, Config) ->
+    Config.
+
+end_per_testcase(_TestCase, _Config) ->
+    %% Clean up any remaining processes
+    cleanup_processes(),
+    ok.
+
+%%====================================================================
+%% Test Cases
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Test that killing gen_yawl during transition allows recovery
+%%--------------------------------------------------------------------
+kill_gen_yawl_during_transition_recovers(_Config) ->
+    NetMod = test_fault_recovery_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, [{fire_timeout, 5000}]),
+    %% Let it start
+    timer:sleep(50),
+    %% Kill the process abruptly
+    exit(Pid, kill),
+    timer:sleep(50),
+    %% Process should be dead
+    false = is_process_alive(Pid),
+    %% Can restart
+    {ok, NewPid} = gen_yawl:start_link(NetMod, undefined, [{fire_timeout, 5000}]),
+    true = is_process_alive(NewPid),
+    gen_yawl:stop(NewPid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that callback crashes are isolated and don't crash gen_server
+%%--------------------------------------------------------------------
+callback_crash_isolated(_Config) ->
+    NetMod = test_crash_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, [{fire_timeout, 1000}]),
+    timer:sleep(100),
+    %% Process should still be alive despite callback crashes
+    true = is_process_alive(Pid),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that memory exhaustion is handled gracefully
+%%--------------------------------------------------------------------
+memory_exhaustion_handled_gracefully(_Config) ->
+    NetMod = test_large_data_workflow,
+    %% Start with limited memory simulation
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, [{fire_timeout, 5000}]),
+    timer:sleep(100),
+    %% Process should handle large data
+    true = is_process_alive(Pid),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that disk write failures during checkpoint are handled
+%%--------------------------------------------------------------------
+disk_write_failure_during_checkpoint(_Config) ->
+    %% Simulate Mnesia being unavailable
+    application:stop(mnesia),
+    NetMod = test_simple_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    timer:sleep(50),
+    %% Should still work even if checkpoint fails
+    true = is_process_alive(Pid),
+    gen_yawl:stop(Pid),
+    %% Restart Mnesia for other tests
+    application:start(mnesia),
+    yawl_persistence:init_schema(),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that invalid marking data is handled
+%%--------------------------------------------------------------------
+invalid_marking_data_handled(_Config) ->
+    NetMod = test_invalid_data_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, [{fire_timeout, 1000}]),
+    timer:sleep(100),
+    %% Process should handle invalid data gracefully
+    true = is_process_alive(Pid),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that timeout on fire is handled
+%%--------------------------------------------------------------------
+timeout_on_fire_handled(_Config) ->
+    NetMod = test_slow_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, [{fire_timeout, 100}]),
+    timer:sleep(200),
+    %% Process should handle timeout gracefully
+    true = is_process_alive(Pid),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test that concurrent start_link errors are handled
+%%--------------------------------------------------------------------
+concurrent_start_link_errors(_Config) ->
+    NetMod = test_simple_workflow,
+    Name = {local, test_concurrent_fault},
+    %% Try to start two processes with same name
+    {ok, Pid1} = gen_yawl:start_link(Name, NetMod, undefined, []),
+    {error, {already_started, Pid1}} = gen_yawl:start_link(Name, NetMod, undefined, []),
+    gen_yawl:stop(Pid1),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Test handling of stale messages
+%%--------------------------------------------------------------------
+stale_message_handling(_Config) ->
+    NetMod = test_simple_workflow,
+    {ok, Pid} = gen_yawl:start_link(NetMod, undefined, []),
+    %% Send unusual messages
+    Pid ! {unknown_message, data},
+    Pid ! <<1, 2, 3>>,
+    Pid ! [],
+    timer:sleep(50),
+    %% Process should still be alive
+    true = is_process_alive(Pid),
+    gen_yawl:stop(Pid),
+    ok.
+
+%%====================================================================
+%% Test Workflow Modules
+%%====================================================================
+
+-module(test_fault_recovery_workflow).
+-behaviour(gen_yawl).
+
+-export([
+    place_lst/0, trsn_lst/0,
+    init_marking/2, preset/1, is_enabled/3, fire/3,
+    init/1, handle_call/3, handle_cast/2, handle_info/2,
+    code_change/3, terminate/2, trigger/3
+]).
+
+place_lst() -> [start, done].
+trsn_lst() -> [t1].
+
+init_marking(start, _UsrInfo) -> [init];
+init_marking(done, _UsrInfo) -> [].
+
+preset(t1) -> [start].
+
+is_enabled(t1, #{start := [init]}, _UsrInfo) -> true;
+is_enabled(_, _, _) -> false.
+
+fire(t1, #{start := []}, _UsrInfo) -> {produce, #{done => [complete]}}.
+
+init(_Arg) -> #{}.
+handle_call(_Request, _From, _State) -> {reply, ok}.
+handle_cast(_Request, _State) -> noreply.
+handle_info(_Info, _State) -> noreply.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+terminate(_Reason, _State) -> ok.
+trigger(_Place, _Token, _State) -> pass.
+
+-module(test_crash_workflow).
+-behaviour(gen_yawl).
+
+-export([
+    place_lst/0, trsn_lst/0,
+    init_marking/2, preset/1, is_enabled/3, fire/3,
+    init/1, handle_call/3, handle_cast/2, handle_info/2,
+    code_change/3, terminate/2, trigger/3
+]).
+
+place_lst() -> [start].
+trsn_lst() -> [t1].
+
+init_marking(start, _UsrInfo) -> [init];
+init_marking(_, _UsrInfo) -> [].
+
+preset(t1) -> [start].
+
+is_enabled(t1, #{start := [init]}, _UsrInfo) -> true;
+is_enabled(_, _, _) -> false.
+
+fire(t1, #{start := [init]}, _UsrInfo) ->
+    %% Simulate callback crash
+    erlang:error(simulated_callback_crash);
+fire(_, _, _) ->
+    abort.
+
+init(_Arg) -> #{}.
+handle_call(_Request, _From, _State) -> {reply, ok}.
+handle_cast(_Request, _State) -> noreply.
+handle_info(_Info, _State) -> noreply.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+terminate(_Reason, _State) -> ok.
+trigger(_Place, _Token, _State) -> pass.
+
+-module(test_large_data_workflow).
+-behaviour(gen_yawl).
+
+-export([
+    place_lst/0, trsn_lst/0,
+    init_marking/2, preset/1, is_enabled/3, fire/3,
+    init/1, handle_call/3, handle_cast/2, handle_info/2,
+    code_change/3, terminate/2, trigger/3
+]).
+
+place_lst() -> [start, done].
+trsn_lst() -> [t1].
+
+init_marking(start, _UsrInfo) -> [init];
+init_marking(done, _UsrInfo) -> [].
+
+preset(t1) -> [start].
+
+is_enabled(t1, #{start := [init]}, _UsrInfo) -> true;
+is_enabled(_, _, _) -> false.
+
+fire(t1, #{start := []}, _UsrInfo) ->
+    LargeBinary = << <<0>> || _ <- lists:seq(1, 10000) >>,
+    {produce, #{done => [LargeBinary]}}.
+
+init(_Arg) -> #{}.
+handle_call(_Request, _From, _State) -> {reply, ok}.
+handle_cast(_Request, _State) -> noreply.
+handle_info(_Info, _State) -> noreply.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+terminate(_Reason, _State) -> ok.
+trigger(_Place, _Token, _State) -> pass.
+
+-module(test_simple_workflow).
+-behaviour(gen_yawl).
+
+-export([
+    place_lst/0, trsn_lst/0,
+    init_marking/2, preset/1, is_enabled/3, fire/3,
+    init/1, handle_call/3, handle_cast/2, handle_info/2,
+    code_change/3, terminate/2, trigger/3
+]).
+
+place_lst() -> [start, done].
+trsn_lst() -> [t1].
+
+init_marking(start, _UsrInfo) -> [init];
+init_marking(done, _UsrInfo) -> [].
+
+preset(t1) -> [start].
+
+is_enabled(t1, #{start := [init]}, _UsrInfo) -> true;
+is_enabled(_, _, _) -> false.
+
+fire(t1, #{start := []}, _UsrInfo) -> {produce, #{done => [complete]}}.
+
+init(_Arg) -> #{}.
+handle_call(_Request, _From, _State) -> {reply, ok}.
+handle_cast(_Request, _State) -> noreply.
+handle_info(_Info, _State) -> noreply.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+terminate(_Reason, _State) -> ok.
+trigger(_Place, _Token, _State) -> pass.
+
+-module(test_invalid_data_workflow).
+-behaviour(gen_yawl).
+
+-export([
+    place_lst/0, trsn_lst/0,
+    init_marking/2, preset/1, is_enabled/3, fire/3,
+    init/1, handle_call/3, handle_cast/2, handle_info/2,
+    code_change/3, terminate/2, trigger/3
+]).
+
+place_lst() -> [start].
+trsn_lst() -> [t1].
+
+init_marking(start, _UsrInfo) -> [init];
+init_marking(_, _UsrInfo) -> [].
+
+preset(t1) -> [start].
+
+is_enabled(t1, #{start := [init]}, _UsrInfo) -> true;
+is_enabled(_, _, _) -> false.
+
+fire(t1, #{start := [init]}, _UsrInfo) ->
+    %% Return malformed produce map
+    {produce, invalid_map};
+fire(_, _, _) ->
+    abort.
+
+init(_Arg) -> #{}.
+handle_call(_Request, _From, _State) -> {reply, ok}.
+handle_cast(_Request, _State) -> noreply.
+handle_info(_Info, _State) -> noreply.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+terminate(_Reason, _State) -> ok.
+trigger(_Place, _Token, _State) -> pass.
+
+-module(test_slow_workflow).
+-behaviour(gen_yawl).
+
+-export([
+    place_lst/0, trsn_lst/0,
+    init_marking/2, preset/1, is_enabled/3, fire/3,
+    init/1, handle_call/3, handle_cast/2, handle_info/2,
+    code_change/3, terminate/2, trigger/3
+]).
+
+place_lst() -> [start].
+trsn_lst() -> [t1].
+
+init_marking(start, _UsrInfo) -> [init];
+init_marking(_, _UsrInfo) -> [].
+
+preset(t1) -> [start].
+
+is_enabled(t1, #{start := [init]}, _UsrInfo) -> true;
+is_enabled(_, _, _) -> false.
+
+fire(t1, #{start := [init]}, _UsrInfo) ->
+    %% Sleep longer than timeout
+    timer:sleep(5000),
+    abort.
+
+init(_Arg) -> #{}.
+handle_call(_Request, _From, _State) -> {reply, ok}.
+handle_cast(_Request, _State) -> noreply.
+handle_info(_Info, _State) -> noreply.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+terminate(_Reason, _State) -> ok.
+trigger(_Place, _Token, _State) -> pass.
+
+%%====================================================================
+%% Helper Functions
+%%====================================================================
+
+cleanup_processes() ->
+    %% Clean up any test processes
+    try
+        gen_yawl:stop(test_concurrent_fault)
+    catch
+        _:_ -> ok
+    end,
+    ok.

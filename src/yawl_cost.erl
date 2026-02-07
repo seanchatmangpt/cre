@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 %% @author YAWL Cost Tracking Implementation
-%% @copyright 2025
+%%
 %%
 %% @doc YAWL Cost Tracking Module for CRE
 %%

@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 %% @author YAWL Monitor Implementation
-%% @copyright 2025
+%%
 %%
 %% @doc YAWL Workflow Monitoring Module for CRE
 %%
