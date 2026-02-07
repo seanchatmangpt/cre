@@ -1,6 +1,6 @@
 # Human-in-the-Loop Workflows with LLM Integration
 
-**Objective:** Comprehensive guide to human-in-the-loop (HITL) workflows in CRE v0.2.1, featuring LLM-powered approval decisions, multi-modal approval flows, and seamless integration with the OpenTelemetry observability stack.
+**Objective:** Comprehensive guide to human-in-the-loop (HITL) workflows in CRE v0.3.0, featuring LLM-powered approval decisions, multi-modal approval flows, and seamless integration with the OpenTelemetry observability stack.
 
 ## Executive Summary
 
@@ -8,7 +8,7 @@ This system enables YAWL workflows to pause at designated checkpoints and requir
 
 ## Table of Contents
 
-- [What's New in v0.2.1](#whats-new-in-v021)
+- [What's New in v0.3.0](#whats-new-in-v030)
 - [Architecture Overview](#architecture-overview)
 - [Key Components](#key-components)
 - [Installation](#installation)
@@ -24,7 +24,7 @@ This system enables YAWL workflows to pause at designated checkpoints and requir
 
 ---
 
-## What's New in v0.2.1
+## What's New in v0.3.0
 
 ### 🚀 Major Enhancements
 
@@ -79,7 +79,7 @@ This system enables YAWL workflows to pause at designated checkpoints and requir
 
 ## Key Components
 
-### 1. `cre_hil` - Human-in-the-Loop Service (v0.2.1+)
+### 1. `cre_hil` - Human-in-the-Loop Service (v0.3.0+)
 
 Unified HITL service providing comprehensive approval management:
 
@@ -117,7 +117,7 @@ Unified HITL service providing comprehensive approval management:
 - Integration with OpenTelemetry logging
 - Web dashboard real-time updates
 
-### 2. `cre_llm_integration` - Multi-LLM Integration (v0.2.1+)
+### 2. `cre_llm_integration` - Multi-LLM Integration (v0.3.0+)
 
 Unified LLM integration supporting multiple providers:
 
@@ -157,7 +157,7 @@ Context = #{
 - Cost tracking and usage analytics
 - Custom model temperature and parameter tuning
 
-### 3. `cre_approval_middleware` - Enhanced Approval Middleware (v0.2.1+)
+### 3. `cre_approval_middleware` - Enhanced Approval Middleware (v0.3.0+)
 
 Advanced middleware with automatic checkpoint detection and routing:
 
@@ -200,7 +200,7 @@ Wrapped = cre_approval_middleware:with_auto_approval(Pattern, Config).
 - Performance metrics collection
 - Real-time dashboard integration
 
-### 4. `cre_approval_worker` - Enterprise Approval Worker (v0.2.1+)
+### 4. `cre_approval_worker` - Enterprise Approval Worker (v0.3.0+)
 
 Robust background worker with enterprise features:
 
@@ -769,7 +769,7 @@ Creates middleware that approves around execution.
 
 ### Overview
 
-All approval workflows in CRE v0.2.1 integrate seamlessly with the OpenTelemetry observability stack via the `yawl_otel_logger` module. This provides comprehensive monitoring, tracing, and analytics for human-in-the-loop processes.
+All approval workflows in CRE v0.3.0 integrate seamlessly with the OpenTelemetry observability stack via the `yawl_otel_logger` module. This provides comprehensive monitoring, tracing, and analytics for human-in-the-loop processes.
 
 ### Automatic Logging
 

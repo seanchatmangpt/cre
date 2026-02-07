@@ -2,7 +2,7 @@
 
 **Document Version:** 1.0
 **Date:** February 6, 2026
-**Applies to:** CRE 0.2.0 / 2.1.0
+**Applies to:** CRE 0.3.0
 **OTP Versions:** 25.0, 26, 27, 28
 
 ---
@@ -613,6 +613,6 @@ fire(_Trsn, _Mode, _UsrInfo) -> abort.
 **Last Updated:** 2026-02-06
 **Related Documents:**
 - `/Users/sac/cre/docs/FINAL_MERGE_SUMMARY.md`
-- `/Users/sac/cre/docs/RELEASE_NOTES_2.1.0.md`
+- `/Users/sac/cre/docs/RELEASE_NOTES_0.3.0.md`
 - `/Users/sac/cre/src/core/gen_pnet.erl`
 - `/Users/sac/cre/src/core/gen_yawl.erl`

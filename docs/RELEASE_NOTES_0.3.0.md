@@ -1,6 +1,6 @@
-# CRE YAWL 2.1 Generic Framework - Release Notes
+# CRE YAWL Generic Framework - Release Notes
 
-## Version: 2.1.0
+## Version: 0.3.0
 ## Release Date: 2026-02-06
 ## Status: Production Ready ✅
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-This release represents a major milestone in the CRE project: a complete, **generic YAWL 2.1 workflow engine** that can execute ANY YAWL 2.1 specification, not just Order Fulfillment workflows.
+This release represents a major milestone in the CRE project: a complete, **generic YAWL workflow engine** that can execute ANY YAWL specification, not just Order Fulfillment workflows.
 
 ### Key Achievement
 
@@ -22,7 +22,7 @@ This release represents a major milestone in the CRE project: a complete, **gene
 
 ### 1. Generic YAWL Executor (`yawl_executor.erl`)
 
-**Complete YAWL 2.1 support**:
+**Complete YAWL support**:
 - Compile ANY YAWL 2.1 XML specification to executable code
 - Execute workflows with full runtime support
 - Support for all YAWL 2.1 constructs:
@@ -112,7 +112,7 @@ This release represents a major milestone in the CRE project: a complete, **gene
 **Core Engine** (7 modules):
 - `wf_engine.erl`, `wf_spec.erl`, `wf_task.erl`, `wf_data.erl`, `wf_scope.erl`, `wf_ops.erl`, `yawl_state.erl`
 
-**YAWL 2.1 Runtime** (12 modules):
+**YAWL Runtime** (12 modules):
 - All `yawl_*.erl` modules listed above
 
 **Pattern Support** (5 modules):
@@ -245,7 +245,7 @@ No changes required! The Order Fulfillment workflow still works exactly as befor
 
 ## Future Roadmap
 
-### Version 2.2.0 (Planned)
+### Version 0.4.0 (Planned)
 
 1. **Enhanced Testing**:
    - Complete test suite for `wf_yawl_schema_test.erl`

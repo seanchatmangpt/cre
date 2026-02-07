@@ -1,6 +1,6 @@
 # CRE - Known Issues and Limitations
 
-**Version:** 0.2.0 / 2.1.0
+**Version:** 0.3.0
 **Last Updated:** 2026-02-06
 **Status:** Active Tracking
 

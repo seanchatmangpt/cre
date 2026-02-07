@@ -1,6 +1,6 @@
 # CRE Architecture - Joe Armstrong Design
 
-**CRE Version:** 0.2.0 / 2.1.0
+**CRE Version:** 0.3.0
 **OTP Support:** 25.0, 26, 27, 28
 **Last Updated:** 2026-02-06
 

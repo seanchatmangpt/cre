@@ -2,23 +2,23 @@
 
 ## Overview
 
-This document provides detailed documentation for all 43 YAWL (Yet Another Workflow Language) workflow patterns implemented in CRE v0.2.1. The patterns are categorized into seven groups based on their functionality and complexity.
+This document provides detailed documentation for all 43 YAWL (Yet Another Workflow Language) workflow patterns implemented in CRE v0.3.0. The patterns are categorized into seven groups based on their functionality and complexity.
 
 ## Version Information
 
-- **CRE Version**: v0.2.1
+- **CRE Version**: v0.3.0
 - **OTP Support**: 25.0 - 28.x
 - **Patterns Count**: 26 of 43 YAWL patterns implemented (60.5%)
 - **Last Updated**: December 2024
 
 ## Quick Links
 
-- [New Features in v0.2.1](#new-features-in-v021)
+- [New Features in v0.3.0](#new-features-in-v030)
 - [Performance Characteristics](#performance-characteristics)
 - [DOT Graph Visualizations](#dot-graph-visualizations)
 - [Real-world Use Cases](#real-world-use-cases)
 
-## New Features in v0.2.1
+## New Features in v0.3.0
 
 ### Enhancements
 - ✅ **Human-in-the-loop integration** with LLM support

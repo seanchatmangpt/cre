@@ -13,7 +13,7 @@ This learning path provides a structured approach to mastering the 43 YAWL (Yet 
 
 ## Version Information
 
-- **CRE Version**: v0.2.1
+- **CRE Version**: v0.3.0
 - **OTP Support**: 25.0 - 28.x
 - **Patterns Count**: 43 complete YAWL patterns
 - **Engine Module**: `wf_engine.erl`

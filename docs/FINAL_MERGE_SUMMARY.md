@@ -3,7 +3,7 @@
 **Date:** February 6, 2026
 **Merge Branch:** `merge-all-remote-branches`
 **Status:** COMPLETE with follow-up items
-**CRE Version:** 0.2.0 / 2.1.0
+**CRE Version:** 0.3.0
 
 ---
 
