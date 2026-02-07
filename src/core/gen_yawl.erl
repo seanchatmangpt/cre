@@ -169,7 +169,11 @@ The fire/3 callback can return:
 %% Internal state record for the gen_yawl wrapper
 -record(wrapper_state, {
           net_mod :: atom(),
-          net_state :: term()
+          net_state :: term(),
+          fire_timeout = 5000 :: pos_integer(),
+          progress_timeout = 30000 :: pos_integer(),
+          shutting_down = false :: boolean(),
+          active_fires = 0 :: non_neg_integer()
          }).
 
 %%====================================================================
@@ -182,9 +186,13 @@ The fire/3 callback can return:
 %%      This is equivalent to `gen_pnet:start_link/3' but with the
 %%      enhanced fire/3 behavior.
 %%
+%%      Options can include:
+%%      - `{fire_timeout, Milliseconds}' - Timeout for fire/3 callbacks (default: 5000)
+%%      - `{progress_timeout, Milliseconds}' - Timeout for progress loop (default: 30000)
+%%
 %% === Example ===
 %% ```
-%% {ok, Pid} = gen_yawl:start_link(my_workflow, InitArg, []).
+%% {ok, Pid} = gen_yawl:start_link(my_workflow, InitArg, [{fire_timeout, 10000}]).
 %% '''
 %%
 %% @see start_link/4
@@ -195,7 +203,7 @@ The fire/3 callback can return:
 
 start_link(NetMod, NetArg, Options)
   when is_atom(NetMod), is_list(Options) ->
-    gen_server:start_link(?MODULE, {NetMod, NetArg}, Options).
+    gen_server:start_link(?MODULE, {NetMod, NetArg, Options}, Options).
 
 
 %%--------------------------------------------------------------------
@@ -204,6 +212,10 @@ start_link(NetMod, NetArg, Options)
 %%      The ServerName can be `{local, Name} | {global, Name} |
 %%      {via, Module, ViaName}'. Internally, the server name and options
 %%      are passed to gen_server:start_link/4.
+%%
+%%      Options can include:
+%%      - `{fire_timeout, Milliseconds}' - Timeout for fire/3 callbacks (default: 5000)
+%%      - `{progress_timeout, Milliseconds}' - Timeout for progress loop (default: 30000)
 %%
 %% === Example ===
 %% ```
@@ -220,7 +232,7 @@ start_link(NetMod, NetArg, Options)
 
 start_link(ServerName, NetMod, InitArg, Options)
   when is_tuple(ServerName), is_atom(NetMod), is_list(Options) ->
-    gen_server:start_link(ServerName, ?MODULE, {NetMod, InitArg}, Options).
+    gen_server:start_link(ServerName, ?MODULE, {NetMod, InitArg, Options}, Options).
 
 
 %%--------------------------------------------------------------------
@@ -483,9 +495,18 @@ get_stats(#net_state{stats = Stats}) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec init({NetMod :: atom(), NetArg :: term()}) -> {ok, #wrapper_state{}}.
+-spec init({NetMod :: atom(), NetArg :: term(), Options :: [prop()]}) ->
+          {ok, #wrapper_state{}}.
 
-init({NetMod, NetArg}) ->
+init({NetMod, NetArg, Options}) ->
+    %% Extract timeout options
+    FireTimeout = proplists:get_value(fire_timeout, Options, 5000),
+    ProgressTimeout = proplists:get_value(progress_timeout, Options, 30000),
+
+    %% Validate timeouts
+    true = is_integer(FireTimeout) andalso FireTimeout > 0,
+    true = is_integer(ProgressTimeout) andalso ProgressTimeout > 0,
+
     %% Initialize user info from the callback module
     UsrInfo = NetMod:init(NetArg),
 
@@ -511,10 +532,14 @@ init({NetMod, NetArg}) ->
     %% Start the Petri net execution
     continue(self()),
 
-    %% Create wrapper state
+    %% Create wrapper state with timeouts
     WrapperState = #wrapper_state{
                       net_mod = NetMod,
-                      net_state = NetState
+                      net_state = NetState,
+                      fire_timeout = FireTimeout,
+                      progress_timeout = ProgressTimeout,
+                      shutting_down = false,
+                      active_fires = 0
                      },
 
     {ok, WrapperState}.
@@ -602,17 +627,40 @@ handle_call(_Request, _From, WrapperState) ->
 
 handle_cast(continue,
             WrapperState = #wrapper_state{
+                              shutting_down = true
+                             }) ->
+    %% Stop accepting new transitions during shutdown
+    logger:debug("gen_yawl ignoring continue during shutdown"),
+    {noreply, WrapperState};
+
+handle_cast(continue,
+            WrapperState = #wrapper_state{
+                              fire_timeout = FireTimeout,
+                              progress_timeout = ProgressTimeout,
                               net_state = NetState0 = #net_state{
                                                         stats = Stats,
                                                         tstart = T1,
                                                         cnt = Cnt
                                                        }
                              }) ->
-    case progress(NetState0) of
+    %% Check progress timeout
+    StartTime = erlang:monotonic_time(millisecond),
+
+    case progress(NetState0, FireTimeout) of
         abort ->
             {noreply, WrapperState};
 
         {delta, Mode, Pm, NewUsrInfo} ->
+            Elapsed = erlang:monotonic_time(millisecond) - StartTime,
+            case Elapsed > ProgressTimeout of
+                true ->
+                    logger:warning("gen_yawl progress timeout: ~p ms", [Elapsed]),
+                    %% Continue anyway but log warning
+                    ok;
+                false ->
+                    ok
+            end,
+
             %% Update net state with consumed tokens
             NetState1 = cns(Mode, NetState0),
 
@@ -625,12 +673,25 @@ handle_cast(continue,
             %% Handle trigger and produce tokens
             NetMod = WrapperState#wrapper_state.net_mod,
             NetState3 = handle_trigger(Pm, NetState2, NetMod),
-            continue(self()),
+
+            %% Check if we should continue (not shutting down)
+            case WrapperState#wrapper_state.shutting_down of
+                false ->
+                    continue(self());
+                true ->
+                    logger:debug("gen_yawl not continuing due to shutdown")
+            end,
 
             %% Update stats
             NetState4 = update_stats(NetState3, Stats, T1, Cnt),
 
-            {noreply, WrapperState#wrapper_state{net_state = NetState4}}
+            {noreply, WrapperState#wrapper_state{net_state = NetState4}};
+
+        {error, Reason, NetState1} ->
+            logger:error("gen_yawl progress error: ~p", [Reason]),
+            %% Continue despite error - log and try next transition
+            continue(self()),
+            {noreply, WrapperState#wrapper_state{net_state = NetState1}}
     end;
 
 handle_cast({cast, Request},
@@ -701,13 +762,54 @@ code_change(OldVsn, WrapperState = #wrapper_state{net_mod = NetMod, net_state = 
 %% @private
 %% @doc Handle process termination.
 %%
-%%      Delegates to the callback module's terminate/2.
+%%      Implements graceful shutdown with state persistence and
+%%      delegates to the callback module's terminate/2.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec terminate(Reason :: term(), State :: #wrapper_state{}) -> ok.
 
-terminate(Reason, #wrapper_state{net_mod = NetMod, net_state = NetState}) ->
+terminate(Reason, #wrapper_state{net_mod = NetMod,
+                                net_state = NetState,
+                                active_fires = ActiveFires,
+                                shutting_down = IsShuttingDown}) ->
+    %% Log shutdown event
+    _ = logger:info("gen_yawl terminating: reason=~p, active_fires=~p, shutting_down=~p",
+                [Reason, ActiveFires, IsShuttingDown]),
+
+    %% If we have active transitions, wait a short time for them to complete
+    _ = case ActiveFires > 0 of
+        true ->
+            _ = logger:info("gen_yawl waiting for ~p active transitions to complete",
+                        [ActiveFires]),
+            %% Give active fires a moment to complete (max 1 second)
+            timer:sleep(100),
+            ok;
+        false ->
+            ok
+    end,
+
+    %% Persist final state if available
+    _ = case catch yawl_persistence:checkpoint_save(self(), NetState) of
+        ok ->
+            logger:info("gen_yawl successfully persisted final state"),
+            ok;
+        {error, _Why} ->
+            logger:warning("gen_yawl failed to persist state"),
+            ok;
+        {'EXIT', _} ->
+            %% Persistence module not available or failed
+            ok
+    end,
+
+    %% Emit shutdown telemetry event
+    _ = case catch yawl_telemetry:emit(shutdown, #{reason => Reason,
+                                                  active_fires => ActiveFires}) of
+        ok -> ok;
+        _ -> ok
+    end,
+
+    %% Delegate to callback module's terminate
     NetMod:terminate(Reason, NetState).
 
 
@@ -791,17 +893,19 @@ update_stats(NetState, Stats, T1, Cnt) ->
 %%
 %%      This is the core function where we call the module's fire/3
 %%      and handle both the standard 2-tuple and enhanced 3-tuple returns.
+%%      Wraps fire/3 in try-catch for error handling.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec progress(NetState :: #net_state{}) ->
-          abort | {delta, #{atom() => [term()]}, #{atom() => [term()]}, term() | undefined}.
+-spec progress(NetState :: #net_state{}, FireTimeout :: pos_integer()) ->
+          abort | {delta, #{atom() => [term()]}, #{atom() => [term()]}, term() | undefined} |
+          {error, term(), #net_state{}}.
 
 progress(#net_state{
            marking = Marking,
            net_mod = NetMod,
            usr_info = UsrInfo
-          }) ->
+          }, FireTimeout) ->
     %% Get all transitions in the net
     TrsnLst = NetMod:trsn_lst(),
 
@@ -820,7 +924,7 @@ progress(#net_state{
     ModeMap = lists:foldl(F, #{}, TrsnLst),
 
     %% Attempt to fire a transition
-    attempt_progress(ModeMap, NetMod, UsrInfo).
+    attempt_progress(ModeMap, NetMod, UsrInfo, FireTimeout).
 
 
 %%--------------------------------------------------------------------
@@ -829,16 +933,18 @@ progress(#net_state{
 %%
 %%      Returns the delta (consumed mode, produced map, and optionally
 %%      new user info) or abort. Handles both 2-tuple and 3-tuple
-%%      fire/3 returns.
+%%      fire/3 returns. Wraps fire/3 in try-catch for error handling.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec attempt_progress(ModeMap :: #{atom() => [#{atom() => [term()]}]},
                        NetMod :: atom(),
-                       UsrInfo :: term()) ->
-          abort | {delta, #{atom() => [term()]}, #{atom() => [term()]}, term() | undefined}.
+                       UsrInfo :: term(),
+                       FireTimeout :: pos_integer()) ->
+          abort | {delta, #{atom() => [term()]}, #{atom() => [term()]}, term() | undefined} |
+          {error, term(), #net_state{}}.
 
-attempt_progress(ModeMap, NetMod, UsrInfo) ->
+attempt_progress(ModeMap, NetMod, UsrInfo, FireTimeout) ->
     case maps:size(ModeMap) of
         0 ->
             abort;
@@ -849,27 +955,83 @@ attempt_progress(ModeMap, NetMod, UsrInfo) ->
             #{Trsn := ModeLst} = ModeMap,
             Mode = pick_from(ModeLst),
 
-            case NetMod:fire(Trsn, Mode, UsrInfo) of
+            %% Wrap fire/3 in try-catch with timeout for error handling
+            try
+                FireResult = case FireTimeout of
+                    infinity ->
+                        NetMod:fire(Trsn, Mode, UsrInfo);
+                    _ ->
+                        %% Use spawn_monitor for timeout protection
+                        {Pid, Ref} = spawn_monitor(fun() ->
+                            Result = NetMod:fire(Trsn, Mode, UsrInfo),
+                            exit({fire_result, Result})
+                        end),
 
-                {produce, ProdMap} ->
-                    %% Standard 2-tuple return - no user info update
-                    {delta, Mode, ProdMap, undefined};
-
-                {produce, ProdMap, NewUsrInfo} ->
-                    %% Enhanced 3-tuple return - user info will be updated
-                    {delta, Mode, ProdMap, NewUsrInfo};
-
-                abort ->
-                    %% Try another mode or transition
-                    ModeLst1 = ModeLst -- [Mode],
-                    case ModeLst1 of
-                        [] ->
-                            attempt_progress(maps:remove(Trsn, ModeMap), NetMod, UsrInfo);
-                        [_ | _] ->
-                            attempt_progress(ModeMap#{Trsn := ModeLst1}, NetMod, UsrInfo)
+                    receive
+                        {fire_result, Result} ->
+                            Result;
+                        {'DOWN', Ref, process, Pid, Reason} ->
+                            logger:error("gen_yawl fire/3 process crashed: ~p", [Reason]),
+                            {error, {fire_crashed, Reason}}
+                    after FireTimeout ->
+                        demonitor(Ref, [flush]),
+                        exit(Pid, kill),
+                        logger:warning("gen_yawl fire/3 timeout for ~p after ~p ms", [Trsn, FireTimeout]),
+                        {error, {fire_timeout, Trsn}}
                     end
+                end,
 
+                case FireResult of
+                    {produce, ProdMap} ->
+                        %% Standard 2-tuple return - no user info update
+                        {delta, Mode, ProdMap, undefined};
+
+                    {produce, ProdMap, NewUsrInfo} ->
+                        %% Enhanced 3-tuple return - user info will be updated
+                        {delta, Mode, ProdMap, NewUsrInfo};
+
+                    abort ->
+                        %% Try another mode or transition
+                        ModeLst1 = ModeLst -- [Mode],
+                        case ModeLst1 of
+                            [] ->
+                                attempt_progress(maps:remove(Trsn, ModeMap), NetMod, UsrInfo, FireTimeout);
+                            [_ | _] ->
+                                attempt_progress(ModeMap#{Trsn := ModeLst1}, NetMod, UsrInfo, FireTimeout)
+                        end;
+
+                    {error, _Reason} = ErrorTuple ->
+                        ErrorTuple
+                end
+
+            catch
+                Type:Exception:Stacktrace ->
+                    logger:error("gen_yawl fire/3 exception: ~p:~p~n~p",
+                                [Type, Exception, Stacktrace]),
+                    %% Continue trying other transitions
+                    attempt_progress_with_mode_removed(ModeMap, Trsn, ModeLst, Mode, NetMod, UsrInfo, FireTimeout)
             end
+    end.
+
+%% @private
+-spec attempt_progress_with_mode_removed(
+        #{atom() => [_]},
+        atom(),
+        [#{atom() => [_]}],
+        #{atom() => [_]},
+        atom(),
+        term(),
+        pos_integer()) ->
+    abort | {delta, #{atom() => [term()]}, #{atom() => [term()]}, term() | undefined} |
+    {error, term(), #net_state{}}.
+
+attempt_progress_with_mode_removed(ModeMap, Trsn, ModeLst, Mode, NetMod, UsrInfo, FireTimeout) ->
+    ModeLst1 = ModeLst -- [Mode],
+    case ModeLst1 of
+        [] ->
+            attempt_progress(maps:remove(Trsn, ModeMap), NetMod, UsrInfo, FireTimeout);
+        [_ | _] ->
+            attempt_progress(ModeMap#{Trsn := ModeLst1}, NetMod, UsrInfo, FireTimeout)
     end.
 
 

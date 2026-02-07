@@ -135,9 +135,18 @@ ok
 -export([get_all/0]).
 -export([doctest_test/0]).
 
+%% Secrets management
+-export([get_secret/1, get_secret/2, set_secret/2]).
+-export([list_secrets/0, validate_secrets/0]).
+
 %%====================================================================
 %% Persistent Term Keys
 %%====================================================================
+
+%% Secrets management keys
+-define(SECRET_COOKIE, cre_secret_cookie).
+-define(SECRET_DB_PASSWORD, cre_secret_db_password).
+-define(SECRET_API_KEY, cre_secret_api_key).
 
 %% Authentication keys
 -define(AUTH_PBKDF2_ITERATIONS, cre_auth_pbkdf2_iterations).
@@ -177,6 +186,7 @@ ok
 
 -type key() :: atom().
 -type value() :: term().
+-type secret_key() :: cookie | db_password | api_key | atom().
 
 %%====================================================================
 %% API Functions
@@ -608,3 +618,185 @@ init_cre_master_terms() ->
     persistent_term:put(?CRE_MASTER_LOG_MODULE, cre),
 
     ok.
+
+%%====================================================================
+%% Secrets Management API
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Gets a secret value from environment variables.
+%%
+%% Secrets are read from environment variables prefixed with CRE_.
+%% For example, secret `cookie` is read from CRE_COOKIE environment variable.
+%%
+%% Returns {ok, Value} if found, or {error, missing} if not set.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-doc("""
+Gets a secret value from environment variables.
+
+Secrets are read from environment variables prefixed with `CRE_`.
+For example, secret `cookie` is read from `CRE_COOKIE` environment variable.
+
+## Examples
+
+```erlang
+1> %% Set environment variable first
+1> os:putenv("CRE_COOKIE", "my_secret_cookie").
+true
+2> cre_config:get_secret(cookie).
+{ok, <<"my_secret_cookie">>}
+3> cre_config:get_secret(nonexistent).
+{error,missing}
+```
+""").
+-spec get_secret(SecretKey :: secret_key()) ->
+          {ok, binary()} | {error, missing}.
+
+get_secret(SecretKey) when is_atom(SecretKey) ->
+    EnvName = "CRE_" ++ string:uppercase(atom_to_list(SecretKey)),
+    case os:getenv(EnvName) of
+        false ->
+            {error, missing};
+        Value ->
+            {ok, list_to_binary(Value)}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Gets a secret with a default value.
+%%
+%% Returns the secret value or the provided default if not found.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-doc("""
+Gets a secret with a default value.
+
+Returns the secret value from environment or the provided default if not found.
+
+## Examples
+
+```erlang
+1> cre_config:get_secret(api_key, <<"default_key">>).
+{ok, <<"default_key">>}
+```
+""").
+-spec get_secret(SecretKey :: secret_key(), Default :: binary()) ->
+          {ok, binary()}.
+
+get_secret(SecretKey, Default) when is_atom(SecretKey), is_binary(Default) ->
+    case get_secret(SecretKey) of
+        {error, missing} ->
+            {ok, Default};
+        {ok, Value} ->
+            {ok, Value}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Sets a secret value in persistent term storage.
+%%
+%% Note: This is for testing purposes only. In production, secrets
+%% should be managed via environment variables.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-doc("""
+Sets a secret value in persistent term storage.
+
+**Warning:** This is for testing purposes only. In production, secrets
+should be managed via environment variables.
+
+## Examples
+
+```erlang
+1> cre_config:set_secret(test_secret, <<"test_value">>).
+true
+```
+""").
+-spec set_secret(SecretKey :: secret_key(), Value :: binary()) -> true.
+
+set_secret(SecretKey, Value) when is_atom(SecretKey), is_binary(Value) ->
+    PersistentKey = list_to_existing_atom("cre_secret_" ++ atom_to_list(SecretKey)),
+    persistent_term:put(PersistentKey, Value),
+    true.
+
+%%--------------------------------------------------------------------
+%% @doc Lists all available secrets.
+%%
+%% Returns a list of secret keys that have values set.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-doc("""
+Lists all available secrets.
+
+Returns a list of secret keys that have values set in environment variables.
+
+## Examples
+
+```erlang
+1> os:putenv("CRE_COOKIE", "secret").
+true
+2> os:putenv("CRE_API_KEY", "key123").
+true
+3> cre_config:list_secrets().
+[cookie, api_key]
+```
+""").
+-spec list_secrets() -> [secret_key()].
+
+list_secrets() ->
+    KnownSecrets = [cookie, db_password, api_key],
+    lists:filter(fun(Key) ->
+        case get_secret(Key) of
+            {ok, _} -> true;
+            {error, missing} -> false
+        end
+    end, KnownSecrets).
+
+%%--------------------------------------------------------------------
+%% @doc Validates that all required secrets are set.
+%%
+%% Returns ok if all required secrets are available, or {error, Missing}
+%% with a list of missing secrets.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-doc("""
+Validates that all required secrets are set.
+
+Returns `ok` if all required secrets are available, or `{error, Missing}`
+with a list of missing secrets.
+
+## Examples
+
+```erlang
+1> %% No secrets set
+1> cre_config:validate_secrets().
+{error,[cookie,api_key]}
+
+2> %% Set required secrets
+2> os:putenv("CRE_COOKIE", "secret").
+true
+3> os:putenv("CRE_API_KEY", "key").
+true
+4> cre_config:validate_secrets().
+ok
+```
+""").
+-spec validate_secrets() -> ok | {error, [secret_key()]}.
+
+validate_secrets() ->
+    RequiredSecrets = [cookie, api_key],
+    Missing = lists:filter(fun(Key) ->
+        case get_secret(Key) of
+            {error, missing} -> true;
+            {ok, _} -> false
+        end
+    end, RequiredSecrets),
+
+    case Missing of
+        [] -> ok;
+        _ -> {error, Missing}
+    end.

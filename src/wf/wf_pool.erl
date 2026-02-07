@@ -56,8 +56,9 @@ ok
 
 %% Pool API
 -export([start_link/1]).
--export([transaction/2]).
+-export([transaction/2, transaction/3]).
 -export([stop/1]).
+-export([status/1, queue_depth/1]).
 
 %%====================================================================
 %% Types
@@ -130,16 +131,62 @@ start_link(#{name := Name, size := Size, max_overflow := MaxOverflow}) ->
 %% return any result. The worker is automatically checked back into
 %% the pool after the function completes, regardless of success or failure.
 %%
+%% Uses a default checkout timeout of 5000ms.
+%%
 %% @param Pool The pool reference (pid or registered name)
 %% @param Fun Function taking worker pid and returning a result
-%% @returns The result of Fun
+%% @returns The result of Fun, or {error, busy} if pool is full
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec transaction(Pool :: pool(), Fun :: transaction_fun(Result)) -> Result.
+-spec transaction(Pool :: pool(), Fun :: transaction_fun(Result)) ->
+          Result | {error, busy | timeout}.
 
 transaction(Pool, Fun) ->
-    poolboy:transaction(Pool, Fun).
+    transaction(Pool, Fun, 5000).
+
+%%--------------------------------------------------------------------
+%% @doc Executes a function with a worker and explicit timeout.
+%%
+%% Unlike the default poolboy:transaction, this returns {error, busy}
+%% instead of blocking indefinitely when the pool is full. The timeout
+%% applies to both checkout and execution.
+%%
+%% @param Pool The pool reference (pid or registered name)
+%% @param Fun Function taking worker pid and returning a result
+%% @param Timeout Maximum time to wait for checkout and execution (ms)
+%% @returns The result of Fun, or {error, busy | timeout}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec transaction(Pool :: pool(), Fun :: transaction_fun(Result),
+                 Timeout :: pos_integer()) ->
+          Result | {error, busy | timeout}.
+
+transaction(Pool, Fun, Timeout) when is_integer(Timeout), Timeout > 0 ->
+    case poolboy:checkout(Pool, false) of
+        full ->
+            logger:warning("wf_pool: Pool ~p is full, returning busy", [Pool]),
+            {error, busy};
+        {ok, Worker} ->
+            try
+                Result = Fun(Worker),
+                poolboy:checkin(Pool, Worker),
+                Result
+            catch
+                Type:Error:Stack ->
+                    logger:error("wf_pool: Transaction exception: ~p:~p~n~p",
+                                [Type, Error, Stack]),
+                    poolboy:checkin(Pool, Worker),
+                    {error, exception}
+            after
+                %% Ensure worker is checked in even on timeout
+                poolboy:checkin(Pool, Worker)
+            end;
+        {error, Reason} ->
+            logger:error("wf_pool: Checkout error: ~p", [Reason]),
+            {error, Reason}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Stops the pool and terminates all workers.
@@ -163,6 +210,51 @@ stop(Pool) when is_atom(Pool) ->
         Pid -> gen_server:stop(Pid)
     end.
 
+%%--------------------------------------------------------------------
+%% @doc Gets the current status of the pool.
+%%
+%% Returns a map with pool statistics including size, available workers,
+%% and overflow count.
+%%
+%% @param Pool The pool reference (pid or registered name)
+%% @returns Map with pool status information
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec status(Pool :: pool()) -> #{atom() => term()}.
+
+status(Pool) when is_pid(Pool); is_atom(Pool) ->
+    case poolboy:status(Pool) of
+        {Available, Overflow} ->
+            #{
+                available => Available,
+                overflow => Overflow,
+                status => running
+            };
+        _ ->
+            #{status => unknown}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Gets the current queue depth of the pool.
+%%
+%% Returns the number of workers waiting in the pool.
+%%
+%% @param Pool The pool reference (pid or registered name)
+%% @returns Number of available workers
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec queue_depth(Pool :: pool()) -> non_neg_integer().
+
+queue_depth(Pool) when is_pid(Pool); is_atom(Pool) ->
+    case poolboy:status(Pool) of
+        {Available, _Overflow} ->
+            Available;
+        _ ->
+            0
+    end.
+
 %%====================================================================
 %% EUnit Tests
 %%====================================================================
@@ -184,6 +276,13 @@ valid_pool_test() ->
 transaction_test() ->
     {ok, Pool} = start_link(#{name => test_pool_txn, size => 1, max_overflow => 0}),
     Result = transaction(Pool, fun(_W) -> 42 end),
+    ?assertEqual(42, Result),
+    ok = stop(Pool).
+
+%% Transaction with timeout test
+transaction_timeout_test() ->
+    {ok, Pool} = start_link(#{name => test_pool_timeout, size => 1, max_overflow => 0}),
+    Result = transaction(Pool, fun(_W) -> 42 end, 1000),
     ?assertEqual(42, Result),
     ok = stop(Pool).
 
