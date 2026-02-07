@@ -42,7 +42,7 @@ do_main(Args) ->
             io:format("ERROR: ZAI_API_KEY not configured.~n"),
             halt(1);
         _ ->
-            io:format("Goal: ~s~nMax iterations: ~p~n~n", [Goal, MaxIter]),
+            io:format("Goal: ~s~nMax iterations: ~p~nModel: ~s~n~n", [Goal, MaxIter, zai_client:get_model()]),
             case mapek_workflow_creator:run_selfplay(Opts) of
                 {ok, K} ->
                     io:format("~n=== MAPE-K Self-Play Complete ===~n"),

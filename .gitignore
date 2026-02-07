@@ -25,6 +25,9 @@ rebar.lock
 # Wreckit local config (may contain secrets)
 .wreckit/config.local.json
 
+# CRE config with API keys (use sys.config.example as template)
+config/sys.config
+
 # OTP cache and session artifacts
 .erlmcp/
 Mnesia.nonode@nohost/

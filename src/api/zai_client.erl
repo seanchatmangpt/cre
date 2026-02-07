@@ -9,7 +9,8 @@
 -export([
     chat_completions/2,
     chat_json/2,
-    get_api_key/0
+    get_api_key/0,
+    get_model/0
 ]).
 
 %%====================================================================
@@ -34,7 +35,7 @@
 %%====================================================================
 
 -define(BASE_URL, "https://api.z.ai/api/paas/v4/chat/completions").
--define(DEFAULT_MODEL, <<"glm-4-plus">>).
+-define(DEFAULT_MODEL, <<"glm-4.7-flash">>).
 -define(DEFAULT_TEMPERATURE, 0.7).
 -define(DEFAULT_MAX_TOKENS, 256).
 -define(DEFAULT_TIMEOUT, 30000).
@@ -53,6 +54,19 @@ get_api_key() ->
             case os:getenv("ZAI_API_KEY") of
                 false -> undefined;
                 Key -> list_to_binary(Key)
+            end
+    end.
+
+%% @doc Returns configured model (from app env, ZAI_MODEL env, or default).
+-spec get_model() -> binary().
+get_model() ->
+    case application:get_env(cre, zai_model) of
+        {ok, M} when is_list(M) -> list_to_binary(M);
+        {ok, M} when is_binary(M) -> M;
+        _ ->
+            case os:getenv("ZAI_MODEL") of
+                false -> ?DEFAULT_MODEL;
+                M -> list_to_binary(M)
             end
     end.
 
@@ -122,7 +136,7 @@ ensure_inets() ->
     end.
 
 build_request_body(Messages, Options) ->
-    Model = maps:get(model, Options, ?DEFAULT_MODEL),
+    Model = maps:get(model, Options, get_model()),
     Temperature = maps:get(temperature, Options, ?DEFAULT_TEMPERATURE),
     MaxTokens = maps:get(max_tokens, Options, ?DEFAULT_MAX_TOKENS),
     Stream = maps:get(stream, Options, false),

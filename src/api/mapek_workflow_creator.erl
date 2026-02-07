@@ -148,7 +148,7 @@ generate_workflow_yaml(Knowledge, Options) ->
     ),
     Msgs = [#{role => <<"user">>, content => list_to_binary(Prompt)}],
     Opts = #{
-        model => maps:get(model, Options, <<"glm-4-plus">>),
+        model => maps:get(model, Options, zai_client:get_model()),
         temperature => 0.3,
         max_tokens => 2048,
         timeout => 60000
@@ -183,7 +183,7 @@ analyze_and_plan(MonitorData, Knowledge, Options) ->
     ),
     Msgs = [#{role => <<"user">>, content => list_to_binary(Prompt)}],
     Opts = #{
-        model => maps:get(model, Options, <<"glm-4-plus">>),
+        model => maps:get(model, Options, zai_client:get_model()),
         temperature => 0.2,
         max_tokens => 512
     },
