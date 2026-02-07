@@ -1,19 +1,43 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(rebar3 compile)",
+      "Bash(rebar3 eunit)",
+      "Bash(rebar3 dialyzer)",
+      "Bash(rebar3 xref)",
+      "Bash(rebar3 ct)",
+      "Bash(rebar3 cover)"
+    ],
+    "deny": [
+      "Read(.env*)",
+      "Write(.env*)",
+      "Bash(rm -rf *)",
+      "Bash(sudo *)"
+    ]
+  },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$TOOL_INPUT\" | jq -r '.command // empty' | grep -q '\\-\\-no-verify' && echo '{\"decision\":\"block\",\"reason\":\"--no-verify is not allowed\"}' || true",
+            "timeout": 3000
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"ok\": true}'",
-            "timeout": 1000
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-check.sh",
+            "timeout": 10000
           }
         ]
       }
     ]
-  },
-  "permissions": {
-    "allow": [],
-    "deny": []
   }
 }
