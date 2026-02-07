@@ -182,24 +182,6 @@
          update_metrics/3,
          log_audit_event/3]).
 
-%% Validation API
--export([validate_pattern/1,
-         validate_condition/1,
-         validate_task/1,
-         validate_workflow/1,
-         validate_exception/1,
-         validate_compensator/1,
-         validate_retry_policy/1,
-         validate_error_handler/1]).
-
-%% Logging API
--export([log_info/3,
-         log_warning/3,
-         log_error/3,
-         log_debug/3,
-         log_exception/2,
-         log_validation_error/3]).
-
 %% Compensation API
 -export([new_compensator/3,
          compensate/2,

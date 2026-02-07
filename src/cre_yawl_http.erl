@@ -59,6 +59,7 @@ init(Req0, State) ->
 %%====================================================================
 
 %% @doc Route incoming HTTP requests to appropriate handlers
+%% Note: Binary pattern matching with segments must use explicit variables
 -spec route_request(http_method(), http_path(), cowboy_req:req(), term()) ->
     {ok, cowboy_req:req()} | {error, term()}.
 
@@ -69,52 +70,60 @@ route_request(<<"POST">>, <<"/yawl/workflows">>, Req, _State) ->
 route_request(<<"GET">>, <<"/yawl/workflows">>, Req, _State) ->
     handle_list_workflows(Req);
 
-route_request(<<"GET">>, Path, Req, _State)
-  when Path =:= <<"/yawl/workflows/", _/binary>> ->
-    [_, _, WorkflowId | _] = binary:split(Path, <<"/">>, [global]),
-    handle_get_workflow(WorkflowId, Req);
+route_request(<<"GET">>, Path, Req, _State) ->
+    case Path of
+        <<"/yawl/workflows/", WorkflowIdRest/binary>> ->
+            case binary:split(WorkflowIdRest, <<"/">>) of
+                [WorkflowId, <<>>] -> handle_get_workflow(WorkflowId, Req);
+                [WorkflowId, <<"validate">>] -> handle_validate_workflow(WorkflowId, Req);
+                [WorkflowId, <<"execute">>] -> handle_execute_workflow(WorkflowId, Req);
+                [_, <<"events">>] -> handle_workflow_events(Req);
+                _ -> {error, {not_found, <<"Endpoint not found">>}}
+            end;
+        _ ->
+            route_request_get_other(Path, Req, _State)
+    end;
 
-route_request(<<"PUT">>, Path, Req, _State)
-  when Path =:= <<"/yawl/workflows/", _/binary>> ->
-    [_, _, WorkflowId | _] = binary:split(Path, <<"/">>, [global]),
-    handle_update_workflow(WorkflowId, Req);
+route_request(<<"PUT">>, Path, Req, _State) ->
+    case Path of
+        <<"/yawl/workflows/", WorkflowId/binary>> ->
+            handle_update_workflow(WorkflowId, Req);
+        _ ->
+            {error, {not_found, <<"Endpoint not found">>}}
+    end;
 
-route_request(<<"POST">>, Path, Req, _State)
-  when Path =:= <<"/yawl/workflows/", _/binary, "/validate">> ->
-    [_, _, WorkflowId, <<"validate">> | _] = binary:split(Path, <<"/">>, [global]),
-    handle_validate_workflow(WorkflowId, Req);
+route_request(<<"POST">>, Path, Req, _State) ->
+    case Path of
+        <<"/yawl/workflows/", WorkflowIdRest/binary>> ->
+            case binary:split(WorkflowIdRest, <<"/">>) of
+                [WorkflowId, <<"validate">>] -> handle_validate_workflow(WorkflowId, Req);
+                [WorkflowId, <<"execute">>] -> handle_execute_workflow(WorkflowId, Req);
+                _ -> {error, {not_found, <<"Endpoint not found">>}}
+            end;
+        <<"/yawl/patterns/", PatternName/binary>> ->
+            handle_create_pattern(PatternName, Req);
+        <<"/yawl/tasks/", TaskIdRest/binary>> ->
+            case binary:split(TaskIdRest, <<"/">>) of
+                [TaskId, <<"complete">>] -> handle_complete_task(TaskId, Req);
+                _ -> {error, {not_found, <<"Endpoint not found">>}}
+            end;
+        _ ->
+            {error, {not_found, <<"Endpoint not found">>}}
+    end;
 
-route_request(<<"POST">>, Path, Req, _State)
-  when Path =:= <<"/yawl/workflows/", _/binary, "/execute">> ->
-    [_, _, WorkflowId, <<"execute">> | _] = binary:split(Path, <<"/">>, [global]),
-    handle_execute_workflow(WorkflowId, Req);
-
-%% Pattern management endpoints
 route_request(<<"GET">>, <<"/yawl/patterns">>, Req, _State) ->
     handle_list_patterns(Req);
 
-route_request(<<"POST">>, Path, Req, _State)
-  when Path =:= <<"/yawl/patterns/", _/binary>> ->
-    [_, _, PatternName | _] = binary:split(Path, <<"/">>, [global]),
-    handle_create_pattern(PatternName, Req);
-
-%% Task management endpoints
 route_request(<<"GET">>, <<"/yawl/tasks">>, Req, _State) ->
     handle_list_tasks(Req);
 
-route_request(<<"GET">>, Path, Req, _State)
-  when Path =:= <<"/yawl/tasks/", _/binary>> ->
-    [_, _, TaskId | _] = binary:split(Path, <<"/">>, [global]),
-    handle_get_task(TaskId, Req);
-
-route_request(<<"POST">>, Path, Req, _State)
-  when Path =:= <<"/yawl/tasks/", _/binary, "/complete">> ->
-    [_, _, TaskId, <<"complete">> | _] = binary:split(Path, <<"/">>, [global]),
-    handle_complete_task(TaskId, Req);
-
-%% Event and monitoring endpoints
-route_request(<<"GET">>, <<"/yawl/workflows/", _/binary, "/events">>, Req, _State) ->
-    handle_workflow_events(Req);
+route_request(<<"GET">>, Path, Req, _State) ->
+    case Path of
+        <<"/yawl/tasks/", TaskId/binary>> ->
+            handle_get_task(TaskId, Req);
+        _ ->
+            route_request_get_other(Path, Req, _State)
+    end;
 
 route_request(<<"GET">>, <<"/yawl/health">>, Req, _State) ->
     handle_health_check(Req);
@@ -122,9 +131,19 @@ route_request(<<"GET">>, <<"/yawl/health">>, Req, _State) ->
 route_request(<<"OPTIONS">>, _Path, Req, _State) ->
     handle_options(Req);
 
-%% Default 404
-route_request(_, _, Req, _State) ->
+route_request(_, _, _Req, _State) ->
     {error, {not_found, <<"Endpoint not found">>}}.
+
+%% Helper for other GET routes
+route_request_get_other(Path, Req, _State) ->
+    case binary:match(Path, <<"/yawl/workflows/">>) of
+        {match, _} ->
+            [_, _, WorkflowId | _] = binary:split(Path, <<"/">>, [global]),
+            handle_get_workflow(WorkflowId, Req);
+        nomatch ->
+            {error, {not_found, <<"Endpoint not found">>}}
+    end.
+
 
 %%====================================================================
 %% Workflow Management Handlers

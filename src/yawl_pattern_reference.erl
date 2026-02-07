@@ -1692,6 +1692,14 @@ generate_id(Prefix) ->
     Hex = binary:encode_hex(Unique),
     <<Prefix/binary, "_", Hex/binary>>.
 
-test_input() -> test_input.
+%%====================================================================
+%% Doctests
+%%====================================================================
 
-%%
+-spec doctest_test() -> ok.
+
+doctest_test() ->
+    %% Verify module is loaded
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
+

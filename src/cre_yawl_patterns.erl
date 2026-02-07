@@ -465,32 +465,34 @@
          consecutive_compensate/1]).
 
 %% Pattern API functions - Data Flow (WDP-01 through WDP-05)
--export([param_pass/2,
-         data_transform/2,
-         data_distribute/3,
-         data_accumulate/3,
-         data_visibility/3]).
-
+%% TODO: Implement these data flow patterns
+%% -export([param_pass/2,
+%%          data_transform/2,
+%%          data_distribute/3,
+%%          data_accumulate/3,
+%%          data_visibility/3]).
+%%
 %% Pattern Execution API functions - Data Flow (WDP-01 through WDP-05)
--export([execute_param_pass/2,
-         execute_data_transform/2,
-         execute_data_distribute/3,
-         execute_data_accumulate/3,
-         execute_data_visibility/3]).
+%% -export([execute_param_pass/2,
+%%          execute_data_transform/2,
+%%          execute_data_distribute/3,
+%%          execute_data_accumulate/3,
+%%          execute_data_visibility/3]).
 
 %% Pattern API functions - Resource (WRP-01 through WRP-05)
--export([direct_resource_creation/2,
-         role_based_allocation/3,
-         resource_initialization/3,
-         role_based_distribution/4,
-         capability_based_allocation/3]).
-
+%% TODO: Implement these resource patterns
+%% -export([direct_resource_creation/2,
+%%          role_based_allocation/3,
+%%          resource_initialization/3,
+%%          role_based_distribution/4,
+%%          capability_based_allocation/3]).
+%%
 %% Pattern Execution API functions - Resource (WRP-01 through WRP-05)
--export([execute_wrp_01_direct_creation/2,
-         execute_wrp_02_role_allocation/3,
-         execute_wrp_03_resource_init/3,
-         execute_wrp_04_role_distribution/4,
-         execute_wrp_05_capability_allocation/3]).
+%% -export([execute_wrp_01_direct_creation/2,
+%%          execute_wrp_02_role_allocation/3,
+%%          execute_wrp_03_resource_init/3,
+%%          execute_wrp_04_role_distribution/4,
+%%          execute_wrp_05_capability_allocation/3]).
 
 %%====================================================================
 %% Record definitions
