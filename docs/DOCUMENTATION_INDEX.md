@@ -215,7 +215,7 @@ These focus on the 20% of content that provides 80% of value:
 ### 📚 Comprehensive Documentation
 Complete coverage for deep understanding:
 
-- **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** - All 43 patterns
+- **[YAWL_PATTERNS_REFERENCE.md](./YAWL_PATTERNS_REFERENCE.md)** - 26 of 43 patterns implemented (60.5%)
 - **[COMPLETE_API_REFERENCE.md](./COMPLETE_API_REFERENCE.md)** - All APIs
 - **[PNET_CORE_COMPREHENSIVE_REFERENCE.md](./PNET_CORE_COMPREHENSIVE_REFERENCE.md)** - Core internals
 

@@ -150,7 +150,7 @@ requirementDiagram
 
     %% Status indicators
     note 001-001 : Complete - gen_pnet implementation done
-    note 001-002 : Complete - All 43 patterns implemented
+    note 001-002 : 26 of 43 patterns with dedicated modules (60.5%)
     note 001-003 : Complete - Human approval system working
     note 001-004 : Complete - Exception handling implemented
     note 001-005 : In Progress - Worker pool scaling
