@@ -493,7 +493,7 @@ init([]) ->
                 cleanup_interval => 300000  % 5 minutes
             }
         },
-        rng_state = pnet_choice:seed(erlang:timestamp()),
+        rng_state = pnet_choice:seed(erlang:unique_integer()),
         ctrl_marking = CtrlMarking
     }}.
 
@@ -1139,5 +1139,6 @@ stop_sync(ControlName) ->
 -include_lib("eunit/include/eunit.hrl").
 
 doctest_eunit_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 -endif.

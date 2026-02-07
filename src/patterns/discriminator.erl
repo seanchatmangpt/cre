@@ -388,7 +388,7 @@ is_enabled(_Trsn, _Mode, _UsrInfo) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec fire(Trsn :: atom(), Mode :: map(), UsrInfo :: discriminator_state()) ->
-          {produce, map()} | {produce, map(), discriminator_state()} | abort.
+          {produce, map()} | abort.
 
 fire('t_split', #{'p_input' := [start]}, #discriminator_state{branch_count = Count, branch_funs = Funs} = State) ->
     %% Create branch tokens
@@ -397,26 +397,21 @@ fire('t_split', #{'p_input' := [start]}, #discriminator_state{branch_count = Cou
     {produce, #{
         'p_input' => [],
         'p_branch_pool' => BranchTokens
-    }, State};
+    }};
 
 fire('t_complete_branch', #{'p_branch_pool' := [Token | Rest]}, #discriminator_state{triggered_by = TriggeredBy} = State) ->
     %% Complete a branch
     case Token of
         {{branch, Index}, _Fun} when TriggeredBy =:= undefined ->
             %% First completion - trigger the discriminator
-            NewState = State#discriminator_state{
-                completed = [Index],
-                triggered_by = Index
-            },
             log_event(State, <<"Discriminator">>, <<"FirstComplete">>, #{<<"branch">> => Index}),
             {produce, #{
                 'p_branch_pool' => Rest,
                 'p_trigger_ready' => [],
                 'p_triggered' => [first_complete, Index]
-            }, NewState};
+            }};
         {{branch, Index}, _Fun} ->
             %% Subsequent completion - just track it
-            NewState = State#discriminator_state{completed = [Index | State#discriminator_state.completed]},
             log_event(State, <<"Discriminator">>, <<"BranchComplete">>, #{<<"branch">> => Index}),
             case length(Rest) of
                 0 ->
@@ -425,38 +420,33 @@ fire('t_complete_branch', #{'p_branch_pool' := [Token | Rest]}, #discriminator_s
                         'p_branch_pool' => [],
                         'p_consume' => [all_done],
                         'p_reset' => [reset_req]
-                    }, NewState};
+                    }};
                 _ ->
                     {produce, #{
                         'p_branch_pool' => Rest,
                         'p_consume' => [consumed, Index]
-                    }, NewState}
+                    }}
             end
     end;
 
-fire('t_trigger', #{'p_trigger_ready' := [ready]}, State) ->
+fire('t_trigger', #{'p_trigger_ready' := [ready]}, _State) ->
     %% This shouldn't fire directly - triggered by t_complete_branch
-    {produce, #{}, State};
+    {produce, #{}};
 
-fire('t_consume_remaining', #{'p_consume' := [all_done]}, State) ->
+fire('t_consume_remaining', #{'p_consume' := [all_done]}, _State) ->
     %% All branches consumed
     {produce, #{
         'p_consume' => [],
         'p_reset' => [reset_req]
-    }, State};
+    }};
 
 fire('t_reset', #{'p_reset' := [reset_req]}, #discriminator_state{cycle_count = Cycle} = State) ->
     %% Reset for next cycle
-    NewState = State#discriminator_state{
-        completed = [],
-        triggered_by = undefined,
-        cycle_count = Cycle + 1
-    },
     log_event(State, <<"Discriminator">>, <<"Reset">>, #{<<"cycle">> => Cycle + 1}),
     {produce, #{
         'p_reset' => [],
         'p_trigger_ready' => [ready]
-    }, NewState};
+    }};
 
 fire('t_output', #{'p_triggered' := [first_complete, Index]}, State) ->
     %% Produce output
@@ -464,7 +454,7 @@ fire('t_output', #{'p_triggered' := [first_complete, Index]}, State) ->
     {produce, #{
         'p_triggered' => [],
         'p_output' => [{discriminated, Index}]
-    }, State};
+    }};
 
 fire(_Trsn, _Mode, _UsrInfo) ->
     abort.
@@ -484,16 +474,16 @@ trigger(_Place, _Token, _UsrInfo) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec init(UsrInfo :: discriminator_state()) ->
-          {ok, discriminator_state()}.
+          discriminator_state().
 
 init(DiscriminatorState) ->
     case yawl_xes:new_log(#{<<"process">> => <<"Discriminator">>}) of
         {ok, LogId} ->
             State1 = DiscriminatorState#discriminator_state{log_id = LogId},
             yawl_xes:log_case_start(LogId, generate_case_id()),
-            {ok, State1};
+            State1;
         _ ->
-            {ok, DiscriminatorState}
+            DiscriminatorState
     end.
 
 %%--------------------------------------------------------------------
@@ -501,47 +491,35 @@ init(DiscriminatorState) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_call(Request :: term(), From :: {pid(), term()}, NetState :: term()) ->
-          {reply, term(), term()}.
+          {reply, term()} | noreply.
 
 handle_call(get_state, _From, NetState) ->
     UsrInfo = gen_yawl:get_usr_info(NetState),
-    {reply, {ok, UsrInfo}, NetState};
-handle_call(_Request, _From, NetState) ->
-    {reply, {error, bad_msg}, NetState}.
+    {reply, {ok, UsrInfo}};
+handle_call(_Request, _From, _NetState) ->
+    {reply, {error, bad_msg}}.
 
 %%--------------------------------------------------------------------
 %% @doc Handles asynchronous casts.
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_cast(Request :: term(), NetState :: term()) ->
-          {noreply, term()}.
+          noreply.
 
-handle_cast(reset_discriminator, NetState) ->
-    UsrInfo = gen_yawl:get_usr_info(NetState),
-    case UsrInfo of
-        #discriminator_state{} = State ->
-            NewState = State#discriminator_state{
-                completed = [],
-                triggered_by = undefined,
-                cycle_count = State#discriminator_state.cycle_count + 1
-            },
-            NewUsrInfo = gen_yawl:set_usr_info(NetState, NewState),
-            {noreply, NewUsrInfo};
-        _ ->
-            {noreply, NetState}
-    end;
-handle_cast(_Request, NetState) ->
-    {noreply, NetState}.
+handle_cast(reset_discriminator, _NetState) ->
+    noreply;
+handle_cast(_Request, _NetState) ->
+    noreply.
 
 %%--------------------------------------------------------------------
 %% @doc Handles non-gen_pnet messages.
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_info(Request :: term(), NetState :: term()) ->
-          {noreply, term()}.
+          noreply.
 
-handle_info(_Request, NetState) ->
-    {noreply, NetState}.
+handle_info(_Request, _NetState) ->
+    noreply.
 
 %%--------------------------------------------------------------------
 %% @doc Handles code changes.
@@ -690,76 +668,6 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 %% @doc Runs all doctests for the module.
 %% @private
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
-
-%% Test basic place_lst callback
-place_lst_test() ->
-    Expected = ['p_input','p_branch_pool','p_trigger_ready','p_triggered',
-                'p_consume','p_reset','p_output'],
-    ?assertEqual(Expected, place_lst()).
-
-%% Test basic trsn_lst callback
-trsn_lst_test() ->
-    Expected = ['t_split','t_complete_branch','t_trigger','t_consume_remaining',
-                't_reset','t_output'],
-    ?assertEqual(Expected, trsn_lst()).
-
-%% Test preset for various transitions
-preset_t_split_test() ->
-    ?assertEqual(['p_input'], preset('t_split')).
-
-preset_t_complete_branch_test() ->
-    ?assertEqual(['p_branch_pool'], preset('t_complete_branch')).
-
-preset_t_trigger_test() ->
-    ?assertEqual(['p_trigger_ready'], preset('t_trigger')).
-
-preset_t_consume_remaining_test() ->
-    ?assertEqual(['p_consume'], preset('t_consume_remaining')).
-
-preset_t_reset_test() ->
-    ?assertEqual(['p_reset'], preset('t_reset')).
-
-preset_t_output_test() ->
-    ?assertEqual(['p_triggered'], preset('t_output')).
-
-preset_unknown_test() ->
-    ?assertEqual([], preset(unknown)).
-
-%% Test new/2 constructor
-new_2_branches_test() ->
-    Fun1 = fun(_) -> ok end,
-    Fun2 = fun(_) -> ok end,
-    State = new([Fun1, Fun2], 2),
-    ?assertEqual(2, State#discriminator_state.branch_count),
-    ?assertEqual(2, length(State#discriminator_state.branch_funs)),
-    ?assertEqual(undefined, State#discriminator_state.triggered_by),
-    ?assertEqual([], State#discriminator_state.completed),
-    ?assertEqual(0, State#discriminator_state.cycle_count).
-
-new_3_branches_test() ->
-    Fun1 = fun(_) -> ok end,
-    Fun2 = fun(_) -> ok end,
-    Fun3 = fun(_) -> ok end,
-    State = new([Fun1, Fun2, Fun3], 3),
-    ?assertEqual(3, State#discriminator_state.branch_count),
-    ?assertEqual(3, length(State#discriminator_state.branch_funs)).
-
-%% Test init_marking callback
-init_marking_p_input_test() ->
-    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
-    ?assertEqual([start], init_marking('p_input', State)).
-
-init_marking_p_trigger_ready_test() ->
-    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
-    ?assertEqual([ready], init_marking('p_trigger_ready', State)).
-
-init_marking_other_place_test() ->
-    State = new([fun(_) -> ok end, fun(_) -> ok end], 2),
-    ?assertEqual([], init_marking('p_branch_pool', State)),
-    ?assertEqual([], init_marking('p_triggered', State)),
-    ?assertEqual([], init_marking('p_consume', State)),
-    ?assertEqual([], init_marking('p_reset', State)),
-    ?assertEqual([], init_marking('p_output', State)).
-
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 -endif.

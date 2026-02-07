@@ -23,3 +23,7 @@ rebar.lock
 
 # Wreckit local config (may contain secrets)
 .wreckit/config.local.json
+
+# OTP cache and session artifacts
+.erlmcp/
+Mnesia.nonode@nohost/

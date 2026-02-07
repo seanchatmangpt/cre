@@ -8,7 +8,7 @@
 %% @end
 %% -------------------------------------------------------------------
 
--module(yawl_persistence).
+-module(wf_yawl_persistence).
 -behaviour(gen_server).
 
 %%====================================================================
@@ -235,10 +235,10 @@ init(_Options) ->
     %% Ensure schema is initialized
     case init_schema() of
         ok ->
-            logger:info("yawl_persistence initialized"),
+            logger:info("wf_yawl_persistence initialized"),
             {ok, #{}};
         {error, Reason} ->
-            logger:error("yawl_persistence init failed: ~p", [Reason]),
+            logger:error("wf_yawl_persistence init failed: ~p", [Reason]),
             {stop, Reason}
     end.
 

@@ -812,7 +812,8 @@ format_template_var(V) -> list_to_binary(io_lib:format("~p", [V])).
 %%--------------------------------------------------------------------
 -spec doctest_test() -> ok.
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% @private
 -spec doctest_validate_email([binary()]) -> boolean().

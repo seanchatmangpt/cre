@@ -142,7 +142,7 @@ load_state(CaseId) when is_binary(CaseId) ->
         ok ->
             case yawl_persistence:load_case(CaseId) of
                 {ok, CaseMap} ->
-                    try case_map_to_workflow(CaseMap)
+                    try {ok, case_map_to_workflow(CaseMap)}
                     catch
                         Kind:Reason:Stack ->
                             logger:error("Failed to restore workflow from case ~p: ~p:~p~n~p",

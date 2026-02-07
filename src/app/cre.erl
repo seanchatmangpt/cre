@@ -394,18 +394,16 @@ doctest_test() ->
         error:function_clause -> ok
     end,
 
-    %% Test 8: Verify start_cre_webservice/1 with cowboy/ranch
-    %% When apps are started: {ok, _} or {error, {already_started, _}}
-    %% When cowboy not loaded: undef. When ranch not started: noproc.
+    %% Test 8: Verify start_cre_webservice/1 requires cowboy/ranch running
+    %% Returns error, undef, or exit when ranch_sup is not available
     try
-        Result = start_cre_webservice(4142),
-        case Result of
-            {ok, _Port} -> ok;
-            {error, _} -> ok
+        case start_cre_webservice(4142) of
+            {error, _} -> ok;
+            {ok, _} -> ok  %% If ranch happens to be running, that's fine
         end
     catch
         error:undef -> ok;
-        error:noproc -> ok
+        exit:{noproc, _} -> ok
     end,
 
     %% Test 9: Verify module exports are accessible

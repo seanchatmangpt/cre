@@ -28,7 +28,10 @@
 run_demo() ->
     %% Start XES logger
     application:ensure_all_started(cre),
-    {ok, _XesPid} = yawl_xes:start_link(),
+    case yawl_xes:start_link() of
+        {ok, _} -> ok;
+        {error, {already_started, _}} -> ok
+    end,
 
     %% Create sample order
     Order = #order{
@@ -136,7 +139,10 @@ run_demo() ->
 -spec run_demo(OrderInput :: map()) -> ok.
 run_demo(OrderInput) when is_map(OrderInput) ->
     application:ensure_all_started(cre),
-    {ok, _XesPid} = yawl_xes:start_link(),
+    case yawl_xes:start_link() of
+        {ok, _} -> ok;
+        {error, {already_started, _}} -> ok
+    end,
     Result = order_fulfillment:run(OrderInput),
 
     case Result of
@@ -159,7 +165,10 @@ run_simple_test() ->
     io:format("~n=== YAWL Order Fulfillment Subprocess Tests ===~n~n"),
 
     application:ensure_all_started(cre),
-    {ok, _XesPid} = yawl_xes:start_link(),
+    case yawl_xes:start_link() of
+        {ok, _} -> ok;
+        {error, {already_started, _}} -> ok
+    end,
 
     %% Test 1: Ordering
     io:format("Test 1: Ordering Subprocess~n"),

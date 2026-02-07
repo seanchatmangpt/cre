@@ -54,6 +54,7 @@
 
 %% Include shared types
 -include_lib("order_fulfillment_types.hrl").
+-include_lib("gen_pnet/include/gen_pnet.hrl").
 
 %%====================================================================
 %% Records
@@ -259,70 +260,45 @@ fire('t_receive_delivery', #{'p_input' := [start]}, State) ->
 
 fire('t_verify_items', #{'p_delivery_received' := [start]}, State) ->
     Delivery = State#delivery_state.delivery,
-    Shipment = State#delivery_state.shipment,
     Order = State#delivery_state.order,
     #{verified := Verified, condition := Condition} = verify_items(State),
-    UpdatedDelivery = Delivery#delivery{condition = Condition},
-    State1 = State#delivery_state{
-        delivery = UpdatedDelivery,
-        items_verified = Verified
-    },
     log_event(State, <<"Delivery">>, <<"ItemsVerified">>, #{
         <<"delivery_id">> => Delivery#delivery.delivery_id,
         <<"verified">> => Verified,
         <<"condition">> => Condition,
         <<"item_count">> => length(Order#order.items)
     }),
-    {produce, #{'p_items_verified' => [start]}, State1};
+    {produce, #{'p_items_verified' => [start]}};
 
 fire('t_obtain_signature', #{'p_items_verified' := [start]}, State) ->
     Delivery = State#delivery_state.delivery,
     Order = State#delivery_state.order,
-    #{signature := Signature, obtained := Obtained} = obtain_signature(State),
-    UpdatedDelivery = Delivery#delivery{signature = Signature},
-    State1 = State#delivery_state{
-        delivery = UpdatedDelivery,
-        signature_obtained = Obtained
-    },
+    #{signature := Signature, obtained := _Obtained} = obtain_signature(State),
     log_event(State, <<"Delivery">>, <<"SignatureObtained">>, #{
         <<"delivery_id">> => Delivery#delivery.delivery_id,
         <<"signature">> => Signature,
         <<"customer_name">> => Order#order.customer_name
     }),
-    {produce, #{'p_signature_obtained' => [start]}, State1};
+    {produce, #{'p_signature_obtained' => [start]}};
 
 fire('t_send_receipt', #{'p_signature_obtained' := [start]}, State) ->
     Delivery = State#delivery_state.delivery,
     Order = State#delivery_state.order,
-    Shipment = State#delivery_state.shipment,
     send_receipt(State),
-    UpdatedShipment = Shipment#shipment{status = delivered},
-    UpdatedOrder = Order#order{status = delivered},
-    State1 = State#delivery_state{
-        shipment = UpdatedShipment,
-        order = UpdatedOrder,
-        receipt_sent = true
-    },
     log_event(State, <<"Delivery">>, <<"ReceiptSent">>, #{
         <<"delivery_id">> => Delivery#delivery.delivery_id,
         <<"order_id">> => Order#order.order_id,
         <<"customer_email">> => Order#order.customer_email
     }),
-    {produce, #{'p_receipt_sent' => [start]}, State1};
+    {produce, #{'p_receipt_sent' => [start]}};
 
 fire('t_complete', #{'p_receipt_sent' := [start]}, State) ->
     Delivery = State#delivery_state.delivery,
-    Shipment = State#delivery_state.shipment,
-    UpdatedShipment = Shipment#shipment{
-        status = delivered,
-        actual_delivery = Delivery#delivery.delivered_at
-    },
-    State1 = State#delivery_state{shipment = UpdatedShipment},
     log_event(State, <<"Delivery">>, <<"DeliveryComplete">>, #{
         <<"delivery_id">> => Delivery#delivery.delivery_id,
-        <<"order_id">> => State1#delivery_state.order#order.order_id
+        <<"order_id">> => State#delivery_state.order#order.order_id
     }),
-    {produce, #{'p_output' => [start]}, State1};
+    {produce, #{'p_output' => [start]}};
 
 fire(_Trsn, _Mode, _State) ->
     abort.
@@ -331,8 +307,9 @@ fire(_Trsn, _Mode, _State) ->
 %% @doc Trigger callback for custom processing.
 %% @end
 %%--------------------------------------------------------------------
-trigger(Place, _Token, State) ->
-    log_event(State, <<"Delivery">>, <<"PlaceEntered">>, #{
+trigger(Place, _Token, NetState) ->
+    UsrInfo = NetState#net_state.usr_info,
+    log_event(UsrInfo, <<"Delivery">>, <<"PlaceEntered">>, #{
         <<"place">> => atom_to_binary(Place, utf8)
     }),
     pass.
@@ -350,9 +327,9 @@ init(DeliveryState) ->
                 D -> D#delivery.delivery_id
             end,
             yawl_xes:log_case_start(LogId, DeliveryId),
-            {ok, State1};
+            State1;
         _ ->
-            {ok, DeliveryState}
+            DeliveryState
     end.
 
 %%--------------------------------------------------------------------
@@ -389,20 +366,20 @@ code_change(_OldVsn, NetState, _Extra) ->
 %% @doc Terminates the gen_pnet.
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, State) ->
-    LogId = State#delivery_state.log_id,
-    case LogId of
-        undefined -> ok;
-        _ ->
-            DeliveryId = case State#delivery_state.delivery of
+terminate(_Reason, NetState) ->
+    case NetState of
+        #net_state{usr_info = #delivery_state{log_id = LogId} = UsrInfo}
+          when LogId =/= undefined ->
+            DeliveryId = case UsrInfo#delivery_state.delivery of
                 undefined -> <<"UNKNOWN">>;
                 D -> D#delivery.delivery_id
             end,
             yawl_xes:log_case_complete(LogId, DeliveryId, #{
-                <<"items_verified">> => State#delivery_state.items_verified,
-                <<"signature_obtained">> => State#delivery_state.signature_obtained,
-                <<"receipt_sent">> => State#delivery_state.receipt_sent
-            })
+                <<"items_verified">> => UsrInfo#delivery_state.items_verified,
+                <<"signature_obtained">> => UsrInfo#delivery_state.signature_obtained,
+                <<"receipt_sent">> => UsrInfo#delivery_state.receipt_sent
+            });
+        _ -> ok
     end,
     ok.
 

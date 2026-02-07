@@ -28,6 +28,18 @@
         ]
       }
     ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/SessionStart.sh 2>&1 || true",
+            "timeout": 600000,
+            "continueOnError": true
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

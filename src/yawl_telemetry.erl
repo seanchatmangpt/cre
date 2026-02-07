@@ -1517,7 +1517,10 @@ run_health_checks(HealthChecks) ->
             Result = try
                 Fn()
             catch
-                _:_ -> {error, health_check_failed}
+                Class:Reason ->
+                    logger:warning("Health check ~s failed: ~p:~p",
+                                   [Check#health_check.name, Class, Reason]),
+                    {error, health_check_failed}
             end,
             maps:put(Check#health_check.name, Result, Acc)
         end,
@@ -1536,7 +1539,10 @@ check_and_execute_alerts(State) ->
                     Triggered = try
                         CondFn()
                     catch
-                        _:_ -> false
+                        Class:Reason ->
+                            logger:warning("Alert condition ~p evaluation failed: ~p:~p",
+                                           [Rule#alert_rule.id, Class, Reason]),
+                            false
                     end,
 
                     case Triggered of
@@ -1568,7 +1574,7 @@ execute_alert_action(AlertId, State) ->
             case Rule#alert_rule.id of
                 AlertId ->
                     ActionFn = Rule#alert_rule.action,
-                    try ActionFn() catch _:_ -> ok end,
+                    try ActionFn() catch Class:Reason -> logger:warning("Alert action ~p failed: ~p:~p", [AlertId, Class, Reason]) end,
                     Rule#alert_rule{
                         last_triggered = erlang:system_time(millisecond),
                         trigger_count = Rule#alert_rule.trigger_count + 1

@@ -944,18 +944,18 @@ extract_vars_numeric_test() ->
 to_erlog_simple_test() ->
     {ok, {RulesBin, {flow_selected, []}}} =
         to_erlog(<<"/Overall/Flag/text()='true'">>),
-    true = binary:match(RulesBin, <<"token">>) =/= nomatch.
+    true = binary:match(RulesBin, <<"flow_selected">>) =/= nomatch.
 
 to_erlog_compound_test() ->
     {ok, {RulesBin, _}} = to_erlog(
         <<"/Overall/A/text()='true' and /Overall/B/text()='false'">>
     ),
-    true = binary:match(RulesBin, <<"token">>) =/= nomatch,
+    true = binary:match(RulesBin, <<"flow_selected">>) =/= nomatch,
     true = binary:match(RulesBin, <<",">>) =/= nomatch.
 
 to_erlog_numeric_test() ->
     {ok, {RulesBin, _}} = to_erlog(<<"/Overall/Count/text() > 0">>),
-    true = binary:match(RulesBin, <<"token">>) =/= nomatch.
+    true = binary:match(RulesBin, <<"flow_selected">>) =/= nomatch.
 
 %% Unit tests for tokenizer
 tokenize_path_test() ->
@@ -996,9 +996,9 @@ tokenize_ne_test() ->
 integration_full_predicate_test() ->
     Pred = <<"/Overall/PO_timedout/text()='false' and /Overall/POApproval/text()='true'">>,
     {ok, {RulesBin, {flow_selected, []}}} = to_erlog(Pred),
-    %% Should contain token facts for both variables
-    true = binary:match(RulesBin, <<"token('Overall', 'PO_timedout')">>) =/= nomatch,
-    true = binary:match(RulesBin, <<"token('Overall', 'POApproval')">>) =/= nomatch.
+    %% Should contain rule body referencing both variables
+    true = binary:match(RulesBin, <<"po_timedout">>) =/= nomatch,
+    true = binary:match(RulesBin, <<"poapproval">>) =/= nomatch.
 
 integration_yawl_example_test() ->
     %% From orderfulfillment_2_1.yawl

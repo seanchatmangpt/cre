@@ -1000,20 +1000,20 @@ tokenize_rule_test() ->
 
 tokenize_variable_test() ->
     Tokens = tokenize(<<"take(X)">>),
-    [token, '(', {var, 'X'}, ')'] = Tokens.
+    [take, '(', {var, x}, ')'] = Tokens.
 
 tokenize_uppercase_variable_test() ->
     Tokens = tokenize(<<"take(VarName)">>),
-    [token, '(', {var, 'VarName'}, ')'] = Tokens.
+    [take, '(', {var, varname}, ')'] = Tokens.
 
 %% Unit tests for parse
 parse_fact_test() ->
     Tokens = [token, '(', coin_slot, ',', coin, ')', '.'],
-    {[{#{head := {token, [coin_slot, coin]}}, []}], []} = parse_clauses(Tokens).
+    {[#{head := {token, [coin_slot, coin]}, body := []}], []} = parse_clauses(Tokens).
 
 parse_rule_test() ->
     Tokens = [enabled, '(', a, ')', ':-', token, '(', coin_slot, ',', coin, ')', '.'],
-    {[{#{head := {enabled, [a]}, body := [{token, [coin_slot, coin]}]}}], []} = parse_clauses(Tokens).
+    {[#{head := {enabled, [a]}, body := [{token, [coin_slot, coin]}]}], []} = parse_clauses(Tokens).
 
 parse_multiple_clauses_test() ->
     Tokens = [fact, '(', a, ')', '.', fact, '(', b, ')', '.'],
@@ -1027,18 +1027,18 @@ facts_empty_test() ->
 
 facts_single_place_test() ->
     Facts = facts_from_marking(#{p => [a]}),
-    [{token, p, a}] = Facts.
+    [{token, [p, a]}] = Facts.
 
 facts_multiple_tokens_test() ->
     Facts = facts_from_marking(#{p => [a, b, c]}),
     3 = length(Facts),
-    true = lists:member({token, p, a}, Facts),
-    true = lists:member({token, p, b}, Facts),
-    true = lists:member({token, p, c}, Facts).
+    true = lists:member({token, [p, a]}, Facts),
+    true = lists:member({token, [p, b]}, Facts),
+    true = lists:member({token, [p, c]}, Facts).
 
 facts_empty_place_test() ->
     Facts = facts_from_marking(#{p => [], q => [a]}),
-    [{token, q, a}] = Facts.
+    [{token, [q, a]}] = Facts.
 
 %% Unit tests for unify
 unify_atoms_test() ->
@@ -1069,7 +1069,7 @@ bool_simple_false_test() ->
 
 bool_with_token_fact_test() ->
     {ok, Rules} = compile(<<"enabled :- token(slot, coin).">>),
-    Facts = [{token, slot, coin}],
+    Facts = [{token, [slot, coin]}],
     true = bool(Rules, {enabled, []}, Facts, #{}).
 
 bool_no_token_fact_test() ->
@@ -1091,7 +1091,7 @@ query_no_vars_test() ->
 
 query_single_var_test() ->
     {ok, Rules} = compile(<<"p(X) :- token(t, X).">>),
-    Facts = [{token, t, a}, {token, t, b}],
+    Facts = [{token, [t, a]}, {token, [t, b]}],
     {ok, Bs} = query(Rules, {p, {var, x}}, Facts, #{}),
     2 = length(Bs),
     true = lists:any(fun(B) -> maps:get(x, B) =:= a end, Bs),
@@ -1099,7 +1099,7 @@ query_single_var_test() ->
 
 query_multiple_vars_test() ->
     {ok, Rules} = compile(<<"p(X, Y) :- token(t, X, Y).">>),
-    Facts = [{token, t, a, b}, {token, t, c, d}],
+    Facts = [{token, [t, a, b]}, {token, [t, c, d]}],
     {ok, Bs} = query(Rules, {p, {var, x}, {var, y}}, Facts, #{}),
     2 = length(Bs).
 

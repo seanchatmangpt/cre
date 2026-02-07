@@ -186,7 +186,7 @@ newly created process. The instance is registered locally under `CreName`.
 ```
 """).
 start_link(CreName) ->
-    gen_server:start_link(CreName, ?MODULE, [], []).
+    gen_server:start_link({local, CreName}, ?MODULE, [], []).
 
 
 %% @doc Registers a worker process with a given CRE instance.
@@ -436,7 +436,8 @@ init(_Arg) ->
     WorkerMarking = pnet_marking:new([?P_IDLE_WORKERS, ?P_BUSY_WORKERS, ?P_PENDING_TASKS]),
 
     %% Initialize deterministic RNG for worker selection
-    RngState = pnet_choice:seed(erlang:timestamp()),
+    {Mega, Secs, Micro} = erlang:timestamp(),
+    RngState = pnet_choice:seed(Mega * 1000000000000 + Secs * 1000000 + Micro),
 
     {ok, #cre_state{
         worker_marking = WorkerMarking,

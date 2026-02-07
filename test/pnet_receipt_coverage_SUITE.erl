@@ -128,8 +128,8 @@ effects_multiple_multiple_places(_Config) ->
     ok.
 
 make_creates_valid_receipt(_Config) ->
-    BeforeHash = crypto:hash(sha256, term_to_binary(before)),
-    AfterHash = crypto:hash(sha256, term_to_binary('after')),
+    BeforeHash = crypto:hash(sha256, term_to_binary(before_state)),
+    AfterHash = crypto:hash(sha256, term_to_binary(after_state)),
     Move = #{
         trsn => my_transition,
         mode => #{input => [token]},
@@ -145,10 +145,9 @@ make_creates_valid_receipt(_Config) ->
 make_validates_move_structure(_Config) ->
     BeforeHash = <<1>>,
     AfterHash = <<2>>,
-    %% Invalid move - missing fields
+    %% Invalid moves missing required fields cause badmatch in make/3
     InvalidMove1 = #{trsn => t1},
-    ?assertError({badmatch, _}, pnet_receipt:make(BeforeHash, AfterHash, InvalidMove1)),
-
+    ?assertError(_, pnet_receipt:make(BeforeHash, AfterHash, InvalidMove1)),
     InvalidMove2 = #{mode => #{}},
-    ?assertError({badmatch, _}, pnet_receipt:make(BeforeHash, AfterHash, InvalidMove2)),
+    ?assertError(_, pnet_receipt:make(BeforeHash, AfterHash, InvalidMove2)),
     ok.

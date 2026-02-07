@@ -17,7 +17,7 @@
 %%   </type>
 %% </schema>
 %% ```
--module(yawl_schema).
+-module(wf_yawl_schema).
 -behaviour(gen_server).
 
 %% Include record definitions

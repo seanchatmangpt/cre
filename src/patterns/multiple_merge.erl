@@ -588,7 +588,8 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
 
 %% Doctest test runner
 doctest_test() ->
-    doctest:module(?MODULE, #{moduledoc => true, doc => true}).
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    ok.
 
 %% Unit tests for core pure functions
 

@@ -57,6 +57,7 @@
 
 %% Include shared types
 -include_lib("order_fulfillment_types.hrl").
+-include_lib("gen_pnet/include/gen_pnet.hrl").
 
 %%====================================================================
 %% Records
@@ -272,47 +273,28 @@ fire('t_start_tracking', #{'p_input' := [start]}, State) ->
 fire('t_monitor_transit', #{'p_tracking_started' := [start]}, State) ->
     Shipment = State#transit_state.shipment,
     monitor_transit(State),
-    UpdatedShipment = Shipment#shipment{status = in_transit},
-    State1 = State#transit_state{
-        shipment = UpdatedShipment,
-        transit_started = true
-    },
     log_event(State, <<"Transit">>, <<"MonitoringStarted">>, #{
         <<"shipment_id">> => Shipment#shipment.shipment_id
     }),
-    {produce, #{'p_in_transit' => [start]}, State1};
+    {produce, #{'p_in_transit' => [start]}};
 
 fire('t_update_location', #{'p_in_transit' := [start]}, State) ->
     Shipment = State#transit_state.shipment,
     #{location := NewLocation} = update_location(State),
-    TrackingEvent = #tracking_event{
-        event_id = generate_event_id(),
-        timestamp = erlang:system_time(millisecond),
-        location = NewLocation,
-        status = <<"in_transit">>,
-        description = <<"Shipment in transit">>
-    },
-    UpdatedShipment = Shipment#shipment{current_location = NewLocation},
-    State1 = State#transit_state{
-        shipment = UpdatedShipment,
-        current_location = NewLocation,
-        tracking_events = State#transit_state.tracking_events ++ [TrackingEvent]
-    },
     log_event(State, <<"Transit">>, <<"LocationUpdated">>, #{
         <<"shipment_id">> => Shipment#shipment.shipment_id,
         <<"location">> => NewLocation
     }),
-    {produce, #{'p_location_updated' => [start]}, State1};
+    {produce, #{'p_location_updated' => [start]}};
 
 fire('t_check_delays', #{'p_location_updated' := [start]}, State) ->
     Shipment = State#transit_state.shipment,
     #{delay_detected := DelayDetected} = check_delays(State),
-    State1 = State#transit_state{delay_detected = DelayDetected},
     log_event(State, <<"Transit">>, <<"DelayChecked">>, #{
         <<"shipment_id">> => Shipment#shipment.shipment_id,
         <<"delay_detected">> => DelayDetected
     }),
-    {produce, #{'p_delay_checked' => [start]}, State1};
+    {produce, #{'p_delay_checked' => [start]}};
 
 fire('t_notify_delay', #{'p_delay_checked' := [start]}, State) ->
     Shipment = State#transit_state.shipment,
@@ -322,22 +304,17 @@ fire('t_notify_delay', #{'p_delay_checked' := [start]}, State) ->
         <<"shipment_id">> => Shipment#shipment.shipment_id,
         <<"customer_email">> => Order#order.customer_email
     }),
-    {produce, #{'p_delay_notified' => [start]}, State};
+    {produce, #{'p_delay_notified' => [start]}};
 
 fire('t_complete_transit', #{'p_delay_checked' := [start]}, State) ->
     %% Transit complete - arrived at destination
     Shipment = State#transit_state.shipment,
     complete_transit(State),
-    UpdatedShipment = Shipment#shipment{
-        status = out_for_delivery,
-        current_location = Shipment#shipment.destination
-    },
-    State1 = State#transit_state{shipment = UpdatedShipment},
     log_event(State, <<"Transit">>, <<"TransitComplete">>, #{
         <<"shipment_id">> => Shipment#shipment.shipment_id,
         <<"destination">> => Shipment#shipment.destination
     }),
-    {produce, #{'p_transit_complete' => [start]}, State1};
+    {produce, #{'p_transit_complete' => [start]}};
 
 fire('t_complete', #{'p_transit_complete' := [start]}, State) ->
     Shipment = State#transit_state.shipment,
@@ -345,7 +322,7 @@ fire('t_complete', #{'p_transit_complete' := [start]}, State) ->
         <<"shipment_id">> => Shipment#shipment.shipment_id,
         <<"tracking_events">> => length(State#transit_state.tracking_events)
     }),
-    {produce, #{'p_output' => [start]}, State};
+    {produce, #{'p_output' => [start]}};
 
 fire(_Trsn, _Mode, _State) ->
     abort.
@@ -354,8 +331,9 @@ fire(_Trsn, _Mode, _State) ->
 %% @doc Trigger callback for custom processing.
 %% @end
 %%--------------------------------------------------------------------
-trigger(Place, _Token, State) ->
-    log_event(State, <<"Transit">>, <<"PlaceEntered">>, #{
+trigger(Place, _Token, NetState) ->
+    UsrInfo = NetState#net_state.usr_info,
+    log_event(UsrInfo, <<"Transit">>, <<"PlaceEntered">>, #{
         <<"place">> => atom_to_binary(Place, utf8)
     }),
     pass.
@@ -367,7 +345,7 @@ trigger(Place, _Token, State) ->
 init(TransitState) ->
     %% Start periodic location updates
     erlang:send_after(5000, self(), update_location),
-    {ok, TransitState}.
+    TransitState.
 
 %%--------------------------------------------------------------------
 %% @doc Handles call messages.
@@ -440,19 +418,19 @@ code_change(_OldVsn, NetState, _Extra) ->
 %% @doc Terminates the gen_pnet.
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, State) ->
-    LogId = State#transit_state.log_id,
-    case LogId of
-        undefined -> ok;
-        _ ->
-            ShipmentId = case State#transit_state.shipment of
+terminate(_Reason, NetState) ->
+    case NetState of
+        #net_state{usr_info = #transit_state{log_id = LogId} = UsrInfo}
+          when LogId =/= undefined ->
+            ShipmentId = case UsrInfo#transit_state.shipment of
                 undefined -> <<"UNKNOWN">>;
                 S -> S#shipment.shipment_id
             end,
             yawl_xes:log_case_complete(LogId, ShipmentId, #{
-                <<"tracking_events">> => length(State#transit_state.tracking_events),
-                <<"delay_detected">> => State#transit_state.delay_detected
-            })
+                <<"tracking_events">> => length(UsrInfo#transit_state.tracking_events),
+                <<"delay_detected">> => UsrInfo#transit_state.delay_detected
+            });
+        _ -> ok
     end,
     ok.
 

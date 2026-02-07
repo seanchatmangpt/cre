@@ -1551,7 +1551,10 @@ rollback_execution_state(ExecId) ->
 
 evaluate_condition(ConditionFun, Input) when is_function(ConditionFun, 1) ->
     try ConditionFun(Input)
-    catch _:_ -> false end;
+    catch Class:Reason ->
+        logger:warning("evaluate_condition: ~p:~p", [Class, Reason]),
+        false
+    end;
 evaluate_condition(true, _Input) -> true;
 evaluate_condition(false, _Input) -> false;
 evaluate_condition(_, _Input) -> false.
@@ -1657,8 +1660,8 @@ doctest_test() ->
     value = context_get(Ctx3, key),  %% Original key preserved
 
     %% Test 8: Context to map
-    MapList = context_to_map(Ctx3),
-    true = is_list(MapList),
+    MapResult = context_to_map(Ctx3),
+    true = is_map(MapResult),
 
     %% Test 9: Parallel split pattern execution
     ParallelPattern = #parallel_split{
