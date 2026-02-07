@@ -1,0 +1,268 @@
+# Security scanning configuration for Cloud Build
+# Includes vulnerability scanning, SAST analysis, and compliance checking
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-scanning-config
+  namespace: cloud-build
+data:
+  # OWASP DependencyCheck configuration
+  dependencycheck.properties: |
+    # DependencyCheck settings
+    dependency-check.enabled=true
+    dependency-check.format=JSON
+    dependency-check.fail-on-cvss=7.0
+    dependency-check.suppression-file=
+
+  # SonarQube configuration
+  sonarqube-config.yaml: |
+    sonar:
+      host:
+        url: https://sonarqube.example.com
+      projectKey: admin-console
+      projectName: Admin Console
+      projectVersion: 1.0.0
+
+      sources: admin-console/src
+      exclusions: |
+        **/*.test.ts
+        **/*.spec.ts
+        **/node_modules/**
+        **/dist/**
+
+      javascript:
+        lcov:
+          reportPaths: coverage/lcov.info
+
+      coverage:
+        exclusions: |
+          **/*.test.ts
+          **/*.spec.ts
+          **/test/**
+
+      issues:
+        ignore:
+          multicriteria: true
+
+    rules:
+      - key: typescript:S101
+        status: ACTIVE
+      - key: typescript:S3923
+        status: ACTIVE
+
+  # Container scanning configuration
+  container-scanning.yaml: |
+    scanning:
+      enabled: true
+      deep-scan: true
+      include-base-images: true
+
+      policies:
+        - name: critical-vulnerabilities
+          severity: CRITICAL
+          action: FAIL
+
+        - name: high-vulnerabilities
+          severity: HIGH
+          action: WARN
+
+        - name: medium-vulnerabilities
+          severity: MEDIUM
+          action: CONTINUE
+
+      exceptions:
+        - cve-id: CVE-2021-12345
+          reason: "False positive, not exploitable in our context"
+          expiration: "2025-12-31"
+
+  # SAST (Static Application Security Testing) rules
+  sast-rules.yaml: |
+    security-rules:
+      # SQL Injection detection
+      - id: sql-injection
+        pattern: "execute.*\\$"
+        severity: CRITICAL
+
+      # XSS detection
+      - id: xss-vulnerability
+        pattern: "innerHTML\\s*="
+        severity: HIGH
+
+      # Hardcoded secrets
+      - id: hardcoded-secrets
+        pattern: "(password|secret|api_key)\\s*=\\s*['\"].*['\"]"
+        severity: CRITICAL
+
+      # Insecure randomness
+      - id: insecure-randomness
+        pattern: "Math\\.random()"
+        severity: HIGH
+
+  # SBOM configuration (Syft)
+  sbom-config.yaml: |
+    syft:
+      output:
+        formats:
+          - json
+          - spdx
+
+      catalogers:
+        - npm-package
+        - npm-lock
+        - package-lock
+
+      search:
+        scope: all-layers
+
+      attestation:
+        enabled: true
+        format: in-toto
+---
+# Network policies for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: admin-console-network-policy
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: admin-console
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from load balancer/ingress
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Allow from monitoring
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow to external APIs
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow to database (if applicable)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: database
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# Pod Security Policy for production
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: admin-console-psp
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'MustRunAs'
+    seLinuxOptions:
+      level: "s0:c123,c456"
+  supplementalGroups:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: true
+---
+# Resource quota for security compliance
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: admin-console-quota
+  namespace: production
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: "40Gi"
+    limits.cpu: "40"
+    limits.memory: "80Gi"
+    pods: "100"
+    persistentvolumeclaims: "10"
+  scopeSelector:
+    matchExpressions:
+      - operator: In
+        scopeName: PriorityClass
+        values: ["high", "medium"]
+---
+# Network limit range for cost control
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: admin-console-limits
+  namespace: production
+spec:
+  limits:
+    # Pod limits
+    - max:
+        cpu: "2"
+        memory: "2Gi"
+      min:
+        cpu: "100m"
+        memory: "128Mi"
+      default:
+        cpu: "500m"
+        memory: "512Mi"
+      defaultRequest:
+        cpu: "250m"
+        memory: "256Mi"
+      type: Container
+
+    # Pod range limits
+    - max:
+        cpu: "4"
+        memory: "4Gi"
+      min:
+        cpu: "100m"
+        memory: "128Mi"
+      type: Pod

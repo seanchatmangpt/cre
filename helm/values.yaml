@@ -1,0 +1,446 @@
+# Default values for marketplace Helm chart
+# GCP Marketplace Application Configuration
+
+# Global settings
+global:
+  environment: production
+  domain: marketplace.local
+  projectId: "claude-flow-prod"
+  region: "us-central1"
+
+# Application name overrides
+nameOverride: ""
+fullnameOverride: ""
+
+# Claude Flow specific configuration
+claudeFlow:
+  mode: production
+  maxAgents: 8
+  enableHnsw: true
+  enableSona: true
+  memoryBackend: hybrid
+  swarmTopology: hierarchical
+  consensusAlgorithm: raft
+
+# GCP Configuration
+gcp:
+  projectId: "claude-flow-prod"
+  region: "us-central1"
+  gcpMarketplace:
+    enabled: true
+    publisher: "Claude Flow Contributors"
+    solutionId: "claude-flow"
+
+  # GCP service integration
+  services:
+    cloudStorage:
+      enabled: true
+      bucket: "claude-flow-prod-storage"
+    cloudLogging:
+      enabled: true
+      logLevel: INFO
+    cloudMonitoring:
+      enabled: true
+    cloudIAM:
+      enabled: true
+
+  # GCP authentication
+  authentication:
+    oauth2:
+      enabled: true
+      scopes:
+        - https://www.googleapis.com/auth/cloud-platform
+    serviceAccount:
+      enabled: true
+      roles:
+        - roles/container.admin
+        - roles/storage.admin
+        - roles/monitoring.metricWriter
+        - roles/logging.logWriter
+
+# Kubernetes configuration
+kubernetes:
+  version: "1.24"
+  cluster:
+    type: GKE
+    addons:
+      - gke-metrics-server
+
+# Service Account configuration
+serviceAccount:
+  create: true
+  annotations:
+    iam.gke.io/gcp-service-account: "claude-flow@claude-flow-prod.iam.gserviceaccount.com"
+  name: ""
+
+# RBAC configuration
+rbac:
+  create: true
+  clusterRole:
+    create: true
+    rules: []
+  role:
+    create: true
+    rules: []
+
+# PostgreSQL database configuration
+postgresql:
+  enabled: true
+  auth:
+    username: postgres
+    password: "changeme"
+    database: marketplace
+  primary:
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClassName: "standard"
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "1000m"
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
+  metrics:
+    enabled: true
+
+# Redis cache configuration
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "changeme"
+  master:
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClassName: "standard"
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+  replica:
+    replicaCount: 2
+  metrics:
+    enabled: true
+
+# RabbitMQ message queue configuration
+rabbitmq:
+  enabled: true
+  auth:
+    username: guest
+    password: "changeme"
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClassName: "standard"
+  replicaCount: 3
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  metrics:
+    enabled: true
+
+# Elasticsearch configuration
+elasticsearch:
+  enabled: true
+  auth:
+    enabled: true
+    elasticsearch:
+      username: elastic
+      password: "changeme"
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  persistence:
+    enabled: true
+    size: 100Gi
+    storageClassName: "standard"
+  replicas: 3
+
+# Kibana visualization configuration
+kibana:
+  enabled: true
+  elasticsearch:
+    hosts:
+      - "elasticsearch.default.svc.cluster.local"
+    port: 9200
+  auth:
+    enabled: true
+    username: elastic
+    password: "changeme"
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# Prometheus monitoring configuration
+prometheus:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClassName: "standard"
+  retention: 15d
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  serviceMonitor:
+    enabled: true
+
+# Grafana visualization configuration
+grafana:
+  enabled: true
+  adminPassword: "changeme"
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClassName: "standard"
+  datasources:
+    prometheus:
+      enabled: true
+      url: "http://prometheus.default.svc.cluster.local:9090"
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - host: grafana.marketplace.local
+        paths:
+          - path: /
+            pathType: Prefix
+
+# NGINX Ingress Controller
+nginx-ingress:
+  enabled: true
+  controller:
+    replicaCount: 2
+    service:
+      type: LoadBalancer
+      annotations:
+        cloud.google.com/load-balancer-type: "External"
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+  metrics:
+    enabled: true
+
+# Cert-Manager for TLS certificates
+cert-manager:
+  enabled: true
+  installCRDs: true
+  global:
+    leaderElection:
+      namespace: cert-manager
+  issuer:
+    letsencrypt:
+      enabled: true
+      production: true
+      email: "admin@marketplace.local"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: api.marketplace.local
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: dashboard.marketplace.local
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: marketplace.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: marketplace-tls
+      hosts:
+        - api.marketplace.local
+        - dashboard.marketplace.local
+        - marketplace.local
+
+# Network policies
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Pod Security Policy
+podSecurityPolicy:
+  enabled: true
+
+# Resource quotas
+resources:
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+  requests:
+    cpu: 2000m
+    memory: 4Gi
+
+# Autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Node affinity and pod anti-affinity
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: cloud.google.com/gke-nodepool
+              operator: In
+              values:
+                - default-pool
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - marketplace
+          topologyKey: kubernetes.io/hostname
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  capabilities:
+    drop:
+      - ALL
+
+# Backup and recovery
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: 30
+  storageLocation: "gs://claude-flow-prod-backups"
+
+# Logging configuration
+logging:
+  enabled: true
+  level: INFO
+  format: json
+  outputs:
+    - stdout
+    - stackdriver
+
+# Metrics configuration
+metrics:
+  enabled: true
+  interval: 30s
+  port: 8080
+  path: /metrics
+
+# Health checks
+healthChecks:
+  liveness:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Update strategy
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Tolerations for node taints
+tolerations: []
+
+# Environment variables
+env:
+  CLAUDE_FLOW_MODE: production
+  ENABLE_HNSW: "true"
+  MAX_AGENTS: "8"
+  MEMORY_BACKEND: hybrid
+  SWARM_TOPOLOGY: hierarchical
+  ENABLE_SONA: "true"
+  CONSENSUS_ALGORITHM: raft
+  LOG_LEVEL: INFO
+  GCP_PROJECT_ID: "claude-flow-prod"
+  GCP_REGION: "us-central1"
+
+# ConfigMaps
+configMaps:
+  enabled: true
+  data: {}
+
+# Secrets
+secrets:
+  enabled: true
+  externalSecrets: false
+  gcpSecretManager:
+    enabled: true
+    projectId: "claude-flow-prod"
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+
+# DNS configuration
+dnsPolicy: ClusterFirst
+dnsConfig:
+  options:
+    - name: ndots
+      value: "1"
+
+# Feature gates
+featureGates:
+  memoryOptimization: true
+  performanceMonitoring: true
+  enhancedSecurity: true
+  autoScaling: true

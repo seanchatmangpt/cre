@@ -1,0 +1,350 @@
+applicationApiVersion: v1beta1
+
+properties:
+  name:
+    type: string
+    x-google-marketplace:
+      type: NAME
+    title: Application name
+    description: The name of the application instance
+    maxLength: 63
+    pattern: '^[a-z]([-a-z0-9]*[a-z0-9])?$'
+
+  namespace:
+    type: string
+    x-google-marketplace:
+      type: NAMESPACE
+    title: Namespace
+    description: The Kubernetes namespace where the application will be deployed
+
+  # Service Account Configuration
+  deployerServiceAccount:
+    type: string
+    title: Deployer Service Account
+    x-google-marketplace:
+      type: DEPLOYER_SERVICE_ACCOUNT
+      serviceAccount:
+        description: Service account used by the deployer
+        roles:
+        - type: ClusterRole
+          rulesType: CUSTOM
+          rules:
+          - apiGroups: ['*']
+            resources: ['*']
+            verbs: ['*']
+
+  appServiceAccount:
+    type: string
+    title: Application Service Account
+    x-google-marketplace:
+      type: SERVICE_ACCOUNT
+      serviceAccount:
+        description: Service account for the application
+        roles:
+        - type: Role
+          rulesType: CUSTOM
+          rules:
+          - apiGroups: ['apps']
+            resources: ['deployments', 'statefulsets']
+            verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+          - apiGroups: ['']
+            resources: ['services', 'configmaps', 'secrets', 'persistentvolumeclaims']
+            verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+          - apiGroups: ['batch']
+            resources: ['jobs', 'cronjobs']
+            verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+
+  meteringServiceAccount:
+    type: string
+    title: Usage Metering Service Account
+    x-google-marketplace:
+      type: SERVICE_ACCOUNT
+      serviceAccount:
+        description: Service account for usage metering
+        roles:
+        - type: ClusterRole
+          rulesType: CUSTOM
+          rules:
+          - apiGroups: ['']
+            resources: ['pods', 'nodes']
+            verbs: ['get', 'list', 'watch']
+          - apiGroups: ['metrics.k8s.io']
+            resources: ['*']
+            verbs: ['get', 'list']
+
+  # Reporting Secret (for billing)
+  reportingSecret:
+    type: string
+    title: Reporting Secret
+    x-google-marketplace:
+      type: REPORTING_SECRET
+
+  # Enterprise Configuration
+  replicaCount:
+    type: integer
+    title: Number of replicas
+    description: Number of application replicas for high availability
+    default: 3
+    minimum: 1
+    maximum: 20
+
+  # Resource Configuration - Enterprise Tier
+  resources:
+    type: object
+    title: Resource Configuration
+    properties:
+      requests:
+        type: object
+        properties:
+          cpu:
+            type: string
+            title: CPU request
+            default: "2000m"
+            description: CPU resources requested per pod
+          memory:
+            type: string
+            title: Memory request
+            default: "4Gi"
+            description: Memory resources requested per pod
+      limits:
+        type: object
+        properties:
+          cpu:
+            type: string
+            title: CPU limit
+            default: "4000m"
+            description: Maximum CPU resources per pod
+          memory:
+            type: string
+            title: Memory limit
+            default: "8Gi"
+            description: Maximum memory resources per pod
+
+  # Storage Configuration
+  persistence:
+    type: object
+    title: Persistent Storage
+    properties:
+      enabled:
+        type: boolean
+        title: Enable persistence
+        default: true
+      storageClass:
+        type: string
+        title: Storage class
+        default: "standard-rwo"
+        description: Kubernetes storage class for persistent volumes
+      size:
+        type: string
+        title: Storage size
+        default: "100Gi"
+        description: Size of persistent volume
+      backup:
+        type: object
+        properties:
+          enabled:
+            type: boolean
+            title: Enable automated backups
+            default: true
+          schedule:
+            type: string
+            title: Backup schedule (cron)
+            default: "0 2 * * *"
+          retention:
+            type: integer
+            title: Backup retention (days)
+            default: 30
+
+  # Database Configuration
+  database:
+    type: object
+    title: Database Configuration
+    properties:
+      type:
+        type: string
+        title: Database type
+        enum:
+        - "postgresql"
+        - "mysql"
+        - "cloudsql"
+        default: "postgresql"
+      highAvailability:
+        type: boolean
+        title: Enable HA database
+        default: true
+      replicas:
+        type: integer
+        title: Database replicas
+        default: 3
+        minimum: 1
+        maximum: 5
+
+  # SSO Configuration
+  sso:
+    type: object
+    title: Single Sign-On Configuration
+    properties:
+      enabled:
+        type: boolean
+        title: Enable SSO
+        default: false
+      provider:
+        type: string
+        title: SSO Provider
+        enum:
+        - "saml"
+        - "oauth2"
+        - "oidc"
+        - "ldap"
+        default: "saml"
+      entityId:
+        type: string
+        title: Entity ID
+        description: SAML Entity ID or OAuth Client ID
+      metadataUrl:
+        type: string
+        title: Metadata URL
+        description: URL to SSO provider metadata
+
+  # Monitoring & Observability
+  monitoring:
+    type: object
+    title: Monitoring Configuration
+    properties:
+      enabled:
+        type: boolean
+        title: Enable monitoring
+        default: true
+      prometheus:
+        type: boolean
+        title: Enable Prometheus integration
+        default: true
+      grafana:
+        type: boolean
+        title: Deploy Grafana dashboards
+        default: true
+      alerting:
+        type: boolean
+        title: Enable alerting
+        default: true
+
+  # Security Configuration
+  security:
+    type: object
+    title: Security Configuration
+    properties:
+      networkPolicies:
+        type: boolean
+        title: Enable network policies
+        default: true
+      podSecurityPolicies:
+        type: boolean
+        title: Enable pod security policies
+        default: true
+      encryptionAtRest:
+        type: boolean
+        title: Enable encryption at rest
+        default: true
+      mtls:
+        type: boolean
+        title: Enable mTLS
+        default: true
+      auditLogging:
+        type: boolean
+        title: Enable audit logging
+        default: true
+
+  # Compliance
+  compliance:
+    type: object
+    title: Compliance Configuration
+    properties:
+      soc2:
+        type: boolean
+        title: SOC2 compliance mode
+        default: false
+      hipaa:
+        type: boolean
+        title: HIPAA compliance mode
+        default: false
+      pciDss:
+        type: boolean
+        title: PCI-DSS compliance mode
+        default: false
+
+  # Auto-scaling
+  autoscaling:
+    type: object
+    title: Auto-scaling Configuration
+    properties:
+      enabled:
+        type: boolean
+        title: Enable auto-scaling
+        default: true
+      minReplicas:
+        type: integer
+        title: Minimum replicas
+        default: 3
+        minimum: 1
+      maxReplicas:
+        type: integer
+        title: Maximum replicas
+        default: 20
+        maximum: 100
+      targetCPUUtilization:
+        type: integer
+        title: Target CPU utilization (%)
+        default: 70
+        minimum: 50
+        maximum: 90
+      targetMemoryUtilization:
+        type: integer
+        title: Target memory utilization (%)
+        default: 80
+        minimum: 50
+        maximum: 90
+
+  # Ingress Configuration
+  ingress:
+    type: object
+    title: Ingress Configuration
+    properties:
+      enabled:
+        type: boolean
+        title: Enable ingress
+        default: true
+      hostname:
+        type: string
+        title: Hostname
+        description: Fully qualified domain name
+      tlsEnabled:
+        type: boolean
+        title: Enable TLS
+        default: true
+      certificateIssuer:
+        type: string
+        title: Certificate issuer
+        enum:
+        - "letsencrypt-prod"
+        - "letsencrypt-staging"
+        - "custom"
+        default: "letsencrypt-prod"
+
+required:
+- name
+- namespace
+- deployerServiceAccount
+- appServiceAccount
+- meteringServiceAccount
+- reportingSecret
+
+form:
+- widget: help
+  description: |
+    Configure your enterprise application deployment.
+    For production workloads, we recommend:
+    - At least 3 replicas for high availability
+    - Persistent storage enabled with automated backups
+    - SSO integration with your identity provider
+    - Monitoring and alerting enabled
+    - Appropriate compliance modes activated

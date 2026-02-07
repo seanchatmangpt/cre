@@ -1,0 +1,264 @@
+x-google-marketplace:
+  schemaVersion: v2
+  applicationApiVersion: v1beta1
+  publishedVersion: '1.0.0'
+  publishedVersionMetadata:
+    releaseNote: Initial release with automated GCP provisioning
+    releaseTypes:
+      - Feature
+    recommended: true
+
+  # Images section
+  images:
+    '':
+      properties:
+        image.repository:
+          type: REPO_WITH_REGISTRY
+        image.tag:
+          type: TAG
+
+  # Deployer image
+  deployerServiceAccount:
+    description: Service account used by the deployer
+    roles:
+      - type: ClusterRole
+        rulesType: CUSTOM
+        rules:
+          - apiGroups: ['*']
+            resources: ['*']
+            verbs: ['*']
+
+properties:
+  # Application name
+  name:
+    type: string
+    x-google-marketplace:
+      type: NAME
+    title: Application name
+    description: The name of the application instance
+    maxLength: 63
+
+  # Namespace
+  namespace:
+    type: string
+    x-google-marketplace:
+      type: NAMESPACE
+    title: Namespace
+    description: The namespace for the application
+
+  # GKE Configuration
+  gke:
+    type: object
+    title: GKE Configuration
+    properties:
+      clusterName:
+        type: string
+        title: GKE Cluster Name
+        description: Name of the GKE cluster (leave empty to create new)
+        default: ""
+
+      nodeCount:
+        type: integer
+        title: Node Count
+        description: Number of nodes in the GKE cluster
+        default: 3
+        minimum: 1
+        maximum: 100
+
+      machineType:
+        type: string
+        title: Machine Type
+        description: GCE machine type for nodes
+        default: "n1-standard-4"
+        enum:
+          - "n1-standard-2"
+          - "n1-standard-4"
+          - "n1-standard-8"
+          - "n1-standard-16"
+
+      region:
+        type: string
+        title: Region
+        description: GCP region for the cluster
+        default: "us-central1"
+
+      enableAutoscaling:
+        type: boolean
+        title: Enable Autoscaling
+        description: Enable cluster autoscaling
+        default: true
+
+      minNodes:
+        type: integer
+        title: Minimum Nodes
+        description: Minimum number of nodes (if autoscaling enabled)
+        default: 1
+
+      maxNodes:
+        type: integer
+        title: Maximum Nodes
+        description: Maximum number of nodes (if autoscaling enabled)
+        default: 10
+
+  # Database Configuration
+  database:
+    type: object
+    title: Database Configuration
+    properties:
+      enabled:
+        type: boolean
+        title: Enable Database
+        description: Create Cloud SQL database instance
+        default: true
+
+      tier:
+        type: string
+        title: Database Tier
+        description: Cloud SQL instance tier
+        default: "db-n1-standard-2"
+        enum:
+          - "db-f1-micro"
+          - "db-g1-small"
+          - "db-n1-standard-1"
+          - "db-n1-standard-2"
+          - "db-n1-standard-4"
+
+      databaseVersion:
+        type: string
+        title: Database Version
+        description: PostgreSQL version
+        default: "POSTGRES_14"
+        enum:
+          - "POSTGRES_13"
+          - "POSTGRES_14"
+          - "POSTGRES_15"
+
+      storageSize:
+        type: integer
+        title: Storage Size (GB)
+        description: Database storage size in GB
+        default: 20
+        minimum: 10
+        maximum: 10000
+
+      backupEnabled:
+        type: boolean
+        title: Enable Backups
+        description: Enable automated backups
+        default: true
+
+  # Networking Configuration
+  networking:
+    type: object
+    title: Networking Configuration
+    properties:
+      vpcName:
+        type: string
+        title: VPC Name
+        description: Name of VPC network (leave empty to create new)
+        default: ""
+
+      subnetCidr:
+        type: string
+        title: Subnet CIDR
+        description: CIDR range for the subnet
+        default: "10.0.0.0/24"
+        pattern: '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'
+
+      enablePrivateCluster:
+        type: boolean
+        title: Private GKE Cluster
+        description: Create GKE cluster with private nodes
+        default: true
+
+      masterIpv4CidrBlock:
+        type: string
+        title: Master CIDR Block
+        description: CIDR block for GKE master (private cluster)
+        default: "172.16.0.0/28"
+        pattern: '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'
+
+  # IAM Configuration
+  iam:
+    type: object
+    title: IAM Configuration
+    properties:
+      createServiceAccounts:
+        type: boolean
+        title: Create Service Accounts
+        description: Automatically create required service accounts
+        default: true
+
+      workloadIdentityEnabled:
+        type: boolean
+        title: Enable Workload Identity
+        description: Enable Workload Identity for GKE
+        default: true
+
+  # Application Configuration
+  application:
+    type: object
+    title: Application Configuration
+    properties:
+      replicas:
+        type: integer
+        title: Replicas
+        description: Number of application replicas
+        default: 2
+        minimum: 1
+        maximum: 10
+
+      resources:
+        type: object
+        title: Resource Limits
+        properties:
+          requests:
+            type: object
+            properties:
+              memory:
+                type: string
+                title: Memory Request
+                default: "256Mi"
+              cpu:
+                type: string
+                title: CPU Request
+                default: "100m"
+          limits:
+            type: object
+            properties:
+              memory:
+                type: string
+                title: Memory Limit
+                default: "512Mi"
+              cpu:
+                type: string
+                title: CPU Limit
+                default: "500m"
+
+  # Service Account
+  serviceAccount:
+    type: string
+    x-google-marketplace:
+      type: SERVICE_ACCOUNT
+      serviceAccount:
+        description: Service account for the application
+        roles:
+          - type: ClusterRole
+            rulesType: CUSTOM
+            rules:
+              - apiGroups: ['']
+                resources: ['pods', 'services', 'endpoints']
+                verbs: ['get', 'list', 'watch']
+              - apiGroups: ['apps']
+                resources: ['deployments', 'replicasets']
+                verbs: ['get', 'list', 'watch']
+
+required:
+  - name
+  - namespace
+  - serviceAccount
+  - gke
+  - database
+  - networking
+  - iam
+  - application

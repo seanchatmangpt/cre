@@ -1,0 +1,97 @@
+apiVersion: v2
+name: marketplace
+description: A Helm chart for deploying a marketplace application with microservices, databases, and caching layers
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - marketplace
+  - e-commerce
+  - microservices
+  - kubernetes
+
+home: https://github.com/marketplace/helm
+sources:
+  - https://github.com/marketplace/helm
+maintainers:
+  - name: Platform Team
+    email: platform@marketplace.local
+    url: https://marketplace.local
+
+icon: https://marketplace.local/logo.png
+
+dependencies:
+  - name: postgresql
+    version: "13.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+    tags:
+      - database
+    import-values:
+      - child: primary.service
+        parent: postgresqlService
+
+  - name: redis
+    version: "18.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled
+    tags:
+      - cache
+
+  - name: rabbitmq
+    version: "13.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: rabbitmq.enabled
+    tags:
+      - messaging
+      - queue
+
+  - name: elasticsearch
+    version: "20.x.x"
+    repository: "https://helm.elastic.co"
+    condition: elasticsearch.enabled
+    tags:
+      - search
+      - logging
+
+  - name: kibana
+    version: "7.x.x"
+    repository: "https://helm.elastic.co"
+    condition: kibana.enabled
+    tags:
+      - logging
+      - visualization
+
+  - name: prometheus
+    version: "25.x.x"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: prometheus.enabled
+    tags:
+      - monitoring
+      - metrics
+
+  - name: grafana
+    version: "7.x.x"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: grafana.enabled
+    tags:
+      - monitoring
+      - visualization
+
+  - name: nginx-ingress
+    version: "4.x.x"
+    repository: "https://kubernetes.github.io/ingress-nginx"
+    condition: nginx-ingress.enabled
+    tags:
+      - ingress
+      - networking
+
+  - name: cert-manager
+    version: "v1.x.x"
+    repository: "https://charts.jetstack.io"
+    condition: cert-manager.enabled
+    tags:
+      - certificates
+      - tls
+      - security

@@ -1,0 +1,350 @@
+openapi: 3.0.0
+info:
+  title: CRE Master API
+  description: |
+    Cuneiform Runtime Environment (CRE) Master API
+
+    The CRE Master API provides endpoints for monitoring the distributed runtime environment,
+    including system status, worker information, caching statistics, and execution history.
+
+    This API is implemented using Erlang and Cowboy web framework.
+  version: 0.2.0
+  contact:
+    name: CRE Team
+    email: support@cuneiform-lang.org
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:4142
+    description: Default local CRE Master server
+    variables:
+      port:
+        default: '4142'
+        description: HTTP port for CRE Master API
+      host:
+        default: localhost
+        description: Server hostname or IP address
+  - url: https://cre.example.com
+    description: Production CRE Master server
+
+tags:
+  - name: Status
+    description: System and worker status endpoints
+  - name: History
+    description: Execution history and caching endpoints
+
+paths:
+  /:
+    get:
+      tags:
+        - Status
+      summary: Get CRE Master status
+      operationId: getStatus
+      description: |
+        Retrieves the current status of the CRE Master process, including:
+        - Active worker list with status
+        - Idle worker list
+        - Pending applications queue
+        - Subscriptions information
+      responses:
+        '200':
+          description: Status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CREStatus'
+              examples:
+                success:
+                  summary: Typical status response
+                  value:
+                    idle_workers:
+                      - worker@node1
+                      - worker@node2
+                    busy_workers: []
+                    pending_queue: []
+                    subscriptions:
+                      - client@node1
+                    worker_count: 2
+                    idle_count: 2
+                    busy_count: 0
+                    queue_length: 0
+        '500':
+          description: Server error retrieving status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /status.json:
+    get:
+      tags:
+        - Status
+      summary: Get CRE Master status (JSON endpoint)
+      operationId: getStatusJson
+      description: |
+        Retrieves the current status of the CRE Master process in JSON format.
+        This is an alias for the root `/` endpoint.
+      responses:
+        '200':
+          description: Status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CREStatus'
+        '500':
+          description: Server error retrieving status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /history.json:
+    get:
+      tags:
+        - History
+      summary: Get execution history and cache
+      operationId: getHistory
+      description: |
+        Retrieves the execution history and cache map from the CRE Master.
+        Contains all memoized application-result pairs for performance optimization.
+      responses:
+        '200':
+          description: History retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CREHistory'
+              examples:
+                success:
+                  summary: Typical history response
+                  value:
+                    cache_entries: 42
+                    total_executions: 156
+                    cache_hits: 114
+                    cache_misses: 42
+                    hit_rate: 0.73
+                    cache_size_bytes: 524288
+                    oldest_entry:
+                      timestamp: '2024-02-06T10:30:45Z'
+                      app_id: app_123
+                    latest_entry:
+                      timestamp: '2024-02-06T18:45:20Z'
+                      app_id: app_987
+        '500':
+          description: Server error retrieving history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    CREStatus:
+      type: object
+      title: CRE Master Status
+      description: Current status of the CRE Master process
+      required:
+        - idle_workers
+        - busy_workers
+        - pending_queue
+        - subscriptions
+      properties:
+        idle_workers:
+          type: array
+          description: List of idle worker processes
+          items:
+            type: string
+            pattern: '^\w+@[\w\.\-]+$'
+            example: worker@node1.example.com
+        busy_workers:
+          type: array
+          description: List of busy worker processes with current applications
+          items:
+            $ref: '#/components/schemas/BusyWorker'
+        pending_queue:
+          type: array
+          description: List of applications waiting to be scheduled
+          items:
+            $ref: '#/components/schemas/PendingApplication'
+        subscriptions:
+          type: array
+          description: List of subscribed client processes
+          items:
+            type: string
+            pattern: '^\w+@[\w\.\-]+$'
+            example: client@node1.example.com
+        worker_count:
+          type: integer
+          description: Total number of registered workers
+          example: 2
+        idle_count:
+          type: integer
+          description: Number of idle workers
+          example: 2
+        busy_count:
+          type: integer
+          description: Number of busy workers
+          example: 0
+        queue_length:
+          type: integer
+          description: Number of pending applications
+          example: 0
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when status was generated
+          example: '2024-02-06T18:45:20Z'
+
+    BusyWorker:
+      type: object
+      title: Busy Worker
+      description: A worker currently executing an application
+      required:
+        - worker_id
+        - app_id
+        - start_time
+      properties:
+        worker_id:
+          type: string
+          description: Unique identifier for the worker
+          example: worker@node1
+        app_id:
+          type: string
+          description: Unique identifier for the application being executed
+          example: app_123
+        start_time:
+          type: string
+          format: date-time
+          description: When execution started
+          example: '2024-02-06T18:40:20Z'
+        elapsed_ms:
+          type: integer
+          description: Elapsed milliseconds
+          example: 300000
+
+    PendingApplication:
+      type: object
+      title: Pending Application
+      description: An application waiting for scheduling
+      required:
+        - app_id
+        - queued_time
+      properties:
+        app_id:
+          type: string
+          description: Unique identifier for the application
+          example: app_456
+        queued_time:
+          type: string
+          format: date-time
+          description: When the application was queued
+          example: '2024-02-06T18:42:20Z'
+        priority:
+          type: integer
+          description: Priority level (higher = more important)
+          example: 5
+
+    CREHistory:
+      type: object
+      title: CRE Execution History
+      description: Cache and execution history from CRE Master
+      required:
+        - cache_entries
+        - total_executions
+        - cache_hits
+        - cache_misses
+      properties:
+        cache_entries:
+          type: integer
+          description: Total number of cached entries
+          example: 42
+        total_executions:
+          type: integer
+          description: Total number of executions
+          example: 156
+        cache_hits:
+          type: integer
+          description: Number of cache hits
+          example: 114
+        cache_misses:
+          type: integer
+          description: Number of cache misses
+          example: 42
+        hit_rate:
+          type: number
+          format: double
+          description: Cache hit rate (0.0 to 1.0)
+          example: 0.73
+          minimum: 0.0
+          maximum: 1.0
+        cache_size_bytes:
+          type: integer
+          description: Total size of cache in bytes
+          example: 524288
+        oldest_entry:
+          $ref: '#/components/schemas/CacheEntry'
+        latest_entry:
+          $ref: '#/components/schemas/CacheEntry'
+        entries:
+          type: array
+          description: Detailed cache entries
+          items:
+            $ref: '#/components/schemas/CacheEntry'
+
+    CacheEntry:
+      type: object
+      title: Cache Entry
+      description: A single cached application-result pair
+      required:
+        - app_id
+        - timestamp
+      properties:
+        app_id:
+          type: string
+          description: Application identifier
+          example: app_123
+        timestamp:
+          type: string
+          format: date-time
+          description: When this entry was cached
+          example: '2024-02-06T10:30:45Z'
+        result_size_bytes:
+          type: integer
+          description: Size of the cached result in bytes
+          example: 2048
+        execution_time_ms:
+          type: integer
+          description: Time taken to execute this application
+          example: 5000
+
+    Error:
+      type: object
+      title: Error Response
+      description: Error information returned by the API
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type or code
+          example: internal_server_error
+        message:
+          type: string
+          description: Human-readable error message
+          example: Failed to retrieve status from CRE Master
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+        trace_id:
+          type: string
+          description: Unique trace identifier for debugging
+          example: trace_abc123def456
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred
+          example: '2024-02-06T18:45:20Z'

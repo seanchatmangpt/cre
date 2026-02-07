@@ -1,0 +1,70 @@
+---
+# Metering ClusterRole - Read-only access to cluster metrics
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ${NAME}-metering-role
+  labels:
+    app.kubernetes.io/name: ${NAME}
+    app.kubernetes.io/component: metering
+    app.kubernetes.io/managed-by: gcp-marketplace
+rules:
+# Pod and node metrics access
+- apiGroups: [""]
+  resources:
+  - pods
+  - nodes
+  - namespaces
+  - persistentvolumeclaims
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - watch
+
+# Metrics API access
+- apiGroups: ["metrics.k8s.io"]
+  resources:
+  - pods
+  - nodes
+  verbs:
+  - get
+  - list
+
+# Custom metrics access (if available)
+- apiGroups: ["custom.metrics.k8s.io"]
+  resources:
+  - "*"
+  verbs:
+  - get
+  - list
+
+---
+# Application ClusterRole - For cross-namespace operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ${NAME}-app-cluster-role
+  labels:
+    app.kubernetes.io/name: ${NAME}
+    app.kubernetes.io/component: application
+    app.kubernetes.io/managed-by: gcp-marketplace
+rules:
+# Read-only cluster-wide resources
+- apiGroups: [""]
+  resources:
+  - namespaces
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+
+# CRD access (if using custom resources)
+- apiGroups: ["apiextensions.k8s.io"]
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - get
+  - list
+  - watch

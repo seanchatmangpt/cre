@@ -1,0 +1,207 @@
+# Prometheus SLO (Service Level Objective) Rules
+# Defines target availability, latency, and error rates
+# Records metrics for easier dashboard and alert computation
+
+groups:
+  - name: slo_recording_rules
+    interval: 30s
+    rules:
+      # API Availability SLO: 99.9% (99.9% of requests should succeed)
+      - record: slo:api_availability:ratio_1h
+        expr: |
+          (
+            sum(rate(http_requests_total{status!~"5.."}[1h]))
+            /
+            sum(rate(http_requests_total[1h]))
+          ) * 100
+
+      - record: slo:api_availability:ratio_30d
+        expr: |
+          (
+            sum(increase(http_requests_total{status!~"5.."}[30d]))
+            /
+            sum(increase(http_requests_total[30d]))
+          ) * 100
+
+      # API Latency SLO: 95% of requests < 200ms (p95)
+      - record: slo:api_latency:p95_1h
+        expr: 'histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1h])) by (le))'
+
+      - record: slo:api_latency:p99_1h
+        expr: 'histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[1h])) by (le))'
+
+      - record: slo:api_latency:p50_1h
+        expr: 'histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[1h])) by (le))'
+
+      # Error Budget calculation (for 99.9% availability target)
+      - record: slo:error_budget:remaining_percentage
+        expr: |
+          (
+            (1 - (1 - 0.999)) * 100 -
+            ((1 - (slo:api_availability:ratio_30d / 100)) * 100)
+          )
+
+      # Burn rate indicators (for alerting)
+      - record: slo:burn_rate:1h
+        expr: '(1 - (slo:api_availability:ratio_1h / 100)) / (1 - 0.999)'
+
+      - record: slo:burn_rate:30d
+        expr: '(1 - (slo:api_availability:ratio_30d / 100)) / (1 - 0.999)'
+
+      # Database SLO: 99.95% availability
+      - record: slo:database_availability:ratio_1h
+        expr: |
+          (
+            sum(rate(db_query_total{status="success"}[1h]))
+            /
+            sum(rate(db_query_total[1h]))
+          ) * 100
+
+      # Cache SLO: 95% hit rate
+      - record: slo:cache_hitrate:ratio_1h
+        expr: |
+          (
+            sum(rate(cache_hits_total[1h]))
+            /
+            (sum(rate(cache_hits_total[1h])) + sum(rate(cache_misses_total[1h])))
+          ) * 100
+
+      # Message Queue SLO: 99% of messages processed within 5 minutes
+      - record: slo:queue_processing:ratio_1h
+        expr: |
+          (
+            sum(rate(queue_processed_within_slo[1h]))
+            /
+            sum(rate(queue_processed_total[1h]))
+          ) * 100
+
+      # Kubernetes Pod Availability SLO: 99.9%
+      - record: slo:pod_availability:ratio_1h
+        expr: |
+          (
+            count(kube_pod_status_phase{phase="Running"})
+            /
+            count(kube_pod_status_phase)
+          ) * 100
+
+      # Container Build Success SLO: 99.5%
+      - record: slo:build_success:ratio_30d
+        expr: |
+          (
+            sum(increase(container_builds_total{status="success"}[30d]))
+            /
+            sum(increase(container_builds_total[30d]))
+          ) * 100
+
+      # Deployment Success SLO: 99%
+      - record: slo:deployment_success:ratio_30d
+        expr: |
+          (
+            sum(increase(deployments_total{status="success"}[30d]))
+            /
+            sum(increase(deployments_total[30d]))
+          ) * 100
+
+  - name: slo_alerts
+    interval: 1m
+    rules:
+      # API Availability SLO Breach (99.9% target)
+      - alert: SLOApiAvailabilityBreach
+        expr: 'slo:api_availability:ratio_1h < 99.9'
+        for: 5m
+        labels:
+          severity: critical
+          slo: api_availability
+        annotations:
+          summary: "API Availability SLO breach"
+          description: "API availability is {{ $value | humanize }}% (SLO: 99.9%) in last hour"
+
+      # API Latency SLO Breach (p95 < 200ms)
+      - alert: SLOApiLatencyBreach
+        expr: 'slo:api_latency:p95_1h > 0.2'
+        for: 10m
+        labels:
+          severity: warning
+          slo: api_latency
+        annotations:
+          summary: "API Latency SLO breach"
+          description: "API p95 latency is {{ $value | humanizeDuration }} (SLO: 200ms)"
+
+      # High Burn Rate (consuming error budget too fast)
+      - alert: HighBurnRate
+        expr: 'slo:burn_rate:1h > 10'
+        for: 5m
+        labels:
+          severity: critical
+          slo: burn_rate
+        annotations:
+          summary: "High SLO burn rate detected"
+          description: "Error budget is burning at {{ $value | humanize }}x rate (critical: >10x)"
+          action: "Immediate incident response required"
+
+      # Error Budget Running Low (< 10% remaining)
+      - alert: ErrorBudgetLow
+        expr: 'slo:error_budget:remaining_percentage < 10'
+        for: 10m
+        labels:
+          severity: warning
+          slo: error_budget
+        annotations:
+          summary: "Error budget running low"
+          description: "{{ $value | humanize }}% of error budget remaining for this month"
+
+      # Error Budget Exhausted
+      - alert: ErrorBudgetExhausted
+        expr: 'slo:error_budget:remaining_percentage <= 0'
+        for: 1m
+        labels:
+          severity: critical
+          slo: error_budget
+        annotations:
+          summary: "Error budget exhausted"
+          description: "No error budget remaining - SLO target is being missed"
+          action: "Stop deployments and focus on stability improvements"
+
+      # Database SLO Breach
+      - alert: SLODatabaseAvailabilityBreach
+        expr: 'slo:database_availability:ratio_1h < 99.95'
+        for: 5m
+        labels:
+          severity: critical
+          slo: database_availability
+        annotations:
+          summary: "Database Availability SLO breach"
+          description: "Database availability is {{ $value | humanize }}% (SLO: 99.95%)"
+
+      # Cache Hit Rate SLO Breach
+      - alert: SLOCacheHitRateBreach
+        expr: 'slo:cache_hitrate:ratio_1h < 95'
+        for: 10m
+        labels:
+          severity: warning
+          slo: cache_hitrate
+        annotations:
+          summary: "Cache Hit Rate SLO breach"
+          description: "Cache hit rate is {{ $value | humanize }}% (SLO: 95%)"
+
+      # Queue Processing SLO Breach
+      - alert: SLOQueueProcessingBreach
+        expr: 'slo:queue_processing:ratio_1h < 99'
+        for: 5m
+        labels:
+          severity: warning
+          slo: queue_processing
+        annotations:
+          summary: "Queue Processing SLO breach"
+          description: "Queue processing SLO is {{ $value | humanize }}% (SLO: 99%)"
+
+      # Pod Availability SLO Breach
+      - alert: SLOPodAvailabilityBreach
+        expr: 'slo:pod_availability:ratio_1h < 99.9'
+        for: 5m
+        labels:
+          severity: critical
+          slo: pod_availability
+        annotations:
+          summary: "Pod Availability SLO breach"
+          description: "Pod availability is {{ $value | humanize }}% (SLO: 99.9%)"

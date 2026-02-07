@@ -1,0 +1,150 @@
+GCP Marketplace Application - Complete File Structure
+=====================================================
+
+gcp-marketplace/
+│
+├── deployer/
+│   ├── Dockerfile                          # Deployer container definition
+│   └── deploy.sh                           # Deployment orchestration script (executable)
+│
+├── manifest/
+│   ├── application.yaml                    # Main application descriptor with metadata
+│   └── schema.yaml                         # Deployment UI form configuration
+│
+├── rbac/
+│   ├── service-account.yaml                # 4 service accounts (app, metering, admin, backup)
+│   ├── cluster-role.yaml                   # Cluster-wide roles (metering, app-cluster)
+│   ├── role.yaml                           # Namespace roles (app, admin, backup)
+│   └── role-binding.yaml                   # Role bindings (4 bindings + 2 cluster bindings)
+│
+├── billing/
+│   └── usage-metering-agent.yaml           # Usage metering agent deployment + ConfigMaps
+│
+├── k8s/
+│   ├── deployment.yaml                     # Application deployment with HA
+│   ├── service.yaml                        # Services (API, admin, metrics)
+│   └── hpa.yaml                            # Horizontal Pod Autoscaler
+│
+├── pricing.yaml                            # Complete pricing configuration
+├── README.md                               # Main documentation
+├── DEPLOYMENT_GUIDE.md                     # Step-by-step deployment guide
+└── STRUCTURE.txt                           # This file
+
+Total Files: 15
+
+Key Features by File:
+====================
+
+deployer/Dockerfile:
+  - Based on GCP deployer_helm:0.11.8
+  - Copies all manifests to /data
+  - Sets enterprise environment variables
+  - Marketplace metadata labels
+
+deployer/deploy.sh:
+  - 500+ lines of production-ready deployment logic
+  - Environment validation
+  - RBAC deployment
+  - Billing agent setup
+  - Health checks and tests
+  - Post-deployment configuration
+  - Network policies
+  - Pod disruption budgets
+
+manifest/application.yaml:
+  - Kubernetes Application CRD
+  - Fortune 5 enterprise features list
+  - Multiple info sections (admin, API, Grafana)
+  - 15+ component kinds
+  - Post-deployment notes
+
+manifest/schema.yaml:
+  - UI form configuration
+  - 3 service accounts (deployer, app, metering)
+  - Reporting secret for billing
+  - 50+ configuration properties
+  - Enterprise features (SSO, monitoring, compliance, autoscaling)
+  - Resource configuration
+  - Database options
+  - Security settings
+
+rbac/service-account.yaml:
+  - 4 service accounts with labels
+  - app-sa: Application runtime
+  - metering-sa: Metrics collection
+  - admin-sa: Admin operations
+  - backup-sa: Backup/restore
+
+rbac/cluster-role.yaml:
+  - Metering ClusterRole: Read-only cluster metrics
+  - App ClusterRole: Cross-namespace read access
+
+rbac/role.yaml:
+  - App Role: Full workload management in namespace
+  - Admin Role: Full namespace access
+  - Backup Role: Volume snapshots and backups
+
+rbac/role-binding.yaml:
+  - 4 RoleBindings (app, admin, backup)
+  - 2 ClusterRoleBindings (app-cluster, metering)
+
+billing/usage-metering-agent.yaml:
+  - Deployment with ubbagent
+  - Security context (non-root, read-only FS)
+  - ConfigMap with metrics configuration
+  - 5 metrics tracked:
+    * instance_time (hours)
+    * cpu_usage (vcpu-hours)
+    * memory_usage (gb-hours)
+    * storage_usage (gb-hours)
+    * api_requests (requests)
+  - Billing config ConfigMap
+
+k8s/deployment.yaml:
+  - Multi-replica deployment (default: 3)
+  - Pod anti-affinity for HA
+  - Security context (non-root, seccomp)
+  - Resource limits (2-4 vCPU, 4-8Gi memory)
+  - Health probes (liveness, readiness, startup)
+  - Rolling update strategy
+
+k8s/service.yaml:
+  - 3 services: API, admin, metrics
+  - Session affinity
+  - GCP NEG annotations
+  - ClusterIP type
+
+k8s/hpa.yaml:
+  - CPU-based scaling (70% target)
+  - Memory-based scaling (80% target)
+  - Scale 3-20 pods
+  - Advanced scaling behavior
+
+pricing.yaml:
+  - Hybrid pricing model (subscription + usage)
+  - 3 plans: Enterprise, Professional, Starter
+  - Enterprise: $5000/month base
+  - Usage tiers for all metrics
+  - Billing configuration
+  - Support tiers
+  - SLA definitions with credits
+  - Commitment discounts (1yr: 10%, 3yr: 20%)
+  - Volume discounts
+
+Summary Statistics:
+==================
+- Total YAML files: 13
+- Total lines of YAML: ~3000
+- Service Accounts: 4
+- ClusterRoles: 2
+- Roles: 3
+- RoleBindings: 4
+- ClusterRoleBindings: 2
+- Services: 3
+- Deployments: 2 (app + metering agent)
+- HPA: 1
+- Metrics tracked: 5
+- Pricing tiers: 3
+- Support tiers: 3
+- Compliance modes: 3 (SOC2, HIPAA, PCI-DSS)
+

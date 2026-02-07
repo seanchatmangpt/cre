@@ -1,0 +1,93 @@
+apiVersion: app.k8s.io/v1beta1
+kind: Application
+metadata:
+  name: "${APP_NAME}"
+  namespace: "${NAMESPACE}"
+  labels:
+    app.kubernetes.io/name: "${APP_NAME}"
+    app.kubernetes.io/version: "${APP_VERSION:-1.0.0}"
+  annotations:
+    kubernetes-engine.cloud.google.com/icon: "data:image/png;base64,..."
+    marketplace.cloud.google.com/deploy-info: |
+      {
+        "partner_id": "your-partner-id",
+        "product_id": "${APP_NAME}",
+        "partner_name": "Your Company"
+      }
+spec:
+  descriptor:
+    type: "${APP_NAME}"
+    version: "${APP_VERSION:-1.0.0}"
+    description: |-
+      ${APP_DESCRIPTION:-GCP Marketplace Application with automated provisioning}
+
+    maintainers:
+    - name: Your Company
+      url: https://yourcompany.com
+
+    links:
+    - description: Getting Started Guide
+      url: https://docs.yourcompany.com/getting-started
+    - description: Documentation
+      url: https://docs.yourcompany.com
+
+    notes: |-
+      # Getting Started
+
+      Your application has been successfully deployed!
+
+      ## Access Your Application
+
+      Get the external IP address:
+      ```
+      kubectl get svc ${APP_NAME} -n ${NAMESPACE}
+      ```
+
+      ## View Logs
+
+      ```
+      kubectl logs -f -n ${NAMESPACE} -l app=${APP_NAME}
+      ```
+
+      ## Scale Your Application
+
+      ```
+      kubectl scale deployment ${APP_NAME} -n ${NAMESPACE} --replicas=5
+      ```
+
+      ## Database Connection
+
+      Database credentials are stored in the secret: ${APP_NAME}-db-credentials
+
+      ## Support
+
+      For questions or issues, contact support@yourcompany.com
+
+  componentKinds:
+  - group: apps/v1
+    kind: Deployment
+  - group: v1
+    kind: Service
+  - group: v1
+    kind: ConfigMap
+  - group: v1
+    kind: Secret
+  - group: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+
+  selector:
+    matchLabels:
+      app: "${APP_NAME}"
+
+  addOwnerRef: true
+
+  info:
+  - name: Application URL
+    type: Reference
+    valueFrom:
+      serviceRef:
+        name: "${APP_NAME}"
+  - name: Namespace
+    value: "${NAMESPACE}"
+  - name: Version
+    value: "${APP_VERSION:-1.0.0}"

@@ -1,0 +1,47 @@
+{
+  "name": "@cre/compliance-framework",
+  "version": "1.0.0",
+  "description": "Comprehensive compliance validation framework for SOC 2, ISO 27001, GDPR, and HIPAA",
+  "main": "compliance-manager.ts",
+  "types": "types.ts",
+  "bin": {
+    "compliance": "./cli.ts"
+  },
+  "scripts": {
+    "validate": "ts-node cli.ts validate",
+    "validate:soc2": "ts-node cli.ts validate --standard SOC2",
+    "validate:iso27001": "ts-node cli.ts validate --standard ISO27001",
+    "validate:gdpr": "ts-node cli.ts validate --standard GDPR",
+    "validate:hipaa": "ts-node cli.ts validate --standard HIPAA",
+    "assess": "ts-node cli.ts assess",
+    "certificate": "ts-node cli.ts certificate",
+    "report": "ts-node cli.ts report",
+    "list": "ts-node cli.ts list",
+    "verify": "ts-node cli.ts verify",
+    "build": "tsc",
+    "dev": "ts-node"
+  },
+  "keywords": [
+    "compliance",
+    "soc2",
+    "iso27001",
+    "gdpr",
+    "hipaa",
+    "security",
+    "audit",
+    "certification"
+  ],
+  "author": "CRE Compliance Team",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

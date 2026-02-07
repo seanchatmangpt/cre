@@ -1,0 +1,193 @@
+---
+# Application Role - Namespace-scoped permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ${NAME}-app-role
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: ${NAME}
+    app.kubernetes.io/component: application
+    app.kubernetes.io/managed-by: gcp-marketplace
+rules:
+# Workload management
+- apiGroups: ["apps"]
+  resources:
+  - deployments
+  - statefulsets
+  - daemonsets
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+
+# Service and networking
+- apiGroups: [""]
+  resources:
+  - services
+  - endpoints
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+
+# Configuration
+- apiGroups: [""]
+  resources:
+  - configmaps
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+
+# Storage
+- apiGroups: [""]
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+
+# Batch jobs
+- apiGroups: ["batch"]
+  resources:
+  - jobs
+  - cronjobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+
+# Pod management
+- apiGroups: [""]
+  resources:
+  - pods
+  - pods/log
+  - pods/exec
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+
+# Events
+- apiGroups: [""]
+  resources:
+  - events
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+
+# Ingress
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+
+# HPA
+- apiGroups: ["autoscaling"]
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+
+---
+# Admin Role - Elevated permissions for admin operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ${NAME}-admin-role
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: ${NAME}
+    app.kubernetes.io/component: admin
+    app.kubernetes.io/managed-by: gcp-marketplace
+rules:
+# Full access to all resources in namespace
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+
+---
+# Backup Role - Permissions for backup operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ${NAME}-backup-role
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: ${NAME}
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/managed-by: gcp-marketplace
+rules:
+# Read access for backup
+- apiGroups: [""]
+  resources:
+  - persistentvolumeclaims
+  - configmaps
+  - secrets
+  verbs:
+  - get
+  - list
+
+# Volume snapshots
+- apiGroups: ["snapshot.storage.k8s.io"]
+  resources:
+  - volumesnapshots
+  - volumesnapshotcontents
+  verbs:
+  - get
+  - list
+  - create
+  - delete
+
+# Backup CRDs (if using Velero or similar)
+- apiGroups: ["velero.io"]
+  resources:
+  - backups
+  - restores
+  - schedules
+  verbs:
+  - get
+  - list
+  - create
+  - delete

@@ -1,0 +1,104 @@
+# Grafana Datasource Configuration
+# Auto-provisioned datasources for Prometheus and related systems
+
+apiVersion: 1
+
+datasources:
+  # Primary Prometheus Instance
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    password: ''
+    user: ''
+    database: ''
+    basicAuth: false
+    isDefault: true
+    jsonData:
+      timeInterval: 15s
+      cacheTimeout: 60
+      tlsSkipVerify: false
+      customHeaders:
+        X-Custom-Header: "Monitoring-System"
+    editable: true
+
+  # Secondary Prometheus (HA Setup)
+  - name: Prometheus-HA
+    type: prometheus
+    access: proxy
+    url: http://prometheus-ha:9090
+    password: ''
+    user: ''
+    database: ''
+    basicAuth: false
+    isDefault: false
+    jsonData:
+      timeInterval: 15s
+    editable: true
+
+  # Loki for Logs
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    password: ''
+    user: ''
+    database: ''
+    basicAuth: false
+    isDefault: false
+    jsonData:
+      maxLines: 1000
+    editable: true
+
+  # Jaeger for Tracing
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    password: ''
+    user: ''
+    database: ''
+    basicAuth: false
+    isDefault: false
+    jsonData: {}
+    editable: true
+
+  # Elasticsearch for Logs (optional)
+  - name: Elasticsearch
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    password: ''
+    user: ''
+    database: 'logs-'
+    basicAuth: false
+    isDefault: false
+    jsonData:
+      esVersion: '7.10.0'
+      logMessageField: message
+      logLevelField: level
+      timeField: '@timestamp'
+    editable: true
+
+  # Cloud Monitoring (GCP)
+  - name: Cloud Monitoring
+    type: stackdriver
+    access: proxy
+    jsonData:
+      authenticationType: 'gce'
+      defaultProject: '${GCP_PROJECT_ID}'
+    editable: true
+
+  # VictoriaMetrics (Optional - Long-term storage)
+  - name: VictoriaMetrics
+    type: prometheus
+    access: proxy
+    url: http://victoriametrics:8428
+    password: ''
+    user: ''
+    database: ''
+    basicAuth: false
+    isDefault: false
+    jsonData:
+      timeInterval: 15s
+    editable: true

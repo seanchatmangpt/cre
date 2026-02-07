@@ -1,0 +1,100 @@
+# GCP Marketplace Pricing Configuration
+# Enterprise Application Platform - Hybrid Pricing Model
+
+pricing:
+  version: v1
+  model: hybrid
+  currency: USD
+
+  plans:
+  - id: enterprise-v1
+    name: Enterprise Plan
+    description: Complete enterprise solution with 24/7 support, 99.99% SLA
+    recommended: true
+
+    subscription:
+      type: monthly
+      amount: 5000.00
+      includes:
+        - Up to 3 application instances
+        - 24/7 Premium Support
+        - 99.99% SLA
+        - SOC2, HIPAA, ISO27001 compliance
+
+    usage_components:
+    - metric: instance_time
+      name: Additional Instances
+      unit: hours
+      tiers:
+      - up_to: 730
+        per_unit: 2.50
+      - up_to: null
+        per_unit: 2.00
+
+    - metric: cpu_usage
+      name: Compute (vCPU)
+      unit: vcpu-hours
+      tiers:
+      - up_to: 1000
+        per_unit: 0.05
+      - up_to: null
+        per_unit: 0.03
+
+    - metric: memory_usage
+      name: Memory
+      unit: gb-hours
+      tiers:
+      - up_to: 2000
+        per_unit: 0.01
+      - up_to: null
+        per_unit: 0.006
+
+    - metric: storage_usage
+      name: Persistent Storage
+      unit: gb-hours
+      per_unit: 0.001
+      included: 1000
+
+    - metric: api_requests
+      name: API Requests
+      unit: requests
+      tiers:
+      - up_to: 1000000
+        per_unit: 0
+      - up_to: null
+        per_unit: 0.00005
+
+billing:
+  cycle: monthly
+  invoice:
+    day_of_month: 1
+    due_days: 30
+  payment_methods:
+  - credit_card
+  - wire_transfer
+  - gcp_billing_account
+  commitments:
+  - duration: 12_months
+    discount_percentage: 10
+  - duration: 36_months
+    discount_percentage: 20
+
+support:
+  enterprise:
+    channels: [email, phone, slack, dedicated_engineer]
+    response_times:
+      critical: 15_minutes
+      high: 1_hour
+    availability: 24x7
+
+sla:
+  enterprise:
+    uptime_percentage: 99.99
+    monthly_downtime_minutes: 4.38
+    credits:
+    - threshold: 99.99
+      credit_percentage: 0
+    - threshold: 99.9
+      credit_percentage: 10
+    - threshold: 99.0
+      credit_percentage: 25

@@ -1,0 +1,232 @@
+# Prometheus SLA (Service Level Agreement) Rules
+# Formal contractual service levels with credit/compensation terms
+# More stringent than SLOs, these are customer-facing commitments
+
+groups:
+  - name: sla_recording_rules
+    interval: 1m
+    rules:
+      # SLA: API Availability 99.95% (monthly)
+      # Downtime allowed: 21.6 minutes per month
+      - record: sla:api_availability:ratio_monthly
+        expr: |
+          (
+            sum(increase(http_requests_total{status!~"5.."}[30d]))
+            /
+            sum(increase(http_requests_total[30d]))
+          ) * 100
+
+      - record: sla:api_availability:downtime_minutes_monthly
+        expr: |
+          30 * 24 * 60 * (1 - (sla:api_availability:ratio_monthly / 100))
+
+      # SLA: API Latency p99 < 500ms (95% of requests)
+      - record: sla:api_latency:p99_5m
+        expr: 'histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))'
+
+      - record: sla:api_latency:slo_met
+        expr: 'sla:api_latency:p99_5m < 0.5'
+
+      # SLA: Database Availability 99.99% (52.6 minutes downtime per year)
+      - record: sla:database_availability:ratio_yearly
+        expr: |
+          (
+            sum(increase(db_query_total{status="success"}[365d]))
+            /
+            sum(increase(db_query_total[365d]))
+          ) * 100
+
+      # SLA: Data Consistency - All replicas within 100ms
+      - record: sla:data_consistency:replication_lag_p99
+        expr: 'histogram_quantile(0.99, sum(rate(db_replication_lag_seconds_bucket[5m])) by (le))'
+
+      - record: sla:data_consistency:slo_met
+        expr: 'sla:data_consistency:replication_lag_p99 < 0.1'
+
+      # SLA: Message Delivery - 99.9% of messages delivered successfully
+      - record: sla:message_delivery:ratio_monthly
+        expr: |
+          (
+            sum(increase(messages_delivered_total[30d]))
+            /
+            sum(increase(messages_sent_total[30d]))
+          ) * 100
+
+      # SLA: Data Durability - 99.999999% (11.6 seconds downtime per year)
+      - record: sla:data_durability:ratio_yearly
+        expr: |
+          (
+            sum(increase(data_writes_persisted_total[365d]))
+            /
+            sum(increase(data_writes_attempted_total[365d]))
+          ) * 100
+
+      # SLA: Backup/Recovery - RTO 1 hour, RPO 15 minutes
+      - record: sla:backup_recovery:last_backup_age_hours
+        expr: '(time() - backup_last_completion_timestamp_seconds) / 3600'
+
+      - record: sla:backup_recovery:rto_slo_met
+        expr: 'sla:backup_recovery:last_backup_age_hours < 1'
+
+      # SLA: Security - Zero unpatched critical vulnerabilities
+      - record: sla:security:critical_vulns_count
+        expr: 'count(security_vulnerabilities_total{severity="critical", patched="false"})'
+
+      # SLA: Support Response Time - Critical issues < 1 hour
+      - record: sla:support:critical_response_time_minutes
+        expr: 'histogram_quantile(0.95, sum(rate(support_response_time_seconds_bucket{severity="critical"}[5m])) by (le)) / 60'
+
+  - name: sla_breach_alerts
+    interval: 1m
+    rules:
+      # SLA: API Availability Breach (99.95%)
+      - alert: SLAApiAvailabilityBreach
+        expr: 'sla:api_availability:ratio_monthly < 99.95'
+        for: 15m
+        labels:
+          severity: critical
+          sla: api_availability
+          compensation: 'Credits apply'
+        annotations:
+          summary: "CRITICAL: SLA API Availability breach (customer compensation triggered)"
+          description: |
+            API Availability SLA breach: {{ $value | humanize }}% (SLA: 99.95%)
+            Monthly downtime: {{ | query "sla:api_availability:downtime_minutes_monthly" | humanize }} minutes
+            Customer compensation: 5-10% monthly credit
+          escalation: "VP Engineering, Customer Success"
+          runbook: "https://runbooks.example.com/sla-api-availability"
+
+      # SLA: Latency Breach
+      - alert: SLALatencyBreach
+        expr: 'sla:api_latency:p99_5m > 0.5'
+        for: 20m
+        labels:
+          severity: critical
+          sla: api_latency
+          compensation: 'Credits apply'
+        annotations:
+          summary: "CRITICAL: SLA Latency breach"
+          description: "API p99 latency {{ $value | humanizeDuration }} exceeds SLA target of 500ms"
+          escalation: "VP Engineering"
+
+      # SLA: Database Availability Breach (99.99%)
+      - alert: SLADatabaseAvailabilityBreach
+        expr: 'sla:database_availability:ratio_yearly < 99.99'
+        for: 10m
+        labels:
+          severity: critical
+          sla: database_availability
+          compensation: 'Credits apply'
+        annotations:
+          summary: "CRITICAL: SLA Database Availability breach"
+          description: "Database Availability SLA breach: {{ $value | humanize }}% (SLA: 99.99%)"
+          escalation: "VP Infrastructure, CTO"
+
+      # SLA: Data Consistency Breach
+      - alert: SLADataConsistencyBreach
+        expr: 'sla:data_consistency:slo_met == 0'
+        for: 5m
+        labels:
+          severity: critical
+          sla: data_consistency
+          compensation: 'Incident review required'
+        annotations:
+          summary: "CRITICAL: SLA Data Consistency breach"
+          description: "Replication lag exceeds SLA target of 100ms. Current: {{ | query "sla:data_consistency:replication_lag_p99" | humanizeDuration }}"
+
+      # SLA: Message Delivery Breach (99.9%)
+      - alert: SLAMessageDeliveryBreach
+        expr: 'sla:message_delivery:ratio_monthly < 99.9'
+        for: 15m
+        labels:
+          severity: critical
+          sla: message_delivery
+          compensation: 'Credits apply'
+        annotations:
+          summary: "CRITICAL: SLA Message Delivery breach"
+          description: "Message delivery rate {{ $value | humanize }}% falls below SLA of 99.9%"
+
+      # SLA: Data Durability Breach (99.999999%)
+      - alert: SLADataDurabilityBreach
+        expr: 'sla:data_durability:ratio_yearly < 99.999999'
+        for: 5m
+        labels:
+          severity: critical
+          sla: data_durability
+          compensation: 'Emergency incident'
+        annotations:
+          summary: "CRITICAL: SLA Data Durability breach (data loss detected)"
+          description: "Data durability SLA breach - data loss event detected. Immediate investigation required."
+          escalation: "CTO, VP Engineering, Legal"
+
+      # SLA: Backup/Recovery Breach (RTO 1 hour)
+      - alert: SLABackupRecoveryBreach
+        expr: 'sla:backup_recovery:last_backup_age_hours >= 1'
+        for: 5m
+        labels:
+          severity: critical
+          sla: backup_recovery
+          compensation: 'SLO penalty'
+        annotations:
+          summary: "SLA Backup/Recovery breach - Last backup too old"
+          description: "Last backup is {{ $value | humanize }} hours old (RTO SLA: 1 hour). Immediate backup required."
+          action: "Trigger immediate backup operation"
+
+      # SLA: Security - Unpatched Critical Vulnerability
+      - alert: SLASecurityCriticalVulnerability
+        expr: 'sla:security:critical_vulns_count > 0'
+        for: 1h
+        labels:
+          severity: critical
+          sla: security
+          compensation: 'Service disruption possible'
+        annotations:
+          summary: "CRITICAL: Unpatched critical security vulnerability"
+          description: "{{ $value | humanize }} unpatched critical vulnerabilities detected"
+          escalation: "Security Team, CTO, VP Engineering"
+          action: "Apply security patches immediately"
+
+      # SLA: Support Response Time Breach (critical < 1 hour)
+      - alert: SLASupportResponseBreach
+        expr: 'sla:support:critical_response_time_minutes > 60'
+        for: 5m
+        labels:
+          severity: critical
+          sla: support_response
+          compensation: 'Support credit'
+        annotations:
+          summary: "SLA Support Response breach"
+          description: "Critical support response time {{ $value | humanize }} minutes exceeds SLA of 60 minutes"
+
+  - name: sla_monitoring_rules
+    interval: 5m
+    rules:
+      # Track SLA compliance across all services
+      - record: sla:global:compliance_percentage
+        expr: |
+          (
+            (sla:api_availability:ratio_monthly >= 99.95 ? 1 : 0) +
+            (sla:database_availability:ratio_yearly >= 99.99 ? 1 : 0) +
+            (sla:message_delivery:ratio_monthly >= 99.9 ? 1 : 0)
+          ) / 3 * 100
+
+      # Monthly SLA report tracking
+      - record: sla:monthly_report:uptime_api
+        expr: 'sla:api_availability:ratio_monthly'
+
+      - record: sla:monthly_report:uptime_database
+        expr: 'sla:database_availability:ratio_yearly'
+
+      - record: sla:monthly_report:message_delivery_rate
+        expr: 'sla:message_delivery:ratio_monthly'
+
+      - record: sla:monthly_report:latency_p99
+        expr: 'sla:api_latency:p99_5m * 1000'  # Convert to milliseconds
+
+      - record: sla:monthly_report:error_rate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[30d]))
+            /
+            sum(rate(http_requests_total[30d]))
+          ) * 100

@@ -1,0 +1,82 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: staging
+
+commonLabels:
+  app: admin-console
+  environment: staging
+  version: v1
+
+commonAnnotations:
+  deployment-time: "2024-01-01T00:00:00Z"
+  description: "Admin Console Staging Deployment"
+
+resources:
+  - deployment.yaml
+
+configMapGenerator:
+  - name: admin-console-config
+    behavior: merge
+    literals:
+      - api-url=https://staging-api.example.com
+      - log-level=debug
+      - environment=staging
+      - cache-ttl=300
+      - enable-debug=true
+
+secretGenerator:
+  - name: admin-console-secrets
+    behavior: merge
+    envs:
+      - secrets.env
+
+images:
+  - name: us-central1-docker.pkg.dev/PROJECT_ID/admin-console-repo/admin-console
+    newName: us-central1-docker.pkg.dev/PROJECT_ID/admin-console-repo/admin-console
+    newTag: latest
+
+namePrefix: staging-
+nameSuffix: -v1
+
+replicas:
+  - name: admin-console
+    count: 2
+
+patches:
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: admin-console
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: staging
+  - target:
+      group: apps
+      version: v1
+      kind: HorizontalPodAutoscaler
+      name: admin-console-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 2
+      - op: replace
+        path: /spec/maxReplicas
+        value: 5
+
+vars:
+  - name: NAMESPACE
+    objref:
+      kind: Service
+      name: admin-console
+      apiVersion: v1
+    fieldref:
+      fieldpath: metadata.namespace

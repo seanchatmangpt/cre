@@ -1,0 +1,123 @@
+# Network Policies for CRE Application
+
+---
+# Allow CRE app to receive traffic from ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cre-app-ingress
+  namespace: cre-system
+spec:
+  podSelector:
+    matchLabels:
+      app: cre-app
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow traffic from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+
+---
+# Allow CRE app egress to Cloud SQL and external services
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cre-app-egress
+  namespace: cre-system
+spec:
+  podSelector:
+    matchLabels:
+      app: cre-app
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS (covered by separate policy, but included for completeness)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+  # Allow HTTPS to external services
+  - to:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443
+
+  # Allow Cloud SQL Proxy communication (localhost)
+  - to:
+    - podSelector:
+        matchLabels:
+          app: cre-app
+    ports:
+    - protocol: TCP
+      port: 5432
+
+  # Allow access to GKE metadata server (for Workload Identity)
+  - to:
+    - ipBlock:
+        cidr: 169.254.169.254/32
+    ports:
+    - protocol: TCP
+      port: 988
+
+---
+# Allow CRE app to communicate with monitoring
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cre-app-to-monitoring
+  namespace: cre-system
+spec:
+  podSelector:
+    matchLabels:
+      app: cre-app
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app: prometheus
+    ports:
+    - protocol: TCP
+      port: 9090
+
+---
+# Allow Prometheus to scrape CRE app metrics
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scraping
+  namespace: cre-system
+spec:
+  podSelector:
+    matchLabels:
+      app: cre-app
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app: prometheus
+    ports:
+    - protocol: TCP
+      port: 9090  # Metrics port

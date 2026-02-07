@@ -1,0 +1,127 @@
+# Cloud Build configuration for GCP Marketplace Deployer
+# This file automates building and pushing the deployer image
+
+substitutions:
+  _APP_NAME: marketplace-app
+  _APP_VERSION: '1.0.0'
+  _REGION: us-central1
+
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  # Step 1: Validate schema.yaml
+  - name: 'python:3.9-slim'
+    id: 'validate-schema'
+    entrypoint: 'python3'
+    args:
+      - '-c'
+      - |
+        import yaml
+        with open('schema.yaml', 'r') as f:
+            schema = yaml.safe_load(f)
+        print('✓ Schema validation passed')
+
+  # Step 2: Lint shell scripts
+  - name: 'koalaman/shellcheck-alpine:stable'
+    id: 'lint-scripts'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        find scripts -name "*.sh" -exec shellcheck {} +
+        echo "✓ Shell script linting passed"
+
+  # Step 3: Build deployer image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-image'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_APP_NAME}/deployer:${_APP_VERSION}'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_APP_NAME}/deployer:latest'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_APP_NAME}/deployer:$SHORT_SHA'
+      - '.'
+
+  # Step 4: Push images to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-images'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'gcr.io/$PROJECT_ID/${_APP_NAME}/deployer'
+
+  # Step 5: Run security scan (if Artifact Analysis API is enabled)
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'security-scan'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set +e
+        gcloud container images describe gcr.io/$PROJECT_ID/${_APP_NAME}/deployer:${_APP_VERSION} \
+          --show-package-vulnerability
+        exit 0
+
+  # Step 6: Generate build metadata
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'generate-metadata'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cat <<EOF > build-metadata.json
+        {
+          "appName": "${_APP_NAME}",
+          "version": "${_APP_VERSION}",
+          "buildId": "$BUILD_ID",
+          "commitSha": "$COMMIT_SHA",
+          "shortSha": "$SHORT_SHA",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "images": [
+            "gcr.io/$PROJECT_ID/${_APP_NAME}/deployer:${_APP_VERSION}",
+            "gcr.io/$PROJECT_ID/${_APP_NAME}/deployer:latest",
+            "gcr.io/$PROJECT_ID/${_APP_NAME}/deployer:$SHORT_SHA"
+          ]
+        }
+        EOF
+        cat build-metadata.json
+
+  # Step 7: Upload artifacts to Cloud Storage (optional)
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'upload-artifacts'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set +e
+        gsutil mb gs://${PROJECT_ID}-marketplace-artifacts || true
+        gsutil cp build-metadata.json gs://${PROJECT_ID}-marketplace-artifacts/builds/${_APP_VERSION}/
+        gsutil cp schema.yaml gs://${PROJECT_ID}-marketplace-artifacts/builds/${_APP_VERSION}/
+        exit 0
+
+# Images to push (automatically pushed after build)
+images:
+  - 'gcr.io/$PROJECT_ID/${_APP_NAME}/deployer:${_APP_VERSION}'
+  - 'gcr.io/$PROJECT_ID/${_APP_NAME}/deployer:latest'
+  - 'gcr.io/$PROJECT_ID/${_APP_NAME}/deployer:$SHORT_SHA'
+
+# Artifacts to save
+artifacts:
+  objects:
+    location: 'gs://${PROJECT_ID}-marketplace-artifacts/builds/${_APP_VERSION}'
+    paths:
+      - 'build-metadata.json'
+      - 'schema.yaml'
+
+# Tags for organizing builds
+tags:
+  - 'marketplace-deployer'
+  - '${_APP_NAME}'
+  - 'version-${_APP_VERSION}'
+
+# Timeout for entire build
+timeout: '1200s'

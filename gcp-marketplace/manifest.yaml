@@ -1,0 +1,311 @@
+apiVersion: marketplace.cnrm.cloud.google.com/v1beta1
+kind: Solution
+metadata:
+  name: claude-flow
+  displayName: Claude Flow
+  description: "Multi-agent AI orchestration platform for complex task automation"
+spec:
+  publisher:
+    name: "Claude Flow Contributors"
+    id: claude-flow-publisher
+  pricing:
+    billingModel: MONTHLY
+    plans:
+      - id: free-tier
+        displayName: "Free Tier"
+        description: "Community edition with basic features"
+        pricing:
+          currencyCode: USD
+          amount: 0.0
+        features:
+          - "Up to 5 concurrent agents"
+          - "Basic memory storage"
+          - "Community support"
+      - id: pro-tier
+        displayName: "Professional"
+        description: "Production-ready with advanced features"
+        pricing:
+          currencyCode: USD
+          amount: 99.0
+        features:
+          - "Up to 50 concurrent agents"
+          - "Advanced memory with HNSW indexing"
+          - "Priority support"
+          - "Custom neural patterns"
+          - "Enterprise integrations"
+      - id: enterprise-tier
+        displayName: "Enterprise"
+        description: "Custom deployment and support"
+        pricing:
+          currencyCode: USD
+          amount: 0.0
+          customContractRequired: true
+        features:
+          - "Unlimited concurrent agents"
+          - "Dedicated infrastructure"
+          - "SLA guarantees"
+          - "Custom security configurations"
+          - "Dedicated account management"
+
+  application:
+    name: claude-flow
+    version: "3.0.0"
+    components:
+      - name: claude-flow-core
+        type: DOCKER_IMAGE
+        image:
+          registry: gcr.io
+          project: claude-flow-prod
+          repository: claude-flow
+          tag: "3.0.0"
+        requirements:
+          cpu:
+            min: "2"
+            recommended: "4"
+          memory:
+            min: "4Gi"
+            recommended: "8Gi"
+          storage:
+            min: "20Gi"
+
+      - name: claude-flow-controller
+        type: DOCKER_IMAGE
+        image:
+          registry: gcr.io
+          project: claude-flow-prod
+          repository: claude-flow-controller
+          tag: "3.0.0"
+        requirements:
+          cpu:
+            min: "1"
+            recommended: "2"
+          memory:
+            min: "2Gi"
+            recommended: "4Gi"
+
+      - name: claude-flow-memory
+        type: DOCKER_IMAGE
+        image:
+          registry: gcr.io
+          project: claude-flow-prod
+          repository: claude-flow-memory
+          tag: "3.0.0"
+        requirements:
+          cpu:
+            min: "1"
+            recommended: "2"
+          memory:
+            min: "4Gi"
+            recommended: "8Gi"
+          storage:
+            min: "50Gi"
+
+  deployment:
+    supportedDeploymentTypes:
+      - GKE
+      - CLOUD_RUN
+      - COMPUTE_ENGINE
+    gke:
+      minKubernetesVersion: "1.24"
+      requiredClusterAddons:
+        - gke-metrics-server
+      rbac:
+        enabled: true
+    cloudRun:
+      minMemory: "4Gi"
+      minCpu: "2"
+      timeoutSeconds: 3600
+    computeEngine:
+      machineType: n2-highmem-4
+      bootDiskSizeGb: 100
+
+  authentication:
+    oauth2:
+      enabled: true
+      scopes:
+        - https://www.googleapis.com/auth/cloud-platform
+      redirectUris:
+        - "https://console.cloud.google.com/marketplace/details/claude-flow/claude-flow"
+    serviceAccount:
+      required: true
+      roles:
+        - roles/container.admin
+        - roles/storage.admin
+        - roles/monitoring.metricWriter
+        - roles/logging.logWriter
+
+  integrations:
+    googleCloud:
+      services:
+        - name: Kubernetes Engine
+          apis:
+            - container.googleapis.com
+        - name: Cloud Storage
+          apis:
+            - storage-api.googleapis.com
+        - name: Cloud Monitoring
+          apis:
+            - monitoring.googleapis.com
+        - name: Cloud Logging
+          apis:
+            - logging.googleapis.com
+        - name: Cloud IAM
+          apis:
+            - iam.googleapis.com
+    externalServices:
+      - name: Claude API
+        documentation: "https://anthropic.com/docs"
+      - name: IPFS (Optional)
+        documentation: "https://ipfs.io/docs"
+
+  configuration:
+    properties:
+      - name: CLAUDE_FLOW_MODE
+        displayName: "Deployment Mode"
+        description: "Operating mode for Claude Flow"
+        type: STRING
+        default: "production"
+        enum:
+          - "development"
+          - "staging"
+          - "production"
+      - name: ENABLE_HNSW
+        displayName: "Enable HNSW Vector Search"
+        description: "Enable hyperbolic vector search for pattern matching"
+        type: BOOLEAN
+        default: true
+      - name: MAX_AGENTS
+        displayName: "Maximum Concurrent Agents"
+        description: "Maximum number of agents running concurrently"
+        type: INTEGER
+        default: 8
+        min: 1
+        max: 100
+      - name: MEMORY_BACKEND
+        displayName: "Memory Backend"
+        description: "Storage backend for agent memory"
+        type: STRING
+        default: "hybrid"
+        enum:
+          - "hybrid"
+          - "sql"
+          - "vectordb"
+      - name: SWARM_TOPOLOGY
+        displayName: "Swarm Topology"
+        description: "Network topology for agent coordination"
+        type: STRING
+        default: "hierarchical"
+        enum:
+          - "hierarchical"
+          - "mesh"
+          - "ring"
+          - "star"
+          - "hierarchical-mesh"
+      - name: ENABLE_SONA
+        displayName: "Enable SONA Learning"
+        description: "Enable Self-Optimizing Neural Architecture"
+        type: BOOLEAN
+        default: true
+      - name: CONSENSUS_ALGORITHM
+        displayName: "Consensus Algorithm"
+        description: "Algorithm for distributed consensus"
+        type: STRING
+        default: "raft"
+        enum:
+          - "raft"
+          - "byzantine"
+          - "gossip"
+          - "crdt"
+
+  monitoring:
+    metrics:
+      - name: "agent_count"
+        displayName: "Active Agent Count"
+        description: "Number of currently running agents"
+      - name: "memory_usage"
+        displayName: "Memory Usage"
+        description: "Total memory used by the system"
+      - name: "task_throughput"
+        displayName: "Task Throughput"
+        description: "Tasks completed per minute"
+      - name: "latency_p95"
+        displayName: "95th Percentile Latency"
+        description: "P95 response latency in milliseconds"
+    alerts:
+      - name: high_memory_usage
+        condition: "memory_usage > 80%"
+        severity: WARNING
+      - name: agent_failures
+        condition: "agent_failure_rate > 5%"
+        severity: CRITICAL
+      - name: consensus_timeout
+        condition: "consensus_latency > 5000ms"
+        severity: WARNING
+
+  support:
+    documentationUrl: "https://github.com/ruvnet/claude-flow/wiki"
+    issueTrackerUrl: "https://github.com/ruvnet/claude-flow/issues"
+    communityUrl: "https://github.com/ruvnet/claude-flow/discussions"
+    supportEmail: "support@claude-flow.dev"
+    supportLevel: COMMUNITY
+    sla:
+      responseTimeHours: 48
+      resolutionTimeHours: 168
+
+  licenses:
+    - type: OPEN_SOURCE
+      licenseName: Apache License 2.0
+      licenseUrl: "https://www.apache.org/licenses/LICENSE-2.0"
+
+  security:
+    encryption:
+      atRest: true
+      inTransit: true
+    compliance:
+      - GDPR
+      - CCPA
+      - SOC2
+    containerScanningEnabled: true
+    vulnerabilityManagementEnabled: true
+
+  versioning:
+    minSupportedVersion: "2.5.0"
+    currentVersion: "3.0.0"
+    versionSchedule:
+      releaseFrequency: MONTHLY
+      supportWindow: 12_MONTHS
+
+  tags:
+    - ai
+    - automation
+    - orchestration
+    - agents
+    - machine-learning
+    - kubernetes
+    - cloud
+
+  categories:
+    - "AI & Machine Learning"
+    - "Application Development"
+    - "DevOps & Containers"
+    - "Automation"
+
+  badges:
+    - type: GOOGLE_CLOUD_NATIVE
+      label: "Google Cloud Native"
+    - type: OPEN_SOURCE
+      label: "Open Source"
+    - type: CERTIFIED
+      label: "Cloud Certified"
+
+  images:
+    - url: "https://storage.googleapis.com/claude-flow-marketplace/logo.png"
+      type: LOGO
+    - url: "https://storage.googleapis.com/claude-flow-marketplace/hero.png"
+      type: HERO_IMAGE
+    - url: "https://storage.googleapis.com/claude-flow-marketplace/screenshot1.png"
+      type: SCREENSHOT
+    - url: "https://storage.googleapis.com/claude-flow-marketplace/screenshot2.png"
+      type: SCREENSHOT
+    - url: "https://storage.googleapis.com/claude-flow-marketplace/screenshot3.png"
+      type: SCREENSHOT

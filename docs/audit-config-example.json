@@ -1,0 +1,279 @@
+{
+  "auditLogging": {
+    "enabled": true,
+    "projectId": "my-gcp-project",
+    "logName": "audit-logs",
+    "batchSize": 50,
+    "batchTimeoutMs": 5000,
+    "enableCloudLogging": true,
+    "enableSiemExport": true,
+    "siemEndpoint": "siem-server.example.com:514",
+    "siemFormat": "CEF",
+    "sampling": {
+      "enabled": true,
+      "rate": 0.95
+    },
+    "encryption": {
+      "enabled": true,
+      "keyId": "projects/my-project/locations/us/keyRings/audit-keys/cryptoKeys/audit-key"
+    },
+    "retentionPolicies": [
+      {
+        "policyId": "SOC2",
+        "name": "SOC 2 Retention Policy",
+        "description": "1-year retention for SOC 2 compliance",
+        "eventTypes": [
+          "auth.login",
+          "auth.logout",
+          "authz.grant",
+          "authz.revoke",
+          "admin.user_create",
+          "admin.user_delete",
+          "admin.policy_create",
+          "admin.policy_update",
+          "admin.policy_delete",
+          "security.violation"
+        ],
+        "retentionDays": 365,
+        "archiveAfterDays": 90,
+        "deleteAfterDays": 2555,
+        "complianceFramework": "SOC2",
+        "enabled": true
+      },
+      {
+        "policyId": "HIPAA",
+        "name": "HIPAA Retention Policy",
+        "description": "5-year retention for HIPAA compliance",
+        "eventTypes": [
+          "resource.read",
+          "resource.update",
+          "resource.delete",
+          "auth.login",
+          "auth.logout",
+          "admin.user_create",
+          "admin.user_delete",
+          "security.violation"
+        ],
+        "retentionDays": 1825,
+        "archiveAfterDays": 365,
+        "deleteAfterDays": 2555,
+        "complianceFramework": "HIPAA",
+        "enabled": true
+      },
+      {
+        "policyId": "PCI-DSS",
+        "name": "PCI-DSS Retention Policy",
+        "description": "1-year retention for PCI-DSS compliance",
+        "eventTypes": [
+          "auth.login",
+          "auth.failure",
+          "resource.create",
+          "resource.update",
+          "resource.delete",
+          "admin.user_create",
+          "admin.user_delete",
+          "config.update",
+          "security.violation"
+        ],
+        "retentionDays": 365,
+        "archiveAfterDays": 90,
+        "deleteAfterDays": 730,
+        "complianceFramework": "PCI-DSS",
+        "enabled": true
+      },
+      {
+        "policyId": "GDPR",
+        "name": "GDPR Retention Policy",
+        "description": "90-day retention for GDPR compliance with PII redaction",
+        "eventTypes": [
+          "resource.read",
+          "resource.update",
+          "resource.delete",
+          "resource.export",
+          "auth.login",
+          "auth.logout",
+          "security.violation"
+        ],
+        "retentionDays": 90,
+        "archiveAfterDays": 30,
+        "deleteAfterDays": 365,
+        "complianceFramework": "GDPR",
+        "enabled": true
+      }
+    ],
+    "accessControls": [
+      {
+        "controlId": "admin-access",
+        "role": "admin",
+        "permissions": [
+          "read",
+          "export",
+          "delete",
+          "manage_policy",
+          "manage_access"
+        ],
+        "enabled": true
+      },
+      {
+        "controlId": "compliance-officer-access",
+        "role": "compliance-officer",
+        "permissions": [
+          "read",
+          "export",
+          "manage_policy"
+        ],
+        "dataRedaction": {
+          "enabled": false,
+          "fields": []
+        },
+        "enabled": true
+      },
+      {
+        "controlId": "auditor-access",
+        "role": "auditor",
+        "permissions": [
+          "read",
+          "export"
+        ],
+        "dataRedaction": {
+          "enabled": true,
+          "fields": [
+            "context.userAgent",
+            "metadata"
+          ]
+        },
+        "enabled": true
+      },
+      {
+        "controlId": "analyst-access",
+        "role": "analyst",
+        "permissions": [
+          "read"
+        ],
+        "dataRedaction": {
+          "enabled": true,
+          "fields": [
+            "actor.userEmail",
+            "context.userAgent",
+            "context.sourceIp",
+            "metadata"
+          ]
+        },
+        "enabled": true
+      },
+      {
+        "controlId": "viewer-access",
+        "role": "viewer",
+        "permissions": [
+          "read"
+        ],
+        "eventTypeFilter": [
+          "auth.login",
+          "resource.create",
+          "resource.delete"
+        ],
+        "dataRedaction": {
+          "enabled": true,
+          "fields": [
+            "actor",
+            "context",
+            "metadata"
+          ]
+        },
+        "enabled": true
+      }
+    ],
+    "complianceExports": [
+      {
+        "exportId": "soc2-quarterly",
+        "name": "SOC 2 Quarterly Report",
+        "framework": "SOC2",
+        "format": "JSON",
+        "filters": {
+          "eventTypes": [
+            "auth.login",
+            "authz.grant",
+            "authz.revoke",
+            "admin.policy_create",
+            "admin.policy_update",
+            "security.violation"
+          ],
+          "dateRange": {
+            "startDate": "2024-01-01T00:00:00Z",
+            "endDate": "2024-03-31T23:59:59Z"
+          }
+        },
+        "transformations": {
+          "redactPii": true,
+          "anonymize": false,
+          "aggregateByHour": false
+        },
+        "destination": {
+          "type": "gcs_and_bigquery",
+          "bucket": "compliance-exports",
+          "dataset": "audit_logs",
+          "table": "soc2_events"
+        },
+        "schedule": {
+          "frequency": "quarterly"
+        }
+      },
+      {
+        "exportId": "hipaa-annual",
+        "name": "HIPAA Annual Report",
+        "framework": "HIPAA",
+        "format": "PARQUET",
+        "filters": {
+          "eventTypes": [
+            "resource.read",
+            "resource.update",
+            "resource.delete",
+            "auth.login",
+            "security.violation"
+          ],
+          "dateRange": {
+            "startDate": "2024-01-01T00:00:00Z",
+            "endDate": "2024-12-31T23:59:59Z"
+          }
+        },
+        "transformations": {
+          "redactPii": true,
+          "anonymize": true,
+          "aggregateByHour": false
+        },
+        "destination": {
+          "type": "bigquery",
+          "dataset": "audit_logs",
+          "table": "hipaa_events"
+        },
+        "schedule": {
+          "frequency": "yearly"
+        }
+      },
+      {
+        "exportId": "gdpr-monthly",
+        "name": "GDPR Monthly Export",
+        "framework": "GDPR",
+        "format": "CSV",
+        "filters": {
+          "dateRange": {
+            "startDate": "2024-01-01T00:00:00Z",
+            "endDate": "2024-01-31T23:59:59Z"
+          }
+        },
+        "transformations": {
+          "redactPii": true,
+          "anonymize": true,
+          "aggregateByHour": false
+        },
+        "destination": {
+          "type": "gcs",
+          "bucket": "gdpr-exports"
+        },
+        "schedule": {
+          "frequency": "monthly"
+        }
+      }
+    ]
+  }
+}

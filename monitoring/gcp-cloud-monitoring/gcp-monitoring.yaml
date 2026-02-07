@@ -1,0 +1,268 @@
+# GCP Cloud Monitoring Configuration
+# Integrates with Cloud Monitoring API for enterprise monitoring
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gcp-cloud-monitoring
+  namespace: monitoring
+spec:
+  groups:
+    - name: gcp.recording_rules
+      interval: 30s
+      rules:
+        # Record metrics for Cloud Monitoring export
+        - record: gcp:api:request:rate
+          expr: rate(http_requests_total[5m])
+
+        - record: gcp:api:error:rate
+          expr: rate(http_requests_total{status=~"5.."}[5m])
+
+        - record: gcp:api:latency:p99
+          expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))
+
+        - record: gcp:container:cpu:usage
+          expr: rate(container_cpu_usage_seconds_total[5m])
+
+        - record: gcp:container:memory:usage
+          expr: container_memory_working_set_bytes
+
+---
+# GCP Cloud Monitoring Stackdriver Exporter Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stackdriver-exporter-config
+  namespace: monitoring
+data:
+  stackdriver.conf: |
+    # Stackdriver Exporter Configuration
+
+    # GCP Project ID
+    project_id = "YOUR_PROJECT_ID"
+
+    # Metrics to export to Cloud Monitoring
+    export_metrics:
+      # System metrics
+      - metric_name: "compute.googleapis.com/instance/cpu/usage_time"
+        prometheus_metric: "node_cpu_seconds_total"
+        labels:
+          resource_type: "gce_instance"
+          project_id: "YOUR_PROJECT_ID"
+
+      # Network metrics
+      - metric_name: "compute.googleapis.com/instance/network/received_bytes_count"
+        prometheus_metric: "node_network_receive_bytes_total"
+        labels:
+          resource_type: "gce_instance"
+
+      # Custom application metrics
+      - metric_name: "custom.googleapis.com/application/http/requests"
+        prometheus_metric: "http_requests_total"
+        labels:
+          resource_type: "global"
+          metric_kind: "CUMULATIVE"
+
+      - metric_name: "custom.googleapis.com/application/http/latency"
+        prometheus_metric: "http_request_duration_seconds"
+        labels:
+          resource_type: "global"
+          metric_kind: "DISTRIBUTION"
+
+    # Alert policy configurations
+    alert_policies:
+      - display_name: "High Error Rate"
+        conditions:
+          - display_name: "Error Rate > 5%"
+            condition_threshold:
+              filter: 'resource.type="global" AND metric.type="custom.googleapis.com/application/http/requests"'
+              threshold_value: 0.05
+              comparison: "COMPARISON_GT"
+              duration: "300s"
+        notification_channels:
+          - "projects/YOUR_PROJECT_ID/notificationChannels/CHANNEL_ID"
+
+      - display_name: "High Latency"
+        conditions:
+          - display_name: "P95 Latency > 500ms"
+            condition_threshold:
+              filter: 'resource.type="global" AND metric.type="custom.googleapis.com/application/http/latency"'
+              threshold_value: 0.5
+              comparison: "COMPARISON_GT"
+              duration: "600s"
+        notification_channels:
+          - "projects/YOUR_PROJECT_ID/notificationChannels/CHANNEL_ID"
+
+---
+# SLO Configuration for GCP Cloud Monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: api-availability-sli
+  namespace: monitoring
+spec:
+  displayName: "API Availability"
+  goals:
+    - displayName: "API Availability 99.9%"
+      goalValue: 0.999
+      rollingPeriod: "2592000s"  # 30 days
+
+  serviceLevelIndicator:
+    requestBased:
+      # Good requests (non-5xx status codes)
+      goodTotalRatio:
+        filter: |
+          resource.type="global"
+          AND metric.type="custom.googleapis.com/application/http/requests"
+          AND NOT (metric.status >= 500)
+        totalFilter: |
+          resource.type="global"
+          AND metric.type="custom.googleapis.com/application/http/requests"
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceLevelIndicator
+metadata:
+  name: api-latency-sli
+  namespace: monitoring
+spec:
+  displayName: "API Latency"
+  goals:
+    - displayName: "API Latency P95 < 200ms"
+      goalValue: 0.95
+      rollingPeriod: "2592000s"  # 30 days
+
+  serviceLevelIndicator:
+    requestBased:
+      goodTotalRatio:
+        filter: |
+          resource.type="global"
+          AND metric.type="custom.googleapis.com/application/http/latency"
+          AND metric.latency < 200
+        totalFilter: |
+          resource.type="global"
+          AND metric.type="custom.googleapis.com/application/http/latency"
+
+---
+# GCP Monitoring Dashboard
+apiVersion: monitoring.coreos.com/v1
+kind: MonitoringDashboard
+metadata:
+  name: enterprise-dashboard
+  namespace: monitoring
+spec:
+  displayName: "Enterprise Monitoring Dashboard"
+  mosaicLayout:
+    columns: 12
+    tiles:
+      # API Availability Metric
+      - width: 6
+        height: 4
+        widget:
+          title: "API Availability"
+          xyChart:
+            dataSets:
+              - timeSeriesQuery:
+                  timeSeriesFilter:
+                    filter: |
+                      metric.type="custom.googleapis.com/application/http/requests"
+                      resource.type="global"
+
+      # Error Rate Metric
+      - width: 6
+        height: 4
+        widget:
+          title: "Error Rate"
+          xyChart:
+            dataSets:
+              - timeSeriesQuery:
+                  timeSeriesFilter:
+                    filter: |
+                      metric.type="custom.googleapis.com/application/http/requests"
+                      metric.status >= 500
+                      resource.type="global"
+
+      # Latency Distribution
+      - width: 12
+        height: 4
+        widget:
+          title: "Request Latency Distribution"
+          xyChart:
+            dataSets:
+              - timeSeriesQuery:
+                  timeSeriesFilter:
+                    filter: |
+                      metric.type="custom.googleapis.com/application/http/latency"
+                      resource.type="global"
+
+      # GCE CPU Usage
+      - width: 6
+        height: 4
+        widget:
+          title: "Compute Engine CPU Usage"
+          xyChart:
+            dataSets:
+              - timeSeriesQuery:
+                  timeSeriesFilter:
+                    filter: |
+                      metric.type="compute.googleapis.com/instance/cpu/utilization"
+                      resource.type="gce_instance"
+
+      # GCE Memory Usage
+      - width: 6
+        height: 4
+        widget:
+          title: "Compute Engine Memory Usage"
+          xyChart:
+            dataSets:
+              - timeSeriesQuery:
+                  timeSeriesFilter:
+                    filter: |
+                      metric.type="compute.googleapis.com/instance/memory/utilization"
+                      resource.type="gce_instance"
+
+# Kubernetes Integration
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gke-monitoring-config
+  namespace: monitoring
+data:
+  gke-config.yaml: |
+    # GKE-specific monitoring configuration
+
+    # Enable GKE metrics collection
+    gke_metrics:
+      enabled: true
+      cluster_name: "YOUR_CLUSTER_NAME"
+      project_id: "YOUR_PROJECT_ID"
+      region: "YOUR_REGION"
+
+    # Workload metrics
+    workload_metrics:
+      - namespace: "default"
+        deployment: "admin-console"
+        metrics:
+          - cpu_utilization
+          - memory_utilization
+          - network_received_bytes
+          - network_sent_bytes
+          - pod_network_io
+
+    # GKE-specific alerts
+    alerts:
+      - name: "GKENodeUnready"
+        condition: "GKENodeStatus != Ready"
+        duration: "5m"
+        severity: "CRITICAL"
+
+      - name: "GKEPodCrashLoop"
+        condition: "GKEPodRestarts > 5"
+        duration: "10m"
+        severity: "WARNING"
+
+      - name: "GKEClusterCPUUtilization"
+        condition: "GKEClusterCPU > 80%"
+        duration: "10m"
+        severity: "WARNING"

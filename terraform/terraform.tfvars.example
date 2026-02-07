@@ -1,0 +1,127 @@
+# Google Cloud Platform Configuration
+project_id  = "my-gcp-project-id"
+region      = "us-central1"
+environment = "dev"
+
+# AWS Configuration (for hybrid deployments)
+aws_region = "us-east-1"
+
+# Labels applied to all resources
+labels = {
+  project     = "cre"
+  managed-by  = "terraform"
+  team        = "platform"
+  cost-center = "engineering"
+}
+
+# Network Configuration
+primary_subnet_cidr   = "10.0.0.0/20"
+secondary_subnet_cidr = "10.0.16.0/20"
+ssh_source_ranges     = ["0.0.0.0/0"]
+
+# GKE Cluster Configuration
+cluster_name  = "cre-cluster"
+subnet_cidr   = "10.1.0.0/20"
+pods_cidr     = "172.16.0.0/14"
+services_cidr = "172.20.0.0/14"
+
+# Cluster Protection Settings
+deletion_protection = false
+disable_cloud_run   = true
+
+# Cluster Autoscaling Configuration
+cluster_autoscaling_min_cpu    = 1
+cluster_autoscaling_max_cpu    = 64
+cluster_autoscaling_min_memory = 1
+cluster_autoscaling_max_memory = 256
+
+# Primary Node Pool Configuration
+primary_node_count   = 3
+primary_min_nodes    = 1
+primary_max_nodes    = 10
+primary_machine_type = "n1-standard-2"
+primary_disk_size_gb = 50
+primary_preemptible  = false
+
+# Compute Node Pool Configuration
+compute_node_count   = 2
+compute_min_nodes    = 1
+compute_max_nodes    = 20
+compute_machine_type = "n1-highmem-4"
+compute_disk_size_gb = 100
+compute_preemptible  = true
+
+# Kubernetes Namespaces
+gke_namespace       = "default"
+cloud_run_namespace = "cloud-run"
+
+# IAM Configuration
+workload_identity_location = "global"
+
+# Secrets Manager (replace with actual values)
+database_password     = "change-me-to-secure-password"
+api_key               = "change-me-to-api-key"
+jwt_secret            = "change-me-to-jwt-secret"
+oauth_client_secret   = "change-me-to-oauth-secret"
+service_account_email = "app-service-account@my-gcp-project-id.iam.gserviceaccount.com"
+
+# Monitoring
+notification_channel_email = "alerts@example.com"
+log_sink_dataset           = "monitoring_logs"
+
+# Storage Configuration
+buckets = {
+  "data" = {
+    location      = "us-central1"
+    storage_class = "STANDARD"
+    versioning    = true
+    lifecycle_rules = [
+      {
+        age_days = 90
+        action   = "SetStorageClass"
+      },
+      {
+        age_days = 365
+        action   = "Delete"
+      }
+    ]
+    iam_bindings = {
+      "roles/storage.objectViewer" = [
+        "group:data-readers@example.com"
+      ]
+      "roles/storage.objectAdmin" = [
+        "group:data-admins@example.com"
+      ]
+    }
+  }
+
+  "logs" = {
+    location      = "us-central1"
+    storage_class = "NEARLINE"
+    versioning    = false
+    lifecycle_rules = [
+      {
+        age_days = 30
+        action   = "Delete"
+      }
+    ]
+    iam_bindings = {
+      "roles/storage.objectCreator" = [
+        "serviceAccount:logging@my-gcp-project-id.iam.gserviceaccount.com"
+      ]
+    }
+  }
+
+  "archive" = {
+    location      = "us-central1"
+    storage_class = "COLDLINE"
+    versioning    = true
+    lifecycle_rules = [
+      {
+        age_days = 180
+        action   = "SetStorageClass"
+      }
+    ]
+    iam_bindings = {}
+  }
+}

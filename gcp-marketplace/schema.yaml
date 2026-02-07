@@ -1,0 +1,802 @@
+$schema: 'http://json-schema.org/draft-07/schema#'
+title: GCP Marketplace UI Configuration Schema
+description: Schema for defining UI components and configurations for GCP Marketplace applications
+type: object
+required:
+  - apiVersion
+  - kind
+  - metadata
+  - spec
+properties:
+  apiVersion:
+    type: string
+    enum:
+      - v1
+      - v1beta1
+      - v2
+    description: API version of the configuration schema
+  kind:
+    type: string
+    enum:
+      - MarketplaceUIConfig
+      - UIComponent
+      - FormSchema
+      - LayoutConfig
+    description: Kind of the configuration object
+  metadata:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 256
+        pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+        description: Name of the UI configuration
+      namespace:
+        type: string
+        description: Namespace for the configuration
+      labels:
+        type: object
+        additionalProperties:
+          type: string
+        description: Labels for organizing and selecting configurations
+      annotations:
+        type: object
+        additionalProperties:
+          type: string
+        description: Annotations for additional metadata
+      version:
+        type: string
+        description: Version of the configuration
+      createdAt:
+        type: string
+        format: date-time
+        description: Creation timestamp
+      updatedAt:
+        type: string
+        format: date-time
+        description: Last update timestamp
+  spec:
+    type: object
+    oneOf:
+      - $ref: '#/definitions/MarketplaceUIConfigSpec'
+      - $ref: '#/definitions/UIComponentSpec'
+      - $ref: '#/definitions/FormSchemaSpec'
+      - $ref: '#/definitions/LayoutConfigSpec'
+definitions:
+  MarketplaceUIConfigSpec:
+    type: object
+    description: Configuration for marketplace UI
+    required:
+      - pages
+    properties:
+      pages:
+        type: array
+        minItems: 1
+        items:
+          $ref: '#/definitions/Page'
+        description: List of pages in the marketplace UI
+      theme:
+        $ref: '#/definitions/Theme'
+        description: Theme configuration
+      navigation:
+        $ref: '#/definitions/Navigation'
+        description: Navigation configuration
+      authentication:
+        $ref: '#/definitions/AuthenticationConfig'
+        description: Authentication configuration
+      i18n:
+        $ref: '#/definitions/I18nConfig'
+        description: Internationalization configuration
+      assets:
+        $ref: '#/definitions/AssetsConfig'
+        description: Assets configuration
+      analytics:
+        $ref: '#/definitions/AnalyticsConfig'
+        description: Analytics configuration
+      featureFlags:
+        type: object
+        additionalProperties:
+          type: boolean
+        description: Feature flags for conditional rendering
+  UIComponentSpec:
+    type: object
+    description: Specification for individual UI components
+    required:
+      - type
+      - properties
+    properties:
+      type:
+        type: string
+        enum:
+          - Button
+          - Card
+          - Form
+          - Input
+          - Select
+          - Checkbox
+          - Radio
+          - Textarea
+          - Modal
+          - Drawer
+          - Tabs
+          - Accordion
+          - Table
+          - List
+          - Badge
+          - Avatar
+          - Icon
+          - Image
+          - Video
+          - Carousel
+          - Stepper
+          - Pagination
+          - Alert
+          - Toast
+          - Tooltip
+        description: Type of UI component
+      properties:
+        type: object
+        description: Properties of the component
+      children:
+        type: array
+        items:
+          $ref: '#/definitions/UIComponentSpec'
+        description: Child components
+      events:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/EventHandler'
+        description: Event handlers for the component
+      styling:
+        $ref: '#/definitions/StylingConfig'
+        description: Styling configuration
+      accessibility:
+        $ref: '#/definitions/AccessibilityConfig'
+        description: Accessibility configuration
+      conditional:
+        $ref: '#/definitions/ConditionalRender'
+        description: Conditional rendering logic
+  FormSchemaSpec:
+    type: object
+    description: Schema for form definitions
+    required:
+      - fields
+    properties:
+      name:
+        type: string
+        description: Form name
+      fields:
+        type: array
+        minItems: 1
+        items:
+          $ref: '#/definitions/FormField'
+        description: Form fields
+      sections:
+        type: array
+        items:
+          $ref: '#/definitions/FormSection'
+        description: Form sections for grouping fields
+      validation:
+        $ref: '#/definitions/ValidationConfig'
+        description: Form-level validation
+      submission:
+        $ref: '#/definitions/SubmissionConfig'
+        description: Form submission configuration
+      layout:
+        type: string
+        enum:
+          - vertical
+          - horizontal
+          - grid
+        description: Form layout type
+      width:
+        type: string
+        enum:
+          - full
+          - max
+          - lg
+          - md
+          - sm
+        description: Form width
+  LayoutConfigSpec:
+    type: object
+    description: Layout configuration for pages
+    required:
+      - type
+    properties:
+      type:
+        type: string
+        enum:
+          - single-column
+          - two-column
+          - three-column
+          - sidebar
+          - grid
+          - custom
+        description: Layout type
+      regions:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/LayoutRegion'
+        description: Layout regions
+      responsive:
+        $ref: '#/definitions/ResponsiveConfig'
+        description: Responsive configuration
+      spacing:
+        $ref: '#/definitions/SpacingConfig'
+        description: Spacing configuration
+  Page:
+    type: object
+    required:
+      - path
+      - name
+    properties:
+      path:
+        type: string
+        description: Route path for the page
+      name:
+        type: string
+        description: Display name of the page
+      title:
+        type: string
+        description: Page title
+      description:
+        type: string
+        description: Page description
+      icon:
+        type: string
+        description: Icon for the page
+      layout:
+        $ref: '#/definitions/LayoutConfigSpec'
+        description: Page layout configuration
+      components:
+        type: array
+        items:
+          $ref: '#/definitions/UIComponentSpec'
+        description: Components on the page
+      metadata:
+        $ref: '#/definitions/PageMetadata'
+        description: Page metadata
+      permissions:
+        type: array
+        items:
+          type: string
+        description: Required permissions
+      breadcrumbs:
+        type: array
+        items:
+          $ref: '#/definitions/BreadcrumbItem'
+        description: Breadcrumb items
+  FormField:
+    type: object
+    required:
+      - name
+      - type
+    properties:
+      name:
+        type: string
+        description: Field name
+      label:
+        type: string
+        description: Field label
+      type:
+        type: string
+        enum:
+          - text
+          - email
+          - password
+          - number
+          - tel
+          - url
+          - date
+          - time
+          - datetime
+          - select
+          - multiselect
+          - checkbox
+          - radio
+          - textarea
+          - file
+          - color
+          - range
+          - hidden
+        description: Field type
+      placeholder:
+        type: string
+        description: Placeholder text
+      helpText:
+        type: string
+        description: Help text
+      required:
+        type: boolean
+        description: Whether field is required
+      disabled:
+        type: boolean
+        description: Whether field is disabled
+      readonly:
+        type: boolean
+        description: Whether field is read-only
+      value:
+        description: Default value
+      options:
+        type: array
+        items:
+          $ref: '#/definitions/SelectOption'
+        description: Options for select/radio/checkbox fields
+      validation:
+        $ref: '#/definitions/FieldValidation'
+        description: Field-level validation
+      errorMessage:
+        type: string
+        description: Error message template
+      conditional:
+        $ref: '#/definitions/ConditionalRender'
+        description: Conditional field display
+      width:
+        type: string
+        enum:
+          - full
+          - half
+          - third
+          - quarter
+        description: Field width in form
+  FormSection:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        description: Section name
+      title:
+        type: string
+        description: Section title
+      description:
+        type: string
+        description: Section description
+      collapsible:
+        type: boolean
+        description: Whether section is collapsible
+      collapsed:
+        type: boolean
+        description: Initial collapsed state
+      fields:
+        type: array
+        items:
+          type: string
+        description: Field names in this section
+  Theme:
+    type: object
+    description: Theme configuration
+    properties:
+      name:
+        type: string
+        description: Theme name
+      colors:
+        $ref: '#/definitions/ColorScheme'
+        description: Color scheme
+      typography:
+        $ref: '#/definitions/Typography'
+        description: Typography settings
+      spacing:
+        $ref: '#/definitions/SpacingScale'
+        description: Spacing scale
+      breakpoints:
+        $ref: '#/definitions/Breakpoints'
+        description: Responsive breakpoints
+      shadows:
+        $ref: '#/definitions/Shadows'
+        description: Shadow definitions
+      transitions:
+        $ref: '#/definitions/Transitions'
+        description: Transition definitions
+  ColorScheme:
+    type: object
+    properties:
+      primary:
+        type: string
+        format: color
+      secondary:
+        type: string
+        format: color
+      success:
+        type: string
+        format: color
+      warning:
+        type: string
+        format: color
+      error:
+        type: string
+        format: color
+      info:
+        type: string
+        format: color
+      background:
+        type: string
+        format: color
+      surface:
+        type: string
+        format: color
+      text:
+        type: string
+        format: color
+      border:
+        type: string
+        format: color
+  Typography:
+    type: object
+    properties:
+      fontFamily:
+        type: object
+        properties:
+          base:
+            type: string
+          heading:
+            type: string
+          mono:
+            type: string
+      sizes:
+        type: object
+        properties:
+          xs:
+            type: string
+          sm:
+            type: string
+          md:
+            type: string
+          lg:
+            type: string
+          xl:
+            type: string
+          '2xl':
+            type: string
+      weights:
+        type: object
+        properties:
+          light:
+            type: integer
+          regular:
+            type: integer
+          medium:
+            type: integer
+          bold:
+            type: integer
+  SpacingScale:
+    type: object
+    additionalProperties:
+      type: string
+  Breakpoints:
+    type: object
+    properties:
+      xs:
+        type: integer
+      sm:
+        type: integer
+      md:
+        type: integer
+      lg:
+        type: integer
+      xl:
+        type: integer
+      '2xl':
+        type: integer
+  Shadows:
+    type: object
+    additionalProperties:
+      type: string
+  Transitions:
+    type: object
+    additionalProperties:
+      type: string
+  Navigation:
+    type: object
+    properties:
+      type:
+        type: string
+        enum:
+          - horizontal
+          - vertical
+          - drawer
+          - tabs
+        description: Navigation type
+      items:
+        type: array
+        items:
+          $ref: '#/definitions/NavigationItem'
+        description: Navigation items
+      sticky:
+        type: boolean
+        description: Whether navigation is sticky
+  NavigationItem:
+    type: object
+    required:
+      - label
+    properties:
+      label:
+        type: string
+      path:
+        type: string
+      icon:
+        type: string
+      children:
+        type: array
+        items:
+          $ref: '#/definitions/NavigationItem'
+      permissions:
+        type: array
+        items:
+          type: string
+  AuthenticationConfig:
+    type: object
+    properties:
+      enabled:
+        type: boolean
+      method:
+        type: string
+        enum:
+          - oauth
+          - oidc
+          - saml
+          - basic
+          - custom
+      providers:
+        type: array
+        items:
+          type: string
+      loginPath:
+        type: string
+      logoutPath:
+        type: string
+      callbackPath:
+        type: string
+  I18nConfig:
+    type: object
+    properties:
+      defaultLanguage:
+        type: string
+      supportedLanguages:
+        type: array
+        items:
+          type: string
+      translationPath:
+        type: string
+      fallbackLanguage:
+        type: string
+  AssetsConfig:
+    type: object
+    properties:
+      baseUrl:
+        type: string
+      images:
+        type: object
+        properties:
+          path:
+            type: string
+          formats:
+            type: array
+            items:
+              type: string
+      fonts:
+        type: object
+        properties:
+          path:
+            type: string
+          preload:
+            type: array
+            items:
+              type: string
+      cdn:
+        type: object
+        properties:
+          enabled:
+            type: boolean
+          provider:
+            type: string
+          url:
+            type: string
+  AnalyticsConfig:
+    type: object
+    properties:
+      enabled:
+        type: boolean
+      providers:
+        type: array
+        items:
+          $ref: '#/definitions/AnalyticsProvider'
+  AnalyticsProvider:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+      config:
+        type: object
+        additionalProperties: true
+  ValidationConfig:
+    type: object
+    properties:
+      validateOnBlur:
+        type: boolean
+      validateOnChange:
+        type: boolean
+      validateOnSubmit:
+        type: boolean
+      stopOnFirstError:
+        type: boolean
+  FieldValidation:
+    type: object
+    properties:
+      required:
+        type: boolean
+      pattern:
+        type: string
+      minLength:
+        type: integer
+      maxLength:
+        type: integer
+      min:
+        type: number
+      max:
+        type: number
+      custom:
+        type: object
+        properties:
+          function:
+            type: string
+          message:
+            type: string
+  SubmissionConfig:
+    type: object
+    properties:
+      action:
+        type: string
+      method:
+        type: string
+        enum:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+      enctype:
+        type: string
+      successMessage:
+        type: string
+      errorMessage:
+        type: string
+      successRedirect:
+        type: string
+      validate:
+        type: boolean
+  SelectOption:
+    type: object
+    required:
+      - value
+      - label
+    properties:
+      value:
+        description: Option value
+      label:
+        type: string
+      disabled:
+        type: boolean
+      group:
+        type: string
+  EventHandler:
+    type: object
+    required:
+      - action
+    properties:
+      action:
+        type: string
+      handler:
+        type: string
+      preventDefault:
+        type: boolean
+      stopPropagation:
+        type: boolean
+  StylingConfig:
+    type: object
+    properties:
+      className:
+        type: string
+      style:
+        type: object
+        additionalProperties: true
+      variant:
+        type: string
+      size:
+        type: string
+      color:
+        type: string
+  AccessibilityConfig:
+    type: object
+    properties:
+      role:
+        type: string
+      ariaLabel:
+        type: string
+      ariaLabelledby:
+        type: string
+      ariaDescribedby:
+        type: string
+      tabIndex:
+        type: integer
+      disabled:
+        type: boolean
+  ConditionalRender:
+    type: object
+    properties:
+      type:
+        type: string
+        enum:
+          - equals
+          - notEquals
+          - greaterThan
+          - lessThan
+          - includes
+          - notIncludes
+          - and
+          - or
+      field:
+        type: string
+      value:
+        description: Value to compare
+      conditions:
+        type: array
+        items:
+          $ref: '#/definitions/ConditionalRender'
+  PageMetadata:
+    type: object
+    properties:
+      title:
+        type: string
+      description:
+        type: string
+      keywords:
+        type: array
+        items:
+          type: string
+      ogImage:
+        type: string
+      ogTitle:
+        type: string
+      ogDescription:
+        type: string
+  BreadcrumbItem:
+    type: object
+    required:
+      - label
+    properties:
+      label:
+        type: string
+      path:
+        type: string
+  LayoutRegion:
+    type: object
+    properties:
+      components:
+        type: array
+        items:
+          $ref: '#/definitions/UIComponentSpec'
+      width:
+        type: string
+      height:
+        type: string
+  ResponsiveConfig:
+    type: object
+    additionalProperties:
+      type: object
+  SpacingConfig:
+    type: object
+    properties:
+      padding:
+        type: string
+      margin:
+        type: string
+      gap:
+        type: string

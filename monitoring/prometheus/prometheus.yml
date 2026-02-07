@@ -1,0 +1,222 @@
+# Prometheus Configuration - Enterprise Multi-Environment Setup
+# Supports GCP, Kubernetes, and on-premise monitoring
+
+global:
+  scrape_interval: 15s           # Default scrape interval
+  evaluation_interval: 15s       # Default evaluation interval
+  external_labels:
+    env: '${PROMETHEUS_ENV:production}'
+    region: '${PROMETHEUS_REGION:us-central1}'
+    cluster: '${PROMETHEUS_CLUSTER:main}'
+    monitoring_system: 'prometheus'
+
+# Alert managers configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+            - 'alertmanager-backup:9093'
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_name]
+          target_label: pod
+
+# Load alert rules
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+  - '/etc/prometheus/rules/slo/*.yml'
+  - '/etc/prometheus/rules/sla/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # Kubernetes API Server
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+      - role: endpoints
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+
+  # Kubernetes Nodes (kubelet)
+  - job_name: 'kubernetes-nodes'
+    kubernetes_sd_configs:
+      - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics
+
+  # Kubernetes Pods
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: 'true'
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: kubernetes_pod_name
+      - source_labels: [__meta_kubernetes_pod_phase]
+        regex: Pending|Succeeded|Failed
+        action: drop
+
+  # Kubernetes Services (kube-state-metrics)
+  - job_name: 'kube-state-metrics'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_name]
+        regex: 'kube-state-metrics.*'
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        action: keep
+        regex: 'metrics'
+
+  # Node Exporter
+  - job_name: 'node-exporter'
+    kubernetes_sd_configs:
+      - role: endpoints
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_endpoints_name]
+        regex: 'node-exporter'
+        action: keep
+
+  # cAdvisor (Container metrics)
+  - job_name: 'cadvisor'
+    kubernetes_sd_configs:
+      - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+    metric_relabel_configs:
+      - action: drop
+        regex: 'container_network_tcp_usage_total|container_network_udp_usage_total'
+        source_labels: [__name__]
+
+  # GCP Cloud Monitoring
+  - job_name: 'stackdriver'
+    honor_timestamps: true
+    metrics_path: '/metrics'
+    scheme: https
+    static_configs:
+      - targets: ['stackdriver-exporter:9143']
+    scrape_interval: 60s
+    scrape_timeout: 10s
+
+  # Application Metrics (generic)
+  - job_name: 'application-metrics'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: '.+'
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: 'true'
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+
+  # Istio/Service Mesh Metrics
+  - job_name: 'istio-mesh'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        action: keep
+        regex: '.*-envoy-prom'
+
+  # Custom Applications by namespace
+  - job_name: 'admin-console'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - admin-console
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: 'true'
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __param_target
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: instance
+
+# Remote storage configuration (optional - for long-term retention)
+remote_write:
+  - url: 'http://victoriametrics:8428/api/v1/write'
+    queue_config:
+      capacity: 10000
+      max_shards: 200
+      min_shards: 1
+      max_samples_per_send: 10000
+      batch_send_wait: 5s
+      min_back_off: 30ms
+      max_back_off: 100ms
+    metadata_config:
+      send: true
+      send_interval: 1m
+
+# Optional: GCP Cloud Monitoring remote write
+# - url: 'https://monitoring.googleapis.com/openmetrics.googleapis.com/v1/projects/YOUR_PROJECT_ID/location/global/prometheus/api/v1/write'
+#   bearer_token_file: /var/run/secrets/cloud.google.com/service_account/token
+#   queue_config:
+#     capacity: 10000

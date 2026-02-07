@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: admin-console-config
+  namespace: staging
+  labels:
+    app: admin-console
+    environment: staging
+data:
+  api-url: 'https://staging-api.example.com'
+  log-level: 'debug'
+  environment: 'staging'
+  cache-ttl: '300'
+  enable-debug: 'true'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: admin-console-config
+  namespace: production
+  labels:
+    app: admin-console
+    environment: production
+data:
+  api-url: 'https://api.example.com'
+  log-level: 'info'
+  environment: 'production'
+  cache-ttl: '3600'
+  enable-debug: 'false'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-logging-config
+  namespace: staging
+data:
+  logging.json: |
+    {
+      "version": 1,
+      "disable_existing_loggers": false,
+      "formatters": {
+        "standard": {
+          "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s"
+        },
+        "json": {
+          "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+          "format": "%(timestamp)s %(level)s %(name)s %(message)s"
+        }
+      },
+      "handlers": {
+        "console": {
+          "class": "logging.StreamHandler",
+          "formatter": "json",
+          "stream": "ext://sys.stdout"
+        }
+      },
+      "root": {
+        "level": "DEBUG",
+        "handlers": ["console"]
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-logging-config
+  namespace: production
+data:
+  logging.json: |
+    {
+      "version": 1,
+      "disable_existing_loggers": false,
+      "formatters": {
+        "standard": {
+          "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s"
+        },
+        "json": {
+          "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+          "format": "%(timestamp)s %(level)s %(name)s %(message)s"
+        }
+      },
+      "handlers": {
+        "console": {
+          "class": "logging.StreamHandler",
+          "formatter": "json",
+          "stream": "ext://sys.stdout"
+        }
+      },
+      "root": {
+        "level": "INFO",
+        "handlers": ["console"]
+      }
+    }

@@ -1,0 +1,71 @@
+# Grafana Dashboard Provisioning Configuration
+# Automatically loads dashboards from disk
+
+apiVersion: 1
+
+providers:
+  # System and Infrastructure Dashboards
+  - name: 'System Dashboards'
+    orgId: 1
+    folder: 'Infrastructure'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/system
+
+  # Application Dashboards
+  - name: 'Application Dashboards'
+    orgId: 1
+    folder: 'Applications'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/applications
+
+  # SLO/SLA Dashboards
+  - name: 'SLO/SLA Dashboards'
+    orgId: 1
+    folder: 'SLO & SLA'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/slo-sla
+
+  # Kubernetes Dashboards
+  - name: 'Kubernetes Dashboards'
+    orgId: 1
+    folder: 'Kubernetes'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/kubernetes
+
+  # Business Metrics Dashboards
+  - name: 'Business Dashboards'
+    orgId: 1
+    folder: 'Business Metrics'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/business
+
+  # Cost and Resource Dashboards
+  - name: 'Cost & Resources'
+    orgId: 1
+    folder: 'Cost Management'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/cost

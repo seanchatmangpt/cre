@@ -1,0 +1,137 @@
+apiVersion: app.k8s.io/v1beta1
+kind: Application
+metadata:
+  name: "{{ .Release.Name }}"
+  namespace: "{{ .Release.Namespace }}"
+  annotations:
+    kubernetes-engine.cloud.google.com/icon: |
+      data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==
+    marketplace.cloud.google.com/deploy-info: '{
+      "partner_id": "your-partner-id",
+      "product_id": "enterprise-app-v1",
+      "partner_name": "Your Company Name"
+    }'
+  labels:
+    app.kubernetes.io/name: "{{ .Release.Name }}"
+    app.kubernetes.io/version: "{{ .Chart.Version }}"
+    app.kubernetes.io/managed-by: "gcp-marketplace"
+    app.kubernetes.io/component: "enterprise-application"
+spec:
+  descriptor:
+    type: "Enterprise Application Platform"
+    version: "1.0.0"
+    description: |
+      Fortune 5 Enterprise-Grade Application Platform with:
+      - Multi-tenant architecture with namespace isolation
+      - SSO/SAML integration with enterprise identity providers
+      - Advanced RBAC with fine-grained permissions
+      - Automated backup and disaster recovery
+      - Real-time monitoring and alerting
+      - Audit logging and compliance reporting
+      - High availability with 99.99% SLA
+      - Auto-scaling based on demand
+      - End-to-end encryption (at rest and in transit)
+      - SOC2, HIPAA, and ISO 27001 compliance ready
+    maintainers:
+    - name: "Enterprise Support Team"
+      email: "support@yourcompany.com"
+      url: "https://support.yourcompany.com"
+    links:
+    - description: "User Guide"
+      url: "https://docs.yourcompany.com/user-guide"
+    - description: "API Documentation"
+      url: "https://docs.yourcompany.com/api"
+    - description: "Admin Portal"
+      url: "https://admin.yourcompany.com"
+    - description: "Support Portal"
+      url: "https://support.yourcompany.com"
+    notes: |
+      # Post-Deployment Steps
+
+      1. Access the admin console:
+         kubectl port-forward svc/{{ .Release.Name }}-admin 8080:80 -n {{ .Release.Namespace }}
+
+      2. Retrieve admin credentials:
+         kubectl get secret {{ .Release.Name }}-admin-credentials -n {{ .Release.Namespace }} -o jsonpath='{.data.password}' | base64 -d
+
+      3. Configure SSO (optional):
+         kubectl edit configmap {{ .Release.Name }}-sso-config -n {{ .Release.Namespace }}
+
+      4. Enable monitoring:
+         kubectl apply -f monitoring/servicemonitor.yaml
+
+      5. Review billing metrics:
+         kubectl logs -l app=usage-metering-agent -n {{ .Release.Namespace }}
+
+  info:
+  - name: "Admin Console URL"
+    type: "Reference"
+    valueFrom:
+      serviceRef:
+        name: "{{ .Release.Name }}-admin"
+  - name: "Admin Username"
+    value: "admin"
+  - name: "Admin Password"
+    type: "Reference"
+    valueFrom:
+      secretKeyRef:
+        name: "{{ .Release.Name }}-admin-credentials"
+        key: "password"
+  - name: "API Endpoint"
+    type: "Reference"
+    valueFrom:
+      serviceRef:
+        name: "{{ .Release.Name }}-api"
+  - name: "Grafana Dashboard URL"
+    type: "Reference"
+    valueFrom:
+      serviceRef:
+        name: "{{ .Release.Name }}-grafana"
+  - name: "Billing Account ID"
+    type: "Reference"
+    valueFrom:
+      configMapKeyRef:
+        name: "{{ .Release.Name }}-billing-config"
+        key: "account-id"
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: "{{ .Release.Name }}"
+
+  componentKinds:
+  - group: v1
+    kind: Service
+  - group: apps/v1
+    kind: Deployment
+  - group: apps/v1
+    kind: StatefulSet
+  - group: v1
+    kind: ConfigMap
+  - group: v1
+    kind: Secret
+  - group: v1
+    kind: PersistentVolumeClaim
+  - group: batch/v1
+    kind: Job
+  - group: rbac.authorization.k8s.io/v1
+    kind: Role
+  - group: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+  - group: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+  - group: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+  - group: v1
+    kind: ServiceAccount
+  - group: networking.k8s.io/v1
+    kind: Ingress
+  - group: policy/v1
+    kind: PodDisruptionBudget
+  - group: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+  - group: monitoring.coreos.com/v1
+    kind: ServiceMonitor
+  - group: cert-manager.io/v1
+    kind: Certificate
+
+  addOwnerRef: true

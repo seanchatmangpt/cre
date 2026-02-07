@@ -1,0 +1,52 @@
+{
+  "projectRoot": "/path/to/project",
+  "organization": "My Company Inc.",
+  "auditor": "Jane Smith",
+  "environment": "production",
+  "outputDir": "./compliance-reports",
+  "standards": ["SOC2", "ISO27001", "GDPR", "HIPAA"],
+  "auditFrequency": 90,
+  "includeFormats": ["markdown", "html", "json", "csv"],
+  "certificateOptions": {
+    "validity": 365,
+    "includeControlDetails": true,
+    "digitallySigned": true
+  },
+  "complianceScope": {
+    "SOC2": "Cloud infrastructure and SaaS platform",
+    "ISO27001": "All company systems and processes",
+    "GDPR": "Customer data processing activities",
+    "HIPAA": "Not applicable - non-healthcare organization"
+  },
+  "notificationSettings": {
+    "emailOnCompletion": true,
+    "emailOnFailure": true,
+    "slackNotification": false,
+    "recipients": [
+      "compliance@company.com",
+      "security@company.com"
+    ]
+  },
+  "automationRules": {
+    "autoGenerateReports": true,
+    "autoGenerateCertificates": true,
+    "autoNotifyOnCriticalIssues": true,
+    "criticalIssueThreshold": 3
+  },
+  "customChecks": {
+    "enabled": false,
+    "checksFile": "./custom-checks.json"
+  },
+  "integrations": {
+    "github": {
+      "enabled": false,
+      "createIssuesForFailures": false,
+      "failureLabel": "compliance-issue"
+    },
+    "jira": {
+      "enabled": false,
+      "projectKey": "SEC",
+      "issueType": "Task"
+    }
+  }
+}

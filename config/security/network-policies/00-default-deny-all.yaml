@@ -1,0 +1,72 @@
+# Default Deny-All Network Policies
+# Apply these to every namespace to implement zero-trust networking
+
+---
+# Deny all ingress traffic by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-ingress
+  namespace: cre-system
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+
+---
+# Deny all egress traffic by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-egress
+  namespace: cre-system
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+
+---
+# Default Deny-All for monitoring namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-ingress
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-egress
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+
+---
+# Default Deny-All for kube-system (with exceptions handled by specific policies)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-ingress
+  namespace: kube-system
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-egress
+  namespace: kube-system
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress

@@ -1,0 +1,234 @@
+---
+# Usage Metering Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${NAME}-usage-metering-agent
+  namespace: ${NAMESPACE}
+  labels:
+    app: usage-metering-agent
+    app.kubernetes.io/name: ${NAME}
+    app.kubernetes.io/component: metering
+    app.kubernetes.io/managed-by: gcp-marketplace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: usage-metering-agent
+      app.kubernetes.io/name: ${NAME}
+  template:
+    metadata:
+      labels:
+        app: usage-metering-agent
+        app.kubernetes.io/name: ${NAME}
+        app.kubernetes.io/component: metering
+    spec:
+      serviceAccountName: ${NAME}-metering-sa
+
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+      - name: usage-metering-agent
+        image: gcr.io/cloud-marketplace-tools/metering/ubbagent:latest
+        imagePullPolicy: Always
+
+        # Container security
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+        # Resource limits
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+        # Environment configuration
+        env:
+        - name: AGENT_CONFIG_FILE
+          value: /etc/ubbagent/config.yaml
+        - name: AGENT_LOCAL_PORT
+          value: "4567"
+        - name: AGENT_STATE_DIR
+          value: /var/lib/ubbagent
+        - name: AGENT_REPORT_DIR
+          value: /var/lib/ubbagent/reports
+        - name: REPORTING_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ${REPORTING_SECRET}
+              key: reporting-key
+        - name: CONSUMER_ID
+          valueFrom:
+            secretKeyRef:
+              name: ${REPORTING_SECRET}
+              key: consumer-id
+
+        # Volume mounts
+        volumeMounts:
+        - name: ubbagent-config
+          mountPath: /etc/ubbagent
+          readOnly: true
+        - name: ubbagent-state
+          mountPath: /var/lib/ubbagent
+
+        # Liveness probe
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4567
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        # Readiness probe
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 4567
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+
+      volumes:
+      - name: ubbagent-config
+        configMap:
+          name: ${NAME}-ubbagent-config
+      - name: ubbagent-state
+        emptyDir: {}
+
+---
+# Usage Metering Agent ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${NAME}-ubbagent-config
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: ${NAME}
+    app.kubernetes.io/component: metering
+    app.kubernetes.io/managed-by: gcp-marketplace
+data:
+  config.yaml: |
+    reporting:
+      endpoint: https://servicecontrol.googleapis.com/v1/services/your-service.endpoints.your-project.cloud.goog:report
+      reportingInterval: 300
+    metrics:
+    - name: instance_time
+      type: int
+      aggregation:
+        bufferSeconds: 300
+      endpoints:
+      - name: on_disk
+      - name: servicecontrol
+      passthrough: {}
+    - name: cpu_usage
+      type: double
+      aggregation:
+        bufferSeconds: 60
+      endpoints:
+      - name: on_disk
+      - name: servicecontrol
+      sources:
+      - name: cpu_source
+        heartbeat:
+          period: 60
+    - name: memory_usage
+      type: double
+      aggregation:
+        bufferSeconds: 60
+      endpoints:
+      - name: on_disk
+      - name: servicecontrol
+      sources:
+      - name: memory_source
+        heartbeat:
+          period: 60
+    - name: storage_usage
+      type: double
+      aggregation:
+        bufferSeconds: 300
+      endpoints:
+      - name: on_disk
+      - name: servicecontrol
+      sources:
+      - name: storage_source
+        heartbeat:
+          period: 300
+    - name: api_requests
+      type: int
+      aggregation:
+        bufferSeconds: 60
+      endpoints:
+      - name: on_disk
+      - name: servicecontrol
+      passthrough: {}
+    sources:
+    - name: cpu_source
+      kubernetes:
+        metric: cpu_usage_seconds
+        aggregation: rate
+        namespace: ${NAMESPACE}
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: ${NAME}
+    - name: memory_source
+      kubernetes:
+        metric: memory_working_set_bytes
+        aggregation: average
+        namespace: ${NAMESPACE}
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: ${NAME}
+    - name: storage_source
+      kubernetes:
+        metric: persistentvolumeclaim_capacity_bytes
+        aggregation: sum
+        namespace: ${NAMESPACE}
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: ${NAME}
+    endpoints:
+    - name: on_disk
+      disk:
+        reportDir: /var/lib/ubbagent/reports
+        expireSeconds: 3600
+    - name: servicecontrol
+      servicecontrol:
+        identity: gcp
+        serviceName: your-service.endpoints.your-project.cloud.goog
+        consumerId: $CONSUMER_ID
+
+---
+# Billing Configuration ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${NAME}-billing-config
+  namespace: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: ${NAME}
+    app.kubernetes.io/component: billing
+    app.kubernetes.io/managed-by: gcp-marketplace
+data:
+  account-id: "${BILLING_ACCOUNT_ID:-}"
+  pricing-plan: |
+    {
+      "plan_id": "enterprise-v1",
+      "plan_name": "Enterprise Plan",
+      "pricing_model": "hybrid",
+      "currency": "USD"
+    }

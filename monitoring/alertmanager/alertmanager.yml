@@ -1,0 +1,244 @@
+# Alertmanager Configuration
+# Routes alerts to appropriate channels and groups them intelligently
+
+global:
+  resolve_timeout: 5m
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+  opsgenie_api_key: '${OPSGENIE_API_KEY}'
+  opsgenie_api_url: 'https://api.opsgenie.com/'
+
+# Templates for alert notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Alert routing configuration
+route:
+  # Default receiver for all alerts
+  receiver: 'default-receiver'
+
+  # Grouping configuration
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+
+  # Sub-routes for specific alert types
+  routes:
+    # Critical Production Alerts - Immediate escalation
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_by: ['alertname', 'cluster', 'service', 'instance']
+      group_wait: 5s
+      group_interval: 5s
+      repeat_interval: 5m
+      continue: true
+
+    # SLA/SLO Breaches - Immediate escalation
+    - match:
+        sla: '.+'
+      receiver: 'sla-breach-receiver'
+      group_by: ['sla']
+      group_wait: 5s
+      group_interval: 5s
+      repeat_interval: 5m
+      continue: true
+
+    # Warning Level Alerts
+    - match:
+        severity: warning
+      receiver: 'warning-receiver'
+      group_by: ['alertname', 'cluster']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 1h
+
+    # Info Level Alerts
+    - match:
+        severity: info
+      receiver: 'info-receiver'
+      group_by: ['alertname']
+      group_wait: 1m
+      group_interval: 30m
+      repeat_interval: 24h
+
+    # Kubernetes Alerts
+    - match:
+        component: kubernetes
+      receiver: 'kubernetes-receiver'
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+
+    # Database Alerts
+    - match:
+        component: database
+      receiver: 'database-receiver'
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 30m
+
+    # Security Alerts - Immediate escalation
+    - match:
+        component: security
+      receiver: 'security-receiver'
+      group_wait: 5s
+      group_interval: 5s
+      repeat_interval: 5m
+
+# Receivers - Define notification targets
+receivers:
+  # Default receiver
+  - name: 'default-receiver'
+    slack_configs:
+      - channel: '#monitoring'
+        title: 'Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+
+  # Critical alerts - Multiple channels
+  - name: 'critical-receiver'
+    slack_configs:
+      - channel: '#critical-alerts'
+        title: 'CRITICAL: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}\nRunbook: {{ .Annotations.runbook }}{{ end }}'
+        send_resolved: true
+        color: 'danger'
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_ROUTING_KEY}'
+        description: '{{ .GroupLabels.alertname }}'
+        details:
+          firing: '{{ range .Alerts.Firing }}{{ .Labels.instance }} {{ end }}'
+          description: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+    opsgenie_configs:
+      - api_key: '${OPSGENIE_API_KEY}'
+        description: '{{ .GroupLabels.alertname }}: {{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        details:
+          severity: critical
+          dashboard: '{{ range .Alerts }}{{ .Annotations.dashboard }}{{ end }}'
+    email_configs:
+      - to: 'oncall@example.com,engineering-team@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.example.com:587'
+        auth_username: '${SMTP_USERNAME}'
+        auth_password: '${SMTP_PASSWORD}'
+        headers:
+          Subject: 'CRITICAL: {{ .GroupLabels.alertname }}'
+
+  # SLA/SLO Breaches - Immediate escalation
+  - name: 'sla-breach-receiver'
+    slack_configs:
+      - channel: '#sla-breaches'
+        title: 'SLA/SLO BREACH: {{ .GroupLabels.sla }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}\nEscalation: {{ .Annotations.escalation }}{{ end }}'
+        send_resolved: true
+        color: 'danger'
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_ROUTING_KEY_SLA}'
+        description: 'SLA/SLO Breach: {{ .GroupLabels.sla }}'
+        severity: 'critical'
+    email_configs:
+      - to: 'vp-engineering@example.com,customer-success@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.example.com:587'
+        auth_username: '${SMTP_USERNAME}'
+        auth_password: '${SMTP_PASSWORD}'
+        headers:
+          Subject: 'SLA/SLO BREACH ALERT: {{ .GroupLabels.sla }}'
+
+  # Warning level alerts
+  - name: 'warning-receiver'
+    slack_configs:
+      - channel: '#warnings'
+        title: 'WARNING: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+        color: 'warning'
+
+  # Info level alerts
+  - name: 'info-receiver'
+    slack_configs:
+      - channel: '#info'
+        title: 'INFO: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+        color: 'good'
+
+  # Kubernetes alerts
+  - name: 'kubernetes-receiver'
+    slack_configs:
+      - channel: '#kubernetes'
+        title: 'Kubernetes Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+
+  # Database alerts
+  - name: 'database-receiver'
+    slack_configs:
+      - channel: '#database-alerts'
+        title: 'Database Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_ROUTING_KEY_DB}'
+        description: '{{ .GroupLabels.alertname }}'
+
+  # Security alerts - Immediate escalation
+  - name: 'security-receiver'
+    slack_configs:
+      - channel: '#security-alerts'
+        title: 'SECURITY ALERT: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}\nAction: {{ .Annotations.action }}{{ end }}'
+        send_resolved: true
+        color: 'danger'
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_ROUTING_KEY_SECURITY}'
+        description: 'Security Alert: {{ .GroupLabels.alertname }}'
+        severity: 'critical'
+    email_configs:
+      - to: 'security-team@example.com,cto@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.example.com:587'
+        auth_username: '${SMTP_USERNAME}'
+        auth_password: '${SMTP_PASSWORD}'
+        headers:
+          Subject: 'SECURITY ALERT: {{ .GroupLabels.alertname }}'
+
+# Inhibition rules - Suppress alerts based on conditions
+inhibit_rules:
+  # Suppress warning if critical alert exists for same service
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['alertname', 'cluster', 'service']
+
+  # Suppress info if warning exists
+  - source_match:
+      severity: warning
+    target_match:
+      severity: info
+    equal: ['alertname', 'cluster', 'service']
+
+  # Don't inhibit SLA breaches
+  - source_match:
+      sla: '.+'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname']
+
+  # During maintenance windows, suppress non-critical alerts
+  - source_match:
+      alertname: 'MaintenanceMode'
+    target_match_re:
+      severity: '(warning|info)'
+    equal: ['cluster']
+
+  # Suppress pod restart warnings if node is NotReady
+  - source_match:
+      alertname: 'NodeNotReady'
+    target_match:
+      alertname: 'PodCrashLooping'
+    equal: ['cluster']

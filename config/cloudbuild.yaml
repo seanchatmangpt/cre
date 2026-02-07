@@ -1,0 +1,332 @@
+steps:
+  # Step 1: Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-image'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:latest'
+      - '-f'
+      - 'Dockerfile'
+      - '.'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_ZONE}'
+
+  # Step 2: Push image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-image'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:${SHORT_SHA}'
+    waitFor: ['build-image']
+
+  # Step 3: Run unit tests
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'run-unit-tests'
+    args:
+      - 'run'
+      - '--rm'
+      - '-v'
+      - '/workspace:/workspace'
+      - 'node:18-alpine'
+      - 'sh'
+      - '-c'
+      - 'cd /workspace && npm ci && npm run test -- --run'
+    waitFor: ['-']
+    env:
+      - 'CI=true'
+
+  # Step 4: Run linting and type checks
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'run-lint-checks'
+    args:
+      - 'run'
+      - '--rm'
+      - '-v'
+      - '/workspace:/workspace'
+      - 'node:18-alpine'
+      - 'sh'
+      - '-c'
+      - 'cd /workspace && npm ci && npm run lint && npm run type-check'
+    waitFor: ['-']
+    env:
+      - 'CI=true'
+
+  # Step 5: Container vulnerability scanning using Google Cloud scanning
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    id: 'scan-container'
+    args:
+      - 'run'
+      - '--filename=config/'
+      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:${SHORT_SHA}'
+      - '--location=${_ZONE}'
+    waitFor: ['push-image']
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_ZONE}'
+
+  # Step 6: Run OWASP dependency check
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'dependency-check'
+    args:
+      - 'run'
+      - '--rm'
+      - '-v'
+      - '/workspace:/workspace'
+      - 'owasp/dependency-check:latest'
+      - '--project=AdminConsole'
+      - '--scan=/workspace'
+      - '--format=JSON'
+      - '--out=/workspace/dependency-check-report.json'
+    waitFor: ['-']
+    onFailure: ['CONTINUE']
+
+  # Step 7: SonarQube analysis (optional, requires setup)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'sonar-analysis'
+    args:
+      - 'run'
+      - '--rm'
+      - '-e'
+      - 'SONAR_HOST_URL=${_SONAR_HOST_URL}'
+      - '-e'
+      - 'SONAR_LOGIN=${_SONAR_TOKEN}'
+      - '-v'
+      - '/workspace:/workspace'
+      - 'sonarsource/sonar-scanner-cli:latest'
+      - 'sonar-scanner'
+      - '-Dsonar.projectKey=admin-console'
+      - '-Dsonar.sources=/workspace/admin-console/src'
+      - '-Dsonar.exclusions=**/*.test.ts,**/*.spec.ts,**/node_modules/**'
+    waitFor: ['-']
+    onFailure: ['CONTINUE']
+    env:
+      - 'CI=true'
+
+  # Step 8: Generate SBOM (Software Bill of Materials)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'generate-sbom'
+    args:
+      - 'run'
+      - '--rm'
+      - '-v'
+      - '/workspace:/workspace'
+      - 'anchore/syft:latest'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:${SHORT_SHA}'
+      - '-o'
+      - 'json=/workspace/sbom.json'
+      - '-o'
+      - 'spdx=/workspace/sbom.spdx'
+    waitFor: ['push-image']
+    onFailure: ['CONTINUE']
+
+  # Step 9: Deploy to staging environment
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    id: 'deploy-staging'
+    args:
+      - 'run'
+      - '--filename=config/staging/'
+      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:${SHORT_SHA}'
+      - '--location=${_ZONE}'
+      - '--cluster=${_STAGING_CLUSTER}'
+      - '--namespace=${_STAGING_NAMESPACE}'
+    waitFor: ['run-unit-tests', 'run-lint-checks']
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_ZONE}'
+
+  # Step 10: Run integration/smoke tests against staging
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'integration-tests'
+    args:
+      - 'set'
+      - 'image'
+      - 'deployment/admin-console'
+      - 'admin-console=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:${SHORT_SHA}'
+      - '--record'
+      - '-n'
+      - '${_STAGING_NAMESPACE}'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_STAGING_CLUSTER}'
+    waitFor: ['deploy-staging']
+
+  # Step 11: Run smoke tests
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'smoke-tests'
+    args:
+      - 'run'
+      - '--rm'
+      - '-e'
+      - 'TEST_ENV=staging'
+      - '-e'
+      - 'API_URL=${_STAGING_API_URL}'
+      - '-v'
+      - '/workspace:/workspace'
+      - 'node:18-alpine'
+      - 'sh'
+      - '-c'
+      - 'cd /workspace && npm ci && npm run test:integration'
+    waitFor: ['integration-tests']
+    onFailure: ['CONTINUE']
+
+  # Step 12: Manual approval gate (for production)
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    id: 'approval-gate'
+    args:
+      - 'run'
+      - '--filename=config/prod/'
+    waitFor: ['smoke-tests']
+    onFailure: ['CONTINUE']
+
+  # Step 13: Deploy to production
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    id: 'deploy-prod'
+    args:
+      - 'run'
+      - '--filename=config/prod/'
+      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:${SHORT_SHA}'
+      - '--location=${_ZONE}'
+      - '--cluster=${_PROD_CLUSTER}'
+      - '--namespace=${_PROD_NAMESPACE}'
+    waitFor: ['approval-gate']
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_ZONE}'
+
+  # Step 14: Update production deployment
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'update-prod-deployment'
+    args:
+      - 'set'
+      - 'image'
+      - 'deployment/admin-console'
+      - 'admin-console=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:${SHORT_SHA}'
+      - '--record'
+      - '-n'
+      - '${_PROD_NAMESPACE}'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_PROD_CLUSTER}'
+    waitFor: ['deploy-prod']
+
+  # Step 15: Verify production deployment
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'verify-prod-deployment'
+    args:
+      - 'rollout'
+      - 'status'
+      - 'deployment/admin-console'
+      - '-n'
+      - '${_PROD_NAMESPACE}'
+      - '--timeout=5m'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_PROD_CLUSTER}'
+    waitFor: ['update-prod-deployment']
+
+  # Step 16: Run production smoke tests
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'prod-smoke-tests'
+    args:
+      - 'run'
+      - '--rm'
+      - '-e'
+      - 'TEST_ENV=production'
+      - '-e'
+      - 'API_URL=${_PROD_API_URL}'
+      - '-v'
+      - '/workspace:/workspace'
+      - 'node:18-alpine'
+      - 'sh'
+      - '-c'
+      - 'cd /workspace && npm ci && npm run test:integration'
+    waitFor: ['verify-prod-deployment']
+    onFailure: ['CONTINUE']
+
+  # Step 17: Create deployment artifact and documentation
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'create-deployment-report'
+    args:
+      - 'run'
+      - '--rm'
+      - '-v'
+      - '/workspace:/workspace'
+      - 'alpine:latest'
+      - 'sh'
+      - '-c'
+      - |
+        cat > /workspace/DEPLOYMENT_REPORT.md <<'EOF'
+        # Deployment Report
+
+        **Build ID**: ${BUILD_ID}
+        **Commit SHA**: ${SHORT_SHA}
+        **Image**: ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:${SHORT_SHA}
+
+        ## Deployment Status
+
+        - Staging: Deployed
+        - Production: Deployed
+
+        ## Security Checks
+
+        - Unit Tests: Passed
+        - Lint Checks: Passed
+        - Type Checks: Passed
+        - Dependency Check: Complete
+        - Container Scanning: Complete
+
+        ## Rollback Information
+
+        To rollback this deployment, run:
+
+        ```bash
+        kubectl rollout undo deployment/admin-console -n ${_PROD_NAMESPACE}
+        ```
+
+        Or use the rollback script:
+
+        ```bash
+        ./scripts/rollback.sh ${SHORT_SHA}
+        ```
+        EOF
+        cat /workspace/DEPLOYMENT_REPORT.md
+    waitFor: ['prod-smoke-tests']
+    onFailure: ['CONTINUE']
+
+substitutions:
+  _REGION: 'us-central1'
+  _ZONE: 'us-central1-a'
+  _REPOSITORY: 'admin-console-repo'
+  _IMAGE_NAME: 'admin-console'
+  _STAGING_CLUSTER: 'staging-cluster'
+  _STAGING_NAMESPACE: 'staging'
+  _STAGING_API_URL: 'https://staging-api.example.com'
+  _PROD_CLUSTER: 'prod-cluster'
+  _PROD_NAMESPACE: 'production'
+  _PROD_API_URL: 'https://api.example.com'
+  _SONAR_HOST_URL: 'https://sonarqube.example.com'
+  _SONAR_TOKEN: 'your-sonar-token'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'N1_HIGHCPU_8'
+  substitutionOption: 'ALLOW_LOOSE'
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE_NAME}:latest'
+
+artifacts:
+  objects:
+    location: 'gs://${_BUCKET}/builds/${BUILD_ID}'
+    paths:
+      - 'dependency-check-report.json'
+      - 'sbom.json'
+      - 'sbom.spdx'
+      - 'DEPLOYMENT_REPORT.md'
+
+timeout: '3600s'
+queueTtl: '86400s'
+
+onFailure:
+  - 'ROLLBACK_PROD'

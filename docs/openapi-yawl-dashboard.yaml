@@ -1,0 +1,659 @@
+openapi: 3.0.0
+info:
+  title: YAWL Dashboard API
+  description: |
+    Yet Another Workflow Language (YAWL) Dashboard API
+
+    The YAWL Dashboard API provides real-time monitoring and visualization of workflow
+    executions, OpenTelemetry traces, and execution statistics. This API enables
+    external systems to integrate with YAWL workflow monitoring and debugging.
+  version: 1.0.0
+  contact:
+    name: CRE Team
+    email: support@cuneiform-lang.org
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8081
+    description: Default local YAWL Dashboard server
+    variables:
+      port:
+        default: '8081'
+        description: HTTP port for YAWL Dashboard
+      host:
+        default: localhost
+        description: Server hostname or IP address
+  - url: https://yawl-dashboard.example.com
+    description: Production YAWL Dashboard server
+
+tags:
+  - name: Dashboard
+    description: Dashboard interface endpoints
+  - name: Events
+    description: Workflow execution events
+  - name: Traces
+    description: OpenTelemetry traces and spans
+  - name: Statistics
+    description: Workflow execution statistics
+  - name: Management
+    description: Dashboard management operations
+
+paths:
+  /:
+    get:
+      tags:
+        - Dashboard
+      summary: Get dashboard HTML interface
+      operationId: getDashboard
+      description: |
+        Retrieves the YAWL Dashboard web interface in HTML format.
+        This endpoint serves the interactive dashboard for monitoring workflow executions.
+      responses:
+        '200':
+          description: Dashboard HTML page
+          content:
+            text/html:
+              example: '<html><head><title>YAWL Dashboard</title>...</head><body>...</body></html>'
+
+  /api/events:
+    get:
+      tags:
+        - Events
+      summary: Get all workflow events
+      operationId: listEvents
+      description: |
+        Retrieves a list of all recorded workflow execution events,
+        including task starts, completions, and state changes.
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of events to return
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 10000
+        - name: offset
+          in: query
+          description: Number of events to skip
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: filter
+          in: query
+          description: Filter events by type (task_started, task_completed, state_changed, error)
+          schema:
+            type: string
+            enum: [task_started, task_completed, state_changed, error, all]
+        - name: trace_id
+          in: query
+          description: Filter events by trace ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Events retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventList'
+              examples:
+                success:
+                  summary: Typical events response
+                  value:
+                    events:
+                      - event_id: evt_001
+                        type: task_started
+                        trace_id: trace_abc123
+                        timestamp: '2024-02-06T18:45:00Z'
+                        workflow_id: wf_001
+                        task_name: validate_input
+                      - event_id: evt_002
+                        type: task_completed
+                        trace_id: trace_abc123
+                        timestamp: '2024-02-06T18:45:05Z'
+                        workflow_id: wf_001
+                        task_name: validate_input
+                        result: success
+                    total: 2
+                    limit: 100
+                    offset: 0
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error retrieving events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/events/{traceId}:
+    get:
+      tags:
+        - Events
+      summary: Get events for specific trace
+      operationId: getTraceEvents
+      description: |
+        Retrieves all events associated with a specific trace ID.
+        This provides a detailed view of a single workflow execution.
+      parameters:
+        - name: traceId
+          in: path
+          required: true
+          description: OpenTelemetry trace identifier
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+      responses:
+        '200':
+          description: Trace events retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceEvents'
+              examples:
+                success:
+                  summary: Events for a single trace
+                  value:
+                    trace_id: trace_abc123
+                    workflow_id: wf_001
+                    start_time: '2024-02-06T18:45:00Z'
+                    end_time: '2024-02-06T18:50:30Z'
+                    duration_ms: 330000
+                    status: completed
+                    events:
+                      - event_id: evt_001
+                        timestamp: '2024-02-06T18:45:00Z'
+                        type: task_started
+                        task_name: validate_input
+        '404':
+          description: Trace not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error retrieving trace events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/traces:
+    get:
+      tags:
+        - Traces
+      summary: Get all OpenTelemetry traces
+      operationId: listTraces
+      description: |
+        Retrieves a list of all recorded OpenTelemetry traces,
+        providing an overview of all workflow executions.
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of traces to return
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          description: Number of traces to skip
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: status
+          in: query
+          description: Filter traces by completion status
+          schema:
+            type: string
+            enum: [running, completed, failed, all]
+        - name: min_duration_ms
+          in: query
+          description: Minimum execution duration in milliseconds
+          schema:
+            type: integer
+            minimum: 0
+        - name: max_duration_ms
+          in: query
+          description: Maximum execution duration in milliseconds
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Traces retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceList'
+              examples:
+                success:
+                  summary: List of traces
+                  value:
+                    traces:
+                      - trace_id: trace_abc123
+                        workflow_id: wf_001
+                        start_time: '2024-02-06T18:45:00Z'
+                        end_time: '2024-02-06T18:50:30Z'
+                        duration_ms: 330000
+                        status: completed
+                        event_count: 15
+                      - trace_id: trace_xyz789
+                        workflow_id: wf_002
+                        start_time: '2024-02-06T18:40:00Z'
+                        end_time: null
+                        status: running
+                        event_count: 8
+                    total: 2
+                    limit: 50
+                    offset: 0
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/stats:
+    get:
+      tags:
+        - Statistics
+      summary: Get dashboard statistics
+      operationId: getStatistics
+      description: |
+        Retrieves aggregated statistics about workflow executions,
+        including success rates, performance metrics, and resource usage.
+      parameters:
+        - name: time_window
+          in: query
+          description: Time window for aggregation
+          schema:
+            type: string
+            enum: [1h, 24h, 7d, 30d, all]
+            default: 24h
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Statistics'
+              examples:
+                success:
+                  summary: Typical statistics response
+                  value:
+                    time_window: 24h
+                    total_executions: 156
+                    completed: 142
+                    failed: 12
+                    running: 2
+                    success_rate: 0.91
+                    average_duration_ms: 5432
+                    min_duration_ms: 100
+                    max_duration_ms: 87500
+                    throughput_per_minute: 5.4
+                    error_types:
+                      timeout: 7
+                      validation_error: 3
+                      resource_error: 2
+        '400':
+          description: Invalid time window
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/clear:
+    delete:
+      tags:
+        - Management
+      summary: Clear all events and traces
+      operationId: clearData
+      description: |
+        Clears all recorded events and traces from the dashboard.
+        WARNING: This operation is permanent and cannot be undone.
+      parameters:
+        - name: confirm
+          in: query
+          required: true
+          description: Must be set to 'yes' to confirm deletion
+          schema:
+            type: string
+            enum: ['yes']
+      responses:
+        '200':
+          description: Events and traces cleared successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClearResponse'
+              examples:
+                success:
+                  summary: Clear operation successful
+                  value:
+                    cleared: true
+                    events_deleted: 1524
+                    traces_deleted: 187
+                    timestamp: '2024-02-06T18:45:20Z'
+        '400':
+          description: Missing confirmation parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error during clear operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Event:
+      type: object
+      title: Workflow Event
+      description: A single workflow execution event
+      required:
+        - event_id
+        - type
+        - timestamp
+        - trace_id
+      properties:
+        event_id:
+          type: string
+          description: Unique event identifier
+          example: evt_001
+        type:
+          type: string
+          description: Type of event
+          enum: [task_started, task_completed, state_changed, error, warning, info]
+          example: task_started
+        trace_id:
+          type: string
+          description: Associated OpenTelemetry trace ID
+          example: trace_abc123
+        workflow_id:
+          type: string
+          description: Workflow identifier
+          example: wf_001
+        task_name:
+          type: string
+          description: Name of the task (if applicable)
+          example: validate_input
+        timestamp:
+          type: string
+          format: date-time
+          description: When the event occurred
+          example: '2024-02-06T18:45:00Z'
+        result:
+          type: string
+          description: Result of the event (if applicable)
+          example: success
+        error_message:
+          type: string
+          description: Error message (if type is error)
+          example: Input validation failed
+        duration_ms:
+          type: integer
+          description: Duration in milliseconds
+          example: 5000
+        metadata:
+          type: object
+          description: Additional event metadata
+          additionalProperties: true
+
+    EventList:
+      type: object
+      title: Event List
+      description: Paginated list of events
+      required:
+        - events
+        - total
+        - limit
+        - offset
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        total:
+          type: integer
+          description: Total number of events matching the filter
+          example: 1524
+        limit:
+          type: integer
+          description: Limit parameter used
+          example: 100
+        offset:
+          type: integer
+          description: Offset parameter used
+          example: 0
+
+    TraceEvents:
+      type: object
+      title: Trace with Events
+      description: A trace and all its associated events
+      required:
+        - trace_id
+        - events
+      properties:
+        trace_id:
+          type: string
+          description: OpenTelemetry trace identifier
+          example: trace_abc123
+        workflow_id:
+          type: string
+          description: Workflow identifier
+          example: wf_001
+        start_time:
+          type: string
+          format: date-time
+          description: Trace start time
+          example: '2024-02-06T18:45:00Z'
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Trace end time (null if still running)
+          example: '2024-02-06T18:50:30Z'
+        duration_ms:
+          type: integer
+          description: Total duration in milliseconds
+          example: 330000
+        status:
+          type: string
+          enum: [running, completed, failed, cancelled]
+          description: Current status
+          example: completed
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+
+    Trace:
+      type: object
+      title: Trace
+      description: An OpenTelemetry trace
+      required:
+        - trace_id
+        - start_time
+        - status
+      properties:
+        trace_id:
+          type: string
+          description: OpenTelemetry trace identifier
+          example: trace_abc123
+        workflow_id:
+          type: string
+          description: Workflow identifier
+          example: wf_001
+        start_time:
+          type: string
+          format: date-time
+          description: Trace start time
+          example: '2024-02-06T18:45:00Z'
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Trace end time
+          example: '2024-02-06T18:50:30Z'
+        duration_ms:
+          type: integer
+          description: Duration in milliseconds
+          example: 330000
+        status:
+          type: string
+          enum: [running, completed, failed, cancelled]
+          example: completed
+        event_count:
+          type: integer
+          description: Number of events in this trace
+          example: 15
+
+    TraceList:
+      type: object
+      title: Trace List
+      description: Paginated list of traces
+      required:
+        - traces
+        - total
+        - limit
+        - offset
+      properties:
+        traces:
+          type: array
+          items:
+            $ref: '#/components/schemas/Trace'
+        total:
+          type: integer
+          description: Total number of traces
+          example: 187
+        limit:
+          type: integer
+          description: Limit parameter used
+          example: 50
+        offset:
+          type: integer
+          description: Offset parameter used
+          example: 0
+
+    Statistics:
+      type: object
+      title: Dashboard Statistics
+      description: Aggregated workflow execution statistics
+      required:
+        - total_executions
+        - completed
+        - success_rate
+      properties:
+        time_window:
+          type: string
+          description: Time window for aggregation
+          example: 24h
+        total_executions:
+          type: integer
+          description: Total workflow executions
+          example: 156
+        completed:
+          type: integer
+          description: Successfully completed executions
+          example: 142
+        failed:
+          type: integer
+          description: Failed executions
+          example: 12
+        running:
+          type: integer
+          description: Currently running executions
+          example: 2
+        success_rate:
+          type: number
+          format: double
+          description: Success rate (0.0 to 1.0)
+          example: 0.91
+          minimum: 0.0
+          maximum: 1.0
+        average_duration_ms:
+          type: integer
+          description: Average execution duration
+          example: 5432
+        min_duration_ms:
+          type: integer
+          description: Minimum execution duration
+          example: 100
+        max_duration_ms:
+          type: integer
+          description: Maximum execution duration
+          example: 87500
+        throughput_per_minute:
+          type: number
+          format: double
+          description: Throughput (executions per minute)
+          example: 5.4
+        error_types:
+          type: object
+          description: Count of errors by type
+          additionalProperties:
+            type: integer
+
+    ClearResponse:
+      type: object
+      title: Clear Operation Response
+      description: Result of clearing data
+      required:
+        - cleared
+      properties:
+        cleared:
+          type: boolean
+          description: Whether the clear operation succeeded
+          example: true
+        events_deleted:
+          type: integer
+          description: Number of events deleted
+          example: 1524
+        traces_deleted:
+          type: integer
+          description: Number of traces deleted
+          example: 187
+        timestamp:
+          type: string
+          format: date-time
+          description: When the clear operation occurred
+          example: '2024-02-06T18:45:20Z'
+
+    Error:
+      type: object
+      title: Error Response
+      description: Error information returned by the API
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type or code
+          example: invalid_parameter
+        message:
+          type: string
+          description: Human-readable error message
+          example: Invalid time window parameter
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+        trace_id:
+          type: string
+          description: Unique trace identifier for debugging
+          example: trace_def789ghi123

@@ -1,0 +1,259 @@
+# Example: Pod compliant with Restricted Pod Security Standard
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cre-app-restricted-example
+  namespace: cre-system
+  labels:
+    app: cre-app
+    security-tier: restricted
+spec:
+  # Use non-root user
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+  # Service account with Workload Identity
+  serviceAccountName: cre-app
+  automountServiceAccountToken: true
+
+  containers:
+  - name: cre-app
+    image: us-central1-docker.pkg.dev/project-id/cre/app:v1.0.0
+
+    # Container security context
+    securityContext:
+      # Required by restricted profile
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 1000
+
+      # Drop all capabilities
+      capabilities:
+        drop:
+        - ALL
+
+      # Read-only root filesystem
+      readOnlyRootFilesystem: true
+
+      # Seccomp profile
+      seccompProfile:
+        type: RuntimeDefault
+
+    # Resource limits (required for production)
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    # Environment variables
+    env:
+    - name: PORT
+      value: "8080"
+    - name: LOG_LEVEL
+      value: "info"
+
+    # Volume mounts for writable directories
+    volumeMounts:
+    - name: tmp
+      mountPath: /tmp
+    - name: cache
+      mountPath: /app/cache
+    - name: config
+      mountPath: /app/config
+      readOnly: true
+
+    # Health checks
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 10
+
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+  # Volumes (no hostPath allowed)
+  volumes:
+  - name: tmp
+    emptyDir: {}
+  - name: cache
+    emptyDir: {}
+  - name: config
+    configMap:
+      name: cre-app-config
+      defaultMode: 0440
+
+  # Affinity and topology
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app
+              operator: In
+              values:
+              - cre-app
+          topologyKey: kubernetes.io/hostname
+
+---
+# Example: Deployment with Restricted Pod Security
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cre-app
+  namespace: cre-system
+  labels:
+    app: cre-app
+    version: v1.0.0
+spec:
+  replicas: 3
+
+  # Rolling update strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  selector:
+    matchLabels:
+      app: cre-app
+
+  template:
+    metadata:
+      labels:
+        app: cre-app
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+
+    spec:
+      # Pod security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      serviceAccountName: cre-app
+      automountServiceAccountToken: true
+
+      # Init container example (also must be restricted)
+      initContainers:
+      - name: init-config
+        image: busybox:latest
+        command: ['sh', '-c', 'echo "Initializing..." > /tmp/init.log']
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+
+      containers:
+      - name: cre-app
+        image: us-central1-docker.pkg.dev/project-id/cre/app:v1.0.0
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/cache
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+      # Cloud SQL Proxy sidecar (also restricted)
+      - name: cloud-sql-proxy
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest
+        args:
+        - "--structured-logs"
+        - "--port=5432"
+        - "project:region:instance"
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}

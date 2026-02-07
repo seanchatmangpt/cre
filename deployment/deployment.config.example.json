@@ -1,0 +1,392 @@
+{
+  "deployments": [
+    {
+      "name": "standard-blue-green",
+      "description": "Standard blue-green deployment for production",
+      "strategy": "blue-green",
+      "blueGreenConfig": {
+        "replicasPerEnv": 3,
+        "healthCheckInterval": 5000
+      },
+      "trafficSwitchConfig": {
+        "strategy": "immediate",
+        "rollbackOnError": true
+      },
+      "notificationChannels": [
+        {
+          "type": "slack",
+          "destination": "#deployments",
+          "events": ["started", "completed", "failed", "rollback"]
+        },
+        {
+          "type": "email",
+          "destination": "devops@example.com",
+          "events": ["failed", "rollback"]
+        }
+      ],
+      "rollbackOnError": true,
+      "maxDeploymentDuration": 600000
+    },
+    {
+      "name": "gradual-blue-green",
+      "description": "Gradual blue-green deployment with 10% increments",
+      "strategy": "blue-green",
+      "blueGreenConfig": {
+        "replicasPerEnv": 5,
+        "healthCheckInterval": 5000
+      },
+      "trafficSwitchConfig": {
+        "strategy": "gradual",
+        "percentageIncrement": 10,
+        "incrementInterval": 30000,
+        "maxErrorRate": 0.05,
+        "rollbackOnError": true
+      },
+      "notificationChannels": [
+        {
+          "type": "slack",
+          "destination": "#deployments",
+          "events": ["started", "completed", "failed"]
+        }
+      ],
+      "rollbackOnError": true,
+      "maxDeploymentDuration": 900000
+    },
+    {
+      "name": "safe-canary",
+      "description": "Safe canary deployment starting at 5%, 5% increments",
+      "strategy": "canary",
+      "canaryConfig": {
+        "initialPercentage": 5,
+        "targetPercentage": 100,
+        "incrementPercentage": 5,
+        "incrementInterval": 300000,
+        "maxDuration": 3600000,
+        "metricsWindow": 30000
+      },
+      "canaryThresholds": {
+        "maxErrorRate": 0.05,
+        "maxLatency": 2000,
+        "minThroughput": 500,
+        "maxCpuUsage": 80,
+        "maxMemoryUsage": 85,
+        "customMetricThresholds": {
+          "databaseLatency": {
+            "max": 200
+          },
+          "cacheHitRate": {
+            "min": 0.8
+          }
+        }
+      },
+      "notificationChannels": [
+        {
+          "type": "slack",
+          "destination": "#deployments",
+          "events": ["started", "completed", "failed", "anomaly"]
+        },
+        {
+          "type": "pagerduty",
+          "destination": "P123ABC",
+          "events": ["failed", "anomaly"]
+        }
+      ],
+      "rollbackOnError": true,
+      "maxDeploymentDuration": 3600000
+    },
+    {
+      "name": "aggressive-canary",
+      "description": "Faster canary deployment with higher thresholds",
+      "strategy": "canary",
+      "canaryConfig": {
+        "initialPercentage": 25,
+        "targetPercentage": 100,
+        "incrementPercentage": 25,
+        "incrementInterval": 120000,
+        "maxDuration": 600000,
+        "metricsWindow": 15000
+      },
+      "canaryThresholds": {
+        "maxErrorRate": 0.10,
+        "maxLatency": 5000,
+        "minThroughput": 200,
+        "maxCpuUsage": 90,
+        "maxMemoryUsage": 90,
+        "customMetricThresholds": {}
+      },
+      "notificationChannels": [
+        {
+          "type": "slack",
+          "destination": "#deployments",
+          "events": ["started", "completed", "failed"]
+        }
+      ],
+      "rollbackOnError": true,
+      "maxDeploymentDuration": 600000
+    },
+    {
+      "name": "combined-approach",
+      "description": "Blue-green with canary monitoring",
+      "strategy": "blue-green-with-canary",
+      "blueGreenConfig": {
+        "replicasPerEnv": 3,
+        "healthCheckInterval": 5000
+      },
+      "canaryConfig": {
+        "initialPercentage": 10,
+        "targetPercentage": 100,
+        "incrementPercentage": 10,
+        "incrementInterval": 120000,
+        "maxDuration": 1200000,
+        "metricsWindow": 20000
+      },
+      "canaryThresholds": {
+        "maxErrorRate": 0.05,
+        "maxLatency": 3000,
+        "minThroughput": 400,
+        "maxCpuUsage": 85,
+        "maxMemoryUsage": 85,
+        "customMetricThresholds": {}
+      },
+      "trafficSwitchConfig": {
+        "strategy": "gradual",
+        "percentageIncrement": 10,
+        "incrementInterval": 120000,
+        "maxErrorRate": 0.05,
+        "rollbackOnError": true
+      },
+      "notificationChannels": [
+        {
+          "type": "slack",
+          "destination": "#deployments",
+          "events": ["started", "completed", "failed", "anomaly", "rollback"]
+        },
+        {
+          "type": "webhook",
+          "destination": "https://example.com/webhooks/deployment",
+          "events": ["completed", "failed", "rollback"]
+        }
+      ],
+      "rollbackOnError": true,
+      "maxDeploymentDuration": 1200000
+    }
+  ],
+  "versionRegistry": {
+    "1.0.0": {
+      "releaseDate": "2024-01-01",
+      "compatibleVersions": ["1.1.0"],
+      "breakingChanges": [],
+      "deprecatedFeatures": [],
+      "requiredServices": [
+        {
+          "name": "postgres",
+          "minVersion": "12.0",
+          "required": true
+        },
+        {
+          "name": "redis",
+          "minVersion": "6.0",
+          "required": true
+        }
+      ],
+      "databaseMigrations": []
+    },
+    "1.1.0": {
+      "releaseDate": "2024-06-01",
+      "compatibleVersions": ["1.2.0", "2.0.0"],
+      "breakingChanges": [],
+      "deprecatedFeatures": ["legacy_api_v1"],
+      "requiredServices": [
+        {
+          "name": "postgres",
+          "minVersion": "12.0",
+          "required": true
+        },
+        {
+          "name": "redis",
+          "minVersion": "6.0",
+          "required": true
+        }
+      ],
+      "databaseMigrations": [
+        "001_add_users_table.sql",
+        "002_add_indexes.sql"
+      ]
+    },
+    "1.2.0": {
+      "releaseDate": "2024-09-01",
+      "compatibleVersions": ["2.0.0"],
+      "breakingChanges": ["removed_config_key_auth.legacy"],
+      "deprecatedFeatures": ["legacy_api_v1", "legacy_auth_method"],
+      "requiredServices": [
+        {
+          "name": "postgres",
+          "minVersion": "13.0",
+          "required": true
+        },
+        {
+          "name": "redis",
+          "minVersion": "6.2",
+          "required": true
+        },
+        {
+          "name": "elasticsearch",
+          "minVersion": "7.0",
+          "required": false
+        }
+      ],
+      "databaseMigrations": ["003_update_schema.sql"]
+    },
+    "2.0.0": {
+      "releaseDate": "2025-01-15",
+      "compatibleVersions": [],
+      "breakingChanges": [
+        "config_structure_changed",
+        "database_schema_v2",
+        "api_response_format_changed"
+      ],
+      "deprecatedFeatures": [],
+      "requiredServices": [
+        {
+          "name": "postgres",
+          "minVersion": "14.0",
+          "required": true
+        },
+        {
+          "name": "redis",
+          "minVersion": "7.0",
+          "required": true
+        },
+        {
+          "name": "elasticsearch",
+          "minVersion": "8.0",
+          "required": true
+        }
+      ],
+      "databaseMigrations": [
+        "004_migrate_to_v2_schema.sql",
+        "005_backfill_data.sql"
+      ]
+    }
+  },
+  "rollbackTriggers": [
+    {
+      "id": "error-rate-trigger",
+      "type": "metric",
+      "condition": {
+        "metric": "error_rate",
+        "operator": "gt",
+        "value": 0.10,
+        "duration": 30000,
+        "cooldown": 60000
+      },
+      "priority": "high",
+      "enabled": true
+    },
+    {
+      "id": "latency-trigger",
+      "type": "metric",
+      "condition": {
+        "metric": "p99_latency",
+        "operator": "gt",
+        "value": 5000,
+        "duration": 60000,
+        "cooldown": 60000
+      },
+      "priority": "medium",
+      "enabled": true
+    },
+    {
+      "id": "health-check-trigger",
+      "type": "health",
+      "condition": {
+        "serviceName": "app",
+        "checkType": "readiness",
+        "failureThreshold": 3,
+        "checkInterval": 5000,
+        "cooldown": 60000
+      },
+      "priority": "critical",
+      "enabled": true
+    },
+    {
+      "id": "error-spike-trigger",
+      "type": "error_spike",
+      "condition": {
+        "baselineErrorRate": 0.02,
+        "increasePercentage": 100,
+        "windowSize": 60000,
+        "minErrorCount": 10,
+        "cooldown": 120000
+      },
+      "priority": "high",
+      "enabled": true
+    },
+    {
+      "id": "dependency-failure-trigger",
+      "type": "dependency_failure",
+      "condition": {
+        "dependencyName": "postgres",
+        "failureTimeWindow": 30000,
+        "requiredFailureCount": 5,
+        "cooldown": 120000
+      },
+      "priority": "critical",
+      "enabled": true
+    }
+  ],
+  "kubernetes": {
+    "namespace": "production",
+    "imageRegistry": "myregistry.azurecr.io",
+    "imagePullSecrets": ["regcred"],
+    "resources": {
+      "requests": {
+        "cpu": "100m",
+        "memory": "128Mi"
+      },
+      "limits": {
+        "cpu": "1000m",
+        "memory": "2Gi"
+      }
+    },
+    "healthProbes": {
+      "readiness": {
+        "path": "/health/ready",
+        "initialDelaySeconds": 10,
+        "periodSeconds": 5,
+        "timeoutSeconds": 5,
+        "failureThreshold": 3
+      },
+      "liveness": {
+        "path": "/health/live",
+        "initialDelaySeconds": 15,
+        "periodSeconds": 10,
+        "timeoutSeconds": 5,
+        "failureThreshold": 3
+      }
+    }
+  },
+  "monitoring": {
+    "prometheus": {
+      "enabled": true,
+      "url": "http://prometheus:9090",
+      "scrapeInterval": "15s"
+    },
+    "alertmanager": {
+      "enabled": true,
+      "url": "http://alertmanager:9093"
+    },
+    "customMetrics": [
+      "http_request_duration_seconds",
+      "http_requests_total",
+      "database_query_duration_seconds"
+    ]
+  },
+  "backup": {
+    "enabled": true,
+    "type": "postgresql",
+    "location": "/backups",
+    "retention": 30,
+    "schedule": "0 2 * * *"
+  }
+}

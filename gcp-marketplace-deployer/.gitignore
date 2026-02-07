@@ -1,0 +1,81 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# Credentials
+*.json
+*.key
+*.pem
+credentials/
+secrets/
+
+# Build artifacts
+*.tar.gz
+*.zip
+package/
+dist/
+build/
+
+# Logs
+*.log
+logs/
+tmp/
+temp/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker
+.dockerignore
+
+# Test data
+test-data/
+test-results/
+
+# Cloud Build
+build-metadata.json
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# Terraform (if used)
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Documentation build
+docs/_build/
+site/
+
+# Backup files
+*.bak
+*.backup
+*~

@@ -1,0 +1,255 @@
+# Prometheus Alert Rules - Enterprise Production Alerts
+# Critical, High, Medium, Low severity levels
+
+groups:
+  - name: system_alerts
+    interval: 30s
+    rules:
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: 'node_cpu_seconds_total{mode="user"} > 0.8'
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage has been above 80% for 5 minutes on {{ $labels.instance }}. Current value: {{ $value | humanizePercentage }}"
+          dashboard: "https://grafana.example.com/d/system-overview"
+
+      # Memory Pressure
+      - alert: HighMemoryUsage
+        expr: '(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.85'
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 85% on {{ $labels.instance }}. Current value: {{ $value | humanizePercentage }}"
+          runbook: "https://runbooks.example.com/memory-pressure"
+
+      # Disk Space Critical
+      - alert: DiskSpaceCritical
+        expr: '(1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) > 0.90'
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical disk space on {{ $labels.instance }}"
+          description: "Disk usage is above 90% on {{ $labels.instance }}. Device: {{ $labels.device }}"
+          action: "Immediately free up disk space or scale storage"
+
+      # Disk Space Warning
+      - alert: DiskSpaceWarning
+        expr: '(1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) > 0.75'
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High disk usage on {{ $labels.instance }}"
+          description: "Disk usage is above 75% on {{ $labels.instance }}. Device: {{ $labels.device }}"
+
+      # System Load High
+      - alert: SystemLoadHigh
+        expr: 'node_load5 > 4'
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High system load on {{ $labels.instance }}"
+          description: "System load average (5m) is {{ $value | humanize }} on {{ $labels.instance }}"
+
+  - name: kubernetes_alerts
+    interval: 30s
+    rules:
+      # Pod CrashLooping
+      - alert: PodCrashLooping
+        expr: 'rate(kube_pod_container_status_restarts_total[15m]) > 0.1'
+        for: 5m
+        labels:
+          severity: critical
+          component: kubernetes
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash looping"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has restarted {{ $value | humanize }} times in the last 15m"
+          runbook: "https://runbooks.example.com/pod-crash-loop"
+
+      # Pod Not Ready
+      - alert: PodNotReady
+        expr: 'sum by (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Unknown"}) > 0'
+        for: 15m
+        labels:
+          severity: warning
+          component: kubernetes
+        annotations:
+          summary: "Pod {{ $labels.pod }} is not ready"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in state {{ $labels.phase }} for 15 minutes"
+
+      # Node Not Ready
+      - alert: NodeNotReady
+        expr: 'kube_node_status_condition{condition="Ready",status="true"} == 0'
+        for: 5m
+        labels:
+          severity: critical
+          component: kubernetes
+        annotations:
+          summary: "Node {{ $labels.node }} is not ready"
+          description: "Node {{ $labels.node }} has been unready for 5 minutes"
+          action: "Investigate node status and logs immediately"
+
+      # Node Memory Pressure
+      - alert: NodeMemoryPressure
+        expr: 'kube_node_status_condition{condition="MemoryPressure",status="true"} == 1'
+        for: 5m
+        labels:
+          severity: warning
+          component: kubernetes
+        annotations:
+          summary: "Node {{ $labels.node }} has memory pressure"
+          description: "Node {{ $labels.node }} is reporting memory pressure"
+
+      # Node Disk Pressure
+      - alert: NodeDiskPressure
+        expr: 'kube_node_status_condition{condition="DiskPressure",status="true"} == 1'
+        for: 5m
+        labels:
+          severity: warning
+          component: kubernetes
+        annotations:
+          summary: "Node {{ $labels.node }} has disk pressure"
+          description: "Node {{ $labels.node }} is reporting disk pressure"
+
+      # High Container CPU
+      - alert: HighContainerCPU
+        expr: 'rate(container_cpu_usage_seconds_total[5m]) > 0.8'
+        for: 5m
+        labels:
+          severity: warning
+          component: kubernetes
+        annotations:
+          summary: "Container {{ $labels.container }} has high CPU usage"
+          description: "Container {{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }} CPU usage is {{ $value | humanizePercentage }}"
+
+      # High Container Memory
+      - alert: HighContainerMemory
+        expr: '(container_memory_working_set_bytes / container_spec_memory_limit_bytes) > 0.9'
+        for: 5m
+        labels:
+          severity: warning
+          component: kubernetes
+        annotations:
+          summary: "Container {{ $labels.container }} has high memory usage"
+          description: "Container {{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }} memory usage is {{ $value | humanizePercentage }}"
+
+      # Persistent Volume Filling Up
+      - alert: PVCFillingUp
+        expr: '(kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.85'
+        for: 5m
+        labels:
+          severity: warning
+          component: kubernetes
+        annotations:
+          summary: "PVC {{ $labels.persistentvolumeclaim }} is filling up"
+          description: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full"
+
+  - name: application_alerts
+    interval: 30s
+    rules:
+      # API Error Rate High
+      - alert: HighErrorRate
+        expr: 'rate(http_requests_total{status=~"5.."}[5m]) > 0.05'
+        for: 5m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "High error rate on {{ $labels.instance }}"
+          description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.job }} {{ $labels.instance }}"
+          dashboard: "https://grafana.example.com/d/app-metrics"
+
+      # API Latency High
+      - alert: HighLatency
+        expr: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1'
+        for: 10m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High API latency on {{ $labels.instance }}"
+          description: "95th percentile latency is {{ $value | humanizeDuration }} on {{ $labels.job }}"
+
+      # Database Connection Pool Exhausted
+      - alert: DatabaseConnectionPoolExhausted
+        expr: 'db_connection_pool_used / db_connection_pool_max > 0.9'
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Using {{ $value | humanizePercentage }} of connection pool"
+
+      # Queue Depth High
+      - alert: QueueDepthHigh
+        expr: 'queue_depth > 10000'
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "Job queue depth is high on {{ $labels.instance }}"
+          description: "Queue {{ $labels.queue }} has {{ $value | humanize }} items pending"
+
+  - name: network_alerts
+    interval: 30s
+    rules:
+      # High Network Traffic
+      - alert: HighNetworkTraffic
+        expr: 'rate(node_network_transmit_bytes_total[5m]) > 1000000000'
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High network traffic on {{ $labels.instance }}"
+          description: "Network interface {{ $labels.device }} has {{ $value | humanize }}B/s traffic"
+
+      # Network Errors
+      - alert: NetworkErrors
+        expr: 'rate(node_network_transmit_errs_total[5m]) > 100'
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "Network errors on {{ $labels.instance }}"
+          description: "Network interface {{ $labels.device }} has {{ $value | humanize }} errors/s"
+
+  - name: alertmanager_alerts
+    interval: 30s
+    rules:
+      # Alertmanager Down
+      - alert: AlertmanagerDown
+        expr: 'up{job="alertmanager"} == 0'
+        for: 5m
+        labels:
+          severity: critical
+          component: monitoring
+        annotations:
+          summary: "Alertmanager is down"
+          description: "Alertmanager {{ $labels.instance }} is not responding"
+
+      # Prometheus Down
+      - alert: PrometheusDown
+        expr: 'up{job="prometheus"} == 0'
+        for: 5m
+        labels:
+          severity: critical
+          component: monitoring
+        annotations:
+          summary: "Prometheus is down"
+          description: "Prometheus {{ $labels.instance }} is not responding"
