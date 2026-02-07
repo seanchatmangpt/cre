@@ -1419,9 +1419,9 @@ fire(mark_failed, #{'ExceptionRaised' := [Exception]}, _UsrInfo) ->
      }}.
 
 code_change(_OldVsn, NetState, _Extra) -> {ok, NetState}.
-handle_call(_Request, _From, _NetState) -> {reply, {error, bad_msg}}.
-handle_cast(_Request, _NetState) -> noreply.
-handle_info(_Request, _NetState) -> noreply.
+handle_call(_Request, _From, NetState) -> {reply, {error, bad_msg}, NetState}.
+handle_cast(_Request, NetState) -> {noreply, NetState}.
+handle_info(_Request, NetState) -> {noreply, NetState}.
 
 init(_Arg) ->
     #exception_state{}.

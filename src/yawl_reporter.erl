@@ -173,6 +173,9 @@ generate_report(html, engine, _Node) ->
     Data = fetch_engine_data(),
     {ok, to_html(Data)};
 
+generate_report(Format, custom, Filters) when is_map(Filters) ->
+    create_custom_report(Filters, Format);
+
 generate_report(pdf, _Scope, _Identifier) ->
     {error, pdf_not_supported};
 
@@ -231,7 +234,8 @@ export_case_data(CaseId, Format, Options) ->
         xml -> {ok, to_xml(Data)};
         csv -> {ok, to_csv(Data)};
         html -> {ok, to_html(Data)};
-        pdf -> {error, pdf_not_supported}
+        pdf -> {error, pdf_not_supported};
+        _ -> {error, {unsupported_format, Format}}
     end.
 
 %%--------------------------------------------------------------------
@@ -265,7 +269,8 @@ export_period_data(Start, End, Format) ->
         xml -> {ok, to_xml(BaseData)};
         csv -> {ok, to_csv(BaseData)};
         html -> {ok, to_html(BaseData)};
-        pdf -> {error, pdf_not_supported}
+        pdf -> {error, pdf_not_supported};
+        _ -> {error, {unsupported_format, Format}}
     end.
 
 %%--------------------------------------------------------------------
@@ -288,7 +293,8 @@ create_custom_report(Filters, Format) ->
         xml -> {ok, to_xml(Data)};
         csv -> {ok, to_csv(Data)};
         html -> {ok, to_html(Data)};
-        pdf -> {error, pdf_not_supported}
+        pdf -> {error, pdf_not_supported};
+        _ -> {error, {unsupported_format, Format}}
     end.
 
 %%--------------------------------------------------------------------
