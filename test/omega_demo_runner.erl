@@ -192,6 +192,7 @@ find_and_complete_human_task(Pid, Executor, Spec, Marking, Agents, CaseId) ->
     end.
 
 %% Run subnets that have tokens in their entry places. Injects subnet outputs into root.
+%% When subnets run, steps until no more automated transitions fire (Phase 1.4).
 run_subnets_if_needed(Pid, Executor, Spec, Marking) ->
     case is_yaml_spec(Spec) of
         false -> none;
@@ -201,31 +202,81 @@ run_subnets_if_needed(Pid, Executor, Spec, Marking) ->
             SubnetDefs = wf_yaml_spec:net_subnets(Spec, RootNet),
             Ran = run_ready_subnets(Pid, Marking, SubnetModules, SubnetDefs, Executor),
             case Ran of
-                true -> ok;
+                true ->
+                    %% Step until abort (drain automated transitions)
+                    _ = step_until_abort(Pid, 100),
+                    ok;
                 false -> none
             end
+    end.
+
+step_until_abort(_Pid, 0) -> ok;
+step_until_abort(Pid, N) ->
+    case gen_yawl:step(Pid) of
+        {ok, _} -> step_until_abort(Pid, N - 1);
+        abort -> ok;
+        {error, _} -> ok
     end.
 
 is_yaml_spec(Spec) when is_tuple(Spec) -> element(1, Spec) =:= yawl_yaml_spec;
 is_yaml_spec(_) -> false.
 
 run_ready_subnets(_Pid, _Marking, [], _SubnetDefs, _Executor) -> false;
-run_ready_subnets(Pid, Marking, [{NetId, Mod} | Rest], SubnetDefs, Executor) ->
-    case get_subnet_entry_exit(NetId, SubnetDefs, Executor) of
-        {ok, Entry, Exit} ->
-            EntryAtom = to_place_atom(Entry),
-            ExitAtom = to_place_atom(Exit),
-            BranchPlace = binary_to_atom(NetId, utf8),
-            Tokens = maps:get(BranchPlace, Marking, []) ++ maps:get(EntryAtom, Marking, []),
-            case Tokens of
-                [] -> run_ready_subnets(Pid, Marking, Rest, SubnetDefs, Executor);
-                [T | _] ->
-                    run_one_subnet(Pid, Mod, EntryAtom, ExitAtom, T),
-                    true
-            end;
-        undefined ->
-            run_ready_subnets(Pid, Marking, Rest, SubnetDefs, Executor)
-    end.
+run_ready_subnets(Pid, Marking, SubnetModules, SubnetDefs, Executor) ->
+    %% Run ALL subnets that have tokens (P3 Sync needs ProgramExit, OpsExit, CommsExit)
+    %% Try both YAML names (ProgramThread) and P42 pattern names (p_thread1, p_thread2, ...)
+    Ran = lists:foldl(
+        fun({NetId, Mod}, Acc) ->
+            case get_subnet_entry_exit(NetId, SubnetDefs, Executor) of
+                {ok, Entry, Exit} ->
+                    EntryAtom = to_place_atom(Entry),
+                    ExitAtom = to_place_atom(Exit),
+                    BranchPlace = binary_to_atom(NetId, utf8),
+                    %% P42 pattern uses p_thread1..p_thread4; YAML uses ProgramThread, etc.
+                    Index = subnet_index(NetId, SubnetModules),
+                    P42Place = list_to_atom("p_thread" ++ integer_to_list(Index)),
+                    BranchTokens = maps:get(BranchPlace, Marking, []) ++ maps:get(P42Place, Marking, []),
+                    EntryTokens = maps:get(EntryAtom, Marking, []),
+                    Tokens = BranchTokens ++ EntryTokens,
+                    case Tokens of
+                        [] -> Acc;
+                        [T | _] ->
+                            %% Consume token from root before passing to subnet
+                            WithdrawPlace = case maps:get(BranchPlace, Marking, []) of
+                                [_ | _] -> BranchPlace;
+                                [] -> case maps:get(P42Place, Marking, []) of
+                                    [_ | _] -> P42Place;
+                                    [] -> EntryAtom
+                                end
+                            end,
+                            _ = gen_yawl:withdraw(Pid, #{WithdrawPlace => [T]}),
+                            %% Inject into P3 sync place (p_gonogo_branch1..3) when subnet completes.
+                            %% P3 uses separate namespace to avoid collision with P38 (p_close_branch1..3).
+                            InjectPlace = p_branch_place_for_subnet(Index),
+                            run_one_subnet(Pid, Mod, EntryAtom, ExitAtom, InjectPlace, T),
+                            true
+                    end;
+                undefined -> Acc
+            end
+        end,
+        false,
+        SubnetModules
+    ),
+    Ran.
+
+subnet_index(NetId, SubnetModules) ->
+    I = find_index(NetId, SubnetModules, 1),
+    min(I, 4).  %% thread_split has at most 4 branch places
+
+%% P3 sync preset uses p_gonogo_branch1..3 (separate from P38 p_close_branch1..3).
+p_branch_place_for_subnet(1) -> p_gonogo_branch1;
+p_branch_place_for_subnet(2) -> p_gonogo_branch2;
+p_branch_place_for_subnet(3) -> p_gonogo_branch3;
+p_branch_place_for_subnet(_) -> p_gonogo_branch3.  %% fallback for IncidentThread, etc.
+
+find_index(NetId, [{NetId, _} | _], N) -> N;
+find_index(NetId, [_ | Rest], N) -> find_index(NetId, Rest, N + 1);
+find_index(_, [], N) -> N.
 
 get_subnet_entry_exit(NetId, SubnetDefs, Executor) ->
     case lists:search(fun(S) -> subnet_id_match(S, NetId) end, SubnetDefs) of
@@ -251,7 +302,8 @@ subnet_id_match(#{<<"id">> := Id}, NetId) when is_binary(NetId) -> Id =:= NetId;
 subnet_id_match(#{id := Id}, NetId) when is_binary(NetId) -> Id =:= NetId;
 subnet_id_match(_, _) -> false.
 
-run_one_subnet(RootPid, SubnetMod, EntryPlace, ExitPlace, Token) ->
+%% EntryPlace: subnet entry. ExitPlace: subnet exit (check completion). BranchPlace: root place to inject (F-003).
+run_one_subnet(RootPid, SubnetMod, EntryPlace, ExitPlace, BranchPlace, Token) ->
     try
         case gen_yawl:start_link(SubnetMod, #{}, []) of
             {ok, SubPid} ->
@@ -262,7 +314,7 @@ run_one_subnet(RootPid, SubnetMod, EntryPlace, ExitPlace, Token) ->
                     ExitTokens = maps:get(ExitPlace, SubMarking, []),
                     case ExitTokens of
                         [] -> ok;
-                        [T | _] -> gen_yawl:inject(RootPid, #{ExitPlace => [T]})
+                        [T | _] -> gen_yawl:inject(RootPid, #{BranchPlace => [T]})
                     end
                 after
                     gen_yawl:stop(SubPid)
@@ -278,20 +330,50 @@ run_one_subnet(RootPid, SubnetMod, EntryPlace, ExitPlace, Token) ->
     end.
 
 find_inject_place(Transitions, PresetMap, Marking) ->
+    %% Prefer GoNoGo before CloseSymposium (flow order: Split->GoNoGo->OpenDoors->Close).
+    %% Use P3 place namespace (p_gonogo_branch*) and P38 (p_close_branch*) for phase detection.
+    Ordered = case lists:member(t_GoNoGo, Transitions) andalso lists:member(t_CloseSymposium, Transitions) of
+        true ->
+            %% Close phase: tokens in p_close_branch* or past GoNoGo (p_joined)
+            ClosePreset = maps:get(t_CloseSymposium, PresetMap, []),
+            InClosePhase = has_tokens_in_any(ClosePreset, Marking)
+                orelse maps:get(p_joined, Marking, []) =/= [],
+            if InClosePhase -> [t_CloseSymposium, t_GoNoGo | lists:subtract(Transitions, [t_GoNoGo, t_CloseSymposium])];
+               true -> [t_GoNoGo, t_CloseSymposium | lists:subtract(Transitions, [t_GoNoGo, t_CloseSymposium])]
+            end;
+        false -> Transitions
+    end,
     lists:foldl(fun(Trsn, Acc) ->
         case Acc of
             undefined ->
                 Preset = maps:get(Trsn, PresetMap, []),
-                TaskName = atom_to_binary(Trsn, utf8),
+                TaskName = task_name_from_transition(Trsn),
                 case find_inject_place_for_preset(Preset, Marking, TaskName) of
                     undefined -> undefined;
                     Result -> Result
                 end;
             _ -> Acc
         end
-    end, undefined, Transitions).
+    end, undefined, Ordered).
+
+%% Strip t_ prefix so t_GoNoGo -> <<"GoNoGo">> for task_to_role and agent lookup.
+task_name_from_transition(Trsn) ->
+    Bin = atom_to_binary(Trsn, utf8),
+    case binary:split(Bin, <<"_">>) of
+        [<<"t">>, Rest] when byte_size(Rest) > 0 -> Rest;
+        _ -> Bin
+    end.
+
+%% Helper: true if any of Places has tokens in Marking.
+has_tokens_in_any([], _Marking) -> false;
+has_tokens_in_any([P | Ps], Marking) ->
+    case maps:get(P, Marking, []) of
+        [] -> has_tokens_in_any(Ps, Marking);
+        [_ | _] -> true
+    end.
 
 %% Handle [P1,P2] (one full, one empty), [P1] (single), or [P1,P2,...,Pn] (all but one full).
+%% Never inject when all preset places are empty ({0,K}) - that causes premature injection.
 find_inject_place_for_preset([P1, P2], Marking, TaskName) ->
     T1 = length(maps:get(P1, Marking, [])),
     T2 = length(maps:get(P2, Marking, [])),
@@ -308,7 +390,13 @@ find_inject_place_for_preset(Preset, Marking, TaskName) when is_list(Preset), le
         {N, 1} when N >= 1 ->
             [{EmptyPl, _} | _] = Empty,
             {EmptyPl, TaskName};
-        _ -> undefined
+        {1, 2} ->
+            %% One full, two empty: agent provides second decision
+            [{EmptyPl, _} | _] = Empty,
+            {EmptyPl, TaskName};
+        _ ->
+            %% {0, K} excluded: all empty = no injection (prevents I-001 premature injection)
+            undefined
     end;
 find_inject_place_for_preset(_, _, _) -> undefined.
 

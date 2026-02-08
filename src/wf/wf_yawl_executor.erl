@@ -491,7 +491,12 @@ compile_workflow(_Spec, _Options) ->
 do_compile_workflow(Spec, Options, RootNetFun) ->
     case yawl_compile:compile(Spec, Options) of
         {ok, Compiled} ->
-            RootNet = RootNetFun(Spec),
+            RootNetRaw = RootNetFun(Spec),
+            RootNet = case RootNetRaw of
+                B when is_binary(B) -> B;
+                A when is_atom(A) -> atom_to_binary(A, utf8);
+                _ -> <<"main">>
+            end,
             Prefix = maps:get(module_prefix, Options, <<"yawl_">>),
             RootModule = list_to_atom(binary_to_list(<<Prefix/binary, RootNet/binary>>)),
             Modules = maps:keys(maps:get(modules, Compiled, #{})),
@@ -535,9 +540,13 @@ do_compile_workflow(Spec, Options, RootNetFun) ->
 -spec start_workflow(Executor :: executor(), InitialData :: initial_data()) ->
           {ok, pid(), case_id()} | {error, term()}.
 
-start_workflow(#yawl_executor{root_module = RootMod}, InitialData) when is_map(InitialData) ->
+start_workflow(#yawl_executor{root_module = RootMod, spec = Spec, compiled = Compiled}, InitialData) when is_map(InitialData) ->
     CaseId = generate_case_id(),
-    NetArg = #{initial_data => InitialData, case_id => CaseId},
+    Regions = case root_net_info(Spec, Compiled) of
+        #{regions := R} when is_map(R) -> R;
+        _ -> #{}
+    end,
+    NetArg = #{initial_data => InitialData, case_id => CaseId, regions => Regions},
 
     case gen_yawl:start_link(RootMod, NetArg, []) of
         {ok, Pid} ->
@@ -575,10 +584,14 @@ start_workflow(#yawl_executor{root_module = RootMod}, InitialData) when is_map(I
                      ServerName :: {local, atom()} | {global, atom()} | {via, atom(), term()}) ->
           {ok, pid(), case_id()} | {error, term()}.
 
-start_workflow(#yawl_executor{root_module = RootMod}, InitialData, ServerName)
+start_workflow(#yawl_executor{root_module = RootMod, spec = Spec, compiled = Compiled}, InitialData, ServerName)
         when is_map(InitialData), is_tuple(ServerName) ->
     CaseId = generate_case_id(),
-    NetArg = #{initial_data => InitialData, case_id => CaseId},
+    Regions = case root_net_info(Spec, Compiled) of
+        #{regions := R} when is_map(R) -> R;
+        _ -> #{}
+    end,
+    NetArg = #{initial_data => InitialData, case_id => CaseId, regions => Regions},
 
     case gen_yawl:start_link(ServerName, RootMod, NetArg, []) of
         {ok, Pid} ->
@@ -970,6 +983,19 @@ execute_workflow(FilePath, InitialData, Options)
 %%--------------------------------------------------------------------
 -spec get_root_module(Executor :: executor()) -> atom().
 get_root_module(#yawl_executor{root_module = RootMod}) -> RootMod.
+
+%% @private Get NetInfo for root net from compiled result.
+root_net_info(Spec, Compiled) when is_tuple(Spec), element(1, Spec) =:= yawl_yaml_spec ->
+    RootNet = wf_yaml_spec:root_net(Spec),
+    RootNetBin = case RootNet of
+        B when is_binary(B) -> B;
+        A when is_atom(A) -> atom_to_binary(A, utf8);
+        _ -> <<"main">>
+    end,
+    NetInfos = maps:get(net_info, Compiled, #{}),
+    maps:get(RootNetBin, NetInfos, #{});
+root_net_info(_, Compiled) ->
+    maps:get(net_info, Compiled, #{}).
 
 %% @doc Returns list of {NetId, Module} for all subnet modules (excluding root).
 -spec get_subnet_modules(Executor :: executor()) -> [{binary(), atom()}].

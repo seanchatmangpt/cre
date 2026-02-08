@@ -562,3 +562,398 @@ src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
 
 [SUCCESS] Project compilation verified
 [SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T15:30:02-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     205 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+src/core/yawl_compile.erl:622: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:624: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:626: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:628: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:999: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T15:38:23-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     205 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+    ┌─ src/patterns/cancel_mi_activity.erl:
+    │
+ 51 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/cancel_activity.erl:
+    │
+ 53 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/thread_split.erl:
+    │
+ 61 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/synchronization.erl:
+    │
+ 68 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/thread_merge.erl:
+    │
+ 75 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/recursion.erl:
+    │
+ 59 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/complete_mi_activity.erl:
+    │
+ 45 │  is_enabled(t_complete, Mode, UsrInfo) ->
+    │                               ╰── Warning: variable 'UsrInfo' is unused
+
+    ┌─ src/patterns/complete_mi_activity.erl:
+    │
+ 58 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/dynamic_partial_join_mi.erl:
+    │
+ 57 │  fire(t_compute_threshold, Mode, UsrInfo) ->
+    │                            ╰── Warning: variable 'Mode' is unused
+
+    ┌─ src/patterns/dynamic_partial_join_mi.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/structured_sync_merge.erl:
+    │
+ 76 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/cancel_case.erl:
+    │
+ 52 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 480 │                      NewState = State#or_join_state{
+     │                      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 481 │                          completed = [Index],
+     │                          ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 517 │                      NewState = State#or_join_state{
+     │                      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 518 │                          completed = [],
+     │                          ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+     ┌─ src/patterns/multiple_choice.erl:
+     │
+ 529 │          'p_complete' => [],
+     │          ╰── Warning: key 'p_complete' will be overridden in expression
+
+
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/patterns/blocking_discriminator.erl:
+    │
+ 69 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/generalized_and_join.erl:
+    │
+ 64 │  fire(t_join, Mode, UsrInfo) ->
+    │               ╰── Warning: variable 'Mode' is unused
+
+    ┌─ src/patterns/generalized_and_join.erl:
+    │
+ 70 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/wf/yawl_checkpoint.erl:
+    │
+ 45 │  -type checkpoint() :: #yawl_instance{}.
+    │   ╰── Warning: type checkpoint() is unused
+
+
+     ┌─ src/patterns/structured_loop.erl:
+     │
+ 453 │  fire('t_loop_back', #{'p_body_done' := [{state, NewState}]}, State) ->
+     │                                                  ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/structured_loop.erl:
+     │
+ 470 │          'p_complete' => [],
+     │          ╰── Warning: key 'p_complete' will be overridden in expression
+
+
+    ┌─ src/patterns/transient_trigger.erl:
+    │
+ 43 │  is_enabled(t_trigger, Mode, UsrInfo) ->
+    │                              ╰── Warning: variable 'UsrInfo' is unused
+
+    ┌─ src/patterns/transient_trigger.erl:
+    │
+ 55 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/persistent_trigger.erl:
+    │
+ 50 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/arbitrary_cycles.erl:
+    │
+ 25 │  -record(state, {
+    │   ╰── Warning: record state is unused
+
+    ┌─ src/patterns/arbitrary_cycles.erl:
+    │
+ 52 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/sequence.erl:
+    │
+ 24 │  -record(state, {
+    │   ╰── Warning: record state is unused
+
+    ┌─ src/patterns/sequence.erl:
+    │
+ 53 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/explicit_termination.erl:
+    │
+ 58 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/cancel_region.erl:
+    │
+ 53 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/blocking_partial_join.erl:
+    │
+ 79 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/patterns/implicit_merge.erl:
+     │
+ 557 │  wait_for_first_completion(Ref, Pids, Timeout) ->
+     │                                 ╰── Warning: variable 'Pids' is unused
+
+
+    ┌─ src/patterns/structured_partial_join.erl:
+    │
+ 68 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+src/core/yawl_compile.erl:622: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:624: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:626: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:628: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:999: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/patterns/local_sync_merge.erl:
+    │
+ 65 │  fire(t_join, Mode, UsrInfo) ->
+    │               ╰── Warning: variable 'Mode' is unused
+
+    ┌─ src/patterns/local_sync_merge.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/patterns/parallel_split.erl:
+     │
+ 610 │      NewState = State#parallel_split_state{completed = NewCompleted},
+     │      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/parallel_split.erl:
+     │
+ 610 │      NewState = State#parallel_split_state{completed = NewCompleted},
+     │                                            ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+    ┌─ src/patterns/cancelling_partial_join.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/cancelling_partial_join_mi.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/cancelling_discriminator.erl:
+    │
+ 60 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/static_partial_join_mi.erl:
+    │
+ 65 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/wf/yawl_pred_eval.erl:
+     │
+ 326 │  extract_token_facts(Place, Token) when is_map(Token) ->
+     │                      ╰── Warning: variable 'Place' is unused
+
+
+    ┌─ src/patterns/general_sync_merge.erl:
+    │
+ 72 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/core/yawl_pattern_expander.erl:
+     │
+ 122 │  generate_flows(PatternInstance, Context) ->
+     │                                  ╰── Warning: variable 'Context' is unused
+
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 386 │  fire('t_complete', #{'p_running' := [{{branch, Index}, _Fun} | Rest]}, #n_out_of_m_state{results = Results} = State) ->
+     │                                                                                                     ╰── Warning: variable 'Results' is unused
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 403 │      NewState = State#n_out_of_m_state{quorum_met = true},
+     │      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 403 │      NewState = State#n_out_of_m_state{quorum_met = true},
+     │                                        ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 589 │  collect_quorum(Ref, Pids, N, M, Acc, Errors) when length(Pids) =:= 0, length(Acc) + length(Errors) =:= M ->
+     │                 ╰── Warning: variable 'Ref' is unused
+
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete

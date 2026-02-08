@@ -125,8 +125,10 @@ The fire/3 callback can return:
          usr_info/1,
          state_property/3,
          inject/2,
+         withdraw/2,
          step/1,
-         drain/2]).
+         drain/2,
+         cancel_region/2]).
 
 %% Net state accessor functions
 -export([get_ls/2, get_usr_info/1, get_stats/1]).
@@ -177,7 +179,13 @@ The fire/3 callback can return:
           fire_timeout = 5000 :: pos_integer(),
           progress_timeout = 30000 :: pos_integer(),
           shutting_down = false :: boolean(),
-          active_fires = 0 :: non_neg_integer()
+          active_fires = 0 :: non_neg_integer(),
+          %% Cycle detection: bounded marking history to detect repeated states
+          marking_history = [] :: [non_neg_integer()],
+          max_marking_history = 10 :: pos_integer(),
+          continue_count = 0 :: non_neg_integer(),
+          max_continue = 1000 :: pos_integer(),
+          regions = #{} :: #{binary() | atom() => [atom()]}
          }).
 
 %%====================================================================
@@ -508,6 +516,35 @@ inject(Name, ProduceMap) when is_map(ProduceMap) ->
     gen_server:call(Name, {inject, ProduceMap}).
 
 %%--------------------------------------------------------------------
+%% @doc Remove tokens from the marking.
+%%
+%%      WithdrawMap specifies places and tokens to remove.
+%%      Used for subnet execution: consume branch-place token when
+%%      passing it to a subnet.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec withdraw(Name :: name(), WithdrawMap :: #{atom() => [term()]}) ->
+          ok | {error, term()}.
+
+withdraw(Name, WithdrawMap) when is_map(WithdrawMap) ->
+    gen_server:call(Name, {withdraw, WithdrawMap}).
+
+%%--------------------------------------------------------------------
+%% @doc Cancel a region by withdrawing tokens from all places in that region.
+%%
+%%      The regions map must be provided at start via NetArg: #{regions => #{RegionId => [places]}}.
+%%      Withdraws one token from each place in the region that has tokens.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec cancel_region(Name :: name(), RegionId :: binary() | atom()) ->
+          ok | {error, term()}.
+
+cancel_region(Name, RegionId) when is_binary(RegionId); is_atom(RegionId) ->
+    gen_server:call(Name, {cancel_region, RegionId}).
+
+%%--------------------------------------------------------------------
 %% @doc Fire at most one enabled transition.
 %%
 %%      Equivalent to gen_pnet:step/1.
@@ -618,6 +655,12 @@ init({NetMod, NetArg, Options}) ->
     %% Start the Petri net execution
     continue(self()),
 
+    %% Extract regions from NetArg for cancel_region/2
+    Regions = case NetArg of
+        #{regions := R} when is_map(R) -> R;
+        _ -> #{}
+    end,
+
     %% Create wrapper state with timeouts
     WrapperState = #wrapper_state{
                       net_mod = NetMod,
@@ -625,7 +668,10 @@ init({NetMod, NetArg, Options}) ->
                       fire_timeout = FireTimeout,
                       progress_timeout = ProgressTimeout,
                       shutting_down = false,
-                      active_fires = 0
+                      active_fires = 0,
+                      marking_history = [],
+                      continue_count = 0,
+                      regions = Regions
                      },
 
     {ok, WrapperState}.
@@ -707,6 +753,39 @@ handle_call({inject, ProduceMap}, _From,
         Receipt = ProduceMap,
         continue(self()),
         {reply, {ok, Receipt}, WrapperState#wrapper_state{net_state = NetState1}}
+    catch
+        _:Reason ->
+            {reply, {error, Reason}, WrapperState}
+    end;
+
+handle_call({withdraw, WithdrawMap}, _From,
+            WrapperState = #wrapper_state{net_state = NetState}) ->
+    try
+        NetState1 = cns(WithdrawMap, NetState),
+        {reply, ok, WrapperState#wrapper_state{net_state = NetState1}}
+    catch
+        _:Reason ->
+            {reply, {error, Reason}, WrapperState}
+    end;
+
+handle_call({cancel_region, RegionId}, _From,
+            WrapperState = #wrapper_state{net_state = NetState, regions = Regions}) ->
+    try
+        RegionIdNorm = case RegionId of
+            B when is_binary(B) -> B;
+            A when is_atom(A) -> atom_to_binary(A, utf8);
+            _ -> RegionId
+        end,
+        Places = maps:get(RegionIdNorm, Regions, maps:get(RegionId, Regions, [])),
+        #net_state{marking = Marking} = NetState,
+        WithdrawMap = lists:foldl(fun(Place, Acc) ->
+            case maps:get(Place, Marking, []) of
+                [] -> Acc;
+                [T | _] -> maps:put(Place, [T], Acc)
+            end
+        end, #{}, Places),
+        NetState1 = cns(WithdrawMap, NetState),
+        {reply, ok, WrapperState#wrapper_state{net_state = NetState1}}
     catch
         _:Reason ->
             {reply, {error, Reason}, WrapperState}
@@ -797,57 +876,91 @@ handle_cast(continue,
                                                         stats = Stats,
                                                         tstart = T1,
                                                         cnt = Cnt
-                                                       }
+                                                       },
+                              marking_history = History,
+                              max_marking_history = MaxHistory,
+                              continue_count = ContCount,
+                              max_continue = MaxCont
                              }) ->
-    %% Check progress timeout
-    StartTime = erlang:monotonic_time(millisecond),
-
-    case progress(NetState0, FireTimeout) of
-        abort ->
+    %% Cycle detection: stop if we've exceeded max continue steps
+    case ContCount >= MaxCont of
+        true ->
+            logger:warning("gen_yawl halt: max_continue (~p) reached", [MaxCont]),
             {noreply, WrapperState};
+        false ->
+            %% Check progress timeout
+            StartTime = erlang:monotonic_time(millisecond),
 
-        {delta, Mode, Pm, NewUsrInfo} ->
-            Elapsed = erlang:monotonic_time(millisecond) - StartTime,
-            case Elapsed > ProgressTimeout of
-                true ->
-                    logger:warning("gen_yawl progress timeout: ~p ms", [Elapsed]),
-                    %% Continue anyway but log warning
-                    ok;
-                false ->
-                    ok
-            end,
+            case progress(NetState0, FireTimeout) of
+                abort ->
+                    %% Reset cycle detection state for next execution
+                    {noreply, WrapperState#wrapper_state{
+                        marking_history = [],
+                        continue_count = 0
+                    }};
 
-            %% Update net state with consumed tokens
-            NetState1 = cns(Mode, NetState0),
+                {delta, Mode, Pm, NewUsrInfo} ->
+                    Elapsed = erlang:monotonic_time(millisecond) - StartTime,
+                    case Elapsed > ProgressTimeout of
+                        true ->
+                            logger:warning("gen_yawl progress timeout: ~p ms", [Elapsed]),
+                            ok;
+                        false ->
+                            ok
+                    end,
 
-            %% Update user info if provided by fire/3 3-tuple return
-            NetState2 = case NewUsrInfo of
-                undefined -> NetState1;
-                _ -> NetState1#net_state{usr_info = NewUsrInfo}
-            end,
+                    %% Update net state with consumed tokens
+                    NetState1 = cns(Mode, NetState0),
 
-            %% Handle trigger and produce tokens
-            NetMod = WrapperState#wrapper_state.net_mod,
-            NetState3 = handle_trigger(Pm, NetState2, NetMod),
+                    %% Update user info if provided by fire/3 3-tuple return
+                    NetState2 = case NewUsrInfo of
+                        undefined -> NetState1;
+                        _ -> NetState1#net_state{usr_info = NewUsrInfo}
+                    end,
 
-            %% Check if we should continue (not shutting down)
-            case WrapperState#wrapper_state.shutting_down of
-                false ->
-                    continue(self());
-                true ->
-                    logger:debug("gen_yawl not continuing due to shutdown")
-            end,
+                    %% Handle trigger and produce tokens
+                    NetMod = WrapperState#wrapper_state.net_mod,
+                    NetState3 = handle_trigger(Pm, NetState2, NetMod),
 
-            %% Update stats
-            NetState4 = update_stats(NetState3, Stats, T1, Cnt),
+                    %% Cycle detection: fingerprint new marking and check for repeat
+                    #net_state{marking = NewMarking} = NetState3,
+                    Fingerprint = erlang:phash2(term_to_binary(NewMarking)),
+                    SeenBefore = lists:member(Fingerprint, History),
+                    NewHistory = case SeenBefore of
+                        true ->
+                            logger:warning("gen_yawl halt: marking cycle detected (fingerprint=~p)", [Fingerprint]),
+                            [];
+                        false ->
+                            Hist1 = [Fingerprint | History],
+                            lists:sublist(Hist1, MaxHistory)
+                    end,
 
-            {noreply, WrapperState#wrapper_state{net_state = NetState4}};
+                    %% Decide whether to continue
+                    ShouldContinue = not WrapperState#wrapper_state.shutting_down
+                        andalso not SeenBefore
+                        andalso (ContCount + 1) < MaxCont,
 
-        {error, Reason, NetState1} ->
-            logger:error("gen_yawl progress error: ~p", [Reason]),
-            %% Continue despite error - log and try next transition
-            continue(self()),
-            {noreply, WrapperState#wrapper_state{net_state = NetState1}}
+                    case ShouldContinue of
+                        true ->
+                            continue(self());
+                        false ->
+                            ok
+                    end,
+
+                    %% Update stats
+                    NetState4 = update_stats(NetState3, Stats, T1, Cnt),
+
+                    {noreply, WrapperState#wrapper_state{
+                        net_state = NetState4,
+                        marking_history = NewHistory,
+                        continue_count = ContCount + 1
+                    }};
+
+                {error, Reason, NetState1} ->
+                    logger:error("gen_yawl progress error: ~p", [Reason]),
+                    continue(self()),
+                    {noreply, WrapperState#wrapper_state{net_state = NetState1}}
+            end
     end;
 
 handle_cast({cast, Request},

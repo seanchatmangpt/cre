@@ -274,25 +274,51 @@ compile_yaml_spec(Spec, Options) ->
 
 %% Build net infos from YAML spec with per-net pattern expansion.
 build_yaml_net_infos(Spec, Nets, PatternInstances, Context) ->
+    RootNet = wf_yaml_spec:root_net(Spec),
+    RootNetNorm = case RootNet of
+        B when is_binary(B) -> B;
+        A when is_atom(A) -> atom_to_binary(A, utf8);
+        _ -> <<"">>
+    end,
     lists:foldl(fun(NetId, Acc) ->
+        NetIdNorm = case NetId of
+            N when is_binary(N) -> N;
+            N when is_atom(N) -> atom_to_binary(N, utf8);
+            _ -> <<"">>
+        end,
         Tasks = wf_yaml_spec:tasks(Spec, NetId),
         Expanded = yawl_pattern_expander:expand_patterns_for_net(PatternInstances, NetId, Context),
         InputCond = wf_yaml_spec:net_input_condition(Spec, NetId),
         OutputCond = wf_yaml_spec:net_output_condition(Spec, NetId),
+        Variables = wf_yaml_spec:variables(Spec, NetId),
+        Regions = wf_yaml_spec:net_regions(Spec, NetId),
+        ExpandedPlaces = maps:get(places, Expanded, []),
+        ExpandedPreset = maps:get(preset, Expanded, #{}),
+        ExpandedPostset = maps:get(postset, Expanded, #{}),
+        %% Ensure all preset/postset places are in place_lst (prevents enum_mode badmatch)
+        PresetPlaces = lists:usort(lists:flatten(maps:values(ExpandedPreset))),
+        PostsetPlaces = lists:usort(lists:flatten(maps:values(ExpandedPostset))),
+        AllReferencedPlaces = lists:usort(PresetPlaces ++ PostsetPlaces),
+        Places = case ExpandedPlaces of
+            [_ | _] -> lists:usort(ExpandedPlaces ++ AllReferencedPlaces);
+            [] -> []
+        end,
         NetInfo = #{
             id => NetId,
             spec_id => wf_yaml_spec:id(Spec),
-            is_root => (NetId =:= wf_yaml_spec:root_net(Spec)),
+            is_root => (NetIdNorm =:= RootNetNorm),
             tasks => Tasks,
-            places => maps:get(places, Expanded, []),
+            places => Places,
             transitions => maps:get(transitions, Expanded, []),
-            preset => maps:get(preset, Expanded, #{}),
-            postset => maps:get(postset, Expanded, #{}),
+            preset => ExpandedPreset,
+            postset => ExpandedPostset,
             flows => maps:get(flows, Expanded, []),
             split_types => #{},
             join_types => #{},
             input_condition => InputCond,
-            output_condition => OutputCond
+            output_condition => OutputCond,
+            variables => Variables,
+            regions => build_region_places_map(Regions, ExpandedPlaces, PatternInstances, NetId, Spec)
         },
         Acc#{NetId => NetInfo}
     end, #{}, Nets).
@@ -340,13 +366,15 @@ generate_module(NetId, NetInfo) ->
 %%--------------------------------------------------------------------
 %% @doc Generates the list of places for a YAWL net.
 %%
-%% Returns a list of place atoms for the specified net structure.
-%% Places include: input condition, output condition, and one per task.
+%% For YAML specs with pattern expansion, uses Expanded.places when present.
+%% Otherwise uses input condition, output condition, and one per task.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec generate_places(NetInfo :: net_info()) -> [place()].
 
+generate_places(#{places := ExpandedPlaces}) when is_list(ExpandedPlaces), ExpandedPlaces =/= [] ->
+    lists:usort(ExpandedPlaces);
 generate_places(#{input_condition := InputCond,
                   output_condition := OutputCond,
                   tasks := Tasks}) ->
@@ -359,19 +387,83 @@ generate_places(#{input_condition := InputCond,
 %%--------------------------------------------------------------------
 %% @doc Generates the list of transitions for a YAWL net.
 %%
-%% Returns a list of transition atoms for the specified net structure.
-%% Each task has exactly one transition.
+%% For YAML specs with pattern expansion, uses Expanded.transitions when present.
+%% Otherwise generates one transition per task.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec generate_transitions(NetInfo :: net_info()) -> [transition()].
 
+generate_transitions(#{transitions := ExpandedTrans}) when is_list(ExpandedTrans), ExpandedTrans =/= [] ->
+    ExpandedTrans;
 generate_transitions(#{tasks := Tasks}) ->
     [transition_atom(TaskId, <<"t_">>) || TaskId <- Tasks].
 
 %%====================================================================
 %% Internal Functions - Options
 %%====================================================================
+
+%% @private Build region id -> places map for cancellation. Regions from YAML have id and
+%% cancel_region; places are inferred from P25 CancelRegion pattern instances when available.
+build_region_places_map(Regions, ExpandedPlaces, PatternInstances, NetId, Spec) when is_list(Regions) ->
+    NetIdNorm = case NetId of
+        N when is_binary(N) -> N;
+        N when is_atom(N) -> atom_to_binary(N, utf8);
+        _ -> <<>>
+    end,
+    P25ForNet = [I || I <- PatternInstances,
+        net_matches(I, NetIdNorm),
+        pi_pattern_is(I, <<"P25_CancelRegion">>)],
+    lists:foldl(fun(R, Acc) ->
+        Id = maps:get(<<"id">>, R, maps:get(id, R, undefined)),
+        case Id of
+            undefined -> Acc;
+            B when is_binary(B) ->
+                Places = places_for_region(B, P25ForNet, ExpandedPlaces, Spec),
+                Acc#{B => Places};
+            A when is_atom(A) ->
+                Bin = atom_to_binary(A, utf8),
+                Places = places_for_region(Bin, P25ForNet, ExpandedPlaces, Spec),
+                Acc#{A => Places}
+        end
+    end, #{}, Regions);
+build_region_places_map(_, _, _, _, _) -> #{}.
+
+pi_pattern_is(I, P) when is_map(I) ->
+    PN = maps:get(pattern, I, maps:get(<<"pattern">>, I, undefined)),
+    PN =:= P orelse (is_atom(PN) andalso atom_to_binary(PN, utf8) =:= P).
+
+net_matches(I, NetId) when is_binary(NetId) ->
+    N = maps:get(net, I, maps:get(<<"net">>, I, undefined)),
+    case N of
+        B when is_binary(B) -> B =:= NetId;
+        A when is_atom(A) -> atom_to_binary(A, utf8) =:= NetId;
+        _ -> false
+    end.
+
+places_for_region(RegionId, P25Instances, ExpandedPlaces, Spec) ->
+    %% Find P25 instance with region param matching RegionId
+    Match = lists:search(fun(I) ->
+        R = maps:get(region, I, maps:get(<<"region">>, I, undefined)),
+        case R of
+            B when is_binary(B) -> B =:= RegionId;
+            A when is_atom(A) -> atom_to_binary(A, utf8) =:= RegionId;
+            _ -> false
+        end
+    end, P25Instances),
+    case Match of
+        {value, Inst} ->
+            %% Expand this instance to get its places (with mapping applied)
+            Context = #{spec => Spec},
+            Expanded = yawl_pattern_expander:expand_pattern(Inst, Context),
+            P = maps:get(places, Expanded, []),
+            %% Intersect with ExpandedPlaces so we only include places that exist in the net
+            [Pl || Pl <- P, lists:member(Pl, ExpandedPlaces)];
+        false ->
+            %% No P25 for this region; use cancel_region pattern default places if in net
+            Defaults = [p_start, p_region_active, p_cancel_event, p_region_cancelled, p_end],
+            [Pl || Pl <- Defaults, lists:member(Pl, ExpandedPlaces)]
+    end.
 
 %% @private
 normalize_options(Options) when is_map(Options) ->
@@ -478,8 +570,8 @@ generate_module(NetId, NetInfo, Options) ->
            "\n"
            "%% @private\n"
            "-spec init(term()) -> term().\n"
-           "init(_NetArg) ->\n"
-           "    #{}.\n"
+           "init(NetArg) ->\n"
+           "    ">>, generate_init_usr_info(NetInfo), <<".\n"
            "\n"
            "%% @private\n"
            "-spec handle_call(term(), {pid(), term()}, #net_state{}) ->\n"
@@ -516,9 +608,67 @@ generate_module(NetId, NetInfo, Options) ->
     {ok, ModuleCode}.
 
 %% @private
+%% Generate init/1 body - merge variables from spec with initial_data from NetArg (F-010).
+generate_init_usr_info(#{variables := Vars}) when is_list(Vars), Vars =/= [] ->
+    %% Build #{name => initial} from variable definitions
+    Entries = lists:map(fun(V) ->
+        Name = var_name(V),
+        Initial = var_initial(V),
+        NameAtom = case Name of
+            B when is_binary(B) -> binary_to_atom(B, utf8);
+            A when is_atom(A) -> A;
+            _ -> undefined
+        end,
+        case NameAtom of
+            undefined -> [];
+            _ -> [<<"    ", (atom_to_source(NameAtom))/binary, " => ", (value_to_source(Initial))/binary>>]
+        end
+    end, Vars),
+    ValidEntries = [E || E <- Entries, E =/= []],
+    case ValidEntries of
+        [] ->
+            <<"maps:get(initial_data, NetArg, #{})">>;
+        _ ->
+            DefaultMap = iolist_to_binary(lists:join(<<",\n           ">>, ValidEntries)),
+            <<"DefaultVars = #{\n           ", DefaultMap/binary, "\n    },\n"
+              "    case NetArg of\n"
+              "        #{initial_data := Id} when is_map(Id) -> maps:merge(DefaultVars, Id);\n"
+              "        _ -> DefaultVars\n"
+              "    end">>
+    end;
+generate_init_usr_info(_) ->
+    <<"maps:get(initial_data, NetArg, #{})">>.
+
+var_name(#{<<"name">> := N}) -> N;
+var_name(#{name := N}) -> N;
+var_name(_) -> undefined.
+
+var_initial(#{<<"initial">> := V}) -> V;
+var_initial(#{initial := V}) -> V;
+var_initial(_) -> undefined.
+
+value_to_source(V) when is_boolean(V) -> atom_to_binary(V, utf8);
+value_to_source(V) when is_integer(V) -> integer_to_binary(V);
+value_to_source(V) when is_binary(V) -> iolist_to_binary([$", V, $"]);
+value_to_source(V) when is_list(V) -> iolist_to_binary(io_lib:format("~p", [V]));
+value_to_source(undefined) -> <<"undefined">>;
+value_to_source(V) -> iolist_to_binary(io_lib:format("~p", [V])).
+
+%% @private
 module_name(NetId, #{module_prefix := Prefix}) ->
     PrefixBin = <<Prefix/binary, NetId/binary>>,
     list_to_atom(binary_to_list(PrefixBin)).
+
+%% @private
+ensure_atom(A) when is_atom(A) -> A;
+ensure_atom(B) when is_binary(B) -> binary_to_atom(B, utf8);
+ensure_atom(L) when is_list(L) -> list_to_atom(L);
+ensure_atom(X) -> X.
+
+%% @private
+place_to_source(A) when is_atom(A) -> atom_to_source(A);
+place_to_source(B) when is_binary(B) -> atom_to_source(binary_to_atom(B, utf8));
+place_to_source(X) -> atom_to_source(X).
 
 %% @private
 %% Format atom for Erlang source: quotes when needed (uppercase/special chars).
@@ -593,15 +743,32 @@ generate_trsn_lst(Transitions) ->
 %%====================================================================
 
 %% @private
+generate_init_marking(#{places := [_ | _] = ExpandedPlaces, input_condition := InputCond}) ->
+    %% Expanded net: input place is p_start or first in preset of t_split
+    InputPlace = case lists:member(p_start, ExpandedPlaces) of
+        true -> p_start;
+        false -> sanitize_atom_name(InputCond)
+    end,
+    InitClauses = [
+        <<"\n        ", (atom_to_source(InputPlace))/binary, " ->\n            [init]">>
+    ] ++
+    [ <<"\n        ", (atom_to_source(P))/binary, " ->\n            []">> || P <- ExpandedPlaces, P =/= InputPlace ] ++
+    [ <<"\n        _Place ->\n            []">> ],
+    JoinedClauses = iolist_to_binary(lists:join(<<";">>, InitClauses)),
+    iolist_to_binary([
+        <<"%% @doc Returns the initial marking for a given place.\n"
+           "%% @private\n"
+           "-spec init_marking(atom(), term()) -> [term()].\n"
+           "init_marking(Place, UsrInfo) ->\n"
+           "    case Place of">>, JoinedClauses, <<"\n    end.\n">>
+    ]);
 generate_init_marking(#{input_condition := InputCond, tasks := Tasks}) ->
     InputPlace = sanitize_atom_name(InputCond),
-
     InitClauses = [
         <<"\n        ", (atom_to_source(InputPlace))/binary, " ->\n            [init]">>
     ] ++
     [ generate_init_marking_clause(Task) || Task <- Tasks ] ++
     [ <<"\n        _Place ->\n            []">> ],
-
     JoinedClauses = iolist_to_binary(lists:join(<<";">>, InitClauses)),
     iolist_to_binary([
         <<"%% @doc Returns the initial marking for a given place.\n"
@@ -623,12 +790,28 @@ generate_init_marking_clause(TaskId) ->
 %%====================================================================
 
 %% @private
+generate_preset(#{preset := PresetMap}) when map_size(PresetMap) > 0 ->
+    Clauses = maps:fold(fun(Trsn, PresetList, Acc) ->
+        PlaceAtoms = [ensure_atom(P) || P <- PresetList],
+        TrsnAtom = ensure_atom(Trsn),
+        PlaceSources = [place_to_source(Pa) || Pa <- PlaceAtoms],
+        PlacesStr = iolist_to_binary(lists:join(<<", ">>, PlaceSources)),
+        [iolist_to_binary(["\n        ", place_to_source(TrsnAtom), " ->\n            [", PlacesStr, "]"]) | Acc]
+    end, [], PresetMap),
+    JoinedClauses = iolist_to_binary(lists:join(<<";">>, Clauses ++ [<<"\n        _Transition ->\n            []">>])),
+    iolist_to_binary([
+        <<"%% @doc Returns the preset (input places) for a transition.\n"
+           "%% @private\n"
+           "-spec preset(atom()) -> [atom()].\n"
+           "preset(Transition) ->\n"
+           "    case Transition of">>,
+        JoinedClauses,
+        <<"\n    end.\n">>
+    ]);
 generate_preset(#{input_condition := InputCond, tasks := Tasks}) ->
     InputPlace = sanitize_atom_name(InputCond),
-
     Clauses = [ generate_preset_clause(Task, InputPlace) || Task <- Tasks ] ++
               [ <<"\n        _Transition ->\n            []">> ],
-
     JoinedClauses = iolist_to_binary(lists:join(<<";">>, Clauses)),
     iolist_to_binary([
         <<"%% @doc Returns the preset (input places) for a transition.\n"
@@ -655,11 +838,27 @@ generate_preset_clause(TaskId, InputPlace) ->
 %%====================================================================
 
 %% @private
+generate_is_enabled(#{preset := PresetMap}) when map_size(PresetMap) > 0 ->
+    Clauses = maps:fold(fun(Trsn, PresetList, Acc) ->
+        %% Match Mode has at least one token in each preset place
+        MatchParts = [<<(atom_to_source(P))/binary, " := [_ | _]">> || P <- PresetList],
+        MatchStr = iolist_to_binary(lists:join(<<",\n           ">>, MatchParts)),
+        [<< "\n        {", (atom_to_source(Trsn))/binary, ", #{", MatchStr/binary, "}, _UsrInfo} ->\n            true" >> | Acc]
+    end, [], PresetMap),
+    JoinedClauses = iolist_to_binary(lists:join(<<";">>, Clauses ++ [<<"\n        {_Transition, _Mode, _UsrInfo} ->\n            false">>])),
+    iolist_to_binary([
+        <<"%% @doc Checks if a transition is enabled in the given mode.\n"
+           "%% @private\n"
+           "-spec is_enabled(atom(), #{atom() => [term()]}, term()) -> boolean().\n"
+           "is_enabled(Transition, Mode, UsrInfo) ->\n"
+           "    case {Transition, Mode, UsrInfo} of">>,
+        JoinedClauses,
+        <<"\n    end.\n">>
+    ]);
 generate_is_enabled(#{input_condition := InputCond, tasks := Tasks}) ->
     InputPlace = sanitize_atom_name(InputCond),
     Clauses = [ generate_is_enabled_clause(Task, InputPlace) || Task <- Tasks ] ++
               [ <<"\n        {_Transition, _Mode, _UsrInfo} ->\n            false">> ],
-
     JoinedClauses = iolist_to_binary(lists:join(<<";">>, Clauses)),
     iolist_to_binary([
         <<"%% @doc Checks if a transition is enabled in the given mode.\n"
@@ -694,6 +893,22 @@ generate_is_enabled_clause(TaskId, InputPlace) ->
 %%====================================================================
 
 %% @private
+generate_fire(#{preset := PresetMap, postset := PostsetMap}) when map_size(PresetMap) > 0, map_size(PostsetMap) > 0 ->
+    Clauses = maps:fold(fun(Trsn, PresetList, Acc) ->
+        PostsetList = maps:get(Trsn, PostsetMap, []),
+        [generate_fire_expanded_clause(Trsn, PresetList, PostsetList) | Acc]
+    end, [], PresetMap),
+    JoinedClauses = iolist_to_binary(lists:join(<<";">>, Clauses ++ [<<"\n        {_Transition, _Mode, _UsrInfo} ->\n            abort">>])),
+    iolist_to_binary([
+        <<"%% @doc Fires a transition, consuming and producing tokens.\n"
+           "%% @private\n"
+           "-spec fire(atom(), #{atom() => [term()]}, term()) ->\n"
+           "    {produce, #{atom() => [term()]}} | abort.\n"
+           "fire(Transition, Mode, UsrInfo) ->\n"
+           "    case {Transition, Mode, UsrInfo} of">>,
+        JoinedClauses,
+        <<"\n    end.\n">>
+    ]);
 generate_fire(#{input_condition := InputCond,
                 output_condition := OutputCond,
                 tasks := Tasks,
@@ -715,6 +930,33 @@ generate_fire(#{input_condition := InputCond,
         JoinedClauses,
         <<"\n    end.\n">>
     ]).
+
+%% @private
+-spec generate_fire_expanded_clause(atom(), [place()], [place()]) -> binary().
+generate_fire_expanded_clause(Trsn, PresetList, PostsetList) ->
+    %% Match Mode: each preset place has at least one token
+    MatchParts = [<<(atom_to_source(P))/binary, " := [_]">> || P <- PresetList],
+    MatchStr = iolist_to_binary(lists:join(<<",\n           ">>, MatchParts)),
+    %% Produce map: each postset place gets token (t_split->token, t_finish*/t_complete*->done, t_merge->merged)
+    Token = produce_token_for_transition(Trsn),
+    ProduceParts = [<<(atom_to_source(P))/binary, " => [", (atom_to_source(Token))/binary, "]">> || P <- PostsetList],
+    ProduceStr = iolist_to_binary(lists:join(<<",\n           ">>, ProduceParts)),
+    <<"\n        {", (atom_to_source(Trsn))/binary, ", #{", MatchStr/binary, "}, _UsrInfo} ->\n"
+      "        {produce, #{\n           ", ProduceStr/binary, "\n        }}">>.
+
+%% @private Token produced by transition (thread_split/thread_merge pattern)
+produce_token_for_transition(t_split) -> token;
+produce_token_for_transition(t_finish) -> done;
+produce_token_for_transition(t_finish1) -> done;
+produce_token_for_transition(t_finish2) -> done;
+produce_token_for_transition(t_finish3) -> done;
+produce_token_for_transition(t_finish4) -> done;
+produce_token_for_transition(t_complete1) -> done;
+produce_token_for_transition(t_complete2) -> done;
+produce_token_for_transition(t_complete3) -> done;
+produce_token_for_transition(t_complete4) -> done;
+produce_token_for_transition(t_merge) -> merged;
+produce_token_for_transition(_) -> token.
 
 %% @private
 -spec generate_fire_clause(task_id(), place(), place(), #{task_id() => atom()}) -> binary().

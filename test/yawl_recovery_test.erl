@@ -65,6 +65,13 @@ setup() ->
     mnesia:delete_schema([node()]),
     timer:sleep(100),
 
+    %% Recreate schema (required before mnesia:start after delete_schema)
+    case mnesia:create_schema([node()]) of
+        ok -> ok;
+        {error, {already_exists, _}} -> ok;
+        {error, Reason} -> exit({schema_create_failed, Reason})
+    end,
+
     %% Initialize schema with yawl_recovery
     ok = yawl_recovery:init_schema(),
     ok.
@@ -381,25 +388,17 @@ test_large_data_checkpoint() ->
     SpecId = <<"spec17">>,
     CaseId = <<"case17">>,
 
-    %% Create large marking with many tokens
-    LargeMarking = lists:foldl(
-        fun(N, Acc) ->
-            Key = list_to_atom("p" ++ integer_to_list(N)),
-            maps:put(Key, lists:seq(1, 100), Acc)
-        end,
-        #{},
-        lists:seq(1, 10)
-    ),
+    %% Create large marking with many tokens (use atoms that exist: p1..p10)
+    LargeMarking = maps:from_list([
+        {list_to_atom("p" ++ integer_to_list(N)), lists:seq(1, 100)}
+        || N <- lists:seq(1, 10)
+    ]),
 
-    %% Create large data map
-    LargeData = lists:foldl(
-        fun(N, Acc) ->
-            Key = list_to_atom("key" ++ integer_to_list(N)),
-            maps:put(Key, lists:seq(1, 100), Acc)
-        end,
-        #{},
-        lists:seq(1, 20)
-    ),
+    %% Create large data map (use binary keys to avoid atom table pressure)
+    LargeData = maps:from_list([
+        {<<"key", (integer_to_binary(N))/binary>>, lists:seq(1, 100)}
+        || N <- lists:seq(1, 20)
+    ]),
 
     {ok, Cpid} = yawl_recovery:checkpoint(SpecId, CaseId, LargeMarking, LargeData),
     {ok, {RestoredMarking, RestoredData}} = yawl_recovery:resume(SpecId, CaseId, Cpid),

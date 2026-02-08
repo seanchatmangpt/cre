@@ -40,9 +40,11 @@
 %% @end
 %%--------------------------------------------------------------------
 setup() ->
-    test_helper:ensure_app_started(bcrypt),
-    {ok, Pid} = yawl_auth:start_auth([{session_timeout, 3600}]),
-    Pid.
+    _ = test_helper:ensure_app_started(bcrypt),
+    case yawl_auth:start_auth([{session_timeout, 3600}]) of
+        {ok, Pid} -> Pid;
+        {error, {already_started, Pid}} -> Pid
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Cleanup function called after each test.

@@ -1044,9 +1044,9 @@ initialize_net(Spec, Case, _CreMaster) ->
 -spec extract_places_from_spec(term()) -> [place()].
 
 extract_places_from_spec(#{tasks := Tasks}) when is_map(Tasks) ->
-    %% Convert task IDs to place atoms
-    [binary_to_existing_atom(TaskId, utf8) || TaskId <- maps:keys(Tasks),
-                                               is_binary(TaskId)];
+    %% Convert task IDs to place atoms (use binary_to_atom for specs with new task names)
+    [binary_to_atom(TaskId, utf8) || TaskId <- maps:keys(Tasks),
+                                      is_binary(TaskId)];
 extract_places_from_spec(_Spec) ->
     [].
 

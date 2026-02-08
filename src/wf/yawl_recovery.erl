@@ -162,7 +162,7 @@ init_schema() ->
         {error, {already_started, _}} -> ok
     end,
 
-    %% Create yawl_checkpoint table
+    %% Create yawl_checkpoint table (no-op if already exists)
     CheckpointAttrs = record_info(fields, yawl_checkpoint),
     CheckpointDef = [
         {attributes, CheckpointAttrs},
