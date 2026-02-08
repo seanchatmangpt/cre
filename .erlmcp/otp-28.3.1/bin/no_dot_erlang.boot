@@ -1,1 +1,0 @@
-/Users/sac/.erlmcp/otp-28.3.1/lib/erlang/bin/no_dot_erlang.boot
