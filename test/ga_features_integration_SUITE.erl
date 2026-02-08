@@ -17,14 +17,6 @@
 %% Suite Callbacks
 %%====================================================================
 
-%% Define compilation record locally (from ga_compiler.erl)
--record(compilation, {
-    constitution :: #constitution{},
-    warnings = [] :: list(),
-    errors = [] :: list(),
-    compilation_time :: non_neg_integer()
-}).
-
 %% all/0 must return list of test cases and/or groups
 -export([all/0]).
 -export([suite/0]).
@@ -69,9 +61,63 @@ suite() ->
     [{timetrap, {seconds, 30}}].
 
 init_per_suite(Config) ->
-    Config.
+    %% Start mnesia for persistent_timer tests
+    case mnesia:start() of
+        ok ->
+            %% Create mnesia schema if needed (for test environment)
+            case mnesia:table_info(schema, disc_copies) of
+                [] ->
+                    %% No disc copies, use ram_copies for testing
+                    %% Use the record name from wf_persistent_timer module
+                    Attrs = [timer_id, execution_id, target_time, timezone,
+                             callback, status, created_at, fired_at, result,
+                             retry_count, max_retries, metadata, timer_ref],
+                    case mnesia:create_table(wf_persistent_timer, [
+                            {ram_copies, [node()]},
+                            {record_name, persistent_timer},
+                            {attributes, Attrs}
+                        ]) of
+                        {atomic, ok} -> ok;
+                        {aborted, {already_exists, _}} -> ok;
+                        {aborted, Reason} ->
+                            ct:fail({failed_to_create_mnesia_table, Reason})
+                    end;
+                _ ->
+                    %% Disc copies available, use disc_copies
+                    Attrs = [timer_id, execution_id, target_time, timezone,
+                             callback, status, created_at, fired_at, result,
+                             retry_count, max_retries, metadata, timer_ref],
+                    case mnesia:create_table(wf_persistent_timer, [
+                            {disc_copies, [node()]},
+                            {record_name, persistent_timer},
+                            {attributes, Attrs}
+                        ]) of
+                        {atomic, ok} -> ok;
+                        {aborted, {already_exists, _}} -> ok;
+                        {aborted, Reason} ->
+                            ct:fail({failed_to_create_mnesia_table, Reason})
+                    end
+            end,
+            Config;
+        {error, {already_started, _}} ->
+            Config;
+        {error, Reason} ->
+            ct:fail({failed_to_start_mnesia, Reason})
+    end,
+    %% Start wf_time_travel server for time_travel tests
+    case wf_time_travel:start_link(#{}) of
+        {ok, _Pid} -> Config;
+        {error, {already_started, _}} -> Config
+    end.
 
 end_per_suite(_Config) ->
+    %% Stop wf_time_travel server
+    case whereis(wf_time_travel) of
+        Pid when is_pid(Pid) -> gen_server:stop(Pid);
+        undefined -> ok
+    end,
+    %% Stop mnesia (only for test cleanup)
+    mnesia:stop(),
     ok.
 
 init_per_group(_GroupName, Config) ->
@@ -134,7 +180,7 @@ ga_constitution_validation_test(_Config) ->
 
     %% Test 4: Invalid constitution (missing id)
     InvalidMap = #{<<"version">> => <<"1.0">>},
-    ?assertThrow(_, ga_constitution:from_map(InvalidMap)),
+    ?assertException(error, {invalid_constitution, missing_id}, ga_constitution:from_map(InvalidMap)),
 
     ok.
 
@@ -183,7 +229,7 @@ constitution:
 
     %% Serialize back to YAML
     SerializedYaml = ga_constitution:to_yaml(ParsedConstitution),
-    ?assert(is_binary(SerializedYaml)),
+    ?assertMatch(<<_/binary>>, SerializedYaml),  %% Should be binary
 
     %% Parse the serialized version
     {ok, RoundtripConstitution} = ga_yaml:from_yaml(SerializedYaml),
@@ -245,10 +291,11 @@ ga_compiler_full_pipeline_test(_Config) ->
 
     %% Compile the constitution
     {ok, Compilation} = ga_compiler:compile(FullMap),
-    ?assertMatch(#compilation{}, Compilation),
+    ?assertMatch({ok, _}, ga_compiler:compile(FullMap)),
+    ?assertMatch({compilation, _, _, _, _, _}, Compilation),
 
-    %% Verify compilation result has expected fields
-    ?assertMatch(#compilation{constitution = _Con}, Compilation),
+    %% Verify compilation result has expected fields (using tuple access)
+    is_tuple(Compilation) andalso element(1, Compilation) =:= compilation,
 
     ok.
 

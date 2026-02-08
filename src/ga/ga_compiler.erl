@@ -434,12 +434,9 @@ do_generate_code(Constitution, Options) ->
     end.
 
 %% @private
-check_type_bindings(Sigma) when is_map(Sigma) ->
-    TypeBindings = maps:get(type_bindings, Sigma, []),
+check_type_bindings(#sigma{type_bindings = TypeBindings}) ->
     lists:filtermap(
-        fun(Binding) when is_map(Binding) ->
-            Term = maps:get(<<"term">>, Binding, <<>>),
-            Type = maps:get(<<"type">>, Binding, <<>>),
+        fun(#type_binding{term = Term, type = Type}) ->
             case {is_binary(Term), is_binary(Type)} of
                 {true, true} -> false;
                 _ -> {true, <<"Invalid type binding for ", Term/binary>>}
@@ -450,15 +447,13 @@ check_type_bindings(Sigma) when is_map(Sigma) ->
         TypeBindings
     );
 check_type_bindings(_Sigma) ->
-    [<<"Sigma must be a map">>].
+    [<<"Sigma must be a sigma record">>].
 
 %% @private
-check_pattern_sequence(Lambda) when is_map(Lambda) ->
-    Sequence = maps:get(<<"pattern_sequence">>, Lambda, []),
+check_pattern_sequence(#lambda{pattern_sequence = Sequence}) ->
     Supported = sets:from_list(supported_patterns()),
     lists:filtermap(
-        fun(PatternInstance) when is_map(PatternInstance) ->
-            Pattern = maps:get(<<"pattern">>, PatternInstance, <<>>),
+        fun(#pattern_instance{pattern = Pattern}) ->
             case sets:is_element(Pattern, Supported) of
                 true -> false;
                 false -> {true, <<"Unsupported pattern: ", Pattern/binary>>}
@@ -469,14 +464,12 @@ check_pattern_sequence(Lambda) when is_map(Lambda) ->
         Sequence
     );
 check_pattern_sequence(_Lambda) ->
-    [<<"Lambda must be a map">>].
+    [<<"Lambda must be a lambda record">>].
 
 %% @private
 emit_module(Constitution, ModuleName) ->
     %% Generate gen_yawl module source code
-    #constitution{id = Id, lambda = Lambda} = Constitution,
-
-    PatternInstances = maps:get(<<"pattern_sequence">>, Lambda, []),
+    #constitution{id = Id, lambda = #lambda{pattern_sequence = PatternInstances}} = Constitution,
 
     %% Build module header
     Header = [

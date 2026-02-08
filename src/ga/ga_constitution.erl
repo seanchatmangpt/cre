@@ -269,12 +269,21 @@ to_map(#constitution{
 %%--------------------------------------------------------------------
 %% @doc Creates a constitution from a map.
 %%
+%% @throws {invalid_constitution, Reason} if map is missing required fields
 %% @end
 %%--------------------------------------------------------------------
 -spec from_map(map()) -> constitution().
 
 from_map(Map) when is_map(Map) ->
-    new(Map).
+    case maps:get(<<"id">>, Map, undefined) of
+        undefined -> error({invalid_constitution, missing_id});
+        Id when is_binary(Id) ->
+            case maps:get(<<"version">>, Map, undefined) of
+                undefined -> error({invalid_constitution, missing_version});
+                Version when is_binary(Version) ->
+                    new(Map)
+            end
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Converts a constitution to YAML format.

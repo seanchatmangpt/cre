@@ -302,8 +302,20 @@ deferred_choice_trigger(Options, TriggerData) when is_map(Options), map_size(Opt
         [] ->
             {error, no_enabled_branches};
         _ ->
-            %% Select a branch from enabled ones (non-deterministic)
-            Selected = select_branch(Enabled, TriggerData),
+            %% Check if any enabled branches have priority
+            HasPriority = lists:any(fun(Key) ->
+                case maps:get(Key, Options) of
+                    {_Fun, _Priority} -> true;
+                    {_Cond, _Action, _Priority} -> true;
+                    _ -> false
+                end
+            end, Enabled),
+
+            %% Select branch using priority if available, otherwise non-deterministic
+            Selected = case HasPriority of
+                true -> select_by_priority(Enabled, Options);
+                false -> select_branch(Enabled, TriggerData)
+            end,
 
             %% Execute the selected branch
             case maps:get(Selected, Options) of
@@ -756,6 +768,10 @@ get_priority(Key, Options) ->
 %% - It's a simple function (always enabled)
 %% - It's a {Fun, Priority} tuple (Fun is always enabled)
 %% - It's a {ConditionFun, ActionFun, Priority} tuple (ConditionFun must return true)
+%% - It's a {ConditionFun, ActionFun} tuple (ConditionFun must return true)
+%%
+%% IMPORTANT: Order matters! 3-tuples must come before 2-tuples to distinguish
+%% {ConditionFun, ActionFun, Priority} from {Fun, Priority} where both elements are functions.
 %%
 %% @private
 %% @end
@@ -765,25 +781,40 @@ get_priority(Key, Options) ->
 is_branch_enabled(_Key, Fun, _EvalData) when is_function(Fun, 1) ->
     %% Simple function - always enabled
     true;
-is_branch_enabled(_Key, {Fun, _Priority}, _EvalData) when is_function(Fun, 1) ->
-    %% Function with priority - always enabled
-    true;
 is_branch_enabled(_Key, {ConditionFun, _ActionFun, _Priority}, EvalData)
         when is_function(ConditionFun, 1) ->
-    %% Conditional branch - evaluate the condition
+    %% Conditional branch with priority - evaluate the condition
     try
-        ConditionFun(EvalData)
+        case ConditionFun(EvalData) of
+            true -> true;
+            false -> false;
+            _ -> false
+        end
     catch
         _:_:_ -> false
     end;
 is_branch_enabled(_Key, {ConditionFun, _ActionFun}, EvalData)
         when is_function(ConditionFun, 1) ->
-    %% Conditional branch without priority
-    try
-        ConditionFun(EvalData)
-    catch
-        _:_:_ -> false
+    %% Conditional branch without priority - evaluate the condition
+    %% Check if ActionFun is also a function to distinguish from {Fun, Priority}
+    case _ActionFun of
+        Action when is_function(Action, 1) ->
+            try
+                case ConditionFun(EvalData) of
+                    true -> true;
+                    false -> false;
+                    _ -> false
+                end
+            catch
+                _:_:_ -> false
+            end;
+        _Priority ->
+            %% This is {Fun, Priority} where Fun is a function
+            true
     end;
+is_branch_enabled(_Key, {Fun, _Priority}, _EvalData) when is_function(Fun, 1) ->
+    %% Function with priority - always enabled
+    true;
 is_branch_enabled(_, _, _) ->
     %% Unknown format - not enabled
     false.

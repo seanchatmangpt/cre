@@ -94,24 +94,15 @@ from_yaml(YamlBinary) when is_binary(YamlBinary) ->
             {ok, _} -> ok;
             {error, {already_started, _}} -> ok
         end,
-        %% Parse YAML using yamerl:decode
-        %% yamerl:decode returns a generator (0-arity fun) that needs to be evaluated
-        ResultFun = yamerl:decode(YamlBinary),
-        Docs = case ResultFun of
-            Fun when is_function(Fun, 0) -> Fun();  %% Evaluate generator
-            _ -> ResultFun  %% Already evaluated or error
-        end,
-        case Docs of
+        %% Parse YAML using yamerl_constr:string
+        %% This returns materialized results, not generators
+        case yamerl_constr:string(YamlBinary) of
             [Doc | _] ->
                 %% Normalize yamerl output (may be proplist or map)
                 NormalizedData = normalize_yaml_data(Doc),
                 parse_constitution(NormalizedData);
             [] ->
                 {error, [<<"Empty YAML document">>]};
-            Map when is_map(Map) ->
-                %% Single document
-                NormalizedData = normalize_yaml_data(Map),
-                parse_constitution(NormalizedData);
             {error, Reason} ->
                 {error, [iolist_to_binary(io_lib:format("YAML parse error: ~p", [Reason]))]}
         end
@@ -124,15 +115,189 @@ from_yaml(YamlBinary) when is_binary(YamlBinary) ->
 %%--------------------------------------------------------------------
 %% @doc Serializes a constitution record to YAML format.
 %%
+%% Note: This is a simple YAML encoder for basic constitution structures.
+%% For complex cases, consider using a proper YAML encoding library.
+%%
 %% @end
 %%--------------------------------------------------------------------
 -spec to_yaml(#constitution{}) -> binary().
 
 to_yaml(#constitution{} = Constitution) ->
-    %% Convert constitution to YAML-compatible map
-    Map = constitution_to_map(Constitution),
-    %% Use yamerl to encode
-    iolist_to_binary(yamerl:encode(Map)).
+    try
+        %% Convert constitution to YAML-compatible map
+        Map = constitution_to_map(Constitution),
+        %% Encode to YAML using our simple encoder
+        encode_yaml(#{<<"constitution">> => Map})
+    catch
+        Type:Error:Stack ->
+            ?LOG_ERROR("YAML encoding failed: ~p:~p~n~p", [Type, Error, Stack]),
+            error({encoding_failed, {Type, Error}})
+    end.
+
+%% @private
+%% Simple YAML encoder for constitution maps
+encode_yaml(Map) when is_map(Map) ->
+    iolist_to_binary(encode_yaml(Map, "")).
+
+encode_yaml(Map, Indent) when is_map(Map) ->
+    maps:fold(fun(K, V, Acc) ->
+        Key = binary_to_list(K),
+        case V of
+            List when is_list(List) ->
+                %% List of items
+                Acc ++ Indent ++ Key ++ ":\n" ++ encode_list(List, Indent ++ "  ");
+            SubMap when is_map(SubMap) ->
+                %% Nested map
+                Acc ++ Indent ++ Key ++ ":\n" ++ encode_yaml(SubMap, Indent ++ "  ");
+            Bin when is_binary(Bin) ->
+                %% Binary value - quote if needed
+                Val = binary_to_list(Bin),
+                Acc ++ Indent ++ Key ++ ": " ++ maybe_quote(Val) ++ "\n";
+            Int when is_integer(Int) ->
+                Acc ++ Indent ++ Key ++ ": " ++ integer_to_list(Int) ++ "\n";
+            Atom when is_atom(Atom) ->
+                Acc ++ Indent ++ Key ++ ": " ++ atom_to_list(Atom) ++ "\n";
+            _ ->
+                Acc ++ Indent ++ Key ++ ": " ++ io_lib:format("~p", [V]) ++ "\n"
+        end
+    end, "", Map).
+
+encode_list([], _Indent) ->
+    "";
+encode_list(List, Indent) when is_list(List) ->
+    lists:foldl(fun(Item, Acc) ->
+        case Item of
+            Map when is_map(Map) ->
+                %% For list items that are maps, format as:
+                %% - key1: value1
+                %%   key2: value2
+                Acc ++ encode_list_item_map(Map, Indent);
+            Bin when is_binary(Bin) ->
+                Acc ++ Indent ++ "- " ++ binary_to_list(Bin) ++ "\n";
+            _ ->
+                Acc ++ Indent ++ "- " ++ io_lib:format("~p", [Item]) ++ "\n"
+        end
+    end, "", List).
+
+%% @private
+%% Encode a map as a list item (first key with "- ", rest with "  ")
+encode_list_item_map(Map, Indent) ->
+    Keys = maps:keys(Map),
+    encode_list_item_map(Keys, Map, Indent, true).
+
+encode_list_item_map([], _Map, _Indent, _IsFirst) ->
+    "";
+encode_list_item_map([K | Rest], Map, Indent, true) ->
+    %% First key goes on same line as "-"
+    Key = binary_to_list(K),
+    V = maps:get(K, Map),
+    Prefix = Indent ++ "- ",
+    Value = encode_value(V, Indent ++ "  "),
+    Prefix ++ Key ++ ": " ++ Value ++ "\n" ++ encode_list_item_map(Rest, Map, Indent, false);
+encode_list_item_map([K | Rest], Map, Indent, false) ->
+    %% Rest of keys go on next line with proper indentation
+    Key = binary_to_list(K),
+    V = maps:get(K, Map),
+    Prefix = Indent ++ "  ",
+    Value = encode_value(V, Indent ++ "  "),
+    Prefix ++ Key ++ ": " ++ Value ++ "\n" ++ encode_list_item_map(Rest, Map, Indent, false).
+
+%% @private
+%% Encode a value (not a key)
+encode_value(V, _Indent) ->
+    case V of
+        List when is_list(List) ->
+            %% For lists that are values, encode as YAML flow sequence
+            encode_flow_list(List);
+        SubMap when is_map(SubMap) ->
+            "{}";
+        Bin when is_binary(Bin) ->
+            Str = binary_to_list(Bin),
+            maybe_quote(Str);
+        Int when is_integer(Int) ->
+            integer_to_list(Int);
+        Atom when is_atom(Atom) ->
+            atom_to_list(Atom);
+        true ->
+            "true";
+        false ->
+            "false";
+        _ ->
+            io_lib:format("~p", [V])
+    end.
+
+%% @private
+%% Encode a list as a YAML flow sequence: [item1, item2, ...]
+encode_flow_list([]) ->
+    "[]";
+encode_flow_list(List) ->
+    Items = [encode_flow_item(I) || I <- List],
+    "[" ++ string:join(Items, ", ") ++ "]".
+
+%% @private
+%% Encode a single item for flow sequence
+encode_flow_item(Item) ->
+    case Item of
+        Bin when is_binary(Bin) ->
+            Str = binary_to_list(Bin),
+            maybe_quote(Str);
+        Int when is_integer(Int) ->
+            integer_to_list(Int);
+        Atom when is_atom(Atom) ->
+            atom_to_list(Atom);
+        _ ->
+            io_lib:format("~p", [Item])
+    end.
+
+%% @private
+maybe_quote(Str) ->
+    case needs_quoting(Str) of
+        true -> [$", Str, $"];
+        false -> Str
+    end.
+
+%% @private
+needs_quoting([]) ->
+    false;
+needs_quoting(Str) ->
+    %% Quote if contains special chars, is empty, or looks like a boolean/null
+    case string:trim(Str) of
+        "" -> true;
+        "true" -> true;
+        "false" -> true;
+        "null" -> true;
+        "True" -> true;
+        "False" -> true;
+        "Null" -> true;
+        Trimmed -> needs_quoting_chars(Trimmed)
+    end.
+
+needs_quoting_chars([]) ->
+    false;
+needs_quoting_chars([$: | _]) -> true;  % Colon
+needs_quoting_chars([$# | _]) -> true;  % Comment
+needs_quoting_chars([$\s | _]) -> true; % Space
+needs_quoting_chars([$\t | _]) -> true; % Tab
+needs_quoting_chars([$\n | _]) -> true; % Newline
+needs_quoting_chars([$[ | _]) -> true;  % Bracket
+needs_quoting_chars([$] | _]) -> true;  % Bracket
+needs_quoting_chars([${ | _]) -> true;  % Brace
+needs_quoting_chars([$} | _]) -> true;  % Brace
+needs_quoting_chars([$, | _]) -> true;  % Comma
+needs_quoting_chars([$! | _]) -> true;  % Exclamation
+needs_quoting_chars([$& | _]) -> true;  % Ampersand
+needs_quoting_chars([$* | _]) -> true;  % Asterisk
+needs_quoting_chars([$% | _]) -> true;  % Percent
+needs_quoting_chars([$| | _]) -> true;  % Pipe
+needs_quoting_chars([$> | _]) -> true;  % Greater than
+needs_quoting_chars([$' | _]) -> true;  % Single quote
+needs_quoting_chars([$" | _]) -> true;  % Double quote
+needs_quoting_chars([$` | _]) -> true;  % Backtick
+needs_quoting_chars([$@ | _]) -> true;  % At sign
+needs_quoting_chars([$_ | _]) -> true;  %% Others
+needs_quoting_chars([$\r | _]) -> true; % Carriage return
+needs_quoting_chars([_ | Rest]) ->
+    needs_quoting_chars(Rest).
 
 %%--------------------------------------------------------------------
 %% @doc Reads and parses a YAML file into a constitution.
@@ -237,8 +402,8 @@ parse_sigma(SigmaMap) when is_map(SigmaMap) ->
     TypeBindingsList = maps:get(<<"type_bindings">>, SigmaMap, []),
     TypeBindings = [parse_type_binding(B) || B <- TypeBindingsList],
     #{
-        type_system => TypeSystem,
-        type_bindings => TypeBindings
+        <<"type_system">> => TypeSystem,
+        <<"type_bindings">> => TypeBindings
     }.
 
 %% @private
@@ -364,11 +529,23 @@ constitution_to_map(#constitution{
     }.
 
 %% @private
--spec sigma_to_map(map()) -> map().
+-spec sigma_to_map(term()) -> map().
 
-sigma_to_map(#{type_system := Type, type_bindings := Bindings}) ->
+sigma_to_map(SigmaMap) when is_map(SigmaMap) ->
+    %% Handle both map and #sigma{} record
+    TypeSystem = maps:get(<<"type_system">>, SigmaMap, behavioral),
+    TypeBindings = maps:get(<<"type_bindings">>, SigmaMap, []),
+    TypeSystemBin = case TypeSystem of
+        Bin when is_binary(Bin) -> Bin;
+        Atom when is_atom(Atom) -> atom_to_binary(Atom, utf8)
+    end,
     #{
-        <<"type_system">> => atom_to_binary(Type),
+        <<"type_system">> => TypeSystemBin,
+        <<"type_bindings">> => [type_binding_to_map(B) || B <- TypeBindings]
+    };
+sigma_to_map(#sigma{type_system = Type, type_bindings = Bindings}) ->
+    #{
+        <<"type_system">> => atom_to_binary(Type, utf8),
         <<"type_bindings">> => [type_binding_to_map(B) || B <- Bindings]
     }.
 
@@ -379,8 +556,20 @@ type_binding_to_map(#type_binding{term = Term, type = Type, token_contract = Con
     #{
         <<"term">> => Term,
         <<"type">> => Type,
-        <<"token_contract">> => Contract
+        <<"token_contract">> => token_contract_to_map(Contract)
     }.
+
+%% @private
+-spec token_contract_to_map(ga_constitution:token_contract()) -> map().
+
+token_contract_to_map(#token_contract{shape = Shape, validity = Validity, lifespan = Lifespan}) ->
+    #{
+        <<"shape">> => atom_to_binary(Shape),
+        <<"validity">> => atom_to_binary(Validity),
+        <<"lifespan">> => atom_to_binary(Lifespan)
+    };
+token_contract_to_map(Map) when is_map(Map) ->
+    Map.
 
 %% @private
 -spec refusal_to_map(ga_constitution:refusal()) -> map().
@@ -414,8 +603,14 @@ quality_gate_to_map(#quality_gate{
 -spec lambda_to_map(ga_constitution:lambda()) -> map().
 
 lambda_to_map(#lambda{compilation_strategy = Strat, pattern_sequence = Seq}) ->
+    %% compilation_strategy may be an atom or binary
+    StratBin = case Strat of
+        Bin when is_binary(Bin) -> Bin;
+        Atom when is_atom(Atom) -> atom_to_binary(Atom, utf8);
+        _ -> <<"topological">>  %% default fallback
+    end,
     #{
-        <<"compilation_strategy">> => atom_to_binary(Strat),
+        <<"compilation_strategy">> => StratBin,
         <<"pattern_sequence">> => [pattern_instance_to_map(P) || P <- Seq]
     }.
 

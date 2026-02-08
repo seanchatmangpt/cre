@@ -320,8 +320,10 @@ handle_call({start_session, CaseId, NetMod, Options}, _From, State) ->
         session_id = SessionId,
         breakpoints = maps:get(breakpoints, Options, [])
     },
-    Sessions = maps:put(SessionId, Session, State#{sessions => maps:get(sessions, State)}),
-    Timelines = maps:put(SessionId, Timeline, State#{timelines => maps:get(timelines, State)}),
+    CurrentSessions = maps:get(sessions, State, #{}),
+    CurrentTimelines = maps:get(timelines, State, #{}),
+    Sessions = maps:put(SessionId, Session, CurrentSessions),
+    Timelines = maps:put(SessionId, Timeline, CurrentTimelines),
     {reply, {ok, SessionId}, State#{sessions => Sessions, timelines => Timelines}};
 
 handle_call(get_active_sessions, _From, State) ->
@@ -330,7 +332,8 @@ handle_call(get_active_sessions, _From, State) ->
     {reply, ActiveIds, State};
 
 handle_call({replay_from_start, SessionId}, _From, State) ->
-    case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+    Timelines = maps:get(timelines, State, #{}),
+    case maps:get(SessionId, Timelines, undefined) of
         #timeline{events = Events} ->
             {reply, {ok, Events}, State};
         undefined ->
@@ -338,7 +341,8 @@ handle_call({replay_from_start, SessionId}, _From, State) ->
     end;
 
 handle_call({replay_to, SessionId, Timestamp}, _From, State) ->
-    case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+    Timelines = maps:get(timelines, State, #{}),
+    case maps:get(SessionId, Timelines, undefined) of
         #timeline{events = Events} ->
             Filtered = [E || #event{timestamp = TS} = E <- Events, TS =< Timestamp],
             {reply, {ok, Filtered}, State};
@@ -347,14 +351,16 @@ handle_call({replay_to, SessionId, Timestamp}, _From, State) ->
     end;
 
 handle_call({step_forward, SessionId}, _From, State) ->
-    case maps:get(SessionId, State#{sessions => maps:get(sessions, State)}, undefined) of
+    Sessions = maps:get(sessions, State, #{}),
+    case maps:get(SessionId, Sessions, undefined) of
         #session{current_index = Idx} = Session ->
-            case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+            Timelines = maps:get(timelines, State, #{}),
+            case maps:get(SessionId, Timelines, undefined) of
                 #timeline{events = Events} when Idx < length(Events) ->
                     Event = lists:nth(Idx + 1, Events),
                     NewSession = Session#session{current_index = Idx + 1, status = replaying},
-                    Sessions = maps:put(SessionId, NewSession, maps:get(sessions, State)),
-                    {reply, {ok, Event}, State#{sessions => Sessions}};
+                    NewSessions = maps:put(SessionId, NewSession, Sessions),
+                    {reply, {ok, Event}, State#{sessions => NewSessions}};
                 _ ->
                     {reply, {error, end_of_timeline}, State}
             end;
@@ -363,14 +369,16 @@ handle_call({step_forward, SessionId}, _From, State) ->
     end;
 
 handle_call({step_backward, SessionId}, _From, State) ->
-    case maps:get(SessionId, State#{sessions => maps:get(sessions, State)}, undefined) of
+    Sessions = maps:get(sessions, State, #{}),
+    case maps:get(SessionId, Sessions, undefined) of
         #session{current_index = Idx} = Session when Idx > 0 ->
-            case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+            Timelines = maps:get(timelines, State, #{}),
+            case maps:get(SessionId, Timelines, undefined) of
                 #timeline{events = Events} when Idx > 0, Idx =< length(Events) ->
                     Event = lists:nth(Idx, Events),
                     NewSession = Session#session{current_index = Idx - 1, status = replaying},
-                    Sessions = maps:put(SessionId, NewSession, maps:get(sessions, State)),
-                    {reply, {ok, Event}, State#{sessions => Sessions}};
+                    NewSessions = maps:put(SessionId, NewSession, Sessions),
+                    {reply, {ok, Event}, State#{sessions => NewSessions}};
                 _ ->
                     {reply, {ok, at_start}, State}
             end;
@@ -379,17 +387,19 @@ handle_call({step_backward, SessionId}, _From, State) ->
     end;
 
 handle_call({jump_to, SessionId, Index}, _From, State) ->
-    case maps:get(SessionId, State#{sessions => maps:get(sessions, State)}, undefined) of
+    Sessions = maps:get(sessions, State, #{}),
+    case maps:get(SessionId, Sessions, undefined) of
         #session{} = Session ->
-            case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
-                #timeline{events = Events} when Index >= 0, Index =< length(Events) ->
+            Timelines = maps:get(timelines, State, #{}),
+            case maps:get(SessionId, Timelines, undefined) of
+                #timeline{events = Events} when Index >= 0, Index < length(Events) ->
                     NewSession = Session#session{current_index = Index, status = replaying},
-                    Sessions = maps:put(SessionId, NewSession, maps:get(sessions, State)),
+                    NewSessions = maps:put(SessionId, NewSession, Sessions),
                     Event = if
                         Index == 0 -> at_start;
                         Index > 0 -> lists:nth(Index, Events)
                     end,
-                    {reply, {ok, Event}, State#{sessions => Sessions}};
+                    {reply, {ok, Event}, State#{sessions => NewSessions}};
                 _ ->
                     {reply, {error, index_out_of_bounds}, State}
             end;
@@ -398,7 +408,8 @@ handle_call({jump_to, SessionId, Index}, _From, State) ->
     end;
 
 handle_call({get_state_at, SessionId, Timestamp}, _From, State) ->
-    case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+    Timelines = maps:get(timelines, State, #{}),
+    case maps:get(SessionId, Timelines, undefined) of
         #timeline{events = Events} ->
             %% Find the state snapshot at or before the timestamp
             case find_state_at(Events, Timestamp, undefined) of
@@ -412,7 +423,8 @@ handle_call({get_state_at, SessionId, Timestamp}, _From, State) ->
     end;
 
 handle_call({get_timeline, SessionId}, _From, State) ->
-    case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+    Timelines = maps:get(timelines, State, #{}),
+    case maps:get(SessionId, Timelines, undefined) of
         #timeline{events = Events} ->
             {reply, {ok, Events}, State};
         undefined ->
@@ -420,7 +432,8 @@ handle_call({get_timeline, SessionId}, _From, State) ->
     end;
 
 handle_call({get_token_history, SessionId, Token}, _From, State) ->
-    case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+    Timelines = maps:get(timelines, State, #{}),
+    case maps:get(SessionId, Timelines, undefined) of
         #timeline{events = Events} ->
             Filtered = [E || #event{event_type = token_event, data = Data} = E <- Events,
                            maps:get(token, Data, undefined) =:= Token],
@@ -430,7 +443,8 @@ handle_call({get_token_history, SessionId, Token}, _From, State) ->
     end;
 
 handle_call({get_transition_history, SessionId}, _From, State) ->
-    case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+    Timelines = maps:get(timelines, State, #{}),
+    case maps:get(SessionId, Timelines, undefined) of
         #timeline{events = Events} ->
             Filtered = [E || #event{event_type = transition} = E <- Events],
             {reply, {ok, Filtered}, State};
@@ -439,7 +453,8 @@ handle_call({get_transition_history, SessionId}, _From, State) ->
     end;
 
 handle_call({list_breakpoints, SessionId}, _From, State) ->
-    case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+    Timelines = maps:get(timelines, State, #{}),
+    case maps:get(SessionId, Timelines, undefined) of
         #timeline{breakpoints = BPs} ->
             {reply, {ok, BPs}, State};
         undefined ->
@@ -447,7 +462,8 @@ handle_call({list_breakpoints, SessionId}, _From, State) ->
     end;
 
 handle_call({check_breakpoints, SessionId, Event}, _From, State) ->
-    case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+    Timelines = maps:get(timelines, State, #{}),
+    case maps:get(SessionId, Timelines, undefined) of
         #timeline{breakpoints = BPs} ->
             Triggered = check_breakpoints_internal(BPs, Event),
             {reply, Triggered, State};
@@ -460,13 +476,17 @@ handle_call(_Request, _From, State) ->
 
 %% @private
 handle_cast({record_event, SessionId, Event}, State) ->
-    case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+    Timelines = maps:get(timelines, State, #{}),
+    case maps:get(SessionId, Timelines, undefined) of
         #timeline{events = Events} = Timeline ->
             NewTimeline = Timeline#timeline{events = Events ++ [Event]},
-            Timelines = maps:put(SessionId, NewTimeline, maps:get(timelines, State)),
-            {noreply, State#{timelines => Timelines}};
+            NewTimelines = maps:put(SessionId, NewTimeline, Timelines),
+            {noreply, State#{timelines => NewTimelines}};
         undefined ->
-            {noreply, State}
+            %% Create a new timeline for this session if it doesn't exist
+            NewTimeline = #timeline{session_id = SessionId, events = [Event]},
+            NewTimelines = maps:put(SessionId, NewTimeline, Timelines),
+            {noreply, State#{timelines => NewTimelines}}
     end;
 
 handle_cast({stop_session, SessionId}, State) ->
@@ -475,21 +495,23 @@ handle_cast({stop_session, SessionId}, State) ->
     {noreply, State#{sessions => Sessions, timelines => Timelines}};
 
 handle_cast({set_breakpoint, SessionId, Breakpoint}, State) ->
-    case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+    Timelines = maps:get(timelines, State, #{}),
+    case maps:get(SessionId, Timelines, undefined) of
         #timeline{breakpoints = BPs} = Timeline ->
             NewTimeline = Timeline#timeline{breakpoints = [Breakpoint | BPs]},
-            Timelines = maps:put(SessionId, NewTimeline, maps:get(timelines, State)),
-            {noreply, State#{timelines => Timelines}};
+            NewTimelines = maps:put(SessionId, NewTimeline, Timelines),
+            {noreply, State#{timelines => NewTimelines}};
         undefined ->
             {noreply, State}
     end;
 
 handle_cast({clear_breakpoint, SessionId, Breakpoint}, State) ->
-    case maps:get(SessionId, State#{timelines => maps:get(timelines, State)}, undefined) of
+    Timelines = maps:get(timelines, State, #{}),
+    case maps:get(SessionId, Timelines, undefined) of
         #timeline{breakpoints = BPs} = Timeline ->
             NewTimeline = Timeline#timeline{breakpoints = lists:delete(Breakpoint, BPs)},
-            Timelines = maps:put(SessionId, NewTimeline, maps:get(timelines, State)),
-            {noreply, State#{timelines => Timelines}};
+            NewTimelines = maps:put(SessionId, NewTimeline, Timelines),
+            {noreply, State#{timelines => NewTimelines}};
         undefined ->
             {noreply, State}
     end;

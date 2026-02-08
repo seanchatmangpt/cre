@@ -373,8 +373,11 @@ doctest_test() ->
     permanent = maps:get(restart, TimeoutSpec2),
     worker = maps:get(type, TimeoutSpec2),
 
-    %% Test 10: Verify all children are workers (not supervisors)
+    %% Test 10: Verify child types (we have 6 workers and 1 supervisor)
     {ok, {_, Children4}} = init([]),
-    true = lists:all(fun(C) -> worker =:= maps:get(type, C) end, Children4),
+    WorkerCount = lists:filter(fun(C) -> worker =:= maps:get(type, C) end, Children4),
+    SupCount = lists:filter(fun(C) -> supervisor =:= maps:get(type, C) end, Children4),
+    6 = length(WorkerCount),
+    1 = length(SupCount),
 
     ok.

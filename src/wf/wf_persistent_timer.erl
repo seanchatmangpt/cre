@@ -260,9 +260,9 @@ handle_call({start_timer, ExecutionId, TargetTime, Callback, Options}, _From, St
     },
 
     %% Save to Mnesia (if available)
-    case mnesia:whereis_transaction({persistent_timer, TimerId}) of
-        undefined -> ok;
-        _ -> mnesia:dirty_write({persistent_timer, TimerId, Timer})
+    case catch mnesia:table_info(wf_persistent_timer, where_to_write) of
+        {'EXIT', _} -> ok;
+        _ -> mnesia:dirty_write(wf_persistent_timer, Timer)
     end,
 
     %% Calculate delay
@@ -285,17 +285,20 @@ handle_call({cancel_timer, TimerId}, _From, State) ->
         undefined ->
             {reply, {error, not_found}, State};
         Timer ->
-            %% Cancel the Erlang timer
+            %% Cancel the Erlang timer (ignore if already fired)
             case Timer#persistent_timer.timer_ref of
                 undefined -> ok;
-                TRef -> erlang:cancel_timer(TRef)
+                TRef ->
+                    %% cancel_timer throws badarg if timer already fired
+                    catch erlang:cancel_timer(TRef),
+                    ok
             end,
 
             %% Update status
             UpdatedTimer = Timer#persistent_timer{status = cancelled},
-            case mnesia:whereis_transaction({persistent_timer, TimerId}) of
-                undefined -> ok;
-                _ -> mnesia:dirty_write({persistent_timer, TimerId, UpdatedTimer})
+            case catch mnesia:table_info(wf_persistent_timer, where_to_write) of
+                {'EXIT', _} -> ok;
+                _ -> mnesia:dirty_write(wf_persistent_timer, UpdatedTimer)
             end,
 
             ActiveTimers = maps:put(TimerId, UpdatedTimer, State#timer_state.active_timers),
@@ -309,7 +312,7 @@ handle_call(cancel_all_timers, _From, State) ->
             Timer ->
                 case Timer#persistent_timer.timer_ref of
                     undefined -> ok;
-                    TRef -> erlang:cancel_timer(TRef)
+                    TRef -> catch erlang:cancel_timer(TRef)
                 end
         end
     end, maps:to_list(State#timer_state.active_timers)),
@@ -453,9 +456,9 @@ fire_timer(TimerId, State) ->
                 fired_at = erlang:system_time(millisecond),
                 result = Result
             },
-            case mnesia:whereis_transaction({persistent_timer, TimerId}) of
-                undefined -> ok;
-                _ -> mnesia:dirty_write({persistent_timer, TimerId, UpdatedTimer})
+            case catch mnesia:table_info(wf_persistent_timer, where_to_write) of
+                {'EXIT', _} -> ok;
+                _ -> mnesia:dirty_write(wf_persistent_timer, UpdatedTimer)
             end,
 
             %% Remove from active timers
@@ -482,41 +485,45 @@ adjust_for_calendar(TargetTimeMs, Calendar) ->
     {Date, {Hour, _Min, _Sec}} = TargetDateTime,
     DayOfWeek = calendar:day_of_the_week(Date),
 
-    case lists:member(DayOfWeek, Calendar#calendar_settings.weekend_days) of
+    %% Determine adjusted datetime based on calendar
+    {{WorkStartH, WorkStartM}, _WorkEndTime} = Calendar#calendar_settings.work_hours,
+    AdjustedDateTime = case lists:member(DayOfWeek, Calendar#calendar_settings.weekend_days) of
         true ->
-            %% Weekend - move to next work day
-            add_days_until_workday(TargetDateTime, Calendar);
+            %% Weekend - move to next work day and set to work start time
+            add_days_until_workday(TargetDateTime, Calendar, WorkStartH, WorkStartM);
         false ->
             %% Check if within work hours
-            {{WorkStartH, _WorkStartM}, {WorkEndH, _WorkEndM}} =
+            {{_WorkStartH, _WorkStartM}, {WorkEndH, _WorkEndM}} =
                 Calendar#calendar_settings.work_hours,
 
             case Hour of
                 H when H < WorkStartH ->
-                    %% Before work hours - adjust to work start
-                    TargetDateTime;
+                    %% Before work hours - adjust to work start today
+                    {Date, {WorkStartH, WorkStartM, 0}};
                 H when H >= WorkEndH ->
-                    %% After work hours - move to next work day
-                    add_days_until_workday(TargetDateTime, Calendar);
+                    %% After work hours - move to next work day and set to work start
+                    add_days_until_workday(TargetDateTime, Calendar, WorkStartH, WorkStartM);
                 _ ->
                     %% Within work hours - proceed
                     TargetDateTime
             end
     end,
 
-    %% Convert back to milliseconds
-    DateTimeSecs = calendar:datetime_to_gregorian_seconds(TargetDateTime),
-    DateTimeSecs * 1000.
+    %% Convert back to milliseconds using universal_time_to_system_time
+    %% This returns POSIX (Unix epoch) seconds, not Gregorian seconds
+    SecsSinceEpoch = calendar:datetime_to_gregorian_seconds(AdjustedDateTime) -
+                     calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}}),
+    SecsSinceEpoch * 1000.
 
 %% @private
-add_days_until_workday(DateTime, Calendar) ->
+add_days_until_workday(DateTime, Calendar, WorkStartHour, WorkStartMinute) ->
     %% Add days until we hit a work day
     NewDateTime = add_day(DateTime),
     DayOfWeek = calendar:day_of_the_week(element(1, NewDateTime)),
 
     case lists:member(DayOfWeek, Calendar#calendar_settings.weekend_days) of
         true ->
-            add_days_until_workday(NewDateTime, Calendar);
+            add_days_until_workday(NewDateTime, Calendar, WorkStartHour, WorkStartMinute);
         false ->
             %% Check if this day is a holiday
             DateStr = format_date(element(1, NewDateTime)),
@@ -524,9 +531,10 @@ add_days_until_workday(DateTime, Calendar) ->
                                Calendar#calendar_settings.holidays),
             case IsHoliday of
                 true ->
-                    add_days_until_workday(NewDateTime, Calendar);
+                    add_days_until_workday(NewDateTime, Calendar, WorkStartHour, WorkStartMinute);
                 false ->
-                    NewDateTime
+                    %% Valid work day - set to work start time
+                    {element(1, NewDateTime), {WorkStartHour, WorkStartMinute, 0}}
             end
     end.
 
