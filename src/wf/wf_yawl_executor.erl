@@ -554,14 +554,26 @@ start_workflow(#yawl_executor{root_module = RootMod, spec = Spec, compiled = Com
         #{regions := R} when is_map(R) -> R;
         _ -> #{}
     end,
-    NetArg = #{initial_data => InitialData, case_id => CaseId, regions => Regions},
+    SpecId = case Spec of
+        #{<<"id">> := Id} when is_binary(Id) -> Id;
+        #{id := Id} when is_binary(Id) -> Id;
+        _ -> atom_to_binary(RootMod, utf8)
+    end,
+    NetArg = #{initial_data => InitialData, case_id => CaseId, regions => Regions, spec_id => SpecId},
     GenYawlOpts = case maps:get(gen_yawl_options, Options, []) of
         L when is_list(L) -> L;
         _ -> []
     end,
+    CheckpointInterval = maps:get(checkpoint_interval, Options, 0),
+    GenYawlOpts1 = case CheckpointInterval of
+        N when is_integer(N), N > 0 ->
+            [{checkpoint_interval, N} | GenYawlOpts];
+        _ -> GenYawlOpts
+    end,
 
-    case yawl_workflow_supervisor:start_workflow(RootMod, NetArg, GenYawlOpts) of
+    case yawl_workflow_supervisor:start_workflow(RootMod, NetArg, GenYawlOpts1) of
         {ok, Pid} ->
+            _ = yawl_registry:register(CaseId, Pid),
             {ok, Pid, CaseId};
         {error, Reason} ->
             {error, {start_error, Reason}}
@@ -626,6 +638,7 @@ start_workflow(#yawl_executor{root_module = RootMod, spec = Spec, compiled = Com
 -spec stop_workflow(Pid :: pid()) -> ok | {error, term()}.
 
 stop_workflow(Pid) when is_pid(Pid) ->
+    %% Registry auto-cleans on process exit via monitor
     case yawl_workflow_supervisor:stop_workflow(Pid) of
         ok -> ok;
         {error, not_found} -> {error, no_process};

@@ -1,86 +1,10 @@
-# AGI Symposium Ω Workflow
+# AGI Symposium Omega: Issue Identification Guide
 
-## High-Level Flow
+This document provides mermaid diagrams and explanations to diagnose issues when the AGI Symposium Omega demo blocks or fails.
 
-```mermaid
-flowchart LR
-    Start([Start]) --> Split[SplitMegaThreads]
-    Split --> Program[ProgramThread]
-    Split --> Ops[OpsThread]
-    Split --> Comms[CommsThread]
-    Split --> Incident[IncidentThread]
-    Program --> Merge[MergeMegaThreads]
-    Ops --> Merge
-    Comms --> Merge
-    Incident --> Merge
-    Merge --> GoNoGo[GoNoGo]
-    GoNoGo --> OpenDoors[OpenDoors]
-    OpenDoors --> Close[CloseSymposium]
-    Close --> Publish[PublishProceedings]
-    Publish --> End([End])
-```
+---
 
-## Sync Place Namespaces
-
-```mermaid
-flowchart TD
-    subgraph P3[P3 Synchronization]
-        p_g1((p_gonogo_branch1))
-        p_g2((p_gonogo_branch2))
-        p_g3((p_gonogo_branch3))
-        p_g1 --> t_gn[t_GoNoGo]
-        p_g2 --> t_gn
-        p_g3 --> t_gn
-    end
-
-    subgraph P38[P38 General Sync Merge]
-        p_c1((p_close_branch1))
-        p_c2((p_close_branch2))
-        p_c3((p_close_branch3))
-        p_c1 --> t_cs[t_CloseSymposium]
-        p_c2 --> t_cs
-        p_c3 --> t_cs
-    end
-```
-
-## Pattern Instances (43)
-
-```mermaid
-flowchart TD
-    subgraph Symposium[Symposium Net]
-        P42[P42 Thread Split]
-        P41[P41 Thread Merge]
-        P3[P3 Synchronization]
-        P38[P38 General Sync Merge]
-        P32[P32 Cancelling Partial Join]
-        P22[P22 Recursion]
-        P25[P25 Cancel Region]
-        P20[P20 Cancel Case]
-        P43[P43 Explicit Termination]
-        P11[P11 Implicit Termination]
-        P8[P8 Multiple Merge]
-    end
-
-    subgraph ProgramThread[ProgramThread Net]
-        P1[P1 Sequence]
-        P2[P2 Parallel Split]
-        P4[P4 Exclusive Choice]
-        P5[P5 Simple Merge]
-        P6[P6 Multiple Choice]
-        P7[P7 Structured Sync Merge]
-        P9[P9 Discriminator]
-        P10[P10 Arbitrary Cycles]
-        P21[P21 Structured Loop]
-        P19[P19 Cancel Activity]
-        P25p[P25 Cancel Region]
-        P30[P30 Structured Partial Join]
-        P31[P31 Blocking Partial Join]
-        P33[P33 Generalized AND Join]
-        P39[P39 Critical Section]
-    end
-```
-
-## Execution Flow and Blocking Points
+## 1. Execution Flow and Blocking Points
 
 Shows where the Omega demo can stop and why.
 
@@ -101,7 +25,11 @@ flowchart TD
     end
 ```
 
-## Token Flow and Subnet Wiring
+**Issue:** When `step()` returns `abort`, `find_inject_place` returns `undefined` (no root human task enabled). Then `run_subnets_if_needed` may return `none` if no subnets have tokens in entry places. Result: **blocked** at ~3 rounds.
+
+---
+
+## 2. Token Flow: Root to Subnets to P3 Sync
 
 Shows where tokens must flow for GoNoGo to fire.
 
@@ -133,7 +61,11 @@ flowchart LR
     C1 -->|Inject on exit| B3
 ```
 
-## Cycle Detection (when enabled)
+**Issue:** Subnets must complete and `run_one_subnet` must inject into `p_gonogo_branch1..3`. If subnets never receive tokens (P42 place mapping mismatch) or inject to wrong place, P3 never fires.
+
+---
+
+## 3. Cycle Detection Logic (gen_yawl)
 
 When `max_marking_history > 0`, this path can halt execution.
 
@@ -150,7 +82,11 @@ flowchart TD
     end
 ```
 
-## Issue Identification
+**Note:** Omega uses `max_marking_history = 0` so cycle detection is disabled. If someone runs without that option, cycle detection would halt after a repeated marking.
+
+---
+
+## 4. Issue Identification Decision Tree
 
 ```mermaid
 flowchart TD
@@ -166,7 +102,9 @@ flowchart TD
     Q3 -->|no| A5[Root human task: Agent or inject logic]
 ```
 
-## Subnet Run Flow
+---
+
+## 5. Subnet Run Flow (run_ready_subnets)
 
 ```mermaid
 flowchart TD
@@ -185,7 +123,11 @@ flowchart TD
     end
 ```
 
-## Place Name Mapping (P42 vs YAML)
+**Issue:** `p_branch_place_for_subnet(4)` and `p_branch_place_for_subnet(_)` both map to `p_gonogo_branch3`. IncidentThread and SatelliteSymposium (indices 4,5) would both inject into branch3, potentially causing P3 sync to see duplicate tokens or wrong count.
+
+---
+
+## 6. Place Name Mapping (P42 vs YAML)
 
 ```mermaid
 flowchart LR
@@ -210,3 +152,23 @@ flowchart LR
     incident -->|index 4| pt4
     sat -->|index 5| pt4
 ```
+
+**Issue:** 5 subnets but P42 has 4 branches. `subnet_index` and `p_branch_place_for_subnet` may misalign for IncidentThread and SatelliteSymposium.
+
+---
+
+## Quick Reference
+
+| Symptom | Likely Cause |
+|---------|--------------|
+| Rounds = 0 | Pattern collision (namespacing fix applied) |
+| "marking cycle detected" log | Set `max_marking_history = 0` in gen_yawl_options |
+| Blocked at ~3 rounds | Subnet wiring or token injection; check p_threadN and Entry places |
+| find_inject_place undefined | No root human task enabled; run_subnets_if_needed should run |
+| run_subnets_if_needed returns none | No tokens in p_threadN or subnet Entry; P42 split may not have produced |
+
+## Related Files
+
+- `test/omega_demo_runner.erl` - Main run loop, find_and_complete_human_task, run_subnets_if_needed
+- `src/core/gen_yawl.erl` - Cycle detection (marking_history)
+- `docs/mermaid/14-omega-symposium.md` - High-level workflow diagrams

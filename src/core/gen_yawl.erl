@@ -177,6 +177,7 @@ The fire/3 callback can return:
 -record(wrapper_state, {
           net_mod :: atom(),
           net_state :: term(),
+          net_arg = #{} :: term(),
           fire_timeout = 5000 :: pos_integer(),
           progress_timeout = 30000 :: pos_integer(),
           shutting_down = false :: boolean(),
@@ -186,7 +187,9 @@ The fire/3 callback can return:
           max_marking_history = 10 :: pos_integer(),
           continue_count = 0 :: non_neg_integer(),
           max_continue = 1000 :: pos_integer(),
-          regions = #{} :: #{binary() | atom() => [atom()]}
+          regions = #{} :: #{binary() | atom() => [atom()]},
+          checkpoint_interval = 0 :: non_neg_integer(),
+          drain_step_count = 0 :: non_neg_integer()
          }).
 
 %%====================================================================
@@ -651,12 +654,14 @@ init({NetMod, NetArg, Options}) ->
     ProgressTimeout = proplists:get_value(progress_timeout, Options, 30000),
     MaxHistory = proplists:get_value(max_marking_history, Options, 10),
     MaxCont = proplists:get_value(max_continue, Options, 1000),
+    CheckpointInterval = proplists:get_value(checkpoint_interval, Options, 0),
 
     %% Validate timeouts
     true = is_integer(FireTimeout) andalso FireTimeout > 0,
     true = is_integer(ProgressTimeout) andalso ProgressTimeout > 0,
     true = is_integer(MaxHistory) andalso MaxHistory >= 0,
     true = is_integer(MaxCont) andalso MaxCont > 0,
+    true = is_integer(CheckpointInterval) andalso CheckpointInterval >= 0,
 
     %% Initialize user info from the callback module
     UsrInfo = NetMod:init(NetArg),
@@ -696,6 +701,7 @@ init({NetMod, NetArg, Options}) ->
     WrapperState = #wrapper_state{
                       net_mod = NetMod,
                       net_state = NetState,
+                      net_arg = NetArg,
                       fire_timeout = FireTimeout,
                       progress_timeout = ProgressTimeout,
                       shutting_down = false,
@@ -704,7 +710,9 @@ init({NetMod, NetArg, Options}) ->
                       max_marking_history = MaxHistory,
                       continue_count = 0,
                       max_continue = MaxCont,
-                      regions = Regions
+                      regions = Regions,
+                      checkpoint_interval = CheckpointInterval,
+                      drain_step_count = 0
                      },
 
     {ok, WrapperState}.
@@ -859,7 +867,10 @@ handle_call({drain, MaxSteps, _Acc}, _From, WrapperState) when MaxSteps =< 0 ->
 handle_call({drain, MaxSteps, Acc}, _From,
             WrapperState = #wrapper_state{
                               fire_timeout = FireTimeout,
-                              net_state = NetState0
+                              net_state = NetState0,
+                              net_arg = NetArg,
+                              checkpoint_interval = CheckpointInterval,
+                              drain_step_count = DrainStepCount
                              }) ->
     case progress(NetState0, FireTimeout) of
         abort ->
@@ -873,8 +884,18 @@ handle_call({drain, MaxSteps, Acc}, _From,
             end,
             NetMod = WrapperState#wrapper_state.net_mod,
             NetState3 = handle_trigger(Pm, NetState2, NetMod),
+            StepCount = DrainStepCount + 1,
+            case yawl_recovery:maybe_checkpoint(StepCount, CheckpointInterval,
+                    NetArg, NetState3#net_state.marking, NetState3#net_state.usr_info) of
+                {do_checkpoint, SpecId, CaseId, Marking, Data} ->
+                    _ = yawl_recovery:checkpoint(SpecId, CaseId, Marking, Data);
+                ok -> ok
+            end,
             continue(self()),
-            WrapperState1 = WrapperState#wrapper_state{net_state = NetState3},
+            WrapperState1 = WrapperState#wrapper_state{
+                net_state = NetState3,
+                drain_step_count = StepCount
+            },
             handle_call({drain, MaxSteps - 1, [Receipt | Acc]}, _From, WrapperState1);
         {error, Reason, NetState1} ->
             {reply, {error, Reason}, WrapperState#wrapper_state{net_state = NetState1}}
@@ -909,6 +930,7 @@ handle_cast(continue,
             WrapperState = #wrapper_state{
                               fire_timeout = FireTimeout,
                               progress_timeout = ProgressTimeout,
+                              net_arg = NetArg,
                               net_state = NetState0 = #net_state{
                                                         stats = Stats,
                                                         tstart = T1,
@@ -917,7 +939,8 @@ handle_cast(continue,
                               marking_history = History,
                               max_marking_history = MaxHistory,
                               continue_count = ContCount,
-                              max_continue = MaxCont
+                              max_continue = MaxCont,
+                              checkpoint_interval = CheckpointInterval
                              }) ->
     %% Cycle detection: stop if we've exceeded max continue steps
     case ContCount >= MaxCont of
@@ -958,6 +981,15 @@ handle_cast(continue,
                     %% Handle trigger and produce tokens
                     NetMod = WrapperState#wrapper_state.net_mod,
                     NetState3 = handle_trigger(Pm, NetState2, NetMod),
+
+                    %% Optional checkpoint at interval (pure function, no stateful timers)
+                    StepCount = ContCount + 1,
+                    case yawl_recovery:maybe_checkpoint(StepCount, CheckpointInterval,
+                            NetArg, NetState3#net_state.marking, NetState3#net_state.usr_info) of
+                        {do_checkpoint, SpecId, CaseId, Marking, Data} ->
+                            _ = yawl_recovery:checkpoint(SpecId, CaseId, Marking, Data);
+                        ok -> ok
+                    end,
 
                     %% Cycle detection: fingerprint new marking and check for repeat
                     %% (skipped when max_marking_history = 0, e.g. for Omega demo)

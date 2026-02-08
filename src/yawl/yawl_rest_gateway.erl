@@ -201,8 +201,29 @@ terminate(_Reason, _Req, _State) ->
 -spec dispatch(atom(), cowboy_req:req(), map()) -> cowboy_req:req().
 dispatch(Handler, Req0, _Opts) ->
     case Handler of
-        health -> reply_json(200, #{<<"status">> => <<"ok">>}, Req0);
-        _ -> reply_json(501, #{<<"error">> => <<"Not implemented">>, <<"handler">> => atom_to_binary(Handler)}, Req0)
+        health ->
+            reply_json(200, #{<<"status">> => <<"ok">>}, Req0);
+        specifications -> yawl_interface_a:handle(Req0, Handler);
+        specification -> yawl_interface_a:handle(Req0, Handler);
+        launch -> yawl_interface_a:handle(Req0, Handler);
+        cases -> yawl_interface_a:handle(Req0, Handler);
+        case_detail -> yawl_interface_a:handle(Req0, Handler);
+        case_cancel -> yawl_interface_a:handle(Req0, Handler);
+        case_suspend -> yawl_interface_a:handle(Req0, Handler);
+        case_resume -> yawl_interface_a:handle(Req0, Handler);
+        worklist -> yawl_interface_b:handle(Req0, Handler);
+        workitem -> yawl_interface_b:handle(Req0, Handler);
+        workitem_start -> yawl_interface_b:handle(Req0, Handler);
+        workitem_complete -> yawl_interface_b:handle(Req0, Handler);
+        workitem_fail -> yawl_interface_b:handle(Req0, Handler);
+        logs -> yawl_interface_e:handle(Req0, Handler);
+        case_logs -> yawl_interface_e:handle(Req0, Handler);
+        logs_query -> yawl_interface_e:handle(Req0, Handler);
+        exceptions -> yawl_interface_x:handle(Req0, Handler);
+        exception_detail -> yawl_interface_x:handle(Req0, Handler);
+        exception_handle -> yawl_interface_x:handle(Req0, Handler);
+        _ ->
+            reply_json(501, #{<<"error">> => <<"Not implemented">>, <<"handler">> => atom_to_binary(Handler)}, Req0)
     end.
 
 reply_json(Status, Body, Req) ->

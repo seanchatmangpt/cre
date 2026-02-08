@@ -765,18 +765,24 @@ execute_multiple_instances_no_sync(#pattern_state{
     Ref = make_ref(),
     Parent = self(),
 
-    %% Spawn supervisor to manage instance processes
-    SupervisorPid = spawn(fun() ->
+    %% Spawn supervisor to manage instance processes (monitored for crash detection)
+    {SupervisorPid, MRef} = spawn_monitor(fun() ->
         instance_supervisor(Ref, Parent, Subprocess, DataList, OnError, MaxConcurrent)
     end),
 
     %% Wait for supervisor to complete
     receive
-        {Ref, {ok, Results}} -> {ok, Results};
-        {Ref, {error, Reason}} -> {error, Reason};
-        {'EXIT', SupervisorPid, Reason} -> {error, {supervisor_exit, Reason}}
+        {Ref, {ok, Results}} ->
+            demonitor(MRef, [flush]),
+            {ok, Results};
+        {Ref, {error, Reason}} ->
+            demonitor(MRef, [flush]),
+            {error, Reason};
+        {'DOWN', MRef, process, SupervisorPid, Reason} ->
+            {error, {supervisor_exit, Reason}}
     after 30000 ->
         exit(SupervisorPid, kill),
+        demonitor(MRef, [flush]),
         {error, timeout}
     end.
 
@@ -813,16 +819,16 @@ execute_multiple_instances_static(#pattern_state{
     Ref = make_ref(),
     Parent = self(),
 
-    %% Spawn all instances concurrently
-    Pids = lists:map(fun(Data) ->
-        spawn(fun() ->
+    %% Spawn all instances concurrently (monitored for crash detection)
+    PidMRefs = lists:map(fun(Data) ->
+        spawn_monitor(fun() ->
             Result = execute_instance(Subprocess, Data),
             Parent ! {Ref, self(), Result}
         end)
     end, DataList),
 
     %% Collect results from all instances
-    Results = collect_all_results(Ref, Pids, Timeout, OnError, []),
+    Results = collect_all_results(Ref, PidMRefs, Timeout, OnError, []),
 
     case [R || R <- Results, element(1, R) =:= error] of
         [] ->
@@ -860,16 +866,16 @@ execute_multiple_instances_runtime(#pattern_state{
     Ref = make_ref(),
     Parent = self(),
 
-    %% Spawn instances with data
-    Pids = lists:map(fun(I) ->
-        spawn(fun() ->
+    %% Spawn instances with data (monitored for crash detection)
+    PidMRefs = lists:map(fun(I) ->
+        spawn_monitor(fun() ->
             Result = execute_instance(Subprocess, {I, InputData}),
             Parent ! {Ref, self(), Result}
         end)
     end, lists:seq(1, Count)),
 
     %% Collect results from all instances
-    Results = collect_all_results(Ref, Pids, 30000, OnError, []),
+    Results = collect_all_results(Ref, PidMRefs, 30000, OnError, []),
 
     case [R || R <- Results, element(1, R) =:= error] of
         [] ->
@@ -3588,7 +3594,7 @@ execute_instance(Subprocess, Data) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec collect_all_results(Ref :: reference(),
-                         Pids :: [pid()],
+                         PidMRefs :: [{pid(), reference()}],
                          Timeout :: timeout(),
                          OnError :: continue | stop,
                          Acc :: list()) ->
@@ -3596,7 +3602,7 @@ execute_instance(Subprocess, Data) ->
 
 collect_all_results(_Ref, [], _Timeout, _OnError, Acc) ->
     lists:reverse(Acc);
-collect_all_results(Ref, Pids, Timeout, OnError, Acc) ->
+collect_all_results(Ref, PidMRefs, Timeout, OnError, Acc) ->
     ReceiveTimeout = case Timeout of
         infinity -> 5000;
         N when is_integer(N), N > 0 -> min(5000, N)
@@ -3604,20 +3610,35 @@ collect_all_results(Ref, Pids, Timeout, OnError, Acc) ->
     receive
         {Ref, Pid, Result} ->
             NewAcc = [Result | Acc],
+            NewPidMRefs = lists:keydelete(Pid, 1, PidMRefs),
             case {Result, OnError} of
                 {{error, _}, stop} ->
-                    %% Kill remaining processes
-                    lists:foreach(fun(P) -> exit(P, kill) end, Pids -- [Pid]),
+                    lists:foreach(fun({P, MRef}) ->
+                        exit(P, kill),
+                        demonitor(MRef, [flush])
+                    end, NewPidMRefs),
                     lists:reverse(NewAcc);
                 _ ->
-                    collect_all_results(Ref, Pids -- [Pid], Timeout, OnError, NewAcc)
+                    collect_all_results(Ref, NewPidMRefs, Timeout, OnError, NewAcc)
             end;
-        {'EXIT', Pid, _Reason} ->
-            %% Process died, remove from list
-            collect_all_results(Ref, Pids -- [Pid], Timeout, OnError, Acc)
+        {'DOWN', _MRef, process, Pid, Reason} ->
+            NewAcc = [{error, Reason} | Acc],
+            NewPidMRefs = lists:keydelete(Pid, 1, PidMRefs),
+            case OnError of
+                stop ->
+                    lists:foreach(fun({P, MRef}) ->
+                        exit(P, kill),
+                        demonitor(MRef, [flush])
+                    end, NewPidMRefs),
+                    lists:reverse(NewAcc);
+                _ ->
+                    collect_all_results(Ref, NewPidMRefs, Timeout, OnError, NewAcc)
+            end
     after ReceiveTimeout ->
-        %% Timeout, kill remaining and return what we have
-        lists:foreach(fun(P) -> exit(P, kill) end, Pids),
+        lists:foreach(fun({P, MRef}) ->
+            exit(P, kill),
+            demonitor(MRef, [flush])
+        end, PidMRefs),
         lists:reverse(Acc)
     end.
 
@@ -3658,16 +3679,16 @@ instance_supervisor_loop(Ref, Parent, Subprocess, DataList, OnError,
             {[], DataList}
     end,
 
-    %% Spawn new instances
-    NewPids = lists:map(fun(Data) ->
-        spawn(fun() ->
+    %% Spawn new instances (monitored for crash detection)
+    NewPidMRefs = lists:map(fun(Data) ->
+        spawn_monitor(fun() ->
             Result = execute_instance(Subprocess, Data),
             Parent ! {Ref, self(), Result}
         end)
     end, ToSpawn),
 
     %% Wait for at least one completion if we have active instances
-    NewActive = length(NewPids) + Active,
+    NewActive = length(NewPidMRefs) + Active,
     case NewActive of
         0 when Remaining =:= [] ->
             Parent ! {Ref, {ok, lists:reverse(Results)}};
@@ -3678,20 +3699,34 @@ instance_supervisor_loop(Ref, Parent, Subprocess, DataList, OnError,
             receive
                 {Ref, Pid, Result} ->
                     NewResults = [Result | Results],
+                    NewPidMRefs1 = lists:keydelete(Pid, 1, NewPidMRefs),
                     case {Result, OnError} of
                         {{error, _}, stop} ->
-                            %% Kill remaining
-                            lists:foreach(fun(P) -> exit(P, kill) end, NewPids -- [Pid]),
+                            lists:foreach(fun({P, MRef}) ->
+                                exit(P, kill),
+                                demonitor(MRef, [flush])
+                            end, NewPidMRefs1),
                             Parent ! {Ref, {ok, lists:reverse(NewResults)}};
                         _ ->
                             instance_supervisor_loop(Ref, Parent, Subprocess,
                                                     Remaining, OnError,
                                                     MaxConcurrent, NewActive - 1, NewResults)
                     end;
-                {'EXIT', _Pid, _Reason} ->
-                    instance_supervisor_loop(Ref, Parent, Subprocess,
-                                            Remaining, OnError,
-                                            MaxConcurrent, NewActive - 1, Results)
+                {'DOWN', _MRef, process, Pid, Reason} ->
+                    NewResults = [{error, Reason} | Results],
+                    case OnError of
+                        stop ->
+                            NewPidMRefs1 = lists:keydelete(Pid, 1, NewPidMRefs),
+                            lists:foreach(fun({P, MRef}) ->
+                                exit(P, kill),
+                                demonitor(MRef, [flush])
+                            end, NewPidMRefs1),
+                            Parent ! {Ref, {ok, lists:reverse(NewResults)}};
+                        _ ->
+                            instance_supervisor_loop(Ref, Parent, Subprocess,
+                                                    Remaining, OnError,
+                                                    MaxConcurrent, NewActive - 1, NewResults)
+                    end
             end
     end.
 
@@ -3759,13 +3794,23 @@ dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
         {'EXIT', _Pid, _Reason} ->
             dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
                                 CurrentData, MaxConcurrent, OnError,
-                                Active - 1, Results)
+                                Active - 1, Results);
+        {'DOWN', _MRef, process, _Pid, Reason} ->
+            NewResults = [{error, Reason} | Results],
+            case OnError of
+                stop ->
+                    Parent ! {Ref, {ok, lists:reverse(NewResults)}};
+                _ ->
+                    dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
+                                        CurrentData, MaxConcurrent, OnError,
+                                        Active - 1, NewResults)
+            end
     end.
 
 spawn_batch(Ref, Parent, Subprocess, DataFun, Data, MaxConcurrent, OnError, Results) ->
-    %% Spawn up to MaxConcurrent instances
-    Pids = lists:map(fun(_) ->
-        spawn(fun() ->
+    %% Spawn up to MaxConcurrent instances (monitored for crash detection)
+    PidMRefs = lists:map(fun(_) ->
+        spawn_monitor(fun() ->
             Result = execute_instance(Subprocess, Data),
             Parent ! {Ref, self(), Result}
         end)
@@ -3780,7 +3825,7 @@ spawn_batch(Ref, Parent, Subprocess, DataFun, Data, MaxConcurrent, OnError, Resu
     end,
 
     dynamic_instance_loop(Ref, Parent, Subprocess, DataFun,
-                         NextData, MaxConcurrent, OnError, length(Pids), Results).
+                         NextData, MaxConcurrent, OnError, length(PidMRefs), Results).
 
 wait_for_active(Ref, Parent, 0, Results) ->
     Parent ! {Ref, {ok, lists:reverse(Results)}};
@@ -3789,7 +3834,9 @@ wait_for_active(Ref, Parent, Active, Results) ->
         {Ref, _Pid, Result} ->
             wait_for_active(Ref, Parent, Active - 1, [Result | Results]);
         {'EXIT', _Pid, _Reason} ->
-            wait_for_active(Ref, Parent, Active - 1, Results)
+            wait_for_active(Ref, Parent, Active - 1, Results);
+        {'DOWN', _MRef, process, _Pid, Reason} ->
+            wait_for_active(Ref, Parent, Active - 1, [{error, Reason} | Results])
     end.
 
 %%--------------------------------------------------------------------

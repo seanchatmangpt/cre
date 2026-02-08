@@ -115,6 +115,7 @@
 -export([delete_checkpoint/3]).
 -export([list_checkpoints/2]).
 -export([get_latest_checkpoint/2]).
+-export([maybe_checkpoint/5]).
 
 %%====================================================================
 %% Types
@@ -206,6 +207,57 @@ init_schema() ->
 
 checkpoint(SpecId, CaseId, Marking, Data) ->
     checkpoint(SpecId, CaseId, Marking, Data, #{}).
+
+%%--------------------------------------------------------------------
+%% @doc Pure function: determine if checkpoint is due at this step.
+%%
+%% When checkpoint_interval > 0 and step_count rem interval = 0,
+%% returns {do_checkpoint, SpecId, CaseId, Marking, Data} for the caller
+%% to invoke checkpoint/4. Otherwise returns ok.
+%%
+%% No stateful timers - step-based only. Caller invokes this after each
+%% step and performs checkpoint when {do_checkpoint, ...} is returned.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec maybe_checkpoint(StepCount :: non_neg_integer(),
+                      Interval :: non_neg_integer(),
+                      NetArg :: term(),
+                      Marking :: marking(),
+                      UsrInfo :: term()) ->
+    ok | {do_checkpoint, spec_id(), case_id(), marking(), checkpoint_data()}.
+
+maybe_checkpoint(_StepCount, 0, _NetArg, _Marking, _UsrInfo) ->
+    ok;
+maybe_checkpoint(StepCount, Interval, NetArg, Marking, UsrInfo)
+  when is_integer(Interval), Interval > 0, StepCount > 0 ->
+    case StepCount rem Interval =:= 0 of
+        false -> ok;
+        true ->
+            CaseId = case NetArg of
+                #{case_id := C} when is_binary(C) -> C;
+                #{case_id := C} when is_list(C) -> list_to_binary(C);
+                _ -> undefined
+            end,
+            SpecId = case NetArg of
+                #{spec_id := S} when is_binary(S) -> S;
+                #{spec_id := S} when is_list(S) -> list_to_binary(S);
+                _ -> undefined
+            end,
+            Data = case UsrInfo of
+                M when is_map(M) -> M;
+                _ -> #{}
+            end,
+            case CaseId of
+                undefined -> ok;
+                _ ->
+                    SpecId1 = case SpecId of
+                        undefined -> <<"default">>;
+                        _ -> SpecId
+                    end,
+                    {do_checkpoint, SpecId1, CaseId, Marking, Data}
+            end
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Creates a checkpoint with additional options.

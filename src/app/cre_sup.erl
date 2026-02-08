@@ -86,8 +86,8 @@
 %% ```erlang
 %% 1> {ok, {_Flags, Children}} = cre_sup:init([]),
 %% 1> true = is_list(Children),
-%% 1> 5 = length(Children).
-%% 5
+%% 1> 7 = length(Children).
+%% 7
 %% ```
 %%
 %% @end
@@ -261,7 +261,25 @@ init(_Args) ->
                        modules => [yawl_workflow_supervisor]
                       },
 
-    {ok, {SupFlags, [ChildSpec, TimeoutSpec, XesSpec, ApprovalSpec, WorkflowSupSpec]}}.
+    WorklistSpec = #{
+                    id => yawl_worklist,
+                    start => {yawl_worklist, start_link, []},
+                    restart => permanent,
+                    shutdown => 5000,
+                    type => worker,
+                    modules => [yawl_worklist]
+                   },
+
+    RegistrySpec = #{
+                    id => yawl_registry,
+                    start => {yawl_registry, start_link, []},
+                    restart => permanent,
+                    shutdown => 5000,
+                    type => worker,
+                    modules => [yawl_registry]
+                   },
+
+    {ok, {SupFlags, [ChildSpec, TimeoutSpec, XesSpec, ApprovalSpec, WorkflowSupSpec, WorklistSpec, RegistrySpec]}}.
 
 %%====================================================================
 %% Doctests
@@ -311,7 +329,7 @@ doctest_test() ->
     %% Test 5: Verify child specs count
     {ok, {_, Children}} = init([]),
     true = is_list(Children),
-    5 = length(Children),
+    7 = length(Children),
 
     %% Test 6: Verify child specs have required fields
     [
@@ -335,6 +353,8 @@ doctest_test() ->
     true = lists:member(yawl_xes, ChildIds),
     true = lists:member(yawl_approval, ChildIds),
     true = lists:member(yawl_workflow_supervisor, ChildIds),
+    true = lists:member(yawl_worklist, ChildIds),
+    true = lists:member(yawl_registry, ChildIds),
 
     %% Test 8: Verify cre_master spec details
     {ok, {_, Children2}} = init([]),

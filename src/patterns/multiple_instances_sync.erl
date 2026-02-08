@@ -245,9 +245,9 @@ execute(Subprocess, InputData) when is_function(Subprocess), is_list(InputData) 
     Ref = make_ref(),
     Parent = self(),
 
-    %% Spawn all instances in parallel
-    Pids = lists:map(fun({Data, Index}) ->
-        spawn(fun() ->
+    %% Spawn all instances in parallel (monitored for crash detection)
+    PidMRefs = lists:map(fun({Data, Index}) ->
+        {Pid, MRef} = spawn_monitor(fun() ->
             try
                 Result = Subprocess(Data),
                 Parent ! {Ref, {instance_complete, Index}, Result}
@@ -255,11 +255,12 @@ execute(Subprocess, InputData) when is_function(Subprocess), is_list(InputData) 
                 Error:Reason:Stack ->
                     Parent ! {Ref, {instance_error, Index}, {Error, Reason, Stack}}
             end
-        end)
+        end),
+        {Pid, MRef, Index}
     end, lists:zip(InputData, lists:seq(1, InstanceCount))),
 
     %% Wait for all instances to complete
-    wait_all_instances(Ref, Pids, InstanceCount, 30000, #{}).
+    wait_all_instances(Ref, PidMRefs, InstanceCount, 30000, #{}).
 
 %%====================================================================
 %% gen_pnet Callbacks
@@ -684,22 +685,34 @@ wait_for_completion(Pid, Timeout) ->
 %% @private
 %% @end
 %%--------------------------------------------------------------------
--spec wait_all_instances(Ref :: reference(), Pids :: [pid()], Remaining :: pos_integer(),
-                         Timeout :: timeout(), Acc :: map()) ->
+-spec wait_all_instances(Ref :: reference(), PidMRefs :: [{pid(), reference(), pos_integer()}],
+                         Remaining :: pos_integer(), Timeout :: timeout(), Acc :: map()) ->
           {ok, list()} | {error, term()}.
 
-wait_all_instances(_Ref, _Pids, 0, _Timeout, Acc) ->
+wait_all_instances(_Ref, _PidMRefs, 0, _Timeout, Acc) ->
     %% Convert map to ordered list
     ResultList = [maps:get(I, Acc) || I <- lists:seq(1, maps:size(Acc))],
     {ok, ResultList};
-wait_all_instances(Ref, Pids, Remaining, Timeout, Acc) ->
+wait_all_instances(Ref, PidMRefs, Remaining, Timeout, Acc) ->
     receive
         {Ref, {instance_complete, Index}, Result} ->
-            wait_all_instances(Ref, Pids, Remaining - 1, Timeout, maps:put(Index, Result, Acc));
+            NewPidMRefs = [E || E = {_P, _MRef, I} <- PidMRefs, I =/= Index],
+            wait_all_instances(Ref, NewPidMRefs, Remaining - 1, Timeout, maps:put(Index, Result, Acc));
         {Ref, {instance_error, Index}, {Error, Reason, _Stack}} ->
-            {error, {instance_error, Index, Error, Reason}}
+            {error, {instance_error, Index, Error, Reason}};
+        {'DOWN', MRef, process, Pid, Reason} ->
+            case [I || {P, MR, I} <- PidMRefs, P =:= Pid, MR =:= MRef] of
+                [Index] ->
+                    {error, {instance_crash, Index, Reason}};
+                [] ->
+                    %% Stale DOWN (process already completed) - ignore
+                    wait_all_instances(Ref, PidMRefs, Remaining, Timeout, Acc)
+            end
     after Timeout ->
-        lists:foreach(fun(Pid) -> exit(Pid, kill) end, Pids),
+        lists:foreach(fun({Pid, MRef, _}) ->
+            exit(Pid, kill),
+            demonitor(MRef, [flush])
+        end, PidMRefs),
         {error, timeout}
     end.
 
