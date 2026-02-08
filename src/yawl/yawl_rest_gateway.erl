@@ -66,7 +66,7 @@
 %%====================================================================
 
 %% Cowboy handler callbacks
--export([init/2, handle/2, terminate/3]).
+-export([init/2, terminate/3]).
 
 %% API functions
 -export([start_listener/0, start_listener/1, stop_listener/0]).
@@ -177,3 +177,50 @@ get_routes() ->
         {"/api/yawl/exceptions/:id", ?MODULE, #{handler => exception_detail}},
         {"/api/yawl/exceptions/:id/handle", ?MODULE, #{handler => exception_handle}}
     ]}].
+
+%%====================================================================
+%% Cowboy Handler Callbacks
+%%====================================================================
+
+%% @doc Initialize handler - dispatch to handler based on route binding.
+-spec init(cowboy_req:req(), map()) -> {ok, cowboy_req:req(), map()}.
+init(Req0, Opts) ->
+    Handler = maps:get(handler, Opts, health),
+    Req = dispatch(Handler, Req0, Opts),
+    {ok, Req, Opts}.
+
+%% @doc Terminate callback (optional).
+-spec terminate(term(), cowboy_req:req(), term()) -> ok.
+terminate(_Reason, _Req, _State) ->
+    ok.
+
+%%====================================================================
+%% Handler Dispatch
+%%====================================================================
+
+-spec dispatch(atom(), cowboy_req:req(), map()) -> cowboy_req:req().
+dispatch(Handler, Req0, _Opts) ->
+    case Handler of
+        health -> reply_json(200, #{<<"status">> => <<"ok">>}, Req0);
+        _ -> reply_json(501, #{<<"error">> => <<"Not implemented">>, <<"handler">> => atom_to_binary(Handler)}, Req0)
+    end.
+
+reply_json(Status, Body, Req) ->
+    cowboy_req:reply(Status,
+        #{<<"content-type">> => <<"application/json">>},
+        jsx:encode(Body),
+        Req).
+
+%%====================================================================
+%% Doctests
+%%====================================================================
+
+-spec doctest_test() -> ok.
+doctest_test() ->
+    {module, ?MODULE} = code:ensure_loaded(?MODULE),
+    Routes = get_routes(),
+    true = is_list(Routes),
+    1 = length(Routes),
+    {'_', PathList} = hd(Routes),
+    true = length(PathList) >= 20,
+    ok.

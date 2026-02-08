@@ -18,6 +18,7 @@
              cre_status_handler,
              cre_sup,
              cre_validation,
+             yawl_workflow_supervisor,
              cre_worker,
              cre_yawl,
              cre_yawl_client,
