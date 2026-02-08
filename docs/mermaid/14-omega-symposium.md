@@ -210,3 +210,195 @@ flowchart LR
     incident -->|index 4| pt4
     sat -->|index 5| pt4
 ```
+
+## 7. Code-Level Call Chain (Entry to Blocked)
+
+Trace the execution path from `run_omega_loop` to `blocked` with modules and functions. Includes return paths and `step_until_abort`.
+
+```mermaid
+flowchart TD
+    subgraph omega_demo_runner [omega_demo_runner]
+        Loop[run_omega_loop/8]
+        Find[find_and_complete_human_task/6]
+        RunSub[run_subnets_if_needed/4]
+        StepUntil[step_until_abort/2]
+        Check[check_completed/2]
+        Dump[maybe_dump_blocked_state/3]
+    end
+    subgraph gen_yawl [gen_yawl]
+        Step[step/1]
+    end
+    subgraph omega_internals [omega_demo_runner internals]
+        FindInject[find_inject_place/3]
+        RunReady[run_ready_subnets/5]
+    end
+
+    Loop --> Step
+    Step -->|"ok Receipt"| Loop
+    Step -->|abort| Find
+    Find --> FindInject
+    FindInject -->|undefined| RunSub
+    Find -->|ok| Loop
+    Find -->|done| Completed["status: completed"]
+    RunSub --> RunReady
+    RunReady -->|true| StepUntil
+    StepUntil --> Loop
+    RunReady -->|false| Check
+    Check -->|false| Dump
+    Check -->|true| Completed
+    Dump --> Blocked["Result: blocked"]
+```
+
+## 8. Root Human Task Resolution (find_inject_place)
+
+```mermaid
+flowchart TD
+    subgraph omega_demo_runner [omega_demo_runner]
+        FIP[find_inject_place/3]
+        FIPP[find_inject_place_for_preset]
+        TTR[task_to_role/1]
+        AgentLookup["maps:get Role Agents default_agent"]
+        ExtractCtx[extract_workflow_context]
+        PatternLabel[get_current_pattern_label]
+        AgentCall["Agent TaskName Ctx"]
+        InjectRoot[gen_yawl:inject]
+    end
+    subgraph RootMod [RootMod compiled]
+        Trsn[trsn_lst/0]
+        Preset[preset/1]
+    end
+
+    FIP --> Trsn
+    FIP --> Preset
+    FIP --> FIPP
+    FIPP -->|"P1 P2 one full one empty"| Ret1["{Place, TaskName}"]
+    FIPP -->|"P1 single"| Ret2["undefined"]
+    FIPP -->|"length gt 2 N full 1 empty"| Ret1
+    FIPP -->|"else"| Ret2
+
+    Ret1 --> TTR
+    TTR --> AgentLookup
+    AgentLookup --> ExtractCtx
+    ExtractCtx --> PatternLabel
+    PatternLabel --> AgentCall
+    AgentCall --> InjectRoot
+    InjectRoot --> ReturnOk["return ok"]
+
+    Ret2 --> Breakdown1["Breakdown: no root task enabled"]
+```
+
+## 9. Subnet Run Breakdown (run_ready_subnets)
+
+```mermaid
+flowchart TD
+    subgraph omega_demo_runner [omega_demo_runner]
+        RRS[run_ready_subnets/5]
+        GSE[get_subnet_entry_exit/3]
+        SI[subnet_index/2]
+        PB[p_branch_place_for_subnet/1]
+        ROS[run_one_subnet/6]
+        Drain[drain_subnet_with_human_tasks/3]
+    end
+    subgraph gen_yawl [gen_yawl]
+        Withdraw[withdraw/2]
+        StartLink[start_link/3]
+        Inject[inject/2]
+        Marking[marking/1]
+        InjectRoot[inject/2 to root]
+        Stop[stop/1]
+    end
+
+    RRS -->|"for each NetId Mod"| GSE
+    GSE -->|undefined| Skip1["Skip subnet"]
+    GSE -->|"ok Entry Exit"| SI
+    SI --> PB
+    PB -->|"Index 1 to 3"| B1["p_gonogo_branch1..3"]
+    PB -->|"Index 4+"| B2["p_gonogo_branch3"]
+    RRS -->|"BranchTokens ++ EntryTokens = []"| Skip2["Acc no run"]
+    RRS -->|"Tokens /= []"| Withdraw
+    Withdraw --> ROS
+    ROS --> StartLink
+    StartLink --> Inject
+    Inject --> Drain
+    Drain --> Marking
+    Marking --> CheckExit["ExitPlace tokens?"]
+    CheckExit -->|"[]"| Stop
+    CheckExit -->|"T present"| InjectRoot
+    InjectRoot --> Stop
+    Stop --> RanTrue["RRS returns true"]
+    RanTrue --> StepUntil["step_until_abort in run_subnets_if_needed"]
+```
+
+## 10. Subnet Drain Breakdown (drain_subnet_with_human_tasks)
+
+```mermaid
+flowchart TD
+    subgraph omega_demo_runner [omega_demo_runner]
+        Drain[drain_subnet_with_human_tasks/3]
+        DrainRec[drain_subnet_with_human_tasks N-1]
+        SFIP[subnet_find_inject_place/2]
+        FIPP[find_inject_place_for_preset]
+    end
+    subgraph gen_yawl [gen_yawl]
+        Step[step/1]
+        Marking[marking/1]
+        Inject[inject/2]
+    end
+    subgraph SubnetMod [SubnetMod compiled]
+        Trsn[trsn_lst/0]
+        Preset[preset/1]
+    end
+
+    Drain --> NZero{N eq 0?}
+    NZero -->|yes| ReturnOk["return ok to run_one_subnet"]
+    NZero -->|no| Step
+    Step -->|"ok Receipt"| DrainRec
+    DrainRec --> Drain
+    Step -->|abort| Marking
+    Marking --> SFIP
+    SFIP --> Trsn
+    SFIP --> Preset
+    SFIP --> FIPP
+    FIPP -->|found| Inject
+    Inject --> DrainRec
+    FIPP -->|undefined| Break["Breakdown: return ok stop draining"]
+    Break --> ReturnOk
+```
+
+## 11. Place/Token Data Flow
+
+```mermaid
+flowchart TD
+    subgraph root_marking [root_marking]
+        PT1[p_thread1]
+        PT2[p_thread2]
+        PT3[p_thread3]
+        PT4[p_thread4]
+        Prog[ProgramThread]
+        Ops[OpsThread]
+        Comms[CommsThread]
+        Inc[IncidentThread]
+        Entry[EntryPlace from YAML]
+    end
+
+    subgraph run_ready_subnets_logic [run_ready_subnets logic]
+        BranchPlace["BranchPlace = binary_to_atom NetId"]
+        P42Place["P42Place = p_threadN N = subnet_index"]
+        BranchTokens["BranchTokens = BranchPlace ++ P42Place"]
+        EntryTokens["EntryTokens = maps:get EntryPlace Marking"]
+        Tokens["Tokens = BranchTokens ++ EntryTokens"]
+        WithdrawPlace["WithdrawPlace: prefer BranchPlace then P42Place then EntryAtom"]
+    end
+
+    PT1 --> BranchPlace
+    Prog --> BranchPlace
+    PT1 --> P42Place
+    BranchPlace --> BranchTokens
+    P42Place --> BranchTokens
+    Entry --> EntryTokens
+    BranchTokens --> Tokens
+    EntryTokens --> Tokens
+    Tokens -->|"[]"| None["run_subnets_if_needed returns none"]
+    Tokens -->|"T present"| WithdrawPlace
+    WithdrawPlace --> Withdraw["gen_yawl:withdraw"]
+```
