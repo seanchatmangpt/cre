@@ -1,6 +1,6 @@
 # CRE - Common Runtime Environment
 
-Erlang/OTP project implementing a YAWL (Yet Another Workflow Language) workflow engine with Petri Net-based patterns.
+Erlang/OTP YAWL workflow engine with Petri Net patterns. OTP 25+ (tested through 28).
 
 ## Stack
 
