@@ -14,7 +14,7 @@
 -record(constitution, {
     id :: binary(),
     version :: binary(),
-    sigma = #{} :: #{},
+    sigma = #{} :: map(),
     refusals = [] :: [ga_constitution:refusal()],
     quality_gates = [] :: [ga_constitution:quality_gate()],
     lambda :: ga_constitution:lambda()
@@ -50,7 +50,7 @@
 
 -record(lambda, {
     compilation_strategy = sequential :: sequential | parallel | topological,
-    pattern_sequence = [] :: [pattern_instance()]
+    pattern_sequence = [] :: [ga_constitution:pattern_instance()]
 }).
 
 -record(pattern_instance, {
@@ -58,5 +58,21 @@
     instance_id :: binary(),
     config = #{} :: map()
 }).
+
+-record(token_contract, {
+    shape :: singleton | multiple | optional,
+    validity :: eager | lazy,
+    lifespan :: temporary | permanent
+}).
+
+%% Type definitions
+-type constitution() :: #constitution{}.
+-type sigma() :: #sigma{}.
+-type type_binding() :: #type_binding{}.
+-type refusal() :: #refusal{}.
+-type quality_gate() :: #quality_gate{}.
+-type lambda() :: #lambda{}.
+-type pattern_instance() :: #pattern_instance{}.
+-type token_contract() :: #token_contract{}.
 
 -endif.

@@ -281,7 +281,11 @@ run_ready_subnets(Pid, Marking, SubnetModules, SubnetDefs, Executor) ->
                             InjectPlace = p_branch_place_for_subnet(Index),
                             case run_one_subnet(Pid, Mod, EntryAtom, ExitAtom, InjectPlace, T) of
                                 ok -> true;
-                                {error, _} -> Acc
+                                {error, skip_injection} -> Acc;
+                                {error, Reason} ->
+                                    io:format(standard_error, "Subnet ~p failed: ~p~n", [NetId, Reason]),
+                                    _ = gen_yawl:inject(Pid, #{WithdrawPlace => [T]}),
+                                    Acc
                             end
                     end;
                 undefined -> Acc
@@ -293,8 +297,7 @@ run_ready_subnets(Pid, Marking, SubnetModules, SubnetDefs, Executor) ->
     Ran.
 
 subnet_index(NetId, SubnetModules) ->
-    I = find_index(NetId, SubnetModules, 1),
-    min(I, 4).  %% thread_split has at most 4 branch places
+    find_index(NetId, SubnetModules, 1).
 
 %% P3 sync preset uses p_gonogo_branch1..3 (separate from P38 p_close_branch1..3).
 %% P3 waits_for only [ProgramExit, OpsExit, CommsExit]; indices 4+ (IncidentThread, etc.) complete via P41.
@@ -600,7 +603,11 @@ check_completed(Marking, Executor) ->
                         length(maps:get(EndPlace, Marking, [])) > 0
                 end
         end
-    catch _:_ -> false
+    catch
+        Class:Reason:Stack ->
+            io:format(standard_error, "check_completed error: ~p:~p~n~p~n",
+                [Class, Reason, Stack]),
+            false
     end.
 
 place_is_end(P) when is_atom(P) ->

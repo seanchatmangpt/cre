@@ -6697,3 +6697,181 @@ Compiling src/core/yawl_refusal_guard.erl failed
 [ERROR] Compilation failed
 [INFO] Project build skipped or failed (non-fatal)
 [SUCCESS] SessionStart complete
+--- SessionStart 2026-02-07T23:43:48-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v3.0.0)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (     174 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+Compiling src/ga/ga_compiler.erl failed
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 437 │  check_type_bindings(#ga_constitution:sigma{type_bindings = Bindings}) ->
+     │                                      ╰── syntax error before: ':'
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 449 │  check_pattern_sequence(#ga_constitution:lambda{pattern_sequence = Sequence}) ->
+     │                                         ╰── syntax error before: ':'
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 466 │      PatternInstances = Lambda#ga_constitution:lambda.pattern_sequence,
+     │                                               ╰── syntax error before: ':'
+
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 323 │      Errors = check_type_bindings(Sigma),
+     │               ╰── function check_type_bindings/1 undefined, did you mean type_check/1?
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 341 │      Errors = check_pattern_sequence(Lambda),
+     │               ╰── function check_pattern_sequence/1 undefined, did you mean generate_preset/1?
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 361 │          Code = emit_module(Constitution, ModuleName),
+     │                 ╰── function emit_module/2 undefined, did you mean compile_to_module/2?
+
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 502 │  generate_place_lst(_PatternInstances) ->
+     │  ╰── Warning: function generate_place_lst/1 is unused
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 512 │  generate_trsn_lst(_PatternInstances) ->
+     │  ╰── Warning: function generate_trsn_lst/1 is unused
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 521 │  generate_init_marking() ->
+     │  ╰── Warning: function generate_init_marking/0 is unused
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 529 │  generate_preset(_PatternInstances) ->
+     │  ╰── Warning: function generate_preset/1 is unused
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 536 │  generate_is_enabled(_PatternInstances) ->
+     │  ╰── Warning: function generate_is_enabled/1 is unused
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 546 │  generate_fire() ->
+     │  ╰── Warning: function generate_fire/0 is unused
+
+
+[INFO] Re-compilation needed...
+[INFO] Fetching dependencies...
+Verifying dependencies...
+[INFO] Compiling project...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+Compiling src/ga/ga_compiler.erl failed
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 437 │  check_type_bindings(#ga_constitution:sigma{type_bindings = Bindings}) ->
+     │                                      ╰── syntax error before: ':'
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 449 │  check_pattern_sequence(#ga_constitution:lambda{pattern_sequence = Sequence}) ->
+     │                                         ╰── syntax error before: ':'
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 466 │      PatternInstances = Lambda#ga_constitution:lambda.pattern_sequence,
+     │                                               ╰── syntax error before: ':'
+
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 323 │      Errors = check_type_bindings(Sigma),
+     │               ╰── function check_type_bindings/1 undefined, did you mean type_check/1?
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 341 │      Errors = check_pattern_sequence(Lambda),
+     │               ╰── function check_pattern_sequence/1 undefined, did you mean generate_preset/1?
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 361 │          Code = emit_module(Constitution, ModuleName),
+     │                 ╰── function emit_module/2 undefined, did you mean compile_to_module/2?
+
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 502 │  generate_place_lst(_PatternInstances) ->
+     │  ╰── Warning: function generate_place_lst/1 is unused
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 512 │  generate_trsn_lst(_PatternInstances) ->
+     │  ╰── Warning: function generate_trsn_lst/1 is unused
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 521 │  generate_init_marking() ->
+     │  ╰── Warning: function generate_init_marking/0 is unused
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 529 │  generate_preset(_PatternInstances) ->
+     │  ╰── Warning: function generate_preset/1 is unused
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 536 │  generate_is_enabled(_PatternInstances) ->
+     │  ╰── Warning: function generate_is_enabled/1 is unused
+
+     ┌─ src/ga/ga_compiler.erl:
+     │
+ 546 │  generate_fire() ->
+     │  ╰── Warning: function generate_fire/0 is unused
+
+
+[ERROR] Compilation failed
+[INFO] Project build skipped or failed (non-fatal)
+[SUCCESS] SessionStart complete

@@ -173,14 +173,12 @@ to_place_atom(A) when is_atom(A) -> A;
 to_place_atom(_) -> undefined.
 
 subnet_index(NetId, SubnetModules) ->
-    I = find_index(NetId, SubnetModules, 1),
-    min(I, 4).
+    find_index(NetId, SubnetModules, 1).
 
 find_index(NetId, [{NetId, _} | _], N) -> N;
 find_index(NetId, [_ | Rest], N) -> find_index(NetId, Rest, N + 1);
 find_index(_, [], N) -> N.
 
-preset_analysis(Transitions, PresetMap, Marking, HumanTasks) ->
-    Filtered = [T || T <- HumanTasks, lists:member(T, Transitions)],
+preset_analysis(_Transitions, PresetMap, Marking, HumanTasks) ->
     [{T, [{P, length(maps:get(P, Marking, []))} || P <- maps:get(T, PresetMap, [])]}
-     || T <- Filtered].
+     || T <- HumanTasks].

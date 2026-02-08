@@ -38,80 +38,14 @@
 -export([to_yaml/1, from_yaml/1]).
 
 %%====================================================================
-%% Records
+%% Includes
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc Constitution record for GA compiler.
-%%
-%% Contains all components needed to compile a workflow specification
-%% into executable gen_yawl modules.
-%%--------------------------------------------------------------------
--record(constitution, {
-    id :: binary(),                           %% Unique constitution identifier
-    version :: binary(),                      %% Version string
-    sigma = #{} :: #{}                        %% Σ - Typing profile
-}).
-
--record(sigma, {
-    type_system = behavioral :: behavioral | static | dynamic,
-    type_bindings = [] :: [type_binding()]
-}).
-
--record(type_binding, {
-    term :: binary(),
-    type :: binary(),
-    token_contract :: #{
-        shape := singleton | multiple | optional,
-        validity := eager | lazy
-    }
-}).
-
--record(refusal, {
-    state :: binary(),
-    refused_transitions = [] :: [binary()],
-    refusal_reason :: binary()
-}).
-
--record(quality_gate, {
-    name :: binary(),
-    invariant :: binary(),
-    replay_enabled = false :: boolean(),
-    provenance_enabled = false :: boolean()
-}).
-
--record(lambda, {
-    compilation_strategy = topological :: topological | sequential | parallel,
-    pattern_sequence = [] :: [pattern_instance()]
-}).
-
--record(pattern_instance, {
-    pattern :: binary(),
-    instance_id :: binary(),
-    config = #{} :: map()
-}).
-
-%%--------------------------------------------------------------------
-%% @doc Token contract specification.
-%%--------------------------------------------------------------------
--record(token_contract, {
-    shape :: singleton | multiple | optional,
-    validity :: eager | lazy,
-    lifespan :: temporary | permanent
-}).
+-include("ga_constitution.hrl").
 
 %%====================================================================
 %% Types
 %%====================================================================
-
--type constitution() :: #constitution{}.
--type sigma() :: #sigma{}.
--type type_binding() :: #type_binding{}.
--type refusal() :: #refusal{}.
--type quality_gate() :: #quality_gate{}.
--type lambda() :: #lambda{}.
--type pattern_instance() :: #pattern_instance{}.
--type token_contract() :: #token_contract{}.
 
 -type refusal_category() ::
     missing_evidence |
@@ -352,9 +286,7 @@ from_map(Map) when is_map(Map) ->
 -spec to_yaml(constitution()) -> binary().
 
 to_yaml(Constitution) ->
-    Map = to_map(Constitution),
-    %% Simple YAML generation - for production use a proper YAML library
-    yaml_encode(Map).
+    ga_yaml:to_yaml(Constitution).
 
 %%--------------------------------------------------------------------
 %% @doc Parses a constitution from YAML format.
@@ -364,13 +296,7 @@ to_yaml(Constitution) ->
 -spec from_yaml(binary()) -> {ok, constitution()} | {error, term()}.
 
 from_yaml(YamlBinary) when is_binary(YamlBinary) ->
-    try
-        Map = yaml_decode(YamlBinary),
-        {ok, from_map(Map)}
-    catch
-        Type:Error:Stack ->
-            {error, {yaml_parse_error, Type, Error, Stack}}
-    end.
+    ga_yaml:from_yaml(YamlBinary).
 
 %%====================================================================
 %% Internal Functions
@@ -558,10 +484,9 @@ pattern_instance_to_map(#pattern_instance{pattern = Pattern, instance_id = Id, c
 -spec yaml_encode(map()) -> binary().
 
 yaml_encode(Map) when is_map(Map) ->
-    Lines = [
-        <<"constitution:">>,
-        encode_map(<<"  ">, Map)
-    ],
+    Prefix = <<"  ">>,
+    EncodedMap = encode_map(Prefix, Map),
+    Lines = [<<"constitution:">>, EncodedMap],
     iolist_to_binary(lists:flatten(Lines)).
 
 %% @private
@@ -620,7 +545,7 @@ yaml_decode(_YamlBinary) ->
     #{}.
 
 %% @private
--spec maps_get(Key, Map, Default) -> term().
+-spec maps_get(term(), map(), term()) -> term().
 
 maps_get(Key, Map, Default) ->
     case maps:find(Key, Map) of

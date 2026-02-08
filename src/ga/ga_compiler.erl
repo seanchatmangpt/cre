@@ -434,36 +434,49 @@ do_generate_code(Constitution, Options) ->
     end.
 
 %% @private
-check_type_bindings(#ga_constitution:sigma{type_bindings = Bindings}) ->
+check_type_bindings(Sigma) when is_map(Sigma) ->
+    TypeBindings = maps:get(type_bindings, Sigma, []),
     lists:filtermap(
-        fun(#ga_constitution:type_binding{term = Term, type = Type}) ->
+        fun(Binding) when is_map(Binding) ->
+            Term = maps:get(<<"term">>, Binding, <<>>),
+            Type = maps:get(<<"type">>, Binding, <<>>),
             case {is_binary(Term), is_binary(Type)} of
                 {true, true} -> false;
                 _ -> {true, <<"Invalid type binding for ", Term/binary>>}
-            end
+            end;
+           (_) ->
+            {true, <<"Invalid type binding format">>}
         end,
-        Bindings
-    ).
+        TypeBindings
+    );
+check_type_bindings(_Sigma) ->
+    [<<"Sigma must be a map">>].
 
 %% @private
-check_pattern_sequence(#ga_constitution:lambda{pattern_sequence = Sequence}) ->
+check_pattern_sequence(Lambda) when is_map(Lambda) ->
+    Sequence = maps:get(<<"pattern_sequence">>, Lambda, []),
     Supported = sets:from_list(supported_patterns()),
     lists:filtermap(
-        fun(#ga_constitution:pattern_instance{pattern = Pattern}) ->
+        fun(PatternInstance) when is_map(PatternInstance) ->
+            Pattern = maps:get(<<"pattern">>, PatternInstance, <<>>),
             case sets:is_element(Pattern, Supported) of
                 true -> false;
                 false -> {true, <<"Unsupported pattern: ", Pattern/binary>>}
-            end
+            end;
+           (_) ->
+            {true, <<"Invalid pattern instance">>}
         end,
         Sequence
-    ).
+    );
+check_pattern_sequence(_Lambda) ->
+    [<<"Lambda must be a map">>].
 
 %% @private
 emit_module(Constitution, ModuleName) ->
     %% Generate gen_yawl module source code
     #constitution{id = Id, lambda = Lambda} = Constitution,
 
-    PatternInstances = Lambda#ga_constitution:lambda.pattern_sequence,
+    PatternInstances = maps:get(<<"pattern_sequence">>, Lambda, []),
 
     %% Build module header
     Header = [
