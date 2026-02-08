@@ -1629,9 +1629,10 @@ frequency_matrix_parallel_test() ->
     Traces = events_to_traces(Log),
     Freq = calculate_frequency_matrix(Traces),
     ?assertEqual(2, maps:get({a, b}, Freq)),
+    %% a->c appears in trace 2, c->b appears in trace 2
     ?assertEqual(1, maps:get({a, c}, Freq)),
-    ?assertEqual(1, maps:get({b, c}, Freq)),
-    ?assertEqual(1, maps:get({c, b}, Freq)).
+    ?assertEqual(1, maps:get({c, b}, Freq)),
+    ?assertEqual(1, maps:get({b, d}, Freq)).
 
 %%--------------------------------------------------------------------
 %% Dependency calculation tests

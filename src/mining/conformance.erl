@@ -608,11 +608,12 @@ find_output_places(Transition, #{arcs := Arcs}) ->
 -spec can_consume(Places :: [place()], Marking :: marking()) -> boolean().
 
 can_consume([], _Marking) -> true;
-can_consume([Place | Rest], Marking) ->
+can_consume([Place | Rest], Marking) when is_map(Marking) ->
     case maps:get(Place, Marking, 0) of
-        N when N > 0 -> can_consume(Rest, Marking);
+        N when is_integer(N), N > 0 -> can_consume(Rest, Marking);
         _ -> false
-    end.
+    end;
+can_consume(_Places, _Marking) -> false.
 
 %%--------------------------------------------------------------------
 %% @private

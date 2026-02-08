@@ -512,7 +512,8 @@ find_initial_activities(DirectSucc, Activities) ->
     ActivityList = sets:to_list(Activities),
     lists:filter(fun(A) ->
         %% A is initial if no activity B exists such that B > A
-        not lists:any(fun({B, _A}) -> B =:= A end, sets:to_list(DirectSucc))
+        %% i.e., A never appears as the second element
+        not lists:any(fun({_B, X}) -> X =:= A end, sets:to_list(DirectSucc))
     end, ActivityList).
 
 %% @private
@@ -526,7 +527,8 @@ find_final_activities(DirectSucc, Activities) ->
     ActivityList = sets:to_list(Activities),
     lists:filter(fun(A) ->
         %% A is final if no activity B exists such that A > B
-        not lists:any(fun({_A, B}) -> B =:= A end, sets:to_list(DirectSucc))
+        %% i.e., A never appears as the first element
+        not lists:any(fun({X, _B}) -> X =:= A end, sets:to_list(DirectSucc))
     end, ActivityList).
 
 %% @private
