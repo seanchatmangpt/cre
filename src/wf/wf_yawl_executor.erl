@@ -555,9 +555,12 @@ start_workflow(#yawl_executor{root_module = RootMod, spec = Spec, compiled = Com
         _ -> #{}
     end,
     NetArg = #{initial_data => InitialData, case_id => CaseId, regions => Regions},
-    GenYawlOpts = maps:get(gen_yawl_options, Options, []),
+    GenYawlOpts = case maps:get(gen_yawl_options, Options, []) of
+        L when is_list(L) -> L;
+        _ -> []
+    end,
 
-    case gen_yawl:start_link(RootMod, NetArg, GenYawlOpts) of
+    case yawl_workflow_supervisor:start_workflow(RootMod, NetArg, GenYawlOpts) of
         {ok, Pid} ->
             {ok, Pid, CaseId};
         {error, Reason} ->
@@ -623,12 +626,10 @@ start_workflow(#yawl_executor{root_module = RootMod, spec = Spec, compiled = Com
 -spec stop_workflow(Pid :: pid()) -> ok | {error, term()}.
 
 stop_workflow(Pid) when is_pid(Pid) ->
-    try
-        gen_yawl:stop(Pid),
-        ok
-    catch
-        exit:{noproc, _} -> {error, no_process};
-        _:_ -> {error, stop_exception}
+    case yawl_workflow_supervisor:stop_workflow(Pid) of
+        ok -> ok;
+        {error, not_found} -> {error, no_process};
+        {error, Reason} -> {error, Reason}
     end.
 
 %%====================================================================

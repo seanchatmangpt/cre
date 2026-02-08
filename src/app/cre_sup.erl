@@ -86,8 +86,8 @@
 %% ```erlang
 %% 1> {ok, {_Flags, Children}} = cre_sup:init([]),
 %% 1> true = is_list(Children),
-%% 1> 4 = length(Children).
-%% 4
+%% 1> 5 = length(Children).
+%% 5
 %% ```
 %%
 %% @end
@@ -252,7 +252,16 @@ init(_Args) ->
                     modules => [yawl_approval]
                    },
 
-    {ok, {SupFlags, [ChildSpec, TimeoutSpec, XesSpec, ApprovalSpec]}}.
+    WorkflowSupSpec = #{
+                       id => yawl_workflow_supervisor,
+                       start => {yawl_workflow_supervisor, start_link, []},
+                       restart => permanent,
+                       shutdown => infinity,
+                       type => supervisor,
+                       modules => [yawl_workflow_supervisor]
+                      },
+
+    {ok, {SupFlags, [ChildSpec, TimeoutSpec, XesSpec, ApprovalSpec, WorkflowSupSpec]}}.
 
 %%====================================================================
 %% Doctests
@@ -302,7 +311,7 @@ doctest_test() ->
     %% Test 5: Verify child specs count
     {ok, {_, Children}} = init([]),
     true = is_list(Children),
-    4 = length(Children),
+    5 = length(Children),
 
     %% Test 6: Verify child specs have required fields
     [
@@ -325,6 +334,7 @@ doctest_test() ->
     true = lists:member(yawl_timeout, ChildIds),
     true = lists:member(yawl_xes, ChildIds),
     true = lists:member(yawl_approval, ChildIds),
+    true = lists:member(yawl_workflow_supervisor, ChildIds),
 
     %% Test 8: Verify cre_master spec details
     {ok, {_, Children2}} = init([]),
