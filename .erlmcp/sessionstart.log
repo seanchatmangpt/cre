@@ -957,3 +957,3157 @@ src/core/yawl_compile.erl:999: Warning: OPTIMIZED: match context reused
 
 [SUCCESS] Project compilation verified
 [SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T17:37:53-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (      14 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+    ┌─ src/patterns/cancel_mi_activity.erl:
+    │
+ 51 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/recursion.erl:
+    │
+ 59 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/cancel_activity.erl:
+    │
+ 53 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/thread_split.erl:
+    │
+ 61 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/wf/wf_test_net_task_gate.erl:
+     │
+ 124 │  -type task_id() :: term().
+     │   ╰── Warning: type task_id() is unused
+
+     ┌─ src/wf/wf_test_net_task_gate.erl:
+     │
+ 129 │  -type task_status() :: enabled | running | done | failed | cancelled.
+     │   ╰── Warning: type task_status() is unused
+
+
+     ┌─ src/wf/wf_timerq.erl:
+     │
+ 498 │  extract_component([], _Delimiter, Digits, true) ->
+     │                                    ╰── Warning: variable 'Digits' is unused
+
+     ┌─ src/wf/wf_timerq.erl:
+     │
+ 507 │  extract_component([Ch | Rest], Delimiter, Digits, FoundDigit) when Ch >= $0, Ch =< $9 ->
+     │                                                    ╰── Warning: variable 'FoundDigit' is unused
+
+     ┌─ src/wf/wf_timerq.erl:
+     │
+ 510 │  extract_component([Ch | Rest], Delimiter, Digits, _FoundDigit)
+     │                                            ╰── Warning: variable 'Digits' is unused
+
+
+     ┌─ src/cre_validation.erl:
+     │
+ 203 │  validate_binary_field(Value, FieldName) when is_binary(Value) ->
+     │                               ╰── Warning: variable 'FieldName' is unused
+
+     ┌─ src/cre_validation.erl:
+     │
+ 214 │  validate_atom_field(Value, FieldName) when is_atom(Value) ->
+     │                             ╰── Warning: variable 'FieldName' is unused
+
+     ┌─ src/cre_validation.erl:
+     │
+ 225 │  validate_list_field(Value, FieldName) when is_list(Value) ->
+     │                             ╰── Warning: variable 'FieldName' is unused
+
+     ┌─ src/cre_validation.erl:
+     │
+ 236 │  validate_map_field(Value, FieldName) when is_map(Value) ->
+     │                            ╰── Warning: variable 'FieldName' is unused
+
+     ┌─ src/cre_validation.erl:
+     │
+ 247 │  validate_function_field(Value, FieldName) when is_function(Value) ->
+     │                                 ╰── Warning: variable 'FieldName' is unused
+
+
+     ┌─ src/nato/nato_conf.erl:
+     │
+ 162 │  handle_call({approve, By, DraftId}, _From, #state{delegations = Deps, approvals = Approvals} = S) ->
+     │                                                                  ╰── Warning: variable 'Deps' is unused
+
+
+    ┌─ src/patterns/thread_merge.erl:
+    │
+ 75 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/synchronization.erl:
+    │
+ 68 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/patterns/multiple_choice.erl:
+     │
+ 529 │          'p_complete' => [],
+     │          ╰── Warning: key 'p_complete' will be overridden in expression
+
+
+    ┌─ src/nato/nato_assert.erl:
+    │
+ 62 │          PostureSets = [P || {_, posture_set, P} <- Audit],
+    │          ╰── Warning: variable 'PostureSets' is unused
+
+
+     ┌─ src/yawl_approval_middleware.erl:
+     │
+ 588 │      ExecFun = lists:foldl(fun(Middleware, AccFun) ->
+     │                                            ╰── Warning: variable 'AccFun' is unused
+
+
+    ┌─ src/patterns/complete_mi_activity.erl:
+    │
+ 45 │  is_enabled(t_complete, Mode, UsrInfo) ->
+    │                               ╰── Warning: variable 'UsrInfo' is unused
+
+    ┌─ src/patterns/complete_mi_activity.erl:
+    │
+ 58 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/dynamic_partial_join_mi.erl:
+    │
+ 57 │  fire(t_compute_threshold, Mode, UsrInfo) ->
+    │                            ╰── Warning: variable 'Mode' is unused
+
+    ┌─ src/patterns/dynamic_partial_join_mi.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+      ┌─ src/wf/wf_verify.erl:
+      │
+ 1194 │  find_enabled_transitions(Marking, Transitions, PresetMap) ->
+      │  ╰── Warning: function find_enabled_transitions/3 is unused
+
+      ┌─ src/wf/wf_verify.erl:
+      │
+ 1215 │  fire_transitions(Marking, EnabledTransitions, PostsetMap) ->
+      │  ╰── Warning: function fire_transitions/3 is unused
+
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 480 │                      NewState = State#or_join_state{
+     │                      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 481 │                          completed = [Index],
+     │                          ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 517 │                      NewState = State#or_join_state{
+     │                      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 518 │                          completed = [],
+     │                          ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+    ┌─ src/patterns/structured_sync_merge.erl:
+    │
+ 76 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+src/yawl_scheduling.erl:866: Warning: OPTIMIZED: match context reused
+src/yawl_scheduling.erl:871: Warning: OPTIMIZED: match context reused
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 213 │      nomatch =/= binary:match(EmptyXes, <<"<?xml version=\"1.0\" encoding=\"UTF-8\"?>">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 214 │      nomatch =/= binary:match(EmptyXes, <<"<log ">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 225 │      nomatch =/= binary:match(SingleXes, <<"<log ">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 226 │      nomatch =/= binary:match(SingleXes, <<"case_test">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 227 │      nomatch =/= binary:match(SingleXes, <<"<trace>">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 228 │      nomatch =/= binary:match(SingleXes, <<"<event>">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 249 │      nomatch =/= binary:match(MultiXes, <<"case_001">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 250 │      nomatch =/= binary:match(MultiXes, <<"workitem_started">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 251 │      nomatch =/= binary:match(MultiXes, <<"workitem_completed">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 266 │      nomatch =/= binary:match(MultiCaseXes, <<"case_a">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 267 │      nomatch =/= binary:match(MultiCaseXes, <<"case_b">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 283 │      nomatch =/= binary:match(TransitionsXes, <<"schedule">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 284 │      nomatch =/= binary:match(TransitionsXes, <<"start">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 285 │      nomatch =/= binary:match(TransitionsXes, <<"complete">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 286 │      nomatch =/= binary:match(TransitionsXes, <<"suspend">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 287 │      nomatch =/= binary:match(TransitionsXes, <<"resume">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 288 │      nomatch =/= binary:match(TransitionsXes, <<"abort">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 289 │      nomatch =/= binary:match(TransitionsXes, <<"fail">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 300 │      nomatch =:= binary:match(EscapedXes, <<"<script>">>),
+     │              ╰── Warning: use of operator '=:=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 301 │      nomatch =/= binary:match(EscapedXes, <<"&lt;script&gt;">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 312 │      nomatch =/= binary:match(TsXes, <<"2024-01-01T">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 320 │      nomatch =/= binary:match(CustomXes, <<"custom_name">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 321 │      nomatch =/= binary:match(CustomXes, <<"custom_source">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 322 │      nomatch =/= binary:match(CustomXes, <<"custom description">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 399 │      maps:fold(fun(Key, Value, Acc) when Key =:= name; Key =:= type ->
+     │                         ╰── Warning: variable 'Value' is unused
+
+
+     ┌─ src/patterns/structured_loop.erl:
+     │
+ 453 │  fire('t_loop_back', #{'p_body_done' := [{state, NewState}]}, State) ->
+     │                                                  ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/structured_loop.erl:
+     │
+ 470 │          'p_complete' => [],
+     │          ╰── Warning: key 'p_complete' will be overridden in expression
+
+
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/patterns/cancel_case.erl:
+    │
+ 52 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/wf/yawl_telemetry_prometheus.erl:
+    │
+ 37 │  -type metric_name() :: atom().
+    │   ╰── Warning: type metric_name() is unused
+
+    ┌─ src/wf/yawl_telemetry_prometheus.erl:
+    │
+ 38 │  -type metric_value() :: number().
+    │   ╰── Warning: type metric_value() is unused
+
+    ┌─ src/wf/yawl_telemetry_prometheus.erl:
+    │
+ 39 │  -type labels() :: [{atom(), term()}].
+    │   ╰── Warning: type labels() is unused
+
+    ┌─ src/wf/yawl_telemetry_prometheus.erl:
+    │
+ 40 │  -type metric() :: {metric_name(), metric_value(), labels()}.
+    │   ╰── Warning: type metric() is unused
+
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 145 │  -opaque spec() :: term().
+     │   ╰── Warning: opaque type spec() is not exported
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 145 │  -opaque spec() :: term().
+     │   ╰── Warning: type spec() is unused
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 202 │  evaluate_mi(#{min_instances := Min, max_instances := Max} = MIParams, Data) when is_map(Data) ->
+     │                                                              ╰── Warning: variable 'MIParams' is unused
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 254 │  instance_count(#{min_instances := Min, max_instances := Max} = MIParams, Data) ->
+     │                                    ╰── Warning: variable 'Min' is unused
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 254 │  instance_count(#{min_instances := Min, max_instances := Max} = MIParams, Data) ->
+     │                                                          ╰── Warning: variable 'Max' is unused
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 335 │  check_bounds(Requested, Min, Max) when is_integer(Requested), Requested < Min ->
+     │                               ╰── Warning: variable 'Max' is unused
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 339 │  check_bounds(Requested, Min, Max) when is_integer(Requested), is_integer(Max), Requested > Max ->
+     │                          ╰── Warning: variable 'Min' is unused
+
+
+    ┌─ src/wf/yawl_checkpoint.erl:
+    │
+ 45 │  -type checkpoint() :: #yawl_instance{}.
+    │   ╰── Warning: type checkpoint() is unused
+
+
+      ┌─ src/cre_yawl_worker.erl:
+      │
+ 1423 │        handler = fun(X) -> {ok, X} end,
+      │                  ╰── Warning: a term is constructed, but never used
+
+      ┌─ src/cre_yawl_worker.erl:
+      │
+ 1447 │        handler = fun(X) -> {ok, X} end,
+      │                  ╰── Warning: a term is constructed, but never used
+
+
+     ┌─ src/wf/wf_persistence.erl:
+     │
+ 759 │  serialize_rng_state(RngState) ->
+     │                      ╰── Warning: variable 'RngState' is unused
+
+     ┌─ src/wf/wf_persistence.erl:
+     │
+ 788 │  reconstruct_event(#wf_persistent_event{event_type = EventType,
+     │                                                      ╰── Warning: variable 'EventType' is unused
+
+
+    ┌─ src/patterns/blocking_discriminator.erl:
+    │
+ 69 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/generalized_and_join.erl:
+    │
+ 64 │  fire(t_join, Mode, UsrInfo) ->
+    │               ╰── Warning: variable 'Mode' is unused
+
+    ┌─ src/patterns/generalized_and_join.erl:
+    │
+ 70 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/transient_trigger.erl:
+    │
+ 43 │  is_enabled(t_trigger, Mode, UsrInfo) ->
+    │                              ╰── Warning: variable 'UsrInfo' is unused
+
+    ┌─ src/patterns/transient_trigger.erl:
+    │
+ 55 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/patterns/implicit_merge.erl:
+     │
+ 557 │  wait_for_first_completion(Ref, Pids, Timeout) ->
+     │                                 ╰── Warning: variable 'Pids' is unused
+
+
+src/yawl_reporter.erl:793: Warning: OPTIMIZED: match context reused
+src/yawl_reporter.erl:793: Warning: BINARY CREATED: binary is used in term passed to erlang:error/1
+
+src/http/wf_admin_api.erl:396: Warning: BINARY CREATED: binary is used in a term that is returned from the function
+src/http/wf_admin_api.erl:402: Warning: NOT OPTIMIZED: binary is used in remote call to base64:decode/1
+src/http/wf_admin_api.erl:402: Warning: BINARY CREATED: binary is used in call to base64:decode/1 which doesn't support context reuse
+     ┌─ src/http/wf_admin_api.erl:
+     │
+ 183 │  -record(api_error, {
+     │   ╰── Warning: record api_error is unused
+
+
+src/core/yawl_compile.erl:728: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:730: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:732: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:734: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:1105: Warning: OPTIMIZED: match context reused
+
+src/yawl_web_dashboard.erl:282: Warning: NOT OPTIMIZED: binary is used in remote call to yawl_otel_logger:get_events_by_trace/1
+src/yawl_web_dashboard.erl:282: Warning: BINARY CREATED: binary is used in call to yawl_otel_logger:get_events_by_trace/1 which doesn't support context reuse
+src/yawl_web_dashboard.erl:284: Warning: BINARY CREATED: binary is used in term passed to jsx:encode/1
+
+    ┌─ src/patterns/persistent_trigger.erl:
+    │
+ 50 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+src/yawl_twitter.erl:628: Warning: BINARY CREATED: binary is returned from the function
+src/yawl_twitter.erl:631: Warning: BINARY CREATED: binary is used in 'bs_create_bin' which doesn't support context reuse
+src/yawl_twitter.erl:653: Warning: BINARY CREATED: binary is returned from the function
+src/yawl_twitter.erl:656: Warning: BINARY CREATED: binary is used in 'bs_create_bin' which doesn't support context reuse
+
+    ┌─ src/patterns/arbitrary_cycles.erl:
+    │
+ 25 │  -record(state, {
+    │   ╰── Warning: record state is unused
+
+    ┌─ src/patterns/arbitrary_cycles.erl:
+    │
+ 52 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/explicit_termination.erl:
+    │
+ 58 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+src/yawl_mail.erl:756: Warning: NOT OPTIMIZED: binary is used in remote call to binary:split/2
+src/yawl_mail.erl:756: Warning: BINARY CREATED: binary is used in call to binary:split/2 which doesn't support context reuse
+src/yawl_mail.erl:762: Warning: OPTIMIZED: match context reused
+src/yawl_mail.erl:765: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/patterns/cancel_region.erl:
+    │
+ 53 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/sequence.erl:
+    │
+ 24 │  -record(state, {
+    │   ╰── Warning: record state is unused
+
+    ┌─ src/patterns/sequence.erl:
+    │
+ 53 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/blocking_partial_join.erl:
+    │
+ 79 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/patterns/parallel_split.erl:
+     │
+ 610 │      NewState = State#parallel_split_state{completed = NewCompleted},
+     │      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/parallel_split.erl:
+     │
+ 610 │      NewState = State#parallel_split_state{completed = NewCompleted},
+     │                                            ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+     ┌─ src/yawl_documents.erl:
+     │
+ 580 │  doctest_test() ->
+     │  ╰── Warning: function doctest_test/0 is unused
+
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 438 │  field_schema(text) ->
+     │  ╰── Warning: function field_schema/1 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 519 │  render_html(Schema, Options) when is_map(Schema), is_map(Options) ->
+     │  ╰── Warning: function render_html/2 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 598 │  validate(Schema, Data) when is_map(Schema), is_map(Data) ->
+     │  ╰── Warning: function validate/2 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 654 │  normalize_data_keys(Data) when is_map(Data) ->
+     │  ╰── Warning: function normalize_data_keys/1 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 672 │  escape_html(undefined) ->
+     │  ╰── Warning: function escape_html/1 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 694 │  form_class_attr(none, <<"">>) ->
+     │  ╰── Warning: function form_class_attr/2 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 709 │  render_field(FieldName, FieldDef, CSSFramework) ->
+     │  ╰── Warning: function render_field/3 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 773 │  render_input(FieldName, text, Class, Placeholder, Required, Min, Max, Pattern, [], _Default, _CSS) ->
+     │  ╰── Warning: function render_input/11 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 919 │  attr_min_max(_AttrName, undefined) ->
+     │  ╰── Warning: function attr_min_max/2 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 932 │  field_classes(bootstrap) ->
+     │  ╰── Warning: function field_classes/1 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 946 │  render_submit_button(Label, Class, bootstrap) when Class =:= <<"">> ->
+     │  ╰── Warning: function render_submit_button/3 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 967 │  validate_field(FieldName, FieldDef, Data) ->
+     │  ╰── Warning: function validate_field/3 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 996 │  validate_field_type(_FieldName, text, Value, Min, Max, Pattern, _FieldDef) ->
+     │  ╰── Warning: function validate_field_type/7 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1073 │  validate_range(_Value, undefined, undefined) ->
+      │  ╰── Warning: function validate_range/3 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1095 │  is_empty(undefined) -> true;
+      │  ╰── Warning: function is_empty/1 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1105 │  to_binary(V) when is_binary(V) -> V;
+      │  ╰── Warning: function to_binary/1 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1115 │  to_number(V) when is_integer(V) -> V;
+      │  ╰── Warning: function to_number/1 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1129 │  value_to_binary(V) when is_binary(V) -> V;
+      │  ╰── Warning: function value_to_binary/1 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1139 │  number_to_binary(N) when is_integer(N) -> integer_to_binary(N);
+      │  ╰── Warning: function number_to_binary/1 is unused
+
+
+    ┌─ src/cre_config.erl:
+    │
+ 45 │  -behaviour(application).
+    │   ╰── Warning: undefined callback function start/2 (behaviour 'application')
+
+    ┌─ src/cre_config.erl:
+    │
+ 45 │  -behaviour(application).
+    │   ╰── Warning: undefined callback function stop/1 (behaviour 'application')
+
+
+    ┌─ src/patterns/structured_partial_join.erl:
+    │
+ 68 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/local_sync_merge.erl:
+    │
+ 65 │  fire(t_join, Mode, UsrInfo) ->
+    │               ╰── Warning: variable 'Mode' is unused
+
+    ┌─ src/patterns/local_sync_merge.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+src/wf/wf_timer.erl:186: Warning: OPTIMIZED: match context reused
+src/wf/wf_timer.erl:205: Warning: OPTIMIZED: match context reused
+src/wf/wf_timer.erl:207: Warning: NOT OPTIMIZED: binary is used in call to parse_number/1 which does not begin with a suitable binary match
+src/wf/wf_timer.erl:207: Warning: BINARY CREATED: binary is used in call to parse_number/1 which doesn't support context reuse
+src/wf/wf_timer.erl:214: Warning: OPTIMIZED: match context reused
+src/wf/wf_timer.erl:214: Warning: OPTIMIZED: match context reused
+src/wf/wf_timer.erl:237: Warning: BINARY CREATED: binary is used in a term that is returned from the function
+src/wf/wf_timer.erl:238: Warning: OPTIMIZED: match context reused
+
+     ┌─ src/wf/yawl_health.erl:
+     │
+ 287 │  -opaque req() :: term().
+     │   ╰── Warning: opaque type req() is not exported
+
+
+    ┌─ src/patterns/cancelling_partial_join.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/cancelling_partial_join_mi.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/cancelling_discriminator.erl:
+    │
+ 60 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/wf/yawl_pred_eval.erl:
+     │
+ 326 │  extract_token_facts(Place, Token) when is_map(Token) ->
+     │                      ╰── Warning: variable 'Place' is unused
+
+
+    ┌─ src/patterns/static_partial_join_mi.erl:
+    │
+ 65 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/general_sync_merge.erl:
+    │
+ 72 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+src/wf/wf_yawl_pred.erl:798: Warning: BINARY CREATED: binary is returned from the function
+     ┌─ src/wf/wf_yawl_pred.erl:
+     │
+ 758 │  ast_to_body({xpath_var, {path, NetName, VarName}}, Acc) ->
+     │                                 ╰── Warning: variable 'NetName' is unused
+
+     ┌─ src/wf/wf_yawl_pred.erl:
+     │
+ 811 │  format_value(true) -> "true";
+     │  ╰── Warning: function format_value/1 is unused
+
+
+     ┌─ src/wf/wf_test_net_trigger_drop.erl:
+     │
+ 171 │  doctest_test() ->
+     │  ╰── Warning: function doctest_test/0 is unused
+
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 191 │  -type service_request() :: #service_request{}.
+     │   ╰── Warning: type service_request() is unused
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 852 │      Worklet = maps:get(worklet, Config, undefined),
+     │      ╰── Warning: variable 'Worklet' is unused
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 924 │              {NewCase, NewState} = update_workitem_status(
+     │               ╰── Warning: variable 'NewCase' is unused
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 937 │              {NewCase, NewState} = update_workitem_status(
+     │               ╰── Warning: variable 'NewCase' is unused
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 951 │              {NewCase, NewState} = complete_workitem(Case, WiId, Task, Data, Now, State),
+     │               ╰── Warning: variable 'NewCase' is unused
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 968 │  handle_call({suspend_case, CaseId, Now}, _From, State) ->
+     │                                     ╰── Warning: variable 'Now' is unused
+
+      ┌─ src/wf/wf_engine.erl:
+      │
+ 1006 │          #wf_case{marking = Marking} = Case ->
+      │                                        ╰── Warning: variable 'Case' is unused
+
+      ┌─ src/wf/wf_engine.erl:
+      │
+ 1189 │          fun(CaseId, #wf_case{work_items = WIs} = Case, Acc) ->
+      │              ╰── Warning: variable 'CaseId' is unused
+
+      ┌─ src/wf/wf_engine.erl:
+      │
+ 1209 │  update_workitem_status(#wf_case{work_items = WIs} = Case, WiId, Status, User, Now, State) ->
+      │                                                                                ╰── Warning: variable 'Now' is unused
+
+      ┌─ src/wf/wf_engine.erl:
+      │
+ 1387 │  fire_enabled_transition(#wf_case{marking = Marking, data = Data} = Case, Trsn, Def, Spec, Now) ->
+      │                                                                                      ╰── Warning: variable 'Spec' is unused
+
+      ┌─ src/wf/wf_engine.erl:
+      │
+ 1476 │  fire_transition(Trsn, Data, Spec) ->
+      │  ╰── Warning: function fire_transition/3 is unused
+
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 386 │  fire('t_complete', #{'p_running' := [{{branch, Index}, _Fun} | Rest]}, #n_out_of_m_state{results = Results} = State) ->
+     │                                                                                                     ╰── Warning: variable 'Results' is unused
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 403 │      NewState = State#n_out_of_m_state{quorum_met = true},
+     │      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 403 │      NewState = State#n_out_of_m_state{quorum_met = true},
+     │                                        ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 589 │  collect_quorum(Ref, Pids, N, M, Acc, Errors) when length(Pids) =:= 0, length(Acc) + length(Errors) =:= M ->
+     │                 ╰── Warning: variable 'Ref' is unused
+
+
+     ┌─ src/core/yawl_pattern_expander.erl:
+     │
+ 122 │  generate_flows(PatternInstance, Context) ->
+     │                                  ╰── Warning: variable 'Context' is unused
+
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 429 │              if Value < Min -> {error, {min_constraint_violated, Min, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 433 │              if Value < Min -> {error, {min_constraint_violated, Min, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 437 │              if Value < Min -> {error, {min_constraint_violated, Min, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 441 │              if Value < Min -> {error, {min_constraint_violated, Min, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 449 │              if Value > Max -> {error, {max_constraint_violated, Max, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 453 │              if Value > Max -> {error, {max_constraint_violated, Max, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 457 │              if Value > Max -> {error, {max_constraint_violated, Max, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 461 │              if Value > Max -> {error, {max_constraint_violated, Max, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 470 │                  nomatch -> {error, {pattern_mismatch, Pattern, Value}};
+     │                             ╰── Warning: a term is constructed, but never used
+
+
+src/cre_master.erl:721: Warning: OPTIMIZED: match context reused
+src/cre_master.erl:721: Warning: BINARY CREATED: binary is used in term passed to erlang:error/1
+     ┌─ src/cre_master.erl:
+     │
+ 450 │      #cre_state{worker_marking = Marking, rng_state = RngState} = CreState,
+     │                                                       ╰── Warning: variable 'RngState' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 514 │              {produce, DoneMap} = wf_task:done(A, Delta, ?P_IDLE_WORKERS),
+     │                        ╰── Warning: variable 'DoneMap' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 565 │                      {produce, EnabledMap} = wf_task:enabled(A, I, ?P_PENDING_TASKS),
+     │                                ╰── Warning: variable 'EnabledMap' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 589 │        rng_state = RngState
+     │                    ╰── Warning: variable 'RngState' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 639 │                      {produce, FailedMap} = wf_task:failed(A, {worker_down, Pid}, ?P_PENDING_TASKS),
+     │                                ╰── Warning: variable 'FailedMap' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 858 │                      {produce, RunningMap} = wf_task:running(A, Pid, ?P_BUSY_WORKERS),
+     │                                ╰── Warning: variable 'RunningMap' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 924 │      0.0 = Load,
+     │      ╰── Warning: matching on the float 0.0 will no longer also match -0.0 in OTP 27.
+If you specifically intend to match 0.0 alone, write +0.0 instead.
+
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 70 │  pattern_module(P1_Sequence) -> sequence;
+    │                 ╰── Warning: variable 'P1_Sequence' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 71 │  pattern_module(P2_ParallelSplit) -> parallel_split;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 71 │  pattern_module(P2_ParallelSplit) -> parallel_split;
+    │                 ╰── Warning: variable 'P2_ParallelSplit' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 72 │  pattern_module(P3_Synchronization) -> synchronization;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 72 │  pattern_module(P3_Synchronization) -> synchronization;
+    │                 ╰── Warning: variable 'P3_Synchronization' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 73 │  pattern_module(P4_ExclusiveChoice) -> exclusive_choice;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 73 │  pattern_module(P4_ExclusiveChoice) -> exclusive_choice;
+    │                 ╰── Warning: variable 'P4_ExclusiveChoice' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 74 │  pattern_module(P5_SimpleMerge) -> simple_merge;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 74 │  pattern_module(P5_SimpleMerge) -> simple_merge;
+    │                 ╰── Warning: variable 'P5_SimpleMerge' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 75 │  pattern_module(P6_MultipleChoice) -> multiple_choice;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 75 │  pattern_module(P6_MultipleChoice) -> multiple_choice;
+    │                 ╰── Warning: variable 'P6_MultipleChoice' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 76 │  pattern_module(P7_StructuredSyncMerge) -> structured_sync_merge;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 76 │  pattern_module(P7_StructuredSyncMerge) -> structured_sync_merge;
+    │                 ╰── Warning: variable 'P7_StructuredSyncMerge' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 77 │  pattern_module(P8_MultipleMerge) -> multiple_merge;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 77 │  pattern_module(P8_MultipleMerge) -> multiple_merge;
+    │                 ╰── Warning: variable 'P8_MultipleMerge' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 78 │  pattern_module(P9_Discriminator) -> discriminator;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 78 │  pattern_module(P9_Discriminator) -> discriminator;
+    │                 ╰── Warning: variable 'P9_Discriminator' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 79 │  pattern_module(P10_ArbitraryCycles) -> arbitrary_cycles;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 79 │  pattern_module(P10_ArbitraryCycles) -> arbitrary_cycles;
+    │                 ╰── Warning: variable 'P10_ArbitraryCycles' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 80 │  pattern_module(P11_ImplicitTermination) -> implicit_termination;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 80 │  pattern_module(P11_ImplicitTermination) -> implicit_termination;
+    │                 ╰── Warning: variable 'P11_ImplicitTermination' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 81 │  pattern_module(P12_MI_NoSync) -> multiple_instances_sync;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 81 │  pattern_module(P12_MI_NoSync) -> multiple_instances_sync;
+    │                 ╰── Warning: variable 'P12_MI_NoSync' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 82 │  pattern_module(P13_MI_DesignTime) -> multiple_instances_sync;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 82 │  pattern_module(P13_MI_DesignTime) -> multiple_instances_sync;
+    │                 ╰── Warning: variable 'P13_MI_DesignTime' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 83 │  pattern_module(P14_MI_RuntimeKnown) -> multiple_instances_sync;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 83 │  pattern_module(P14_MI_RuntimeKnown) -> multiple_instances_sync;
+    │                 ╰── Warning: variable 'P14_MI_RuntimeKnown' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 84 │  pattern_module(P15_MI_RuntimeUnknown) -> multiple_instances_sync;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 84 │  pattern_module(P15_MI_RuntimeUnknown) -> multiple_instances_sync;
+    │                 ╰── Warning: variable 'P15_MI_RuntimeUnknown' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 85 │  pattern_module(P16_DeferredChoice) -> deferred_choice;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 85 │  pattern_module(P16_DeferredChoice) -> deferred_choice;
+    │                 ╰── Warning: variable 'P16_DeferredChoice' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 86 │  pattern_module(P17_InterleavedParallelRouting) -> interleaved_routing;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 86 │  pattern_module(P17_InterleavedParallelRouting) -> interleaved_routing;
+    │                 ╰── Warning: variable 'P17_InterleavedParallelRouting' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 87 │  pattern_module(P18_Milestone) -> milestone;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 87 │  pattern_module(P18_Milestone) -> milestone;
+    │                 ╰── Warning: variable 'P18_Milestone' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 88 │  pattern_module(P19_CancelActivity) -> cancel_activity;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 88 │  pattern_module(P19_CancelActivity) -> cancel_activity;
+    │                 ╰── Warning: variable 'P19_CancelActivity' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 89 │  pattern_module(P20_CancelCase) -> cancel_case;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 89 │  pattern_module(P20_CancelCase) -> cancel_case;
+    │                 ╰── Warning: variable 'P20_CancelCase' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 90 │  pattern_module(P21_StructuredLoop) -> structured_loop;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 90 │  pattern_module(P21_StructuredLoop) -> structured_loop;
+    │                 ╰── Warning: variable 'P21_StructuredLoop' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 91 │  pattern_module(P22_Recursion) -> recursion;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 91 │  pattern_module(P22_Recursion) -> recursion;
+    │                 ╰── Warning: variable 'P22_Recursion' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 92 │  pattern_module(P23_TransientTrigger) -> transient_trigger;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 92 │  pattern_module(P23_TransientTrigger) -> transient_trigger;
+    │                 ╰── Warning: variable 'P23_TransientTrigger' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 93 │  pattern_module(P24_PersistentTrigger) -> persistent_trigger;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 93 │  pattern_module(P24_PersistentTrigger) -> persistent_trigger;
+    │                 ╰── Warning: variable 'P24_PersistentTrigger' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 94 │  pattern_module(P25_CancelRegion) -> cancel_region;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 94 │  pattern_module(P25_CancelRegion) -> cancel_region;
+    │                 ╰── Warning: variable 'P25_CancelRegion' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 95 │  pattern_module(P26_CancelMIActivity) -> cancel_mi_activity;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 95 │  pattern_module(P26_CancelMIActivity) -> cancel_mi_activity;
+    │                 ╰── Warning: variable 'P26_CancelMIActivity' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 96 │  pattern_module(P27_CompleteMIActivity) -> complete_mi_activity;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 96 │  pattern_module(P27_CompleteMIActivity) -> complete_mi_activity;
+    │                 ╰── Warning: variable 'P27_CompleteMIActivity' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 97 │  pattern_module(P28_BlockingDiscriminator) -> blocking_discriminator;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 97 │  pattern_module(P28_BlockingDiscriminator) -> blocking_discriminator;
+    │                 ╰── Warning: variable 'P28_BlockingDiscriminator' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 98 │  pattern_module(P29_CancellingDiscriminator) -> cancelling_discriminator;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 98 │  pattern_module(P29_CancellingDiscriminator) -> cancelling_discriminator;
+    │                 ╰── Warning: variable 'P29_CancellingDiscriminator' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 99 │  pattern_module(P30_StructuredPartialJoin) -> structured_partial_join;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 99 │  pattern_module(P30_StructuredPartialJoin) -> structured_partial_join;
+    │                 ╰── Warning: variable 'P30_StructuredPartialJoin' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 100 │  pattern_module(P31_BlockingPartialJoin) -> blocking_partial_join;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 100 │  pattern_module(P31_BlockingPartialJoin) -> blocking_partial_join;
+     │                 ╰── Warning: variable 'P31_BlockingPartialJoin' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 101 │  pattern_module(P32_CancellingPartialJoin) -> cancelling_partial_join;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 101 │  pattern_module(P32_CancellingPartialJoin) -> cancelling_partial_join;
+     │                 ╰── Warning: variable 'P32_CancellingPartialJoin' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 102 │  pattern_module(P33_GeneralizedANDJoin) -> generalized_and_join;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 102 │  pattern_module(P33_GeneralizedANDJoin) -> generalized_and_join;
+     │                 ╰── Warning: variable 'P33_GeneralizedANDJoin' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 103 │  pattern_module(P34_StaticPartialJoinMI) -> static_partial_join_mi;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 103 │  pattern_module(P34_StaticPartialJoinMI) -> static_partial_join_mi;
+     │                 ╰── Warning: variable 'P34_StaticPartialJoinMI' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 104 │  pattern_module(P35_CancellingPartialJoinMI) -> cancelling_partial_join_mi;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 104 │  pattern_module(P35_CancellingPartialJoinMI) -> cancelling_partial_join_mi;
+     │                 ╰── Warning: variable 'P35_CancellingPartialJoinMI' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 105 │  pattern_module(P36_DynamicPartialJoinMI) -> dynamic_partial_join_mi;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 105 │  pattern_module(P36_DynamicPartialJoinMI) -> dynamic_partial_join_mi;
+     │                 ╰── Warning: variable 'P36_DynamicPartialJoinMI' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 106 │  pattern_module(P37_LocalSyncMerge) -> local_sync_merge;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 106 │  pattern_module(P37_LocalSyncMerge) -> local_sync_merge;
+     │                 ╰── Warning: variable 'P37_LocalSyncMerge' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 107 │  pattern_module(P38_GeneralSyncMerge) -> general_sync_merge;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 107 │  pattern_module(P38_GeneralSyncMerge) -> general_sync_merge;
+     │                 ╰── Warning: variable 'P38_GeneralSyncMerge' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 108 │  pattern_module(P39_CriticalSection) -> critical_section;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 108 │  pattern_module(P39_CriticalSection) -> critical_section;
+     │                 ╰── Warning: variable 'P39_CriticalSection' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 109 │  pattern_module(P40_InterleavedRouting) -> interleaved_routing;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 109 │  pattern_module(P40_InterleavedRouting) -> interleaved_routing;
+     │                 ╰── Warning: variable 'P40_InterleavedRouting' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 110 │  pattern_module(P41_ThreadMerge) -> thread_merge;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 110 │  pattern_module(P41_ThreadMerge) -> thread_merge;
+     │                 ╰── Warning: variable 'P41_ThreadMerge' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 111 │  pattern_module(P42_ThreadSplit) -> thread_split;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 111 │  pattern_module(P42_ThreadSplit) -> thread_split;
+     │                 ╰── Warning: variable 'P42_ThreadSplit' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 112 │  pattern_module(P43_ExplicitTermination) -> explicit_termination;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 112 │  pattern_module(P43_ExplicitTermination) -> explicit_termination;
+     │                 ╰── Warning: variable 'P43_ExplicitTermination' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 114 │  pattern_module(PatternId) when is_binary(PatternId) ->
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 120 │  pattern_module(_PatternId) -> undefined.
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+
+src/cre_yawl_http.erl:76: Warning: NOT OPTIMIZED: binary is used in remote call to binary:split/2
+src/cre_yawl_http.erl:76: Warning: BINARY CREATED: binary is used in call to binary:split/2 which doesn't support context reuse
+src/cre_yawl_http.erl:90: Warning: NOT OPTIMIZED: binary is used in call to handle_update_workflow/2 which does not begin with a suitable binary match
+src/cre_yawl_http.erl:90: Warning: BINARY CREATED: binary is used in call to handle_update_workflow/2 which doesn't support context reuse
+src/cre_yawl_http.erl:98: Warning: NOT OPTIMIZED: binary is used in remote call to binary:split/2
+src/cre_yawl_http.erl:98: Warning: BINARY CREATED: binary is used in call to binary:split/2 which doesn't support context reuse
+src/cre_yawl_http.erl:104: Warning: NOT OPTIMIZED: binary is used in call to handle_create_pattern/2 which does not begin with a suitable binary match
+src/cre_yawl_http.erl:104: Warning: BINARY CREATED: binary is used in call to handle_create_pattern/2 which doesn't support context reuse
+src/cre_yawl_http.erl:106: Warning: NOT OPTIMIZED: binary is used in remote call to binary:split/2
+src/cre_yawl_http.erl:106: Warning: BINARY CREATED: binary is used in call to binary:split/2 which doesn't support context reuse
+     ┌─ src/cre_yawl_http.erl:
+     │
+ 114 │  route_request(<<"GET">>, <<"/yawl/patterns">>, Req, _State) ->
+     │  ╰── Warning: this clause cannot match because a previous clause at line 73 matches the same pattern as this clause
+
+     ┌─ src/cre_yawl_http.erl:
+     │
+ 128 │  route_request(<<"GET">>, <<"/yawl/health">>, Req, _State) ->
+     │  ╰── Warning: this clause cannot match because a previous clause at line 120 matches the same pattern as this clause
+
+
+src/yawl_wsif.erl:984: Warning: OPTIMIZED: match context reused
+src/yawl_wsif.erl:984: Warning: BINARY CREATED: binary is returned from the function
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 576 │  -record(sync_token, {
+     │   ╰── Warning: record sync_token is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 582 │  -record(loop_state, {
+     │   ╰── Warning: record loop_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 588 │  -record(recursion_token, {
+     │   ╰── Warning: record recursion_token is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 594 │  -record(protocol_state, {
+     │   ╰── Warning: record protocol_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 601 │  -record(catch_state, {
+     │   ╰── Warning: record catch_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 609 │  -record(param_pass_state, {
+     │   ╰── Warning: record param_pass_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 617 │  -record(data_transform_state, {
+     │   ╰── Warning: record data_transform_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 626 │  -record(data_distribute_state, {
+     │   ╰── Warning: record data_distribute_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 634 │  -record(data_accumulate_state, {
+     │   ╰── Warning: record data_accumulate_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 642 │  -record(data_visibility_state, {
+     │   ╰── Warning: record data_visibility_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 651 │  -record(resource, {
+     │   ╰── Warning: record resource is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 663 │  -record(resource_registry, {
+     │   ╰── Warning: record resource_registry is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 671 │  -record(resource_allocation, {
+     │   ╰── Warning: record resource_allocation is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 684 │  -record(work_item, {
+     │   ╰── Warning: record work_item is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 3960 │  doctest_test() ->
+      │  ╰── Warning: function doctest_test/0 is unused
+
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T19:39:16-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (      14 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+    ┌─ src/patterns/cancel_mi_activity.erl:
+    │
+ 51 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/recursion.erl:
+    │
+ 59 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/thread_split.erl:
+    │
+ 61 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/cancel_activity.erl:
+    │
+ 53 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/nato/nato_conf.erl:
+     │
+ 162 │  handle_call({approve, By, DraftId}, _From, #state{delegations = Deps, approvals = Approvals} = S) ->
+     │                                                                  ╰── Warning: variable 'Deps' is unused
+
+
+     ┌─ src/wf/wf_test_net_task_gate.erl:
+     │
+ 124 │  -type task_id() :: term().
+     │   ╰── Warning: type task_id() is unused
+
+     ┌─ src/wf/wf_test_net_task_gate.erl:
+     │
+ 129 │  -type task_status() :: enabled | running | done | failed | cancelled.
+     │   ╰── Warning: type task_status() is unused
+
+
+     ┌─ src/wf/wf_timerq.erl:
+     │
+ 498 │  extract_component([], _Delimiter, Digits, true) ->
+     │                                    ╰── Warning: variable 'Digits' is unused
+
+     ┌─ src/wf/wf_timerq.erl:
+     │
+ 507 │  extract_component([Ch | Rest], Delimiter, Digits, FoundDigit) when Ch >= $0, Ch =< $9 ->
+     │                                                    ╰── Warning: variable 'FoundDigit' is unused
+
+     ┌─ src/wf/wf_timerq.erl:
+     │
+ 510 │  extract_component([Ch | Rest], Delimiter, Digits, _FoundDigit)
+     │                                            ╰── Warning: variable 'Digits' is unused
+
+
+     ┌─ src/cre_validation.erl:
+     │
+ 203 │  validate_binary_field(Value, FieldName) when is_binary(Value) ->
+     │                               ╰── Warning: variable 'FieldName' is unused
+
+     ┌─ src/cre_validation.erl:
+     │
+ 214 │  validate_atom_field(Value, FieldName) when is_atom(Value) ->
+     │                             ╰── Warning: variable 'FieldName' is unused
+
+     ┌─ src/cre_validation.erl:
+     │
+ 225 │  validate_list_field(Value, FieldName) when is_list(Value) ->
+     │                             ╰── Warning: variable 'FieldName' is unused
+
+     ┌─ src/cre_validation.erl:
+     │
+ 236 │  validate_map_field(Value, FieldName) when is_map(Value) ->
+     │                            ╰── Warning: variable 'FieldName' is unused
+
+     ┌─ src/cre_validation.erl:
+     │
+ 247 │  validate_function_field(Value, FieldName) when is_function(Value) ->
+     │                                 ╰── Warning: variable 'FieldName' is unused
+
+
+     ┌─ src/patterns/multiple_choice.erl:
+     │
+ 529 │          'p_complete' => [],
+     │          ╰── Warning: key 'p_complete' will be overridden in expression
+
+
+    ┌─ src/patterns/thread_merge.erl:
+    │
+ 75 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/synchronization.erl:
+    │
+ 68 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/nato/nato_assert.erl:
+    │
+ 62 │          PostureSets = [P || {_, posture_set, P} <- Audit],
+    │          ╰── Warning: variable 'PostureSets' is unused
+
+
+    ┌─ src/patterns/complete_mi_activity.erl:
+    │
+ 45 │  is_enabled(t_complete, Mode, UsrInfo) ->
+    │                               ╰── Warning: variable 'UsrInfo' is unused
+
+    ┌─ src/patterns/complete_mi_activity.erl:
+    │
+ 58 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+      ┌─ src/wf/wf_verify.erl:
+      │
+ 1194 │  find_enabled_transitions(Marking, Transitions, PresetMap) ->
+      │  ╰── Warning: function find_enabled_transitions/3 is unused
+
+      ┌─ src/wf/wf_verify.erl:
+      │
+ 1215 │  fire_transitions(Marking, EnabledTransitions, PostsetMap) ->
+      │  ╰── Warning: function fire_transitions/3 is unused
+
+
+    ┌─ src/patterns/dynamic_partial_join_mi.erl:
+    │
+ 57 │  fire(t_compute_threshold, Mode, UsrInfo) ->
+    │                            ╰── Warning: variable 'Mode' is unused
+
+    ┌─ src/patterns/dynamic_partial_join_mi.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 480 │                      NewState = State#or_join_state{
+     │                      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 481 │                          completed = [Index],
+     │                          ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 517 │                      NewState = State#or_join_state{
+     │                      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/or_join.erl:
+     │
+ 518 │                          completed = [],
+     │                          ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+     ┌─ src/yawl_approval_middleware.erl:
+     │
+ 588 │      ExecFun = lists:foldl(fun(Middleware, AccFun) ->
+     │                                            ╰── Warning: variable 'AccFun' is unused
+
+
+    ┌─ src/patterns/structured_sync_merge.erl:
+    │
+ 76 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+src/yawl_scheduling.erl:866: Warning: OPTIMIZED: match context reused
+src/yawl_scheduling.erl:871: Warning: OPTIMIZED: match context reused
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 213 │      nomatch =/= binary:match(EmptyXes, <<"<?xml version=\"1.0\" encoding=\"UTF-8\"?>">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 214 │      nomatch =/= binary:match(EmptyXes, <<"<log ">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 225 │      nomatch =/= binary:match(SingleXes, <<"<log ">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 226 │      nomatch =/= binary:match(SingleXes, <<"case_test">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 227 │      nomatch =/= binary:match(SingleXes, <<"<trace>">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 228 │      nomatch =/= binary:match(SingleXes, <<"<event>">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 249 │      nomatch =/= binary:match(MultiXes, <<"case_001">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 250 │      nomatch =/= binary:match(MultiXes, <<"workitem_started">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 251 │      nomatch =/= binary:match(MultiXes, <<"workitem_completed">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 266 │      nomatch =/= binary:match(MultiCaseXes, <<"case_a">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 267 │      nomatch =/= binary:match(MultiCaseXes, <<"case_b">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 283 │      nomatch =/= binary:match(TransitionsXes, <<"schedule">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 284 │      nomatch =/= binary:match(TransitionsXes, <<"start">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 285 │      nomatch =/= binary:match(TransitionsXes, <<"complete">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 286 │      nomatch =/= binary:match(TransitionsXes, <<"suspend">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 287 │      nomatch =/= binary:match(TransitionsXes, <<"resume">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 288 │      nomatch =/= binary:match(TransitionsXes, <<"abort">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 289 │      nomatch =/= binary:match(TransitionsXes, <<"fail">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 300 │      nomatch =:= binary:match(EscapedXes, <<"<script>">>),
+     │              ╰── Warning: use of operator '=:=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 301 │      nomatch =/= binary:match(EscapedXes, <<"&lt;script&gt;">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 312 │      nomatch =/= binary:match(TsXes, <<"2024-01-01T">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 320 │      nomatch =/= binary:match(CustomXes, <<"custom_name">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 321 │      nomatch =/= binary:match(CustomXes, <<"custom_source">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 322 │      nomatch =/= binary:match(CustomXes, <<"custom description">>),
+     │              ╰── Warning: use of operator '=/=' has no effect
+
+     ┌─ src/wf/wf_xes.erl:
+     │
+ 399 │      maps:fold(fun(Key, Value, Acc) when Key =:= name; Key =:= type ->
+     │                         ╰── Warning: variable 'Value' is unused
+
+
+    ┌─ src/patterns/cancel_case.erl:
+    │
+ 52 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/patterns/structured_loop.erl:
+     │
+ 453 │  fire('t_loop_back', #{'p_body_done' := [{state, NewState}]}, State) ->
+     │                                                  ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/structured_loop.erl:
+     │
+ 470 │          'p_complete' => [],
+     │          ╰── Warning: key 'p_complete' will be overridden in expression
+
+
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/wf/yawl_telemetry_prometheus.erl:
+    │
+ 37 │  -type metric_name() :: atom().
+    │   ╰── Warning: type metric_name() is unused
+
+    ┌─ src/wf/yawl_telemetry_prometheus.erl:
+    │
+ 38 │  -type metric_value() :: number().
+    │   ╰── Warning: type metric_value() is unused
+
+    ┌─ src/wf/yawl_telemetry_prometheus.erl:
+    │
+ 39 │  -type labels() :: [{atom(), term()}].
+    │   ╰── Warning: type labels() is unused
+
+    ┌─ src/wf/yawl_telemetry_prometheus.erl:
+    │
+ 40 │  -type metric() :: {metric_name(), metric_value(), labels()}.
+    │   ╰── Warning: type metric() is unused
+
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 145 │  -opaque spec() :: term().
+     │   ╰── Warning: opaque type spec() is not exported
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 145 │  -opaque spec() :: term().
+     │   ╰── Warning: type spec() is unused
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 202 │  evaluate_mi(#{min_instances := Min, max_instances := Max} = MIParams, Data) when is_map(Data) ->
+     │                                                              ╰── Warning: variable 'MIParams' is unused
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 254 │  instance_count(#{min_instances := Min, max_instances := Max} = MIParams, Data) ->
+     │                                    ╰── Warning: variable 'Min' is unused
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 254 │  instance_count(#{min_instances := Min, max_instances := Max} = MIParams, Data) ->
+     │                                                          ╰── Warning: variable 'Max' is unused
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 335 │  check_bounds(Requested, Min, Max) when is_integer(Requested), Requested < Min ->
+     │                               ╰── Warning: variable 'Max' is unused
+
+     ┌─ src/wf/wf_mi.erl:
+     │
+ 339 │  check_bounds(Requested, Min, Max) when is_integer(Requested), is_integer(Max), Requested > Max ->
+     │                          ╰── Warning: variable 'Min' is unused
+
+
+    ┌─ src/wf/yawl_checkpoint.erl:
+    │
+ 45 │  -type checkpoint() :: #yawl_instance{}.
+    │   ╰── Warning: type checkpoint() is unused
+
+
+      ┌─ src/cre_yawl_worker.erl:
+      │
+ 1423 │        handler = fun(X) -> {ok, X} end,
+      │                  ╰── Warning: a term is constructed, but never used
+
+      ┌─ src/cre_yawl_worker.erl:
+      │
+ 1447 │        handler = fun(X) -> {ok, X} end,
+      │                  ╰── Warning: a term is constructed, but never used
+
+
+     ┌─ src/wf/wf_persistence.erl:
+     │
+ 759 │  serialize_rng_state(RngState) ->
+     │                      ╰── Warning: variable 'RngState' is unused
+
+     ┌─ src/wf/wf_persistence.erl:
+     │
+ 788 │  reconstruct_event(#wf_persistent_event{event_type = EventType,
+     │                                                      ╰── Warning: variable 'EventType' is unused
+
+
+    ┌─ src/patterns/generalized_and_join.erl:
+    │
+ 64 │  fire(t_join, Mode, UsrInfo) ->
+    │               ╰── Warning: variable 'Mode' is unused
+
+    ┌─ src/patterns/generalized_and_join.erl:
+    │
+ 70 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/blocking_discriminator.erl:
+    │
+ 69 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/transient_trigger.erl:
+    │
+ 43 │  is_enabled(t_trigger, Mode, UsrInfo) ->
+    │                              ╰── Warning: variable 'UsrInfo' is unused
+
+    ┌─ src/patterns/transient_trigger.erl:
+    │
+ 55 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/patterns/implicit_merge.erl:
+     │
+ 557 │  wait_for_first_completion(Ref, Pids, Timeout) ->
+     │                                 ╰── Warning: variable 'Pids' is unused
+
+
+src/http/wf_admin_api.erl:396: Warning: BINARY CREATED: binary is used in a term that is returned from the function
+src/http/wf_admin_api.erl:402: Warning: NOT OPTIMIZED: binary is used in remote call to base64:decode/1
+src/http/wf_admin_api.erl:402: Warning: BINARY CREATED: binary is used in call to base64:decode/1 which doesn't support context reuse
+     ┌─ src/http/wf_admin_api.erl:
+     │
+ 183 │  -record(api_error, {
+     │   ╰── Warning: record api_error is unused
+
+
+src/yawl_web_dashboard.erl:282: Warning: NOT OPTIMIZED: binary is used in remote call to yawl_otel_logger:get_events_by_trace/1
+src/yawl_web_dashboard.erl:282: Warning: BINARY CREATED: binary is used in call to yawl_otel_logger:get_events_by_trace/1 which doesn't support context reuse
+src/yawl_web_dashboard.erl:284: Warning: BINARY CREATED: binary is used in term passed to jsx:encode/1
+
+src/core/yawl_compile.erl:728: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:730: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:732: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:734: Warning: OPTIMIZED: match context reused
+src/core/yawl_compile.erl:1105: Warning: OPTIMIZED: match context reused
+
+src/yawl_reporter.erl:793: Warning: OPTIMIZED: match context reused
+src/yawl_reporter.erl:793: Warning: BINARY CREATED: binary is used in term passed to erlang:error/1
+
+    ┌─ src/patterns/persistent_trigger.erl:
+    │
+ 50 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/arbitrary_cycles.erl:
+    │
+ 25 │  -record(state, {
+    │   ╰── Warning: record state is unused
+
+    ┌─ src/patterns/arbitrary_cycles.erl:
+    │
+ 52 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+src/yawl_twitter.erl:628: Warning: BINARY CREATED: binary is returned from the function
+src/yawl_twitter.erl:631: Warning: BINARY CREATED: binary is used in 'bs_create_bin' which doesn't support context reuse
+src/yawl_twitter.erl:653: Warning: BINARY CREATED: binary is returned from the function
+src/yawl_twitter.erl:656: Warning: BINARY CREATED: binary is used in 'bs_create_bin' which doesn't support context reuse
+
+src/yawl_mail.erl:756: Warning: NOT OPTIMIZED: binary is used in remote call to binary:split/2
+src/yawl_mail.erl:756: Warning: BINARY CREATED: binary is used in call to binary:split/2 which doesn't support context reuse
+src/yawl_mail.erl:762: Warning: OPTIMIZED: match context reused
+src/yawl_mail.erl:765: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/patterns/cancel_region.erl:
+    │
+ 53 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/explicit_termination.erl:
+    │
+ 58 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/sequence.erl:
+    │
+ 24 │  -record(state, {
+    │   ╰── Warning: record state is unused
+
+    ┌─ src/patterns/sequence.erl:
+    │
+ 53 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/blocking_partial_join.erl:
+    │
+ 79 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/patterns/parallel_split.erl:
+     │
+ 610 │      NewState = State#parallel_split_state{completed = NewCompleted},
+     │      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/parallel_split.erl:
+     │
+ 610 │      NewState = State#parallel_split_state{completed = NewCompleted},
+     │                                            ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+    ┌─ src/cre_config.erl:
+    │
+ 45 │  -behaviour(application).
+    │   ╰── Warning: undefined callback function start/2 (behaviour 'application')
+
+    ┌─ src/cre_config.erl:
+    │
+ 45 │  -behaviour(application).
+    │   ╰── Warning: undefined callback function stop/1 (behaviour 'application')
+
+
+     ┌─ src/yawl_documents.erl:
+     │
+ 580 │  doctest_test() ->
+     │  ╰── Warning: function doctest_test/0 is unused
+
+
+    ┌─ src/patterns/structured_partial_join.erl:
+    │
+ 68 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 438 │  field_schema(text) ->
+     │  ╰── Warning: function field_schema/1 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 519 │  render_html(Schema, Options) when is_map(Schema), is_map(Options) ->
+     │  ╰── Warning: function render_html/2 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 598 │  validate(Schema, Data) when is_map(Schema), is_map(Data) ->
+     │  ╰── Warning: function validate/2 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 654 │  normalize_data_keys(Data) when is_map(Data) ->
+     │  ╰── Warning: function normalize_data_keys/1 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 672 │  escape_html(undefined) ->
+     │  ╰── Warning: function escape_html/1 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 694 │  form_class_attr(none, <<"">>) ->
+     │  ╰── Warning: function form_class_attr/2 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 709 │  render_field(FieldName, FieldDef, CSSFramework) ->
+     │  ╰── Warning: function render_field/3 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 773 │  render_input(FieldName, text, Class, Placeholder, Required, Min, Max, Pattern, [], _Default, _CSS) ->
+     │  ╰── Warning: function render_input/11 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 919 │  attr_min_max(_AttrName, undefined) ->
+     │  ╰── Warning: function attr_min_max/2 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 932 │  field_classes(bootstrap) ->
+     │  ╰── Warning: function field_classes/1 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 946 │  render_submit_button(Label, Class, bootstrap) when Class =:= <<"">> ->
+     │  ╰── Warning: function render_submit_button/3 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 967 │  validate_field(FieldName, FieldDef, Data) ->
+     │  ╰── Warning: function validate_field/3 is unused
+
+     ┌─ src/wf/wf_forms.erl:
+     │
+ 996 │  validate_field_type(_FieldName, text, Value, Min, Max, Pattern, _FieldDef) ->
+     │  ╰── Warning: function validate_field_type/7 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1073 │  validate_range(_Value, undefined, undefined) ->
+      │  ╰── Warning: function validate_range/3 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1095 │  is_empty(undefined) -> true;
+      │  ╰── Warning: function is_empty/1 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1105 │  to_binary(V) when is_binary(V) -> V;
+      │  ╰── Warning: function to_binary/1 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1115 │  to_number(V) when is_integer(V) -> V;
+      │  ╰── Warning: function to_number/1 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1129 │  value_to_binary(V) when is_binary(V) -> V;
+      │  ╰── Warning: function value_to_binary/1 is unused
+
+      ┌─ src/wf/wf_forms.erl:
+      │
+ 1139 │  number_to_binary(N) when is_integer(N) -> integer_to_binary(N);
+      │  ╰── Warning: function number_to_binary/1 is unused
+
+
+    ┌─ src/patterns/local_sync_merge.erl:
+    │
+ 65 │  fire(t_join, Mode, UsrInfo) ->
+    │               ╰── Warning: variable 'Mode' is unused
+
+    ┌─ src/patterns/local_sync_merge.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+src/wf/wf_timer.erl:186: Warning: OPTIMIZED: match context reused
+src/wf/wf_timer.erl:205: Warning: OPTIMIZED: match context reused
+src/wf/wf_timer.erl:207: Warning: NOT OPTIMIZED: binary is used in call to parse_number/1 which does not begin with a suitable binary match
+src/wf/wf_timer.erl:207: Warning: BINARY CREATED: binary is used in call to parse_number/1 which doesn't support context reuse
+src/wf/wf_timer.erl:214: Warning: OPTIMIZED: match context reused
+src/wf/wf_timer.erl:214: Warning: OPTIMIZED: match context reused
+src/wf/wf_timer.erl:237: Warning: BINARY CREATED: binary is used in a term that is returned from the function
+src/wf/wf_timer.erl:238: Warning: OPTIMIZED: match context reused
+
+     ┌─ src/wf/yawl_health.erl:
+     │
+ 287 │  -opaque req() :: term().
+     │   ╰── Warning: opaque type req() is not exported
+
+
+    ┌─ src/patterns/cancelling_partial_join.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+src/wf/wf_yawl_pred.erl:798: Warning: BINARY CREATED: binary is returned from the function
+     ┌─ src/wf/wf_yawl_pred.erl:
+     │
+ 758 │  ast_to_body({xpath_var, {path, NetName, VarName}}, Acc) ->
+     │                                 ╰── Warning: variable 'NetName' is unused
+
+     ┌─ src/wf/wf_yawl_pred.erl:
+     │
+ 811 │  format_value(true) -> "true";
+     │  ╰── Warning: function format_value/1 is unused
+
+
+    ┌─ src/patterns/cancelling_partial_join_mi.erl:
+    │
+ 71 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/cancelling_discriminator.erl:
+    │
+ 60 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 191 │  -type service_request() :: #service_request{}.
+     │   ╰── Warning: type service_request() is unused
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 852 │      Worklet = maps:get(worklet, Config, undefined),
+     │      ╰── Warning: variable 'Worklet' is unused
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 924 │              {NewCase, NewState} = update_workitem_status(
+     │               ╰── Warning: variable 'NewCase' is unused
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 937 │              {NewCase, NewState} = update_workitem_status(
+     │               ╰── Warning: variable 'NewCase' is unused
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 951 │              {NewCase, NewState} = complete_workitem(Case, WiId, Task, Data, Now, State),
+     │               ╰── Warning: variable 'NewCase' is unused
+
+     ┌─ src/wf/wf_engine.erl:
+     │
+ 968 │  handle_call({suspend_case, CaseId, Now}, _From, State) ->
+     │                                     ╰── Warning: variable 'Now' is unused
+
+      ┌─ src/wf/wf_engine.erl:
+      │
+ 1006 │          #wf_case{marking = Marking} = Case ->
+      │                                        ╰── Warning: variable 'Case' is unused
+
+      ┌─ src/wf/wf_engine.erl:
+      │
+ 1189 │          fun(CaseId, #wf_case{work_items = WIs} = Case, Acc) ->
+      │              ╰── Warning: variable 'CaseId' is unused
+
+      ┌─ src/wf/wf_engine.erl:
+      │
+ 1209 │  update_workitem_status(#wf_case{work_items = WIs} = Case, WiId, Status, User, Now, State) ->
+      │                                                                                ╰── Warning: variable 'Now' is unused
+
+      ┌─ src/wf/wf_engine.erl:
+      │
+ 1387 │  fire_enabled_transition(#wf_case{marking = Marking, data = Data} = Case, Trsn, Def, Spec, Now) ->
+      │                                                                                      ╰── Warning: variable 'Spec' is unused
+
+      ┌─ src/wf/wf_engine.erl:
+      │
+ 1476 │  fire_transition(Trsn, Data, Spec) ->
+      │  ╰── Warning: function fire_transition/3 is unused
+
+
+    ┌─ src/patterns/general_sync_merge.erl:
+    │
+ 72 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+    ┌─ src/patterns/static_partial_join_mi.erl:
+    │
+ 65 │  fire(_Trsn, _Mode, UsrInfo) ->
+    │                     ╰── Warning: variable 'UsrInfo' is unused
+
+
+     ┌─ src/wf/yawl_pred_eval.erl:
+     │
+ 326 │  extract_token_facts(Place, Token) when is_map(Token) ->
+     │                      ╰── Warning: variable 'Place' is unused
+
+
+     ┌─ src/wf/wf_test_net_trigger_drop.erl:
+     │
+ 171 │  doctest_test() ->
+     │  ╰── Warning: function doctest_test/0 is unused
+
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 386 │  fire('t_complete', #{'p_running' := [{{branch, Index}, _Fun} | Rest]}, #n_out_of_m_state{results = Results} = State) ->
+     │                                                                                                     ╰── Warning: variable 'Results' is unused
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 403 │      NewState = State#n_out_of_m_state{quorum_met = true},
+     │      ╰── Warning: variable 'NewState' is unused
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 403 │      NewState = State#n_out_of_m_state{quorum_met = true},
+     │                                        ╰── Warning: the result of calling setelement/3 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+     ┌─ src/patterns/n_out_of_m.erl:
+     │
+ 589 │  collect_quorum(Ref, Pids, N, M, Acc, Errors) when length(Pids) =:= 0, length(Acc) + length(Errors) =:= M ->
+     │                 ╰── Warning: variable 'Ref' is unused
+
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 70 │  pattern_module(P1_Sequence) -> sequence;
+    │                 ╰── Warning: variable 'P1_Sequence' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 71 │  pattern_module(P2_ParallelSplit) -> parallel_split;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 71 │  pattern_module(P2_ParallelSplit) -> parallel_split;
+    │                 ╰── Warning: variable 'P2_ParallelSplit' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 72 │  pattern_module(P3_Synchronization) -> synchronization;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 72 │  pattern_module(P3_Synchronization) -> synchronization;
+    │                 ╰── Warning: variable 'P3_Synchronization' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 73 │  pattern_module(P4_ExclusiveChoice) -> exclusive_choice;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 73 │  pattern_module(P4_ExclusiveChoice) -> exclusive_choice;
+    │                 ╰── Warning: variable 'P4_ExclusiveChoice' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 74 │  pattern_module(P5_SimpleMerge) -> simple_merge;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 74 │  pattern_module(P5_SimpleMerge) -> simple_merge;
+    │                 ╰── Warning: variable 'P5_SimpleMerge' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 75 │  pattern_module(P6_MultipleChoice) -> multiple_choice;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 75 │  pattern_module(P6_MultipleChoice) -> multiple_choice;
+    │                 ╰── Warning: variable 'P6_MultipleChoice' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 76 │  pattern_module(P7_StructuredSyncMerge) -> structured_sync_merge;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 76 │  pattern_module(P7_StructuredSyncMerge) -> structured_sync_merge;
+    │                 ╰── Warning: variable 'P7_StructuredSyncMerge' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 77 │  pattern_module(P8_MultipleMerge) -> multiple_merge;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 77 │  pattern_module(P8_MultipleMerge) -> multiple_merge;
+    │                 ╰── Warning: variable 'P8_MultipleMerge' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 78 │  pattern_module(P9_Discriminator) -> discriminator;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 78 │  pattern_module(P9_Discriminator) -> discriminator;
+    │                 ╰── Warning: variable 'P9_Discriminator' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 79 │  pattern_module(P10_ArbitraryCycles) -> arbitrary_cycles;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 79 │  pattern_module(P10_ArbitraryCycles) -> arbitrary_cycles;
+    │                 ╰── Warning: variable 'P10_ArbitraryCycles' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 80 │  pattern_module(P11_ImplicitTermination) -> implicit_termination;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 80 │  pattern_module(P11_ImplicitTermination) -> implicit_termination;
+    │                 ╰── Warning: variable 'P11_ImplicitTermination' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 81 │  pattern_module(P12_MI_NoSync) -> multiple_instances_sync;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 81 │  pattern_module(P12_MI_NoSync) -> multiple_instances_sync;
+    │                 ╰── Warning: variable 'P12_MI_NoSync' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 82 │  pattern_module(P13_MI_DesignTime) -> multiple_instances_sync;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 82 │  pattern_module(P13_MI_DesignTime) -> multiple_instances_sync;
+    │                 ╰── Warning: variable 'P13_MI_DesignTime' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 83 │  pattern_module(P14_MI_RuntimeKnown) -> multiple_instances_sync;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 83 │  pattern_module(P14_MI_RuntimeKnown) -> multiple_instances_sync;
+    │                 ╰── Warning: variable 'P14_MI_RuntimeKnown' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 84 │  pattern_module(P15_MI_RuntimeUnknown) -> multiple_instances_sync;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 84 │  pattern_module(P15_MI_RuntimeUnknown) -> multiple_instances_sync;
+    │                 ╰── Warning: variable 'P15_MI_RuntimeUnknown' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 85 │  pattern_module(P16_DeferredChoice) -> deferred_choice;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 85 │  pattern_module(P16_DeferredChoice) -> deferred_choice;
+    │                 ╰── Warning: variable 'P16_DeferredChoice' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 86 │  pattern_module(P17_InterleavedParallelRouting) -> interleaved_routing;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 86 │  pattern_module(P17_InterleavedParallelRouting) -> interleaved_routing;
+    │                 ╰── Warning: variable 'P17_InterleavedParallelRouting' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 87 │  pattern_module(P18_Milestone) -> milestone;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 87 │  pattern_module(P18_Milestone) -> milestone;
+    │                 ╰── Warning: variable 'P18_Milestone' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 88 │  pattern_module(P19_CancelActivity) -> cancel_activity;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 88 │  pattern_module(P19_CancelActivity) -> cancel_activity;
+    │                 ╰── Warning: variable 'P19_CancelActivity' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 89 │  pattern_module(P20_CancelCase) -> cancel_case;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 89 │  pattern_module(P20_CancelCase) -> cancel_case;
+    │                 ╰── Warning: variable 'P20_CancelCase' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 90 │  pattern_module(P21_StructuredLoop) -> structured_loop;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 90 │  pattern_module(P21_StructuredLoop) -> structured_loop;
+    │                 ╰── Warning: variable 'P21_StructuredLoop' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 91 │  pattern_module(P22_Recursion) -> recursion;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 91 │  pattern_module(P22_Recursion) -> recursion;
+    │                 ╰── Warning: variable 'P22_Recursion' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 92 │  pattern_module(P23_TransientTrigger) -> transient_trigger;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 92 │  pattern_module(P23_TransientTrigger) -> transient_trigger;
+    │                 ╰── Warning: variable 'P23_TransientTrigger' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 93 │  pattern_module(P24_PersistentTrigger) -> persistent_trigger;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 93 │  pattern_module(P24_PersistentTrigger) -> persistent_trigger;
+    │                 ╰── Warning: variable 'P24_PersistentTrigger' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 94 │  pattern_module(P25_CancelRegion) -> cancel_region;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 94 │  pattern_module(P25_CancelRegion) -> cancel_region;
+    │                 ╰── Warning: variable 'P25_CancelRegion' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 95 │  pattern_module(P26_CancelMIActivity) -> cancel_mi_activity;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 95 │  pattern_module(P26_CancelMIActivity) -> cancel_mi_activity;
+    │                 ╰── Warning: variable 'P26_CancelMIActivity' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 96 │  pattern_module(P27_CompleteMIActivity) -> complete_mi_activity;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 96 │  pattern_module(P27_CompleteMIActivity) -> complete_mi_activity;
+    │                 ╰── Warning: variable 'P27_CompleteMIActivity' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 97 │  pattern_module(P28_BlockingDiscriminator) -> blocking_discriminator;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 97 │  pattern_module(P28_BlockingDiscriminator) -> blocking_discriminator;
+    │                 ╰── Warning: variable 'P28_BlockingDiscriminator' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 98 │  pattern_module(P29_CancellingDiscriminator) -> cancelling_discriminator;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 98 │  pattern_module(P29_CancellingDiscriminator) -> cancelling_discriminator;
+    │                 ╰── Warning: variable 'P29_CancellingDiscriminator' is unused
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 99 │  pattern_module(P30_StructuredPartialJoin) -> structured_partial_join;
+    │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+    ┌─ src/core/yawl_pattern_registry.erl:
+    │
+ 99 │  pattern_module(P30_StructuredPartialJoin) -> structured_partial_join;
+    │                 ╰── Warning: variable 'P30_StructuredPartialJoin' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 100 │  pattern_module(P31_BlockingPartialJoin) -> blocking_partial_join;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 100 │  pattern_module(P31_BlockingPartialJoin) -> blocking_partial_join;
+     │                 ╰── Warning: variable 'P31_BlockingPartialJoin' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 101 │  pattern_module(P32_CancellingPartialJoin) -> cancelling_partial_join;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 101 │  pattern_module(P32_CancellingPartialJoin) -> cancelling_partial_join;
+     │                 ╰── Warning: variable 'P32_CancellingPartialJoin' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 102 │  pattern_module(P33_GeneralizedANDJoin) -> generalized_and_join;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 102 │  pattern_module(P33_GeneralizedANDJoin) -> generalized_and_join;
+     │                 ╰── Warning: variable 'P33_GeneralizedANDJoin' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 103 │  pattern_module(P34_StaticPartialJoinMI) -> static_partial_join_mi;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 103 │  pattern_module(P34_StaticPartialJoinMI) -> static_partial_join_mi;
+     │                 ╰── Warning: variable 'P34_StaticPartialJoinMI' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 104 │  pattern_module(P35_CancellingPartialJoinMI) -> cancelling_partial_join_mi;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 104 │  pattern_module(P35_CancellingPartialJoinMI) -> cancelling_partial_join_mi;
+     │                 ╰── Warning: variable 'P35_CancellingPartialJoinMI' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 105 │  pattern_module(P36_DynamicPartialJoinMI) -> dynamic_partial_join_mi;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 105 │  pattern_module(P36_DynamicPartialJoinMI) -> dynamic_partial_join_mi;
+     │                 ╰── Warning: variable 'P36_DynamicPartialJoinMI' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 106 │  pattern_module(P37_LocalSyncMerge) -> local_sync_merge;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 106 │  pattern_module(P37_LocalSyncMerge) -> local_sync_merge;
+     │                 ╰── Warning: variable 'P37_LocalSyncMerge' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 107 │  pattern_module(P38_GeneralSyncMerge) -> general_sync_merge;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 107 │  pattern_module(P38_GeneralSyncMerge) -> general_sync_merge;
+     │                 ╰── Warning: variable 'P38_GeneralSyncMerge' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 108 │  pattern_module(P39_CriticalSection) -> critical_section;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 108 │  pattern_module(P39_CriticalSection) -> critical_section;
+     │                 ╰── Warning: variable 'P39_CriticalSection' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 109 │  pattern_module(P40_InterleavedRouting) -> interleaved_routing;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 109 │  pattern_module(P40_InterleavedRouting) -> interleaved_routing;
+     │                 ╰── Warning: variable 'P40_InterleavedRouting' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 110 │  pattern_module(P41_ThreadMerge) -> thread_merge;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 110 │  pattern_module(P41_ThreadMerge) -> thread_merge;
+     │                 ╰── Warning: variable 'P41_ThreadMerge' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 111 │  pattern_module(P42_ThreadSplit) -> thread_split;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 111 │  pattern_module(P42_ThreadSplit) -> thread_split;
+     │                 ╰── Warning: variable 'P42_ThreadSplit' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 112 │  pattern_module(P43_ExplicitTermination) -> explicit_termination;
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 112 │  pattern_module(P43_ExplicitTermination) -> explicit_termination;
+     │                 ╰── Warning: variable 'P43_ExplicitTermination' is unused
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 114 │  pattern_module(PatternId) when is_binary(PatternId) ->
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+     ┌─ src/core/yawl_pattern_registry.erl:
+     │
+ 120 │  pattern_module(_PatternId) -> undefined.
+     │  ╰── Warning: this clause for pattern_module/1 cannot match because a previous clause at line 70 always matches
+
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 429 │              if Value < Min -> {error, {min_constraint_violated, Min, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 433 │              if Value < Min -> {error, {min_constraint_violated, Min, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 437 │              if Value < Min -> {error, {min_constraint_violated, Min, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 441 │              if Value < Min -> {error, {min_constraint_violated, Min, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 449 │              if Value > Max -> {error, {max_constraint_violated, Max, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 453 │              if Value > Max -> {error, {max_constraint_violated, Max, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 457 │              if Value > Max -> {error, {max_constraint_violated, Max, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 461 │              if Value > Max -> {error, {max_constraint_violated, Max, Value}};
+     │                                ╰── Warning: a term is constructed, but never used
+
+     ┌─ src/wf/wf_yawl_schema.erl:
+     │
+ 470 │                  nomatch -> {error, {pattern_mismatch, Pattern, Value}};
+     │                             ╰── Warning: a term is constructed, but never used
+
+
+src/cre_master.erl:721: Warning: OPTIMIZED: match context reused
+src/cre_master.erl:721: Warning: BINARY CREATED: binary is used in term passed to erlang:error/1
+     ┌─ src/cre_master.erl:
+     │
+ 450 │      #cre_state{worker_marking = Marking, rng_state = RngState} = CreState,
+     │                                                       ╰── Warning: variable 'RngState' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 514 │              {produce, DoneMap} = wf_task:done(A, Delta, ?P_IDLE_WORKERS),
+     │                        ╰── Warning: variable 'DoneMap' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 565 │                      {produce, EnabledMap} = wf_task:enabled(A, I, ?P_PENDING_TASKS),
+     │                                ╰── Warning: variable 'EnabledMap' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 589 │        rng_state = RngState
+     │                    ╰── Warning: variable 'RngState' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 639 │                      {produce, FailedMap} = wf_task:failed(A, {worker_down, Pid}, ?P_PENDING_TASKS),
+     │                                ╰── Warning: variable 'FailedMap' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 858 │                      {produce, RunningMap} = wf_task:running(A, Pid, ?P_BUSY_WORKERS),
+     │                                ╰── Warning: variable 'RunningMap' is unused
+
+     ┌─ src/cre_master.erl:
+     │
+ 924 │      0.0 = Load,
+     │      ╰── Warning: matching on the float 0.0 will no longer also match -0.0 in OTP 27.
+If you specifically intend to match 0.0 alone, write +0.0 instead.
+
+
+     ┌─ src/core/yawl_pattern_expander.erl:
+     │
+ 122 │  generate_flows(PatternInstance, Context) ->
+     │                                  ╰── Warning: variable 'Context' is unused
+
+
+src/cre_yawl_http.erl:76: Warning: NOT OPTIMIZED: binary is used in remote call to binary:split/2
+src/cre_yawl_http.erl:76: Warning: BINARY CREATED: binary is used in call to binary:split/2 which doesn't support context reuse
+src/cre_yawl_http.erl:90: Warning: NOT OPTIMIZED: binary is used in call to handle_update_workflow/2 which does not begin with a suitable binary match
+src/cre_yawl_http.erl:90: Warning: BINARY CREATED: binary is used in call to handle_update_workflow/2 which doesn't support context reuse
+src/cre_yawl_http.erl:98: Warning: NOT OPTIMIZED: binary is used in remote call to binary:split/2
+src/cre_yawl_http.erl:98: Warning: BINARY CREATED: binary is used in call to binary:split/2 which doesn't support context reuse
+src/cre_yawl_http.erl:104: Warning: NOT OPTIMIZED: binary is used in call to handle_create_pattern/2 which does not begin with a suitable binary match
+src/cre_yawl_http.erl:104: Warning: BINARY CREATED: binary is used in call to handle_create_pattern/2 which doesn't support context reuse
+src/cre_yawl_http.erl:106: Warning: NOT OPTIMIZED: binary is used in remote call to binary:split/2
+src/cre_yawl_http.erl:106: Warning: BINARY CREATED: binary is used in call to binary:split/2 which doesn't support context reuse
+     ┌─ src/cre_yawl_http.erl:
+     │
+ 114 │  route_request(<<"GET">>, <<"/yawl/patterns">>, Req, _State) ->
+     │  ╰── Warning: this clause cannot match because a previous clause at line 73 matches the same pattern as this clause
+
+     ┌─ src/cre_yawl_http.erl:
+     │
+ 128 │  route_request(<<"GET">>, <<"/yawl/health">>, Req, _State) ->
+     │  ╰── Warning: this clause cannot match because a previous clause at line 120 matches the same pattern as this clause
+
+
+src/yawl_wsif.erl:984: Warning: OPTIMIZED: match context reused
+src/yawl_wsif.erl:984: Warning: BINARY CREATED: binary is returned from the function
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 576 │  -record(sync_token, {
+     │   ╰── Warning: record sync_token is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 582 │  -record(loop_state, {
+     │   ╰── Warning: record loop_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 588 │  -record(recursion_token, {
+     │   ╰── Warning: record recursion_token is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 594 │  -record(protocol_state, {
+     │   ╰── Warning: record protocol_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 601 │  -record(catch_state, {
+     │   ╰── Warning: record catch_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 609 │  -record(param_pass_state, {
+     │   ╰── Warning: record param_pass_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 617 │  -record(data_transform_state, {
+     │   ╰── Warning: record data_transform_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 626 │  -record(data_distribute_state, {
+     │   ╰── Warning: record data_distribute_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 634 │  -record(data_accumulate_state, {
+     │   ╰── Warning: record data_accumulate_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 642 │  -record(data_visibility_state, {
+     │   ╰── Warning: record data_visibility_state is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 651 │  -record(resource, {
+     │   ╰── Warning: record resource is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 663 │  -record(resource_registry, {
+     │   ╰── Warning: record resource_registry is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 671 │  -record(resource_allocation, {
+     │   ╰── Warning: record resource_allocation is unused
+
+     ┌─ src/cre_yawl_patterns.erl:
+     │
+ 684 │  -record(work_item, {
+     │   ╰── Warning: record work_item is unused
+
+      ┌─ src/cre_yawl_patterns.erl:
+      │
+ 3960 │  doctest_test() ->
+      │  ╰── Warning: function doctest_test/0 is unused
+
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T19:40:08-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     206 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T19:58:31-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     210 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T20:08:04-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     210 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
+================================================================================
+[SessionStart] Timestamp: 2026-02-07T20:15:11-08:00
+[SessionStart] Version: 2.5.0-consolidated
+[SessionStart] Working dir: /Users/sac/cre
+[SessionStart] OTP version: 28.3.1 (major >= 28)
+[SessionStart] Cache dir: /Users/sac/cre/.erlmcp/otp-28.3.1
+================================================================================
+[INFO] Starting SessionStart.sh (v2.5.0-consolidated)
+[INFO] Platform: macos
+
+================================================================================
+[PHASE 1/5/4] 1/5 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+
+================================================================================
+[PHASE 3/5/4] 3/5 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   CLAUDE_CODE_REMOTE=true
+[INFO]   ERLMCP_PROFILE=cloud
+[INFO]   ERLMCP_CACHE=/Users/sac/cre/.erlmcp/cache/
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+[SUCCESS] Environment file written: /Users/sac/cre/.erlmcp/env.sh
+
+================================================================================
+[PHASE 4/5/4] 4/5 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+
+================================================================================
+[PHASE 5/5/4] 5/5 Project build (rebar3 deps + compile)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Project already compiled (     210 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: NOT OPTIMIZED: binary is used in remote call to binary:part/3
+src/yawl_sms.erl:686: Warning: BINARY CREATED: binary is used in call to binary:part/3 which doesn't support context reuse
+src/yawl_sms.erl:703: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+[SUCCESS] SessionStart complete
