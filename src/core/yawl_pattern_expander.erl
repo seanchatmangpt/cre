@@ -141,6 +141,7 @@ generate_flows(PatternInstance, Context) ->
 %% Uses branches/waits_for from PatternInstance to map p_thread1..4 to YAML names.
 %% Renames transitions when join_task/join/split_task/merge_task present (avoids merge collision,
 %% enables human task discovery by task name).
+%% Namespaces internal transitions and places per instance to avoid collisions when merging.
 expand_pattern_impl(Module, PatternInstance, Context) ->
     BasePlaces = generate_places(PatternInstance, Context),
     BaseTransitions = generate_transitions(PatternInstance, Context),
@@ -153,17 +154,31 @@ expand_pattern_impl(Module, PatternInstance, Context) ->
     {Places, Transitions, Preset, Postset, Flows} = apply_place_mapping(
         PlaceMap, BasePlaces, BaseTransitions, BasePreset, BasePostset, BaseFlows),
 
-    %% Rename transitions for human tasks (t_join -> t_GoNoGo, etc.) to avoid merge collision
+    %% Rename transitions for human tasks (t_join -> t_GoNoGo, etc.); namespace internal ones
     TrsnMap = build_transition_mapping(Module, PatternInstance),
+    TrsnMap2 = add_internal_transition_namespace(Transitions, TrsnMap, PatternInstance),
     {FinalTransitions, FinalPreset, FinalPostset, FinalFlows} = apply_transition_mapping(
-        TrsnMap, Transitions, Preset, Postset, Flows),
+        TrsnMap2, Transitions, Preset, Postset, Flows),
+
+    %% Namespace internal places (not in PlaceMap values); entry owner keeps p_start
+    PlaceMap2 = add_internal_place_namespace(Places, PlaceMap, PatternInstance, Context),
+    MapPlace = fun(P) -> maps:get(P, PlaceMap2, P) end,
+    MapPlaces = fun(Ps) -> [MapPlace(Pl) || Pl <- Ps] end,
+    FinalPlaces = lists:usort([MapPlace(P) || P <- Places]),
+    FinalPreset2 = maps:fold(fun(Trsn, PresetList, Acc) ->
+        Acc#{Trsn => MapPlaces(PresetList)}
+    end, #{}, FinalPreset),
+    FinalPostset2 = maps:fold(fun(Trsn, PostsetList, Acc) ->
+        Acc#{Trsn => MapPlaces(PostsetList)}
+    end, #{}, FinalPostset),
+    FinalFlows2 = lists:usort([{MapPlace(From), To} || {From, To} <- FinalFlows]),
 
     #{
-        places => Places,
+        places => FinalPlaces,
         transitions => FinalTransitions,
-        flows => FinalFlows,
-        preset => FinalPreset,
-        postset => FinalPostset
+        flows => FinalFlows2,
+        preset => FinalPreset2,
+        postset => FinalPostset2
     }.
 
 %% @private Build mapping from pattern place names (p_thread1..4) to YAML names.
@@ -499,6 +514,58 @@ task_ref(_) -> undefined.
 trsn_atom(A) when is_atom(A) -> list_to_atom("t_" ++ atom_to_list(A));
 trsn_atom(B) when is_binary(B) -> list_to_atom("t_" ++ binary_to_list(B)).
 
+%% @private Build Internal TrsnMap: prefix transitions not renamed by YAML TrsnMap.
+%% Prevents collisions when merging multiple patterns (e.g. t_split, t_complete1..3) on same net.
+add_internal_transition_namespace(Transitions, TrsnMap, PatternInstance) ->
+    %% Only namespace transitions that are NOT explicitly renamed by TrsnMap
+    Prefix = namespace_prefix(PatternInstance),
+    Internal = lists:foldl(fun(T, Acc) ->
+        case maps:is_key(T, TrsnMap) of
+            true -> Acc;
+            false ->
+                TStr = atom_to_list(T),
+                Base = case string:prefix(TStr, "t_") of nomatch -> TStr; Rest -> Rest end,
+                Acc#{T => list_to_atom("t_" ++ atom_to_list(Prefix) ++ "_" ++ Base)}
+        end
+    end, #{}, Transitions),
+    maps:merge(Internal, TrsnMap).
+
+%% @private Build Internal PlaceMap: prefix places not renamed by YAML PlaceMap.
+%% Entry owner keeps p_start unnamespaced so init_marking finds it.
+add_internal_place_namespace(Places, PlaceMap, PatternInstance, Context) ->
+    IsEntryOwner = is_entry_owner(PatternInstance, Context),
+    Prefix = namespace_prefix(PatternInstance),
+    lists:foldl(fun(P, Acc) ->
+        case {P, maps:is_key(P, PlaceMap), IsEntryOwner} of
+            {p_start, false, true} -> Acc;
+            {_, true, _} -> Acc;
+            {_, false, _} ->
+                PStr = atom_to_list(P),
+                Base = case string:prefix(PStr, "p_") of nomatch -> PStr; Rest -> Rest end,
+                Acc#{P => list_to_atom("p_" ++ atom_to_list(Prefix) ++ "_" ++ Base)}
+        end
+    end, PlaceMap, Places).
+
+is_entry_owner(PatternInstance, Context) ->
+    EntryId = maps:get(entry_owner_id, Context, undefined),
+    case EntryId of
+        undefined -> false;
+        _ ->
+            InstId = pi_get(id, PatternInstance),
+            (InstId =:= EntryId) orelse
+                (is_binary(InstId) andalso is_binary(EntryId) andalso InstId =:= EntryId)
+    end.
+
+namespace_prefix(PatternInstance) ->
+    Id = pi_get(id, PatternInstance),
+    IdStr = case Id of
+        B when is_binary(B) -> binary_to_list(B);
+        A when is_atom(A) -> atom_to_list(A);
+        L when is_list(L) -> L;
+        _ -> "unknown"
+    end,
+    list_to_atom("pi" ++ integer_to_list(erlang:phash2(IdStr))).
+
 %% @private Rename transitions in preset, postset, flows.
 %% Note: #{} matches any map in Erlang; use map_size guard for empty check.
 apply_transition_mapping(TrsnMap, Transitions, Preset, Postset, Flows) when map_size(TrsnMap) =:= 0 ->
@@ -564,7 +631,10 @@ build_branch_place_mapping(_, _) ->
     #{}.
 
 %% @private Derive place suffix from join_task (e.g. GoNoGo -> gonogo)
+%% Must match omega_demo_runner p_branch_place_for_subnet (p_gonogo_branch1..3).
 join_task_to_suffix(undefined) -> undefined;
+join_task_to_suffix(<<"GoNoGo">>) -> <<"gonogo">>;
+join_task_to_suffix('GoNoGo') -> <<"gonogo">>;
 join_task_to_suffix(JoinTask) -> task_ref_to_suffix(JoinTask).
 
 %% @private Derive place suffix from join (e.g. CloseSymposium -> close)

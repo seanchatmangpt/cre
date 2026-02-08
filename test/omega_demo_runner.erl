@@ -82,8 +82,9 @@ run_omega_main(DryRun, ZaiEnabled, TranscriptMode) ->
             throw({fallback, ok})
     end,
 
-    %% Start workflow
-    {ok, Pid, CaseId} = case wf_yawl_executor:start_workflow(Executor, #{}) of
+    %% Start workflow (disable cycle detection; step-driven, no init auto-continue)
+    OmegaOpts = #{gen_yawl_options => [{max_marking_history, 0}, {auto_continue, false}]},
+    {ok, Pid, CaseId} = case wf_yawl_executor:start_workflow(Executor, #{}, OmegaOpts) of
         {ok, P, C} -> {ok, P, C};
         {error, Err3} ->
             io:format(standard_error, "ERROR: Start failed: ~p~n", [Err3]),
@@ -154,12 +155,35 @@ run_omega_loop(Pid, Executor, Spec, CaseId, Agents, TranscriptMode, Round, MaxRo
                 none ->
                     case check_completed(Marking, Executor) of
                         true -> #{status => completed, rounds => Round};
-                        false -> #{status => blocked, rounds => Round}
+                        false ->
+                            maybe_dump_blocked_state(Pid, Executor, Spec),
+                            #{status => blocked, rounds => Round}
                     end
             end
     end;
 run_omega_loop(_Pid, _Executor, _Spec, _CaseId, _Agents, _TranscriptMode, Round, _MaxRounds) ->
     #{status => timeout, rounds => Round}.
+
+omega_debug_enabled() ->
+    case os:getenv("DEMO_OMEGA_DEBUG") of
+        "1" -> true;
+        _ ->
+            case os:getenv("DEMO_DEBUG") of
+                "1" -> true;
+                _ ->
+                    try application:get_env(cre, omega_debug, false) of
+                        true -> true;
+                        _ -> false
+                    catch _:_ -> false
+                    end
+            end
+    end.
+
+maybe_dump_blocked_state(Pid, Executor, Spec) ->
+    case omega_debug_enabled() of
+        true -> cre_debug:dump_blocked_state(Pid, Executor, Spec);
+        false -> ok
+    end.
 
 %%====================================================================
 %% Human Task Completion
@@ -303,13 +327,15 @@ subnet_id_match(#{id := Id}, NetId) when is_binary(NetId) -> Id =:= NetId;
 subnet_id_match(_, _) -> false.
 
 %% EntryPlace: subnet entry. ExitPlace: subnet exit (check completion). BranchPlace: root place to inject (F-003).
+%% Drains subnet, auto-completing human tasks with default_agent until exit or max steps.
 run_one_subnet(RootPid, SubnetMod, EntryPlace, ExitPlace, BranchPlace, Token) ->
     try
-        case gen_yawl:start_link(SubnetMod, #{}, []) of
+        SubnetOpts = [{max_marking_history, 0}],
+        case gen_yawl:start_link(SubnetMod, #{}, SubnetOpts) of
             {ok, SubPid} ->
                 try
                     _ = gen_yawl:inject(SubPid, #{EntryPlace => [Token]}),
-                    _ = gen_yawl:drain(SubPid, 500),
+                    _ = drain_subnet_with_human_tasks(SubPid, SubnetMod, 500),
                     SubMarking = gen_yawl:marking(SubPid),
                     ExitTokens = maps:get(ExitPlace, SubMarking, []),
                     case ExitTokens of
@@ -328,6 +354,39 @@ run_one_subnet(RootPid, SubnetMod, EntryPlace, ExitPlace, BranchPlace, Token) ->
             io:format(standard_error, "Subnet ~p error: ~p:~p~n~p~n", [SubnetMod, Class, Err, Stack]),
             ok
     end.
+
+%% Drain subnet; when abort, find human task and inject with default_agent.
+drain_subnet_with_human_tasks(_Pid, _Mod, 0) -> ok;
+drain_subnet_with_human_tasks(Pid, Mod, N) ->
+    case gen_yawl:step(Pid) of
+        {ok, _} -> drain_subnet_with_human_tasks(Pid, Mod, N - 1);
+        abort ->
+            Marking = gen_yawl:marking(Pid),
+            case subnet_find_inject_place(Mod, Marking) of
+                {Place, _TaskName} ->
+                    Data = maps:get(decision, default_agent(<<>>, #{}), <<"accept">>),
+                    _ = gen_yawl:inject(Pid, #{Place => [Data]}),
+                    drain_subnet_with_human_tasks(Pid, Mod, N - 1);
+                undefined -> ok
+            end;
+        {error, _} -> ok
+    end.
+
+subnet_find_inject_place(Mod, Marking) ->
+    Transitions = Mod:trsn_lst(),
+    PresetMap = maps:from_list([{T, Mod:preset(T)} || T <- Transitions]),
+    lists:foldl(fun(Trsn, Acc) ->
+        case Acc of
+            undefined ->
+                Preset = maps:get(Trsn, PresetMap, []),
+                TaskName = task_name_from_transition(Trsn),
+                case find_inject_place_for_preset(Preset, Marking, TaskName) of
+                    undefined -> undefined;
+                    Result -> Result
+                end;
+            _ -> Acc
+        end
+    end, undefined, Transitions).
 
 find_inject_place(Transitions, PresetMap, Marking) ->
     %% Prefer GoNoGo before CloseSymposium (flow order: Split->GoNoGo->OpenDoors->Close).

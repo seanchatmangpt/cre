@@ -540,20 +540,29 @@ do_compile_workflow(Spec, Options, RootNetFun) ->
 -spec start_workflow(Executor :: executor(), InitialData :: initial_data()) ->
           {ok, pid(), case_id()} | {error, term()}.
 
-start_workflow(#yawl_executor{root_module = RootMod, spec = Spec, compiled = Compiled}, InitialData) when is_map(InitialData) ->
+start_workflow(Executor, InitialData) when is_map(InitialData) ->
+    start_workflow(Executor, InitialData, #{}).
+
+-spec start_workflow(Executor :: executor(),
+                     InitialData :: initial_data(),
+                     OptionsOrServerName :: #{atom() => term()} |
+                         {local, atom()} | {global, atom()} | {via, atom(), term()}) ->
+          {ok, pid(), case_id()} | {error, term()}.
+start_workflow(#yawl_executor{root_module = RootMod, spec = Spec, compiled = Compiled}, InitialData, Options) when is_map(InitialData), is_map(Options) ->
     CaseId = generate_case_id(),
     Regions = case root_net_info(Spec, Compiled) of
         #{regions := R} when is_map(R) -> R;
         _ -> #{}
     end,
     NetArg = #{initial_data => InitialData, case_id => CaseId, regions => Regions},
+    GenYawlOpts = maps:get(gen_yawl_options, Options, []),
 
-    case gen_yawl:start_link(RootMod, NetArg, []) of
+    case gen_yawl:start_link(RootMod, NetArg, GenYawlOpts) of
         {ok, Pid} ->
             {ok, Pid, CaseId};
         {error, Reason} ->
             {error, {start_error, Reason}}
-    end.
+    end;
 
 %%--------------------------------------------------------------------
 %% @doc Starts a registered workflow instance.
@@ -579,11 +588,6 @@ start_workflow(#yawl_executor{root_module = RootMod, spec = Spec, compiled = Com
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec start_workflow(Executor :: executor(),
-                     InitialData :: initial_data(),
-                     ServerName :: {local, atom()} | {global, atom()} | {via, atom(), term()}) ->
-          {ok, pid(), case_id()} | {error, term()}.
-
 start_workflow(#yawl_executor{root_module = RootMod, spec = Spec, compiled = Compiled}, InitialData, ServerName)
         when is_map(InitialData), is_tuple(ServerName) ->
     CaseId = generate_case_id(),

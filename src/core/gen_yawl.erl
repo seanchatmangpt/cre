@@ -128,7 +128,8 @@ The fire/3 callback can return:
          withdraw/2,
          step/1,
          drain/2,
-         cancel_region/2]).
+         cancel_region/2,
+         enabled_transitions/1]).
 
 %% Net state accessor functions
 -export([get_ls/2, get_usr_info/1, get_stats/1]).
@@ -282,6 +283,29 @@ ls(Name, Place) when is_atom(Place) ->
 
 marking(Name) ->
     gen_server:call(Name, marking).
+
+
+%%--------------------------------------------------------------------
+%% @doc Return the list of transitions that are currently enabled.
+%%
+%%      Use when step/1 returns abort to inspect what could fire.
+%%
+%% === Example ===
+%% ```
+%% case gen_yawl:step(Pid) of
+%%     abort ->
+%%         Enabled = gen_yawl:enabled_transitions(Pid),
+%%         io:format("Blocked; enabled: ~p~n", [Enabled]);
+%%     {ok, _} -> ok
+%% end.
+%% '''
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec enabled_transitions(Name :: name()) -> [atom()].
+
+enabled_transitions(Name) ->
+    gen_server:call(Name, enabled_transitions).
 
 
 %%--------------------------------------------------------------------
@@ -625,10 +649,14 @@ init({NetMod, NetArg, Options}) ->
     %% Extract timeout options
     FireTimeout = proplists:get_value(fire_timeout, Options, 5000),
     ProgressTimeout = proplists:get_value(progress_timeout, Options, 30000),
+    MaxHistory = proplists:get_value(max_marking_history, Options, 10),
+    MaxCont = proplists:get_value(max_continue, Options, 1000),
 
     %% Validate timeouts
     true = is_integer(FireTimeout) andalso FireTimeout > 0,
     true = is_integer(ProgressTimeout) andalso ProgressTimeout > 0,
+    true = is_integer(MaxHistory) andalso MaxHistory >= 0,
+    true = is_integer(MaxCont) andalso MaxCont > 0,
 
     %% Initialize user info from the callback module
     UsrInfo = NetMod:init(NetArg),
@@ -652,8 +680,11 @@ init({NetMod, NetArg, Options}) ->
                   cnt = 0
                  },
 
-    %% Start the Petri net execution
-    continue(self()),
+    %% Start the Petri net execution (unless auto_continue = false, e.g. Omega step-driven)
+    case proplists:get_value(auto_continue, Options, true) of
+        true -> continue(self());
+        false -> ok
+    end,
 
     %% Extract regions from NetArg for cancel_region/2
     Regions = case NetArg of
@@ -661,7 +692,7 @@ init({NetMod, NetArg, Options}) ->
         _ -> #{}
     end,
 
-    %% Create wrapper state with timeouts
+    %% Create wrapper state with timeouts and cycle detection bounds
     WrapperState = #wrapper_state{
                       net_mod = NetMod,
                       net_state = NetState,
@@ -670,7 +701,9 @@ init({NetMod, NetArg, Options}) ->
                       shutting_down = false,
                       active_fires = 0,
                       marking_history = [],
+                      max_marking_history = MaxHistory,
                       continue_count = 0,
+                      max_continue = MaxCont,
                       regions = Regions
                      },
 
@@ -704,6 +737,10 @@ handle_call({ls, Place}, _From, WrapperState = #wrapper_state{net_state = NetSta
 handle_call(marking, _From, WrapperState = #wrapper_state{net_state = NetState}) ->
     #net_state{marking = Marking} = NetState,
     {reply, Marking, WrapperState};
+
+handle_call(enabled_transitions, _From, WrapperState = #wrapper_state{net_state = NetState}) ->
+    Enabled = compute_enabled_transitions(NetState),
+    {reply, Enabled, WrapperState};
 
 handle_call(usr_info, _From, WrapperState = #wrapper_state{net_state = NetState}) ->
     #net_state{usr_info = UsrInfo} = NetState,
@@ -923,16 +960,23 @@ handle_cast(continue,
                     NetState3 = handle_trigger(Pm, NetState2, NetMod),
 
                     %% Cycle detection: fingerprint new marking and check for repeat
+                    %% (skipped when max_marking_history = 0, e.g. for Omega demo)
                     #net_state{marking = NewMarking} = NetState3,
-                    Fingerprint = erlang:phash2(term_to_binary(NewMarking)),
-                    SeenBefore = lists:member(Fingerprint, History),
-                    NewHistory = case SeenBefore of
-                        true ->
-                            logger:warning("gen_yawl halt: marking cycle detected (fingerprint=~p)", [Fingerprint]),
-                            [];
-                        false ->
-                            Hist1 = [Fingerprint | History],
-                            lists:sublist(Hist1, MaxHistory)
+                    {SeenBefore, NewHistory} = case MaxHistory of
+                        0 ->
+                            {false, []};
+                        _ ->
+                            Fingerprint = erlang:phash2(term_to_binary(NewMarking)),
+                            Seen = lists:member(Fingerprint, History),
+                            Hist = case Seen of
+                                true ->
+                                    logger:warning("gen_yawl halt: marking cycle detected (fingerprint=~p)", [Fingerprint]),
+                                    [];
+                                false ->
+                                    Hist1 = [Fingerprint | History],
+                                    lists:sublist(Hist1, MaxHistory)
+                            end,
+                            {Seen, Hist}
                     end,
 
                     %% Decide whether to continue
@@ -1170,15 +1214,28 @@ update_stats(NetState, Stats, T1, Cnt) ->
           abort | {delta, #{atom() => [term()]}, #{atom() => [term()]}, term() | undefined} |
           {error, term(), #net_state{}}.
 
-progress(#net_state{
-           marking = Marking,
-           net_mod = NetMod,
-           usr_info = UsrInfo
-          }, FireTimeout) ->
-    %% Get all transitions in the net
-    TrsnLst = NetMod:trsn_lst(),
+progress(#net_state{} = NetState, FireTimeout) ->
+    {ModeMap, NetMod, UsrInfo} = build_enabled_mode_map(NetState),
+    attempt_progress(ModeMap, NetMod, UsrInfo, FireTimeout).
 
-    %% Find all enabled transitions and their modes
+%% @private
+%% @doc Compute the list of enabled transition atoms for inspection.
+-spec compute_enabled_transitions(#net_state{}) -> [atom()].
+
+compute_enabled_transitions(#net_state{} = NetState) ->
+    {ModeMap, _NetMod, _UsrInfo} = build_enabled_mode_map(NetState),
+    maps:keys(ModeMap).
+
+%% @private
+-spec build_enabled_mode_map(#net_state{}) ->
+          {#{atom() => [#{atom() => [term()]}]}, atom(), term()}.
+
+build_enabled_mode_map(#net_state{
+                         marking = Marking,
+                         net_mod = NetMod,
+                         usr_info = UsrInfo
+                        }) ->
+    TrsnLst = NetMod:trsn_lst(),
     F = fun(T, Acc) ->
                 Preset = NetMod:preset(T),
                 MLst = enum_mode(Preset, Marking),
@@ -1189,11 +1246,8 @@ progress(#net_state{
                     [_ | _] -> Acc#{T => EnabledMLst}
                 end
         end,
-
     ModeMap = lists:foldl(F, #{}, TrsnLst),
-
-    %% Attempt to fire a transition
-    attempt_progress(ModeMap, NetMod, UsrInfo, FireTimeout).
+    {ModeMap, NetMod, UsrInfo}.
 
 
 %%--------------------------------------------------------------------

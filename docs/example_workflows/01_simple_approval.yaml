@@ -1,0 +1,255 @@
+# ============================================================================
+# Example 1: Simple Approval Workflow
+# ============================================================================
+#
+# Business Context:
+# -----------------
+# A purchase request approval workflow where a single manager must approve
+# requests before processing. This is the most common approval pattern in
+# enterprise systems, covering:
+# - Purchase requisitions
+# - Time off requests
+# - Document approvals
+# - Access requests
+#
+# Pattern Usage:
+# --------------
+# - P1_Sequence: Linear flow through stages
+# - P4_ExclusiveChoice: Approve vs Reject decision
+# - P19_CancelActivity: Cancellation of pending requests
+#
+# Design Decisions:
+# ----------------
+# 1. Single approver: Simpler audit trail, clear accountability
+# 2. Explicit rejection path: Different handling for approved vs rejected
+# 3. Cancellation support: Requests can be withdrawn before decision
+# 4. Automated processing: Post-approval steps are system-executed
+#
+# Generative Analysis:
+# -------------------
+# The receipt trail captures:
+# - Request submission timestamp
+# - Approver identity and decision timestamp
+# - Processing start/completion timestamps
+# - Full state before/after each transition
+#
+# This enables reconstruction of:
+# - "How long did request X sit pending?"
+# - "Who approved request Y and when?"
+# - "What was the state when request Z was cancelled?"
+#
+# ============================================================================
+
+yawl_yaml_version: "0.2"
+
+specificationSet:
+  yawl_schema_version: "2.1"
+  uri: "example_simple_approval"
+  metaData:
+    title: "Simple Single-Approver Workflow"
+    version: "1.0"
+    creator: "CRE Example Workflows"
+    description: "Linear approval flow with single manager approval gate"
+
+  rootNet: SimpleApproval
+
+  roles:
+    - Requester
+    - Manager
+    - System
+
+  # ===========================================================================
+  # Main Net: Simple Approval Flow
+  # ===========================================================================
+  nets:
+    - id: SimpleApproval
+      type: NetFacts
+
+      # Net-level variables track request state
+      variables:
+        - {name: request_id, type: string, initial: ""}
+        - {name: request_amount, type: decimal, initial: 0.00}
+        - {name: requester_id, type: string, initial: ""}
+        - {name: approver_id, type: string, initial: ""}
+        - {name: approval_decision, type: string, initial: "pending"}
+        - {name: created_at, type: datetime, initial: null}
+        - {name: decided_at, type: datetime, initial: null}
+
+      nodes:
+        # Entry and exit points
+        - {id: Start, kind: inputCondition}
+        - {id: End, kind: outputCondition, name: "Request Complete"}
+
+        # P1_Sequence: Submit -> Validate -> Approve -> Process
+        - {id: SubmitRequest, kind: task, taskType: human, name: "Submit Request",
+           docs: "Requester submits details for approval"}
+
+        - {id: ValidateRequest, kind: task, taskType: automated, name: "Validate Request",
+           docs: "System validates request format and business rules"}
+
+        - {id: ManagerApproval, kind: task, taskType: human, name: "Manager Approval",
+           docs: "Manager reviews and approves/rejects request"}
+
+        - {id: ProcessApproved, kind: task, taskType: automated, name: "Process Approved",
+           docs: "Execute approved request (payment, booking, etc.)"}
+
+        - {id: NotifyRejection, kind: task, taskType: automated, name: "Notify Rejection",
+           docs: "Send rejection notification to requester"}
+
+        - {id: ArchiveRecord, kind: task, taskType: automated, name: "Archive Record",
+           docs: "Store final state for audit"}
+
+      flows:
+        # P1_Sequence: Linear flow through stages
+        - {from: Start, to: SubmitRequest}
+        - {from: SubmitRequest, to: ValidateRequest}
+        - {from: ValidateRequest, to: ManagerApproval}
+
+        # P4_ExclusiveChoice: Branch based on approval decision
+        - {from: ManagerApproval, to: ProcessApproved, predicate: "approved"}
+        - {from: ManagerApproval, to: NotifyRejection, predicate: "rejected"}
+
+        # Both paths converge to archiving
+        - {from: ProcessApproved, to: ArchiveRecord}
+        - {from: NotifyRejection, to: ArchiveRecord}
+        - {from: ArchiveRecord, to: End}
+
+      regions:
+        # P25_CancelRegion: Can cancel before manager decision
+        - {id: Region_PendingApproval, cancel_region: true,
+           description: "Pre-approval region that can be cancelled"}
+
+  # ===========================================================================
+  # Pattern Instances
+  # ===========================================================================
+  pattern_instances:
+
+    # P1_Sequence: Main flow is sequential
+    - {id: P1_main_flow, pattern: P1_Sequence, net: SimpleApproval,
+       from: SubmitRequest, to: ArchiveRecord,
+       label: "P1: Submit -> Validate -> Approve -> Process -> Archive"}
+
+    # P4_ExclusiveChoice: Approve vs Reject paths
+    - {id: P4_approval_decision, pattern: P4_ExclusiveChoice, net: SimpleApproval,
+       at: ManagerApproval, choices: [approved, rejected],
+       label: "P4: Manager chooses approve or reject"}
+
+    # P19_CancelActivity: Cancel pending requests
+    - {id: P19_cancel_pending, pattern: P19_CancelActivity, net: SimpleApproval,
+       target: ManagerApproval, cancel_event: request_withdrawn,
+       label: "P19: Cancel pending approval on withdrawal"}
+
+    # P21_StructuredLoop: Resubmit if validation fails
+    - {id: P21_resubmit_loop, pattern: P21_StructuredLoop, net: SimpleApproval,
+       entry: ValidateRequest, body: [SubmitRequest],
+       exit_condition: "validation_passed",
+       label: "P21: Return to submit on validation failure"}
+
+  # ===========================================================================
+  # Pattern Registry
+  # ===========================================================================
+  pattern_registry:
+    P1_Sequence: {macro: "sequence"}
+    P4_ExclusiveChoice: {macro: "xor_choice"}
+    P19_CancelActivity: {macro: "cancel_activity"}
+    P21_StructuredLoop: {macro: "structured_loop"}
+
+  # ===========================================================================
+  # Pattern Usage Index
+  # ===========================================================================
+  pattern_usage_index:
+    P1: [P1_main_flow]
+    P4: [P4_approval_decision]
+    P19: [P19_cancel_pending]
+    P21: [P21_resubmit_loop]
+
+# ============================================================================
+# Sample Execution Trace with Receipts
+# ============================================================================
+#
+# The following illustrates the receipts generated during execution:
+#
+# Receipt 1: Request Submission
+# -----------------------------
+# {
+#   before_hash: <<0,0,0,0,...>>,          # Empty initial marking
+#   after_hash: <<123,45,67,...>>,         # Hash after submission
+#   move: {
+#     trsn: SubmitRequest,
+#     mode: #{start => [init]},
+#     produce: #{validate_request => [{request, req_12345}]},
+#     consumed: #{start => [init]}
+#   },
+#   ts: 1738395923000,                     # 2025-02-01T10:00:00Z
+#   spec_hash: <<255,123,45,67,...>>,      # Links to this spec version
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 2: Validation Pass
+# ---------------------------
+# {
+#   before_hash: <<123,45,67,...>>,
+#   after_hash: <<234,56,78,...>>,
+#   move: {
+#     trsn: ValidateRequest,
+#     mode: #{validate_request => [{request, req_12345}]},
+#     produce: #{manager_approval => [{validated, req_12345}]},
+#     consumed: #{validate_request => [{request, req_12345}]}
+#   },
+#   ts: 1738395923500,                     # 500ms later
+#   agent: system_validator,
+#   spec_hash: <<255,123,45,67,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 3: Manager Approval
+# ----------------------------
+# {
+#   before_hash: <<234,56,78,...>>,
+#   after_hash: <<345,67,89,...>>,
+#   move: {
+#     trsn: ManagerApproval,
+#     mode: #{manager_approval => [{validated, req_12345}]},
+#     produce: #{process_approved => [{approved, req_12345}]},
+#     consumed: #{manager_approval => [{validated, req_12345}]}
+#   },
+#   ts: 1738397123000,                     # 20 minutes later
+#   agent: manager_john_doe,
+#   decision: approved,
+#   decision_reason: "Within budget limit",
+#   spec_hash: <<255,123,45,67,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 4: Processing Complete
+# ------------------------------
+# {
+#   before_hash: <<345,67,89,...>>,
+#   after_hash: <<456,78,90,...>>,
+#   move: {
+#     trsn: ProcessApproved,
+#     mode: #{process_approved => [{approved, req_12345}]},
+#     produce: #{archive_record => [{complete, req_12345}]},
+#     consumed: #{process_approved => [{approved, req_12345}]}
+#   },
+#   ts: 1738397125000,                     # 2 seconds later
+#   agent: payment_processor,
+#   payment_id: "pay_98765",
+#   spec_hash: <<255,123,45,67,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Analysis from Receipts:
+# -----------------------
+# 1. Total cycle time: 1202 seconds (20 minutes)
+# 2. Manager response time: 1199.5 seconds (99.7% of cycle time)
+# 3. Validation time: 0.5 seconds (automated, fast)
+# 4. Processing time: 2 seconds (automated payment)
+# 5. Clear accountability: manager_john_doe approved at 1738397123000
+#
+# This trace enables:
+# - Performance optimization: bottleneck is manager approval
+# - Audit reconstruction: exact sequence of who did what when
+# - Process improvement: consider parallel approval or delegation
+#
+# ============================================================================

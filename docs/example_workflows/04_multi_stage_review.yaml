@@ -1,0 +1,515 @@
+# ============================================================================
+# Example 4: Multi-Stage Review with Revision Loop
+# ============================================================================
+#
+# Business Context:
+# -----------------
+# An academic paper review workflow where authors can revise and resubmit
+# based on reviewer feedback. This iterative process continues until:
+# - Paper is accepted, OR
+# - Maximum revision rounds reached, OR
+# - Authors withdraw submission
+#
+# This pattern is essential for:
+# - Peer review processes
+# - Code review workflows
+# - Design review cycles
+# - Quality assurance iterations
+#
+# Pattern Usage:
+# --------------
+# - P1_Sequence: Review stages happen in order
+# - P21_StructuredLoop: Revise and re-review cycle
+# - P4_ExclusiveChoice: Accept vs Revise vs Reject decision
+# - P6_MultipleChoice: Multiple reviewers in parallel
+# - P7_StructuredSyncMerge: Wait for all reviews before decision
+#
+# Design Decisions:
+# ----------------
+# 1. Bounded iteration: Maximum 3 revision rounds prevents infinite loops
+# 2. Parallel review: Multiple reviewers review each version concurrently
+# 3. Structured merge: Decision made after ALL reviews complete
+# 4. Exit conditions: Clear accept/reject/revise paths
+#
+# Generative Analysis:
+# -------------------
+# The receipt trail captures:
+# - Each revision round's start and end
+# - Reviewer feedback for each round
+# - Evolution of paper quality across rounds
+# - Final decision justification
+#
+# This enables reconstruction of:
+# - "How many rounds did paper X go through?"
+# - "Which reviewers provided key feedback?"
+# - "Did the paper improve across revisions?"
+# - "Why was the paper ultimately accepted/rejected?"
+#
+# Reachability Analysis:
+# ---------------------
+# The structured loop creates cyclic reachability:
+#
+#         Submit
+#           |
+#        Review
+#           |
+#       Decision
+#        /  |  \
+#    Accept  |  Reject
+#        \  |  /
+#         Done   (terminal states)
+#           |
+#        Revise ---+
+#           ^       |
+#           |_______|  (loop back, max 3 times)
+#
+# Loop bound guarantees termination: max 4 review cycles (initial + 3 revisions)
+#
+# ============================================================================
+
+yawl_yaml_version: "0.2"
+
+specificationSet:
+  yawl_schema_version: "2.1"
+  uri: "example_multi_stage_review"
+  metaData:
+    title: "Multi-Stage Review with Revision Loop"
+    version: "1.0"
+    creator: "CRE Example Workflows"
+    description: "Iterative peer review with revise-and-resubmit cycles"
+
+  rootNet: MultiStageReview
+
+  roles:
+    - Author
+    - Reviewer
+    - Editor
+    - System
+
+  # ===========================================================================
+  # Main Net: Multi-Stage Review Flow
+  # ===========================================================================
+  nets:
+    - id: MultiStageReview
+      type: NetFacts
+
+      variables:
+        - {name: paper_id, type: string, initial: ""}
+        - {name: revision_round, type: integer, initial: 0}
+        - {name: max_revisions, type: integer, initial: 3}
+        - {name: overall_decision, type: string, initial: "pending"}
+        - {name: review_scores, type: list, initial: []}
+
+      nodes:
+        # Entry and exit
+        - {id: Start, kind: inputCondition}
+        - {id: End, kind: outputCondition, name: "Review Complete"}
+
+        # Initial submission
+        - {id: SubmitPaper, kind: task, taskType: human, name: "Submit Paper",
+           docs: "Author submits initial paper version"}
+
+        - {id: AssignReviewers, kind: task, taskType: automated,
+           name: "Assign Reviewers",
+           docs: "Assign 3 reviewers to this submission"}
+
+        # P6_MultipleChoice: Parallel reviews
+        - {id: DistributeReviews, kind: task, taskType: automated,
+           name: "Distribute to Reviewers",
+           docs: "Send paper to assigned reviewers"}
+
+        - {id: Reviewer1, kind: task, taskType: human, name: "Reviewer 1",
+           docs: "First reviewer evaluates paper"}
+
+        - {id: Reviewer2, kind: task, taskType: human, name: "Reviewer 2",
+           docs: "Second reviewer evaluates paper"}
+
+        - {id: Reviewer3, kind: task, taskType: human, name: "Reviewer 3",
+           docs: "Third reviewer evaluates paper"}
+
+        # P7_StructuredSyncMerge: Wait for all reviews
+        - {id: CollectReviews, kind: task, taskType: automated,
+           name: "Collect Reviews",
+           docs: "Gather all reviews and scores"}
+
+        # P4_ExclusiveChoice: Editor decision
+        - {id: EditorDecision, kind: task, taskType: human,
+           name: "Editor Decision",
+           docs: "Editor reviews feedback and decides"}
+
+        # Decision paths
+        - {id: AcceptPaper, kind: task, taskType: automated,
+           name: "Process Acceptance",
+           docs: "Mark paper as accepted"}
+
+        - {id: RejectPaper, kind: task, taskType: automated,
+           name: "Process Rejection",
+           docs: "Mark paper as rejected"}
+
+        # P21_StructuredLoop: Revision cycle
+        - {id: RequestRevision, kind: task, taskType: automated,
+           name: "Request Revision",
+           docs: "Send feedback to author and request revision"}
+
+        - {id: AuthorRevise, kind: task, taskType: human,
+           name: "Author Revision",
+           docs: "Author revises paper based on feedback"}
+
+        - {id: CheckRevisionCount, kind: task, taskType: automated,
+           name: "Check Revision Limit",
+           docs: "Verify within max revision rounds"}
+
+        - {id: MaxRevisionsReject, kind: task, taskType: automated,
+           name: "Reject (Max Revisions)",
+           docs: "Reject after maximum revision attempts"}
+
+        - {id: NotifyOutcome, kind: task, taskType: automated,
+           name: "Notify Outcome",
+           docs: "Send final decision to author"}
+
+      flows:
+        # Initial submission
+        - {from: Start, to: SubmitPaper}
+        - {from: SubmitPaper, to: AssignReviewers}
+        - {from: AssignReviewers, to: DistributeReviews}
+
+        # P6: Distribute to 3 parallel reviewers
+        - {from: DistributeReviews, to: Reviewer1}
+        - {from: DistributeReviews, to: Reviewer2}
+        - {from: DistributeReviews, to: Reviewer3}
+
+        # P7: All reviews converge
+        - {from: Reviewer1, to: CollectReviews}
+        - {from: Reviewer2, to: CollectReviews}
+        - {from: Reviewer3, to: CollectReviews}
+
+        # Editor makes decision
+        - {from: CollectReviews, to: EditorDecision}
+
+        # P4: Exclusive choice - accept, reject, or revise
+        - {from: EditorDecision, to: AcceptPaper, predicate: "decision == accept"}
+        - {from: EditorDecision, to: RejectPaper, predicate: "decision == reject"}
+        - {from: EditorDecision, to: RequestRevision, predicate: "decision == revise"}
+
+        # Terminal outcomes
+        - {from: AcceptPaper, to: NotifyOutcome}
+        - {from: RejectPaper, to: NotifyOutcome}
+        - {from: MaxRevisionsReject, to: NotifyOutcome}
+        - {from: NotifyOutcome, to: End}
+
+        # P21: Revision loop back to review
+        - {from: RequestRevision, to: AuthorRevise}
+        - {from: AuthorRevise, to: CheckRevisionCount}
+        - {from: CheckRevisionCount, to: DistributeReviews, predicate: "round < max"}
+        - {from: CheckRevisionCount, to: MaxRevisionsReject, predicate: "round >= max"}
+
+      regions:
+        # Review region that repeats in loop
+        - {id: Region_ReviewCycle, cancel_region: false,
+           description: "Review cycle region - repeats with revisions"}
+
+  # ===========================================================================
+  # Pattern Instances
+  # ===========================================================================
+  pattern_instances:
+
+    # P1_Sequence: Initial submission flow
+    - {id: P1_submission, pattern: P1_Sequence, net: MultiStageReview,
+       from: SubmitPaper, to: DistributeReviews,
+       label: "P1: Submit -> Assign -> Distribute"}
+
+    # P6_MultipleChoice: Parallel reviewer assignment
+    - {id: P6_parallel_review, pattern: P6_MultipleChoice, net: MultiStageReview,
+       at: DistributeReviews,
+       branches: [Reviewer1, Reviewer2, Reviewer3],
+       label: "P6: All 3 reviewers receive paper simultaneously"}
+
+    # P7_StructuredSyncMerge: Wait for all reviews
+    - {id: P7_collect_reviews, pattern: P7_StructuredSyncMerge, net: MultiStageReview,
+       join: CollectReviews,
+       froms: [Reviewer1, Reviewer2, Reviewer3],
+       label: "P7: Wait for all 3 reviews before editor decision"}
+
+    # P4_ExclusiveChoice: Editor selects single outcome
+    - {id: P4_editor_choice, pattern: P4_ExclusiveChoice, net: MultiStageReview,
+       at: EditorDecision,
+       choices: [accept, reject, revise],
+       label: "P4: Editor chooses exactly one outcome"}
+
+    # P21_StructuredLoop: Revision and re-review
+    - {id: P21_revision_loop, pattern: P21_StructuredLoop, net: MultiStageReview,
+       entry: RequestRevision,
+       body: [AuthorRevise, CheckRevisionCount, DistributeReviews,
+              Reviewer1, Reviewer2, Reviewer3, CollectReviews, EditorDecision],
+       exit_condition: "decision == accept || decision == reject || round >= max_revisions",
+       max_iterations: 3,
+       label: "P21: Revise and re-review up to 3 times"}
+
+  # ===========================================================================
+  # Pattern Registry
+  # ===========================================================================
+  pattern_registry:
+    P1_Sequence: {macro: "sequence"}
+    P4_ExclusiveChoice: {macro: "xor_choice"}
+    P6_MultipleChoice: {macro: "or_split_structured"}
+    P7_StructuredSyncMerge: {macro: "or_join_structured"}
+    P21_StructuredLoop: {macro: "structured_loop"}
+
+  # ===========================================================================
+  # Pattern Usage Index
+  # ===========================================================================
+  pattern_usage_index:
+    P1: [P1_submission]
+    P4: [P4_editor_choice]
+    P6: [P6_parallel_review]
+    P7: [P7_collect_reviews]
+    P21: [P21_revision_loop]
+
+# ============================================================================
+# Sample Execution Trace with Receipts
+# ============================================================================
+#
+# Receipt 1: Initial Submission
+# ------------------------------
+# {
+#   before_hash: <<0,0,0,0,...>>,
+#   after_hash: <<111,11,11,...>>,
+#   move: {
+#     trsn: SubmitPaper,
+#     mode: #{start => [init]},
+#     produce: #{assign => [{paper, paper_45678, v1}]},
+#     consumed: #{start => [init]}
+#   },
+#   ts: 1738395923000,
+#   paper_id: "paper_45678",
+#   version: 1,
+#   author: "dr_smith",
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 2: Distribute to Reviewers (P6)
+# ---------------------------------------
+# {
+#   before_hash: <<222,22,22,...>>,
+#   after_hash: <<333,33,33,...>>,
+#   move: {
+#     trsn: DistributeReviews,
+#     mode: #{assign => [{paper, paper_45678, v1}]},
+#     produce: #{
+#       review1 => [{review_req, paper_45678, v1, reviewer_alice}],
+#       review2 => [{review_req, paper_45678, v1, reviewer_bob}],
+#       review3 => [{review_req, paper_45678, v1, reviewer_carol}]
+#     },
+#     consumed: #{assign => [{paper, paper_45678, v1}]}
+#   },
+#   ts: 1738395925000,
+#   reviewers: [reviewer_alice, reviewer_bob, reviewer_carol],
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 3: Reviews Collected (P7)
+# ----------------------------------
+# {
+#   before_hash: <<444,44,44,...>>,
+#   after_hash: <<555,55,55,...>>,
+#   move: {
+#     trsn: CollectReviews,
+#     mode: #{
+#       review1 => [{review, paper_45678, v1, score: 6, revise}],
+#       review2 => [{review, paper_45678, v1, score: 7, accept}],
+#       review3 => [{review, paper_45678, v1, score: 5, revise}]
+#     },
+#     produce: #{editor_decision => [{reviews_collected, paper_45678, v1, avg_score: 6}]},
+#     consumed: #{
+#       review1 => [{review, paper_45678, v1, score: 6}],
+#       review2 => [{review, paper_45678, v1, score: 7}],
+#       review3 => [{review, paper_45678, v1, score: 5}]
+#     }
+#   },
+#   ts: 1738401325000,  # 2 hours later
+#   review_count: 3,
+#   avg_score: 6.0,
+#   recommendations: [revise, accept, revise],
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 4: Editor Decision (P4) - Revise
+# -----------------------------------------
+# {
+#   before_hash: <<555,55,55,...>>,
+#   after_hash: <<666,66,66,...>>,
+#   move: {
+#     trsn: EditorDecision,
+#     mode: #{editor_decision => [{reviews_collected, paper_45678, v1}]},
+#     produce: #{revision => [{revise, paper_45678, v1, round: 1}]},
+#     consumed: #{editor_decision => [{reviews_collected, paper_45678, v1}]}
+#   },
+#   ts: 1738401327000,
+#   agent: editor_dr_jones,
+#   decision: revise,
+#   rationale: "Methodology concerns - 2 of 3 reviewers request changes",
+#   revision_round: 1,
+#   max_revisions: 3,
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 5: Author Revision (P21 Loop Entry)
+# --------------------------------------------
+# {
+#   before_hash: <<777,77,77,...>>,
+#   after_hash: <<888,88,88,...>>,
+#   move: {
+#     trsn: AuthorRevise,
+#     mode: #{revision => [{revise, paper_45678, v1}]},
+#     produce: #{revision_check => [{paper, paper_45678, v2}]},
+#     consumed: #{revision => [{revise, paper_45678, v1}]}
+#   },
+#   ts: 1738412127000,  # 3 hours later
+#   agent: dr_smith,
+#   action: revised,
+#   old_version: 1,
+#   new_version: 2,
+#   changes: "Rewrote methodology section, added experiments",
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 6: Revision Count Check (P21 Loop Condition)
+# -----------------------------------------------------
+# {
+#   before_hash: <<888,88,88,...>>,
+#   after_hash: <<999,99,99,...>>,
+#   move: {
+#     trsn: CheckRevisionCount,
+#     mode: #{revision_check => [{paper, paper_45678, v2}]},
+#     produce: #{distribute => [{paper, paper_45678, v2}]},
+#     consumed: #{revision_check => [{paper, paper_45678, v2}]}
+#   },
+#   ts: 1738412128000,
+#   current_round: 1,
+#   max_rounds: 3,
+#   can_continue: true,
+#   loop_continues: true,
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 7: Second Review Round (P6 again)
+# ------------------------------------------
+# {
+#   before_hash: <<101,10,10,...>>,
+#   after_hash: <<202,20,20,...>>,
+#   move: {
+#     trsn: DistributeReviews,
+#     mode: #{assign => [{paper, paper_45678, v2}]},
+#     produce: #{
+#       review1 => [{review_req, paper_45678, v2, reviewer_alice}],
+#       review2 => [{review_req, paper_45678, v2, reviewer_bob}],
+#       review3 => [{review_req, paper_45678, v2, reviewer_carol}]
+#     },
+#     consumed: #{assign => [{paper, paper_45678, v2}]}
+#   },
+#   ts: 1738412130000,
+#   revision_round: 2,
+#   paper_version: 2,
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 8: Reviews Collected Round 2
+# -------------------------------------
+# {
+#   before_hash: <<303,30,30,...>>,
+#   after_hash: <<404,40,40,...>>,
+#   move: {
+#     trsn: CollectReviews,
+#     mode: #{
+#       review1 => [{review, paper_45678, v2, score: 8, accept}],
+#       review2 => [{review, paper_45678, v2, score: 8, accept}],
+#       review3 => [{review, paper_45678, v2, score: 7, accept}]
+#     },
+#     produce: #{editor_decision => [{reviews_collected, paper_45678, v2, avg_score: 7.67}]},
+#     consumed: #{
+#       review1 => [{review, paper_45678, v2, score: 8}],
+#       review2 => [{review, paper_45678, v2, score: 8}],
+#       review3 => [{review, paper_45678, v2, score: 7}]
+#     }
+#   },
+#   ts: 1738417530000,  # Another 2 hours
+#   review_count: 3,
+#   avg_score: 7.67,
+#   recommendations: [accept, accept, accept],  # Unanimous!
+#   score_improvement: "+1.67 from v1",
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 9: Editor Decision - Accept (P4 Exit)
+# ----------------------------------------------
+# {
+#   before_hash: <<404,40,40,...>>,
+#   after_hash: <<505,50,50,...>>,
+#   move: {
+#     trsn: EditorDecision,
+#     mode: #{editor_decision => [{reviews_collected, paper_45678, v2}]},
+#     produce: #{accept => [{accepted, paper_45678, v2}]},
+#     consumed: #{editor_decision => [{reviews_collected, paper_45678, v2}]}
+#   },
+#   ts: 1738417532000,
+#   agent: editor_dr_jones,
+#   decision: accept,
+#   rationale: "Unanimous accept - improvements address all concerns",
+#   revision_round: 2,
+#   total_rounds: 2,
+#   loop_exits: true,
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 10: Final Acceptance
+# ----------------------------
+# {
+#   before_hash: <<505,50,50,...>>,
+#   after_hash: <<606,60,60,...>>,
+#   move: {
+#     trsn: AcceptPaper,
+#     mode: #{accept => [{accepted, paper_45678, v2}]},
+#     produce: #{notify => [{final, paper_45678, accepted}]},
+#     consumed: #{accept => [{accepted, paper_45678, v2}]}
+#   },
+#   ts: 1738417533000,
+#   paper_id: "paper_45678",
+#   final_version: 2,
+#   outcome: accepted,
+#   total_time_hours: 5.1,
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Analysis from Receipts:
+# -----------------------
+# 1. Total revision rounds: 2 (within limit of 3)
+# 2. Score improvement: 6.0 -> 7.67 (+1.67)
+# 3. Reviewer consistency: Same 3 reviewers for both rounds
+# 4. Time to acceptance: ~5 hours
+# 5. Key feedback: Methodology section was the issue
+#
+# Generative Analysis Value:
+# --------------------------
+# - Receipts trace paper evolution through versions
+# - Each review round is a complete traceable cycle
+# - Score progression shows improvement (or lack thereof)
+# - Editor decision rationale is preserved
+#
+# Reachability Insights:
+# ---------------------
+# - Loop executed twice then exited via accept
+# - Path: Start -> Review -> Decision -> Revise -> Review -> Decision -> Accept -> End
+# - Bounded loop guarantees termination (max 3 iterations)
+# - Exit condition: decision == accept met on round 2
+#
+# ============================================================================

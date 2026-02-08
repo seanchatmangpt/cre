@@ -5,6 +5,11 @@
    %% Z.AI API key (or use ZAI_API_KEY env)
    {zai_api_key, "YOUR_ZAI_API_KEY"},
    %% Model (or use ZAI_MODEL env; default: glm-4.7-flash)
-   {zai_model, "glm-4.7-flash"}
+   {zai_model, "glm-4.7-flash"},
+   %% Debug: general debug mode (default: false)
+   {debug, false},
+   %% Omega debug: dump blocked state when Omega demo blocks (default: false)
+   %% Override with DEMO_OMEGA_DEBUG=1 or DEMO_DEBUG=1 env
+   {omega_debug, false}
  ]}
 ].

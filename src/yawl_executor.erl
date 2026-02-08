@@ -1631,7 +1631,7 @@ doctest_test() ->
     %% Test 1: Execute a basic sequence pattern
     Pattern = #sequence{task_ids = [<<"task1">>, <<"task2">>]},
     {ok, Result1} = execute_pattern(Pattern, #{}),
-    sequence_complete = maps:get(status, Result1),
+    true = maps:get(sequence_complete, Result1),
 
     %% Test 2: Execute with custom options
     Options = #{timeout => 10000, persistent => false},

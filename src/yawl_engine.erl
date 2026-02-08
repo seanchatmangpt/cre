@@ -1605,6 +1605,7 @@ doctest_test() ->
         case_id = <<"case_1">>,
         task_id = <<"task_1">>,
         status = enabled,
+        data = #{},
         enabled_at = Now
     },
 

@@ -1,0 +1,401 @@
+# ============================================================================
+# Example 3: Majority Approval (N-of-M Quorum)
+# ============================================================================
+#
+# Business Context:
+# -----------------
+# A committee approval workflow where a majority (quorum) of members must
+# approve, but not all members are required. This pattern is essential for:
+# - Board decisions
+# - Grant applications
+# - Peer review panels
+# - Democratic processes
+#
+# Pattern Usage:
+# --------------
+# - P13_MI_DesignTime: Fixed number of approval instances (5 members)
+# - P30_StructuredPartialJoin: N-of-M quorum (3 of 5)
+# - P32_CancellingPartialJoin: Cancel remaining approvals after quorum
+# - P5_SimpleMerge: Approved and rejected paths merge
+#
+# Design Decisions:
+# ----------------
+# 1. Quorum-based: 3 of 5 members must approve (60% threshold)
+# 2. Cancelling join: Once quorum reached, cancel pending approvals
+# 3. Early continue: Don't wait for all 5 if 3 approve quickly
+# 4. Explicit rejection: If 3 reject, fail immediately
+#
+# Generative Analysis:
+# -------------------
+# The receipt trail captures:
+# - Each member's vote and timestamp
+# - Running count of approve/reject votes
+# - Exact moment quorum was reached
+# - Which members' votes were cancelled (ignored)
+#
+# This enables reconstruction of:
+# - "Who were the deciding voters?"
+# - "Did we wait unnecessarily for slow voters?"
+# - "What was the final vote split?"
+#
+# Reachability Analysis:
+# ---------------------
+# The partial join creates a lattice reachability structure.
+# States are ordered by vote count:
+#
+#                 (0,0)
+#              /    |    \
+#          (1,0)  (0,1)  [rejection path]
+#          /  |     |
+#      (2,0) (1,1) ...
+#        |     |
+#      (3,0) [QUORUM] -> Continue
+#
+# Where (a,r) = a approve, r reject votes.
+# Quorum reached at (3,0), (3,1), or (3,2)
+# Failure declared at (0,3), (1,3), or (2,3)
+#
+# ============================================================================
+
+yawl_yaml_version: "0.2"
+
+specificationSet:
+  yawl_schema_version: "2.1"
+  uri: "example_majority_approval"
+  metaData:
+    title: "Majority Approval Workflow (N-of-M Quorum)"
+    version: "1.0"
+    creator: "CRE Example Workflows"
+    description: "Committee approval with 3-of-5 quorum requirement"
+
+  rootNet: MajorityApproval
+
+  roles:
+    - Chair
+    - CommitteeMember
+    - System
+
+  # ===========================================================================
+  # Main Net: Majority Approval Flow
+  # ===========================================================================
+  nets:
+    - id: MajorityApproval
+      type: NetFacts
+
+      variables:
+        - {name: proposal_id, type: string, initial: ""}
+        - {name: committee_size, type: integer, initial: 5}
+        - {name: quorum_threshold, type: integer, initial: 3}
+        - {name: approve_count, type: integer, initial: 0}
+        - {name: reject_count, type: integer, initial: 0}
+        - {name: quorum_reached, type: boolean, initial: false}
+
+      nodes:
+        # Entry and exit
+        - {id: Start, kind: inputCondition}
+        - {id: End, kind: outputCondition, name: "Decision Complete"}
+
+        # Initial setup
+        - {id: SubmitProposal, kind: task, taskType: human, name: "Submit Proposal",
+           docs: "Chair submits proposal for committee vote"}
+
+        - {id: DistributeProposal, kind: task, taskType: automated,
+           name: "Distribute to Committee",
+           docs: "Send proposal to all committee members"}
+
+        # P13_MI_DesignTime: Create 5 parallel voting instances
+        - {id: RequestVotes, kind: task, taskType: automated,
+           name: "Request Votes",
+           docs: "Create voting tasks for all 5 committee members",
+           mi_params: {
+             min_instances: 3,
+             max_instances: 5,
+             continuation_threshold: 3
+           }}
+
+        # Individual member votes (5 instances, but only 3 needed)
+        - {id: CastVote, kind: task, taskType: human, name: "Member Vote",
+           docs: "Committee member casts approve/reject vote"}
+
+        # P30/P32: Quorum counting with cancellation
+        - {id: CountVotes, kind: task, taskType: automated,
+           name: "Count Votes (Quorum Check)",
+           docs: "Check if quorum reached (3 approves or 3 rejects)"}
+
+        - {id: ApproveOutcome, kind: task, taskType: automated,
+           name: "Process Approval",
+           docs: "Handle approved proposal"}
+
+        - {id: RejectOutcome, kind: task, taskType: automated,
+           name: "Process Rejection",
+           docs: "Handle rejected proposal"}
+
+        - {id: NotifyResult, kind: task, taskType: automated,
+           name: "Notify Result",
+           docs: "Send outcome to all members"}
+
+        - {id: CancelPendingVotes, kind: task, taskType: automated,
+           name: "Cancel Pending Votes",
+           docs: "Cancel remaining voting instances after decision"}
+
+      flows:
+        # Initial sequence
+        - {from: Start, to: SubmitProposal}
+        - {from: SubmitProposal, to: DistributeProposal}
+        - {from: DistributeProposal, to: RequestVotes}
+
+        # Multi-instance split to 5 committee members
+        - {from: RequestVotes, to: CastVote}
+
+        # Votes flow to counter
+        - {from: CastVote, to: CountVotes}
+
+        # P30_StructuredPartialJoin: Decision made at threshold
+        - {from: CountVotes, to: ApproveOutcome, predicate: "approve_count >= 3"}
+        - {from: CountVotes, to: RejectOutcome, predicate: "reject_count >= 3"}
+
+        # P32: Cancel remaining votes after decision
+        - {from: ApproveOutcome, to: CancelPendingVotes}
+        - {from: RejectOutcome, to: CancelPendingVotes}
+
+        # Both outcomes merge to notification
+        - {from: CancelPendingVotes, to: NotifyResult}
+        - {from: NotifyResult, to: End}
+
+      regions:
+        # Voting region that can be partially cancelled
+        - {id: Region_Voting, cancel_region: true,
+           description: "Voting region - cancelled when quorum reached"}
+
+  # ===========================================================================
+  # Pattern Instances
+  # ===========================================================================
+  pattern_instances:
+
+    # P1_Sequence: Setup phase
+    - {id: P1_setup, pattern: P1_Sequence, net: MajorityApproval,
+       from: SubmitProposal, to: RequestVotes,
+       label: "P1: Submit -> Distribute -> Request"}
+
+    # P13_MI_DesignTime: 5 fixed voting instances
+    - {id: P13_five_votes, pattern: P13_MI_DesignTime, net: MajorityApproval,
+       task: CastVote, instances: 5,
+       label: "P13: Create 5 parallel voting instances"}
+
+    # P30_StructuredPartialJoin: 3-of-5 quorum
+    - {id: P30_quorum, pattern: P30_StructuredPartialJoin, net: MajorityApproval,
+       join: CountVotes, m: 5, n: 3,
+       label: "P30: 3-of-5 quorum (N=5, need 3)"}
+
+    # P32_CancellingPartialJoin: Cancel after threshold
+    - {id: P32_cancel_remaining, pattern: P32_CancellingPartialJoin,
+       net: MajorityApproval,
+       m: 5, n: 3, cancel_remaining: true,
+       label: "P32: Cancel remaining 2 votes after quorum"}
+
+    # P5_SimpleMerge: Approve and reject paths merge
+    - {id: P5_merge_outcomes, pattern: P5_SimpleMerge, net: MajorityApproval,
+       froms: [ApproveOutcome, RejectOutcome], to: CancelPendingVotes,
+       label: "P5: Both outcomes merge to cancel-and-notify"}
+
+  # ===========================================================================
+  # Pattern Registry
+  # ===========================================================================
+  pattern_registry:
+    P1_Sequence: {macro: "sequence"}
+    P5_SimpleMerge: {macro: "simple_merge"}
+    P13_MI_DesignTime: {macro: "mi_design_time"}
+    P30_StructuredPartialJoin: {macro: "structured_partial_join"}
+    P32_CancellingPartialJoin: {macro: "cancelling_partial_join"}
+
+  # ===========================================================================
+  # Pattern Usage Index
+  # ===========================================================================
+  pattern_usage_index:
+    P1: [P1_setup]
+    P5: [P5_merge_outcomes]
+    P13: [P13_five_votes]
+    P30: [P30_quorum]
+    P32: [P32_cancel_remaining]
+
+# ============================================================================
+# Sample Execution Trace with Receipts
+# ============================================================================
+#
+# Receipt 1: Proposal Submission
+# -------------------------------
+# {
+#   before_hash: <<0,0,0,0,...>>,
+#   after_hash: <<101,1,1,...>>,
+#   move: {
+#     trsn: SubmitProposal,
+#     mode: #{start => [init]},
+#     produce: #{distribute => [{proposal, prop_98765}]},
+#     consumed: #{start => [init]}
+#   },
+#   ts: 1738395923000,
+#   proposal_id: "prop_98765",
+#   committee: ["alice", "bob", "carol", "dave", "eve"],
+#   spec_hash: <<255,101,1,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 2: Multi-Instance Vote Creation (P13)
+# ----------------------------------------------
+# {
+#   before_hash: <<202,2,2,...>>,
+#   after_hash: <<303,3,3,...>>,
+#   move: {
+#     trsn: RequestVotes,
+#     mode: #{distribute => [{proposal, prop_98765}]},
+#     produce: #{
+#       vote_alice => [{vote_request, prop_98765, alice}],
+#       vote_bob => [{vote_request, prop_98765, bob}],
+#       vote_carol => [{vote_request, prop_98765, carol}],
+#       vote_dave => [{vote_request, prop_98765, dave}],
+#       vote_eve => [{vote_request, prop_98765, eve}]
+#     },
+#     consumed: #{distribute => [{proposal, prop_98765}]},
+#     mi_instances: 5
+#   },
+#   ts: 1738395925000,
+#   mi_params: #{
+#     min_instances: 3,
+#     max_instances: 5,
+#     continuation_threshold: 3
+#   },
+#   spec_hash: <<255,101,1,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 3a: Alice Votes Approve
+# --------------------------------
+# {
+#   before_hash: <<303,3,3,...>>,
+#   after_hash: <<404,4,4,...>>,
+#   move: {
+#     trsn: CastVote,
+#     mode: #{vote_alice => [{vote_request, prop_98765, alice}]},
+#     produce: #{count => [{vote, approve, alice}]},
+#     consumed: #{vote_alice => [{vote_request, prop_98765, alice}]},
+#     mi_instance: 1,
+#     mi_total: 5
+#   },
+#   ts: 1738396225000,  # 5 minutes later
+#   agent: alice,
+#   vote: approve,
+#   running_tally: #{approve => 1, reject => 0},
+#   spec_hash: <<255,101,1,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 3b: Bob Votes Approve
+# ------------------------------
+# {
+#   before_hash: <<404,4,4,...>>,
+#   after_hash: <<505,5,5,...>>,
+#   move: {
+#     trsn: CastVote,
+#     mode: #{vote_bob => [{vote_request, prop_98765, bob}]},
+#     produce: #{count => [{vote, approve, bob}]},
+#     consumed: #{vote_bob => [{vote_request, prop_98765, bob}]},
+#     mi_instance: 2,
+#     mi_total: 5
+#   },
+#   ts: 1738396325000,  # 10 minutes after request
+#   agent: bob,
+#   vote: approve,
+#   running_tally: #{approve => 2, reject => 0},
+#   spec_hash: <<255,101,1,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 3c: Carol Votes Approve (QUORUM REACHED)
+# ------------------------------------------------
+# {
+#   before_hash: <<505,5,5,...>>,
+#   after_hash: <<606,6,6,...>>,
+#   move: {
+#     trsn: CastVote,
+#     mode: #{vote_carol => [{vote_request, prop_98765, carol}]},
+#     produce: #{count => [{vote, approve, carol}]},
+#     consumed: #{vote_carol => [{vote_request, prop_98765, carol}]},
+#     mi_instance: 3,
+#     mi_total: 5
+#   },
+#   ts: 1738396525000,  # 15 minutes after request
+#   agent: carol,
+#   vote: approve,
+#   running_tally: #{approve => 3, reject => 0},
+#   quorum_reached: true,
+#   deciding_vote: true,
+#   spec_hash: <<255,101,1,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 4: Quorum Detected (P30)
+# ---------------------------------
+# {
+#   before_hash: <<606,6,6,...>>,
+#   after_hash: <<707,7,7,...>>,
+#   move: {
+#     trsn: CountVotes,
+#     mode: #{count => [{vote, approve, alice}, {vote, approve, bob}, {vote, approve, carol}]},
+#     produce: #{approve_outcome => [{approved, prop_98765, tally_3_0}]},
+#     consumed: #{count => [{vote, approve, alice}, {vote, approve, bob}, {vote, approve, carol}]},
+#     partial_join: true
+#   },
+#   ts: 1738396526000,  # 1 second after quorum vote
+#   final_tally: #{approve => 3, reject => 0},
+#   quorum_threshold: 3,
+#   quorum_met: true,
+#   remaining_instances_cancelled: 2,
+#   cancelled_members: [dave, eve],
+#   spec_hash: <<255,101,1,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 5: Cancel Pending Votes (P32)
+# --------------------------------------
+# {
+#   before_hash: <<707,7,7,...>>,
+#   after_hash: <<808,8,8,...>>,
+#   move: {
+#     trsn: CancelPendingVotes,
+#     mode: #{approve_outcome => [{approved, prop_98765}]},
+#     produce: #{notify => [{cancelled_2, dave, eve}]},
+#     consumed: #{approve_outcome => [{approved, prop_98765}]},
+#     cancellation: true
+#   },
+#   ts: 1738396527000,
+#   cancelled_instances: [
+#     {member: dave, reason: "quorum_reached"},
+#     {member: eve, reason: "quorum_reached"}
+#   ],
+#   spec_hash: <<255,101,1,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Analysis from Receipts:
+# -----------------------
+# 1. Time to quorum: 15 minutes
+# 2. Efficiency: Only needed 3 of 5 votes (60%)
+# 3. Deciding voter: Carol (3rd approve)
+# 4. Wasted votes: None - Dave and Eve cancelled before voting
+# 5. Unanimity: 3-0 (stronger than minimum required)
+#
+# Generative Analysis Value:
+# --------------------------
+# - Receipts show exact quorum moment
+# - Can identify "deciding voters" for accountability
+# - Cancellation receipt shows who was excluded
+# - Full audit trail of vote timing and sequence
+#
+# Reachability Insights:
+# ---------------------
+# - Partial join enabled early termination
+# - State (3,0) reached via path: (0,0) -> (1,0) -> (2,0) -> (3,0)
+# - States (3,1), (3,2) never reached (cancelled early)
+# - Maximum efficiency: 2 instances cancelled
+#
+# ============================================================================

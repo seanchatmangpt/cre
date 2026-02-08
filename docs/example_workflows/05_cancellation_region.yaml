@@ -1,0 +1,523 @@
+# ============================================================================
+# Example 5: Cancellation Region Workflow
+# ============================================================================
+#
+# Business Context:
+# -----------------
+# A complex project workflow with a high-risk experimental phase that can be
+# cancelled without affecting the rest of the project. This pattern is
+# essential for:
+# - R&D projects with risky experiments
+# - Software deployment with optional beta phases
+# - Event planning with weather-dependent activities
+# - Construction with optional premium features
+#
+# Pattern Usage:
+# --------------
+# - P1_Sequence: Main project phases
+# - P2_ParallelSplit: Split project into tracks
+# - P25_CancelRegion: Scoped cancellation of experimental track
+# - P3_Synchronization: Merge completed tracks
+# - P19_CancelActivity: Cancel individual activities
+#
+# Design Decisions:
+# ----------------
+# 1. Region-based cancellation: Only experimental region is cancelled
+# 2. Independent tracks: Core and experimental run in parallel
+# 3. Graceful degradation: Project continues without experiment
+# 4. Explicit compensation: Cleanup handled when region cancelled
+#
+# Generative Analysis:
+# -------------------
+# The receipt trail captures:
+# - Region activation and deactivation
+# - Which activities were cancelled vs completed
+# - Compensation actions after cancellation
+# - Partial completion state for audit
+#
+# This enables reconstruction of:
+# - "Why was the experimental phase cancelled?"
+# - "What work was in progress when cancelled?"
+# - "Did the project complete successfully without the experiment?"
+# - "What compensation was performed after cancellation?"
+#
+# Reachability Analysis:
+# ---------------------
+# Cancellation regions introduce non-local transitions in reachability:
+#
+#     Start
+#       |
+#     Split
+#      /  \
+#   Core  Experimental  <- Region boundary
+#    |     /  |  \
+#   Done  Exp1 Exp2 Exp3
+#    \       X  (cancel)
+#     \     /
+#      Merge
+#       |
+#     End
+#
+# The cancel event creates edges from any experimental state to the
+# cancelled state, bypassing normal completion. Core track unaffected.
+#
+# ============================================================================
+
+yawl_yaml_version: "0.2"
+
+specificationSet:
+  yawl_schema_version: "2.1"
+  uri: "example_cancellation_region"
+  metaData:
+    title: "Cancellation Region Workflow"
+    version: "1.0"
+    creator: "CRE Example Workflows"
+    description: "Scoped cancellation of high-risk experimental phase"
+
+  rootNet: CancellationRegion
+
+  roles:
+    - ProjectManager
+    - CoreDeveloper
+    - ExperimentalTeam
+    - SafetyOfficer
+    - System
+
+  # ===========================================================================
+  # Main Net: Cancellation Region Flow
+  # ===========================================================================
+  nets:
+    - id: CancellationRegion
+      type: NetFacts
+
+      variables:
+        - {name: project_id, type: string, initial: ""}
+        - {name: experimental_enabled, type: boolean, initial: true}
+        - {name: region_cancelled, type: boolean, initial: false}
+        - {name: cancel_reason, type: string, initial: ""}
+        - {name: core_complete, type: boolean, initial: false}
+        - {name: experiment_complete, type: boolean, initial: false}
+
+      nodes:
+        # Entry and exit
+        - {id: Start, kind: inputCondition}
+        - {id: End, kind: outputCondition, name: "Project Complete"}
+
+        # Project setup
+        - {id: InitializeProject, kind: task, taskType: human,
+           name: "Initialize Project",
+           docs: "Project manager sets up project parameters"}
+
+        # P2_ParallelSplit: Split into core and experimental tracks
+        - {id: SplitTracks, kind: task, taskType: automated,
+           name: "Split Tracks",
+           docs: "Create parallel core and experimental workstreams"}
+
+        # Core track (safe, essential)
+        - {id: CorePhase1, kind: task, taskType: human,
+           name: "Core Development Phase 1",
+           docs: "Essential core functionality - cannot be cancelled"}
+
+        - {id: CorePhase2, kind: task, taskType: human,
+           name: "Core Development Phase 2",
+           docs: "Complete core functionality"}
+
+        # P25_CancelRegion: Experimental track (can be cancelled)
+        - {id: ExpSetup, kind: task, taskType: human,
+           name: "Experiment Setup",
+           docs: "Prepare high-risk experimental features"}
+
+        - {id: ExpPhase1, kind: task, taskType: human,
+           name: "Experiment Phase 1",
+           docs: "Risky experimental work - may be cancelled"}
+
+        - {id: ExpPhase2, kind: task, taskType: human,
+           name: "Experiment Phase 2",
+           docs: "Continued experimental work"}
+
+        - {id: ExpPhase3, kind: task, taskType: human,
+           name: "Experiment Phase 3",
+           docs: "Final experimental validation"}
+
+        # Cancellation handling
+        - {id: SafetyCheck, kind: task, taskType: human,
+           name: "Safety Check",
+           docs: "Safety officer evaluates risk"}
+
+        - {id: CancelExperiment, kind: task, taskType: automated,
+           name: "Cancel Experiment Region",
+           docs: "Trigger cancellation of experimental region"}
+
+        - {id: CleanupExperiment, kind: task, taskType: automated,
+           name: "Cleanup Experimental",
+           docs: "Compensation and cleanup after cancellation"}
+
+        # P3_Synchronization: Merge tracks
+        - {id: MergeTracks, kind: task, taskType: automated,
+           name: "Merge Tracks",
+           docs: "Combine core and experimental results"}
+
+        - {id: SkipMerge, kind: task, taskType: automated,
+           name: "Skip Experimental Merge",
+           docs: "Continue with core only"}
+
+        # Final project completion
+        - {id: FinalIntegration, kind: task, taskType: human,
+           name: "Final Integration",
+           docs: "Integrate all completed work"}
+
+        - {id: ProjectComplete, kind: task, taskType: automated,
+           name: "Project Complete",
+           docs: "Mark project as complete"}
+
+      flows:
+        # Initial setup
+        - {from: Start, to: InitializeProject}
+        - {from: InitializeProject, to: SplitTracks}
+
+        # P2: Parallel split into core and experimental
+        - {from: SplitTracks, to: CorePhase1}
+        - {from: SplitTracks, to: ExpSetup}
+
+        # Core track flow
+        - {from: CorePhase1, to: CorePhase2}
+        - {from: CorePhase2, to: MergeTracks}
+
+        # Experimental track flow
+        - {from: ExpSetup, to: ExpPhase1}
+        - {from: ExpPhase1, to: ExpPhase2}
+        - {from: ExpPhase2, to: ExpPhase3}
+        - {from: ExpPhase3, to: MergeTracks}
+
+        # Cancellation trigger
+        - {from: ExpSetup, to: SafetyCheck}
+        - {from: SafetyCheck, to: CancelExperiment, predicate: "unsafe"}
+        - {from: CancelExperiment, to: CleanupExperiment}
+        - {from: CleanupExperiment, to: SkipMerge}
+
+        # P3: Merge (either both tracks or core only)
+        - {from: MergeTracks, to: FinalIntegration, predicate: "experiment_complete"}
+        - {from: SkipMerge, to: FinalIntegration, predicate: "experiment_cancelled"}
+
+        # Final completion
+        - {from: FinalIntegration, to: ProjectComplete}
+        - {from: ProjectComplete, to: End}
+
+      regions:
+        # P25: Experimental region that can be cancelled independently
+        - {id: Region_Experimental, cancel_region: true,
+           description: "High-risk experimental region - can be cancelled without affecting core"}
+
+  # ===========================================================================
+  # Pattern Instances
+  # ===========================================================================
+  pattern_instances:
+
+    # P1_Sequence: Setup phase
+    - {id: P1_setup, pattern: P1_Sequence, net: CancellationRegion,
+       from: InitializeProject, to: SplitTracks,
+       label: "P1: Initialize -> Split"}
+
+    # P2_ParallelSplit: Core and experimental tracks
+    - {id: P2_split_tracks, pattern: P2_ParallelSplit, net: CancellationRegion,
+       split_task: SplitTracks,
+       branches: [CorePhase1, ExpSetup],
+       label: "P2: Split into core and experimental tracks"}
+
+    # P3_Synchronization: Wait for completed tracks
+    - {id: P3_merge_tracks, pattern: P3_Synchronization, net: CancellationRegion,
+       join_task: MergeTracks,
+       waits_for: [CorePhase2, ExpPhase3],
+       label: "P3: Merge both completed tracks"}
+
+    # P19_CancelActivity: Cancel individual experimental activities
+    - {id: P19_cancel_exp1, pattern: P19_CancelActivity, net: CancellationRegion,
+       target: ExpPhase1, cancel_event: phase1_cancelled,
+       label: "P19: Cancel experimental phase 1"}
+
+    - {id: P19_cancel_exp2, pattern: P19_CancelActivity, net: CancellationRegion,
+       target: ExpPhase2, cancel_event: phase2_cancelled,
+       label: "P19: Cancel experimental phase 2"}
+
+    - {id: P19_cancel_exp3, pattern: P19_CancelActivity, net: CancellationRegion,
+       target: ExpPhase3, cancel_event: phase3_cancelled,
+       label: "P19: Cancel experimental phase 3"}
+
+    # P25_CancelRegion: Cancel entire experimental region
+    - {id: P25_cancel_experiment_region, pattern: P25_CancelRegion,
+       net: CancellationRegion,
+       region: Region_Experimental,
+       cancel_event: safety_triggered,
+       label: "P25: Cancel entire experimental region on safety trigger"}
+
+  # ===========================================================================
+  # Pattern Registry
+  # ===========================================================================
+  pattern_registry:
+    P1_Sequence: {macro: "sequence"}
+    P2_ParallelSplit: {macro: "parallel_split"}
+    P3_Synchronization: {macro: "and_join"}
+    P19_CancelActivity: {macro: "cancel_activity"}
+    P25_CancelRegion: {macro: "cancel_region"}
+
+  # ===========================================================================
+  # Pattern Usage Index
+  # ===========================================================================
+  pattern_usage_index:
+    P1: [P1_setup]
+    P2: [P2_split_tracks]
+    P3: [P3_merge_tracks]
+    P19: [P19_cancel_exp1, P19_cancel_exp2, P19_cancel_exp3]
+    P25: [P25_cancel_experiment_region]
+
+# ============================================================================
+# Sample Execution Trace with Receipts
+# ============================================================================
+#
+# Receipt 1: Project Initialization
+# -----------------------------------
+# {
+#   before_hash: <<0,0,0,0,...>>,
+#   after_hash: <<111,11,11,...>>,
+#   move: {
+#     trsn: InitializeProject,
+#     mode: #{start => [init]},
+#     produce: #{split => [{project, proj_999}]},
+#     consumed: #{start => [init]}
+#   },
+#   ts: 1738395923000,
+#   project_id: "proj_999",
+#   manager: "sarah",
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 2: Parallel Split (P2)
+# ------------------------------
+# {
+#   before_hash: <<111,11,11,...>>,
+#   after_hash: <<222,22,22,...>>,
+#   move: {
+#     trsn: SplitTracks,
+#     mode: #{split => [{project, proj_999}]},
+#     produce: #{
+#       core => [{track, core, proj_999}],
+#       experimental => [{track, experimental, proj_999}]
+#     },
+#     consumed: #{split => [{project, proj_999}]},
+#     branch_count: 2
+#   },
+#   ts: 1738395925000,
+#   branches: [core, experimental],
+#   regions_active: [Region_Experimental],
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 3a: Core Work Progresses
+# ---------------------------------
+# {
+#   before_hash: <<333,33,33,...>>,
+#   after_hash: <<444,44,44,...>>,
+#   move: {
+#     trsn: CorePhase1,
+#     mode: #{core => [{track, core, proj_999}]},
+#     produce: #{core_phase2 => [{core_complete, phase1, proj_999}]},
+#     consumed: #{core => [{track, core, proj_999}]},
+#     track: core
+#   },
+#   ts: 1738404725000,  # 3 hours later
+#   agent: "dev_team",
+#   status: "on_track",
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 3b: Experimental Setup
+# ------------------------------
+# {
+#   before_hash: <<222,22,22,...>>,
+#   after_hash: <<555,55,55,...>>,
+#   move: {
+#     trsn: ExpSetup,
+#     mode: #{experimental => [{track, experimental, proj_999}]},
+#     produce: #{exp_phase1 => [{exp_ready, phase1, proj_999}], safety_check => [check_needed]},
+#     consumed: #{experimental => [{track, experimental, proj_999}]},
+#     track: experimental,
+#     region: Region_Experimental
+#   },
+#   ts: 1738401225000,  # 1.5 hours after split
+#   agent: "exp_team",
+#   status: "experimental_ready",
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 4: Safety Check Triggers Cancellation
+# ---------------------------------------------
+# {
+#   before_hash: <<555,55,55,...>>,
+#   after_hash: <<666,66,66,...>>,
+#   move: {
+#     trsn: SafetyCheck,
+#     mode: #{safety_check => [check_needed]},
+#     produce: #{cancel => [{safety_triggered, Region_Experimental}]},
+#     consumed: #{safety_check => [check_needed]},
+#     region: Region_Experimental
+#   },
+#   ts: 1738401325000,  # 10 minutes after setup
+#   agent: "safety_officer_tom",
+#   decision: "unsafe",
+#   reason: "Experimental conditions unstable - risk of data corruption",
+#   safety_level: "red",
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 5: Region Cancellation (P25)
+# -------------------------------------
+# {
+#   before_hash: <<666,66,66,...>>,
+#   after_hash: <<777,77,77,...>>,
+#   move: {
+#     trsn: CancelExperiment,
+#     mode: #{cancel => [{safety_triggered, Region_Experimental}]},
+#     produce: #{cleanup => [{region_cancelled, Region_Experimental}]},
+#     consumed: #{cancel => [{safety_triggered, Region_Experimental}]},
+#     cancellation: true
+#   },
+#   ts: 1738401326000,
+#   region_cancelled: Region_Experimental,
+#   cancelled_activities: [ExpPhase1, ExpPhase2, ExpPhase3],
+#   active_when_cancelled: [ExpSetup, ExpPhase1],
+#   tokens_cancelled: 2,
+#   compensation_required: true,
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 6: Cleanup After Cancellation
+# --------------------------------------
+# {
+#   before_hash: <<777,77,77,...>>,
+#   after_hash: <<888,88,88,...>>,
+#   move: {
+#     trsn: CleanupExperiment,
+#     mode: #{cleanup => [{region_cancelled, Region_Experimental}]},
+#     produce: #{skip_merge => [{experiment_skipped, proj_999}]},
+#     consumed: #{cleanup => [{region_cancelled, Region_Experimental}]},
+#     compensation: true
+#   },
+#   ts: 1738401336000,  # 10 seconds cleanup
+#   agent: system,
+#   compensation_actions: [
+#     "rollback experimental database changes",
+#     "archive partial experimental data",
+#     "release experimental resources"
+#   ],
+#   cleanup_status: "complete",
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 7: Core Completes (Unaffected by Cancellation)
+# ------------------------------------------------------
+# {
+#   before_hash: <<444,44,44,...>>,
+#   after_hash: <<999,99,99,...>>,
+#   move: {
+#     trsn: CorePhase2,
+#     mode: #{core_phase2 => [{core_complete, phase1, proj_999}]},
+#     produce: #{merge => [{core_done, proj_999}]},
+#     consumed: #{core_phase2 => [{core_complete, phase1, proj_999}]},
+#     track: core
+#   },
+#   ts: 1738414725000,  # Another 3 hours
+#   agent: "dev_team",
+#   status: "core_complete",
+#   unaffected_by_cancellation: true,
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 8: Skip Merge (P3 with cancelled region)
+# ------------------------------------------------
+# {
+#   before_hash: <<999,99,99,...>>,
+#   after_hash: <<101,10,10,...>>,
+#   move: {
+#     trsn: SkipMerge,
+#     mode: #{
+#       merge => [{core_done, proj_999}],
+#       skip_merge => [{experiment_skipped, proj_999}]
+#     },
+#     produce: #{integration => [{core_only, proj_999}]},
+#     consumed: #{
+#       merge => [{core_done, proj_999}],
+#       skip_merge => [{experiment_skipped, proj_999}]
+#     },
+#     partial_join: true
+#   },
+#   ts: 1738414726000,
+#   merge_type: "core_only",
+#   tracks_completed: [core],
+#   tracks_cancelled: [experimental],
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 9: Project Completion (Despite Cancellation)
+# ----------------------------------------------------
+# {
+#   before_hash: <<101,10,10,...>>,
+#   after_hash: <<202,20,20,...>>,
+#   move: {
+#     trsn: ProjectComplete,
+#     mode: #{integration => [{core_only, proj_999}]},
+#     produce: #{end => [{complete, proj_999, core_only}]},
+#     consumed: #{integration => [{core_only, proj_999}]}
+#   },
+#   ts: 1738415726000,  # ~2.5 hours total
+#   project_id: "proj_999",
+#   final_status: "complete",
+#   completion_mode: "core_only",
+#   experimental_included: false,
+#   cancellation_handled: true,
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Analysis from Receipts:
+# -----------------------
+# 1. Cancellation occurred: Experimental region cancelled after setup
+# 2. Cancellation timing: 1.5 hours after project start
+# 3. Reason: Safety officer identified unstable conditions
+# 4. Core track unaffected: Completed successfully despite cancellation
+# 5. Compensation: Cleanup actions performed (rollback, archive, release)
+# 6. Project outcome: Successful completion (core-only mode)
+#
+# Generative Analysis Value:
+# --------------------------
+# - Receipts show exact moment of region cancellation
+# - Cancellation scope is explicit (Region_Experimental)
+# - Core track receipts show it continued unaffected
+# - Compensation receipts document cleanup actions
+# - Final receipt shows successful degradation (core-only mode)
+#
+# Reachability Insights:
+# ---------------------
+# - Cancellation creates non-local edge: any experimental state -> cancelled
+# - Core track reachability unchanged: linear progression to completion
+# - Experimental track truncated: Setup -> Cancelled (bypassed phases 1-3)
+# - Merge point adapted: accepts partial completion (core only)
+# - System remained sound: no orphaned tokens or deadlocks
+#
+# Cancellation Semantics:
+# ----------------------
+# - Region cancellation is scoped: only affects nodes in Region_Experimental
+# - Outside nodes unaffected: Core track continued normally
+# - Tokens cancelled: 2 tokens (at ExpSetup, about to enter ExpPhase1)
+# - Compensation triggered: Cleanup task executed
+# - Graceful degradation: System adapted to core-only completion
+#
+# ============================================================================

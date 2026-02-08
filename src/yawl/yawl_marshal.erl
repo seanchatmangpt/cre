@@ -273,7 +273,7 @@ format_xml(Xml) when is_binary(Xml) ->
 %%--------------------------------------------------------------------
 -spec escape_xml(binary() | string()) -> binary().
 escape_xml(Text) when is_binary(Text) ->
-    escape_xml(binary_to_list(Text), []);
+    iolist_to_binary(escape_xml(binary_to_list(Text), []));
 escape_xml(Text) when is_list(Text) ->
     iolist_to_binary(escape_xml(Text, [])).
 

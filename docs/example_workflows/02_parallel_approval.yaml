@@ -1,0 +1,355 @@
+# ============================================================================
+# Example 2: Parallel Approval Workflow
+# ============================================================================
+#
+# Business Context:
+# -----------------
+# A contract approval workflow requiring simultaneous approval from multiple
+# departments (Legal, Finance, Security) before proceeding. This pattern is
+# essential for:
+# - Vendor onboarding
+# - Contract negotiations
+# - Policy changes
+# - Cross-functional initiatives
+#
+# Pattern Usage:
+# --------------
+# - P2_ParallelSplit: Split into N concurrent approval lanes
+# - P3_Synchronization: Wait for ALL approvals before proceeding
+# - P1_Sequence: Linear flow before and after parallel section
+#
+# Design Decisions:
+# ----------------
+# 1. AND-join semantics: ALL departments must approve (consensus required)
+# 2. Parallel execution: Approvals happen simultaneously (not sequential)
+# 3. No partial completion: Either all approve or workflow fails
+# 4. Timeout support: Each lane has independent timeout
+#
+# Generative Analysis:
+# -------------------
+# The receipt trail captures:
+# - Parallel branch activation timestamps
+# - Each approver's decision time
+# - Which department was the bottleneck
+# - Total synchronization wait time
+#
+# This enables reconstruction of:
+# - "Why did this contract take 2 weeks to approve?"
+# - "Which department is consistently the slowest?"
+# - "Are approvals happening in parallel or sequentially?"
+#
+# Reachability Analysis:
+# ---------------------
+# The parallel split creates a diamond reachability structure:
+#
+#       Start
+#         |
+#      Split
+#       / | \
+#   Legal Finance Security
+#      \  |  /
+#       Sync
+#         |
+#      Process
+#         |
+#       End
+#
+# Maximum concurrent states: 3 (all three departments active)
+# Critical path: slowest department determines total time
+#
+# ============================================================================
+
+yawl_yaml_version: "0.2"
+
+specificationSet:
+  yawl_schema_version: "2.1"
+  uri: "example_parallel_approval"
+  metaData:
+    title: "Parallel Multi-Approver Workflow (AND-Join)"
+    version: "1.0"
+    creator: "CRE Example Workflows"
+    description: "Concurrent approval from multiple departments with synchronization"
+
+  rootNet: ParallelApproval
+
+  roles:
+    - Requester
+    - LegalApprover
+    - FinanceApprover
+    - SecurityApprover
+    - System
+
+  # ===========================================================================
+  # Main Net: Parallel Approval Flow
+  # ===========================================================================
+  nets:
+    - id: ParallelApproval
+      type: NetFacts
+
+      variables:
+        - {name: contract_id, type: string, initial: ""}
+        - {name: contract_value, type: decimal, initial: 0.00}
+        - {name: legal_approval, type: string, initial: "pending"}
+        - {name: finance_approval, type: string, initial: "pending"}
+        - {name: security_approval, type: string, initial: "pending"}
+        - {name: all_approved, type: boolean, initial: false}
+
+      nodes:
+        # Entry and exit
+        - {id: Start, kind: inputCondition}
+        - {id: End, kind: outputCondition, name: "Contract Processed"}
+
+        # P1_Sequence: Initial setup
+        - {id: SubmitContract, kind: task, taskType: human, name: "Submit Contract",
+           docs: "Submit contract for parallel review"}
+
+        - {id: ValidateContract, kind: task, taskType: automated, name: "Validate Contract",
+           docs: "Initial validation and routing"}
+
+        # P2_ParallelSplit: Split into 3 approval lanes
+        - {id: SplitApprovals, kind: task, taskType: automated, name: "Split Approvals",
+           docs: "Create parallel approval tasks for all departments"}
+
+        # Parallel approval lanes (execute concurrently)
+        - {id: LegalApproval, kind: task, taskType: human, name: "Legal Approval",
+           docs: "Legal department reviews contract terms"}
+
+        - {id: FinanceApproval, kind: task, taskType: human, name: "Finance Approval",
+           docs: "Finance department reviews budget and terms"}
+
+        - {id: SecurityApproval, kind: task, taskType: human, name: "Security Approval",
+           docs: "Security team reviews data handling and access"}
+
+        # P3_Synchronization: Wait for ALL approvals
+        - {id: SyncApprovals, kind: task, taskType: automated, name: "Synchronize Approvals",
+           docs: "Verify all departments approved"}
+
+        # Post-sync processing
+        - {id: ExecuteContract, kind: task, taskType: automated, name: "Execute Contract",
+           docs: "Activate the approved contract"}
+
+        - {id: NotifyParties, kind: task, taskType: automated, name: "Notify Parties",
+           docs: "Send notifications to all stakeholders"}
+
+      flows:
+        # Initial sequence
+        - {from: Start, to: SubmitContract}
+        - {from: SubmitContract, to: ValidateContract}
+        - {from: ValidateContract, to: SplitApprovals}
+
+        # P2_ParallelSplit: Create 3 concurrent approval lanes
+        - {from: SplitApprovals, to: LegalApproval}
+        - {from: SplitApprovals, to: FinanceApproval}
+        - {from: SplitApprovals, to: SecurityApproval}
+
+        # All 3 lanes converge at sync point
+        - {from: LegalApproval, to: SyncApprovals}
+        - {from: FinanceApproval, to: SyncApprovals}
+        - {from: SecurityApproval, to: SyncApprovals}
+
+        # Post-sync sequence
+        - {from: SyncApprovals, to: ExecuteContract}
+        - {from: ExecuteContract, to: NotifyParties}
+        - {from: NotifyParties, to: End}
+
+      regions:
+        # Region containing parallel approval lanes
+        - {id: Region_ParallelApprovals, cancel_region: false,
+           description: "Parallel approval region - all must complete"}
+
+  # ===========================================================================
+  # Pattern Instances
+  # ===========================================================================
+  pattern_instances:
+
+    # P1_Sequence: Linear sections
+    - {id: P1_setup_sequence, pattern: P1_Sequence, net: ParallelApproval,
+       from: SubmitContract, to: SplitApprovals,
+       label: "P1: Submit -> Validate -> Split"}
+
+    - {id: P1_completion_sequence, pattern: P1_Sequence, net: ParallelApproval,
+       from: SyncApprovals, to: NotifyParties,
+       label: "P1: Sync -> Execute -> Notify"}
+
+    # P2_ParallelSplit: Create concurrent lanes
+    - {id: P2_split_parallel, pattern: P2_ParallelSplit, net: ParallelApproval,
+       split_task: SplitApprovals,
+       branches: [LegalApproval, FinanceApproval, SecurityApproval],
+       label: "P2: Split into 3 concurrent approval lanes"}
+
+    # P3_Synchronization: Wait for all branches
+    - {id: P3_sync_all, pattern: P3_Synchronization, net: ParallelApproval,
+       join_task: SyncApprovals,
+       waits_for: [LegalApproval, FinanceApproval, SecurityApproval],
+       label: "P3: AND-join - wait for all 3 approvals"}
+
+    # P19_CancelActivity: Can cancel individual lanes
+    - {id: P19_cancel_legal, pattern: P19_CancelActivity, net: ParallelApproval,
+       target: LegalApproval, cancel_event: legal_withdrawn,
+       label: "P19: Cancel legal lane (breaks sync)"}
+
+    - {id: P19_cancel_finance, pattern: P19_CancelActivity, net: ParallelApproval,
+       target: FinanceApproval, cancel_event: finance_withdrawn,
+       label: "P19: Cancel finance lane (breaks sync)"}
+
+    - {id: P19_cancel_security, pattern: P19_CancelActivity, net: ParallelApproval,
+       target: SecurityApproval, cancel_event: security_withdrawn,
+       label: "P19: Cancel security lane (breaks sync)"}
+
+  # ===========================================================================
+  # Pattern Registry
+  # ===========================================================================
+  pattern_registry:
+    P1_Sequence: {macro: "sequence"}
+    P2_ParallelSplit: {macro: "parallel_split"}
+    P3_Synchronization: {macro: "and_join"}
+    P19_CancelActivity: {macro: "cancel_activity"}
+
+  # ===========================================================================
+  # Pattern Usage Index
+  # ===========================================================================
+  pattern_usage_index:
+    P1: [P1_setup_sequence, P1_completion_sequence]
+    P2: [P2_split_parallel]
+    P3: [P3_sync_all]
+    P19: [P19_cancel_legal, P19_cancel_finance, P19_cancel_security]
+
+# ============================================================================
+# Sample Execution Trace with Receipts
+# ============================================================================
+#
+# Receipt 1: Contract Submission
+# ------------------------------
+# {
+#   before_hash: <<0,0,0,0,...>>,
+#   after_hash: <<111,11,11,...>>,
+#   move: {
+#     trsn: SubmitContract,
+#     mode: #{start => [init]},
+#     produce: #{validate => [{contract, con_12345}]},
+#     consumed: #{start => [init]}
+#   },
+#   ts: 1738395923000,
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 2: Parallel Split
+# -------------------------
+# {
+#   before_hash: <<222,22,22,...>>,
+#   after_hash: <<333,33,33,...>>,
+#   move: {
+#     trsn: SplitApprovals,
+#     mode: #{validate => [{contract, con_12345}]},
+#     produce: #{
+#       legal => [{approval_req, con_12345, legal}],
+#       finance => [{approval_req, con_12345, finance}],
+#       security => [{approval_req, con_12345, security}]
+#     },
+#     consumed: #{validate => [{contract, con_12345}]}
+#   },
+#   ts: 1738395924000,  # 1 second after submission
+#   branch_count: 3,
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 3a: Legal Approves (Fast)
+# ----------------------------------
+# {
+#   before_hash: <<333,33,33,...>>,
+#   after_hash: <<444,44,44,...>>,
+#   move: {
+#     trsn: LegalApproval,
+#     mode: #{legal => [{approval_req, con_12345, legal}]},
+#     produce: #{sync_legal => [{approved, con_12345, legal}]},
+#     consumed: #{legal => [{approval_req, con_12345, legal}]}
+#   },
+#   ts: 1738396324000,  # 10 minutes after split
+#   agent: legal_sarah,
+#   decision: approved,
+#   notes: "Terms look good",
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 3b: Finance Approves (Medium)
+# -------------------------------------
+# {
+#   before_hash: <<333,33,33,...>>,
+#   after_hash: <<555,55,55,...>>,
+#   move: {
+#     trsn: FinanceApproval,
+#     mode: #{finance => [{approval_req, con_12345, finance}]},
+#     produce: #{sync_finance => [{approved, con_12345, finance}]},
+#     consumed: #{finance => [{approval_req, con_12345, finance}]}
+#   },
+#   ts: 1738397224000,  # 30 minutes after split
+#   agent: finance_mike,
+#   decision: approved,
+#   notes: "Budget approved",
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 3c: Security Approves (Slow - Bottleneck)
+# -------------------------------------------------
+# {
+#   before_hash: <<333,33,33,...>>,
+#   after_hash: <<666,66,66,...>>,
+#   move: {
+#     trsn: SecurityApproval,
+#     mode: #{security => [{approval_req, con_12345, security}]},
+#     produce: #{sync_security => [{approved, con_12345, security}]},
+#     consumed: #{security => [{approval_req, con_12345, security}]}
+#   },
+#   ts: 1738401224000,  # 130 minutes after split (2h 10m)
+#   agent: security_alex,
+#   decision: approved,
+#   notes: "Data handling reviewed",
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Receipt 4: Synchronization (Only possible after ALL approvals)
+# ---------------------------------------------------------------
+# {
+#   before_hash: <<777,77,77,...>>,  # After all 3 approvals
+#   after_hash: <<888,88,88,...>>,
+#   move: {
+#     trsn: SyncApprovals,
+#     mode: #{
+#       sync_legal => [{approved, con_12345, legal}],
+#       sync_finance => [{approved, con_12345, finance}],
+#       sync_security => [{approved, con_12345, security}]
+#     },
+#     produce: #{execute => [{all_approved, con_12345}]},
+#     consumed: #{
+#       sync_legal => [{approved, con_12345, legal}],
+#       sync_finance => [{approved, con_12345, finance}],
+#       sync_security => [{approved, con_12345, security}]
+#     }
+#   },
+#   ts: 1738401225000,  # 1 second after final approval
+#   wait_time: 7799000,  # Waited ~2h10m for all approvals
+#   bottleneck: security,
+#   spec_hash: <<255,111,11,...>>,
+#   spec_version: <<"1.0">>
+# }
+#
+# Analysis from Receipts:
+# -----------------------
+# 1. Total approval time: 130 minutes (2h 10m)
+# 2. Parallel efficiency achieved: 3 approvals happened concurrently
+# 3. Bottleneck identified: Security took 130m vs Legal (10m) and Finance (30m)
+# 4. Process improvement: Allocate more security reviewers or pre-review
+#
+# Reachability Insights:
+# ---------------------
+# - After split: 3 concurrent branches active
+# - Each branch independent: no blocking between departments
+# - Sync state only reached when all 3 complete
+# - Maximum concurrency = 3, critical path = slowest branch
+#
+# ============================================================================

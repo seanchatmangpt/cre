@@ -116,7 +116,7 @@
 %% YAML-specific accessors
 -export([yaml_version/1, roles/1, pattern_instances/1, pattern_registry/1, pattern_usage_index/1]).
 -export([net_variables/2, net_regions/2, net_subnets/2]).
--export([net_input_condition/2, net_output_condition/2]).
+-export([net_input_condition/2, net_output_condition/2, net_first_flow_target/2]).
 
 %% Validation
 -export([validate/1]).
@@ -731,6 +731,23 @@ net_output_condition(#yawl_yaml_spec{decompositions = Decomps}, NetId) ->
         #decomposition_info{output_condition = C} -> C;
         _ -> <<"End">>
     end.
+
+%% @doc Returns the first flow target from the net's input condition, or undefined.
+%% Used to determine which pattern instance owns the net entry point (split_task matches).
+-spec net_first_flow_target(Spec :: yawl_yaml_spec(), NetId :: binary()) -> atom() | undefined.
+net_first_flow_target(Spec, NetId) ->
+    InputCond = net_input_condition(Spec, NetId),
+    InputAtom = input_cond_to_atom(InputCond),
+    Flows = flows(Spec),
+    case [To || #flow_info{from = F, to = To} <- Flows, F =:= InputAtom] of
+        [FirstTo | _] -> FirstTo;
+        [] -> undefined
+    end.
+
+input_cond_to_atom(undefined) -> undefined;
+input_cond_to_atom(B) when is_binary(B) -> binary_to_atom(B, utf8);
+input_cond_to_atom(A) when is_atom(A) -> A;
+input_cond_to_atom(_) -> undefined.
 
 -spec cancellation_set(Spec :: yawl_yaml_spec(), TaskId :: task_id()) -> [task_id()].
 cancellation_set(#yawl_yaml_spec{tasks = Tasks}, TaskId) ->

@@ -111,11 +111,16 @@ prompt_claude(Prompt, Schema) ->
 -spec prompt_claude(binary(), json_schema(), map()) -> bridge_result().
 
 prompt_claude(Prompt, Schema, Options) ->
-    %% Get Claude command from persistent config
-    ClaudeCmd = get_claude_command(),
+    %% Get Claude executable path (fail fast if not found)
+    case get_claude_executable() of
+        {ok, Executable} ->
+            do_prompt_claude(Prompt, Schema, Options, Executable);
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
-    %% Build command arguments
-    _Timeout = maps:get(timeout, Options, 30000),
+do_prompt_claude(Prompt, Schema, Options, Executable) ->
+    Timeout = maps:get(timeout, Options, 30000),
     AllowedTools = maps:get(allowed_tools, Options, []),
     MaxTokens = maps:get(max_tokens, Options, 4096),
     Model = maps:get(model, Options, auto),
@@ -130,56 +135,37 @@ prompt_claude(Prompt, Schema, Options) ->
             undefined
     end,
 
-    %% Construct command arguments
-    BaseArgs = [
-        "-p", escape_prompt(Prompt),
-        "--output-format", "json"
-    ],
-
+    %% Build args as list - NO shell parsing, prevents injection
+    %% Prompt passed as single arg; newlines are safe with spawn_executable
+    BaseArgs = ["-p", binary_to_list(Prompt), "--output-format", "json"],
     SchemaArgs = case SchemaFile of
         undefined -> [];
         _ -> ["--json-schema", SchemaFile]
     end,
-
     ToolArgs = case AllowedTools of
         [] -> [];
         _ -> ["--allowed-tools", string:join(AllowedTools, ",")]
     end,
-
     ModelArgs = case Model of
         auto -> [];
         _ -> ["--model", atom_to_list(Model)]
     end,
-
     TokenArgs = ["--max-tokens", integer_to_list(MaxTokens)],
-
     AllArgs = lists:append([BaseArgs, SchemaArgs, ToolArgs, ModelArgs, TokenArgs]),
 
-    %% Execute command
-    FullCmd = string:join([binary_to_list(ClaudeCmd) | AllArgs], " "),
-
     try
-        Result = os:cmd(FullCmd),
+        Result = run_claude_port(Executable, AllArgs, Timeout),
         %% Clean up schema file if created
         case SchemaFile of
             undefined -> ok;
             _ -> file:delete(SchemaFile)
         end,
 
-        %% Parse JSON response
-        case jsone:decode(list_to_binary(Result)) of
-            {ok, JsonMap} when is_map(JsonMap) ->
-                case validate_response(JsonMap, Schema) of
-                    ok -> {ok, JsonMap};
-                    {error, Reason} -> {error, {validation_failed, Reason}}
-                end;
+        case Result of
+            {ok, Output} ->
+                parse_and_validate_response(Output, Schema);
             {error, Reason} ->
-                {error, {json_decode_error, Reason}};
-            JsonMap when is_map(JsonMap) ->
-                case validate_response(JsonMap, Schema) of
-                    ok -> {ok, JsonMap};
-                    {error, Reason} -> {error, {validation_failed, Reason}}
-                end
+                {error, Reason}
         end
     catch
         _:Error ->
@@ -347,7 +333,7 @@ validate_response(Response, Schema) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @doc Gets the Claude Code command to use.
+%% @doc Gets the Claude Code command to use (legacy, returns binary).
 %%
 %% @return The Claude command binary.
 %%
@@ -356,14 +342,80 @@ validate_response(Response, Schema) ->
 -spec get_claude_command() -> binary().
 
 get_claude_command() ->
+    case get_claude_executable() of
+        {ok, Path} -> list_to_binary(Path);
+        {error, _} -> <<"claude">>
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Gets the Claude executable path. Fails fast if not found.
+%%
+%% Returns {ok, Path} or {error, Reason}.
+%% Reasons: claude_not_found, claude_not_executable, claude_version_unsupported
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_claude_executable() -> {ok, file:filename()} | {error, term()}.
+
+get_claude_executable() ->
     case persistent_term:get({?MODULE, claude_command}, undefined) of
         undefined ->
-            %% Try to find claude in PATH
             case os:find_executable("claude") of
-                false -> <<"claude">>;  % Default, will fail if not found
-                Path -> list_to_binary(Path)
+                false ->
+                    {error, {claude_not_found, "claude not found in PATH. Install Claude Code CLI 2.x."}};
+                Path ->
+                    {ok, Path}
             end;
-        Cmd -> Cmd
+        Cmd when is_binary(Cmd) ->
+            %% User explicitly set via set_claude_command - trust it
+            {ok, binary_to_list(Cmd)};
+        Cmd when is_list(Cmd) ->
+            {ok, Cmd}
+    end.
+
+%% @private Run claude via open_port with timeout. Fails fast on hang.
+-spec run_claude_port(file:filename(), [string()], pos_integer()) ->
+          {ok, binary()} | {error, term()}.
+
+run_claude_port(Executable, Args, TimeoutMs) ->
+    Port = open_port(
+        {spawn_executable, Executable},
+        [{args, Args}, exit_status, stderr_to_stdout, binary]
+    ),
+    Acc = collect_port_output(Port, TimeoutMs, <<>>),
+    port_close(Port),
+    Acc.
+
+collect_port_output(Port, TimeoutMs, Acc) ->
+    receive
+        {Port, {data, Data}} ->
+            collect_port_output(Port, TimeoutMs, <<Acc/binary, Data/binary>>);
+        {Port, {exit_status, 0}} ->
+            {ok, Acc};
+        {Port, {exit_status, N}} when N =/= 0 ->
+            {error, {claude_exit, N, Acc}}
+    after TimeoutMs ->
+        port_close(Port),
+        {error, {timeout, "Claude CLI did not respond within " ++ integer_to_list(TimeoutMs) ++ " ms"}}
+    end.
+
+%% @private Parse JSON and validate. Handles empty output.
+parse_and_validate_response(<<>>, _Schema) ->
+    {error, {claude_empty_output, "Claude returned empty output. Check: API key, network, claude --version"}};
+parse_and_validate_response(Output, Schema) when is_binary(Output) ->
+    case jsone:decode(Output) of
+        {ok, JsonMap} when is_map(JsonMap) ->
+            case validate_response(JsonMap, Schema) of
+                ok -> {ok, JsonMap};
+                {error, Reason} -> {error, {validation_failed, Reason}}
+            end;
+        {error, Reason} ->
+            {error, {json_decode_error, Reason, Output}};
+        JsonMap when is_map(JsonMap) ->
+            case validate_response(JsonMap, Schema) of
+                ok -> {ok, JsonMap};
+                {error, Reason} -> {error, {validation_failed, Reason}}
+            end
     end.
 
 %%--------------------------------------------------------------------
@@ -425,20 +477,6 @@ add_context_to_prompt(Prompt, Context) when is_map(Context) ->
               ContextStr/binary,
               "\n-----------------------\n">>
     end.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc Escapes a prompt for shell execution.
-%%
-%% @end
-%%--------------------------------------------------------------------
-escape_prompt(Prompt) ->
-    %% Simple escaping - wrap in single quotes and escape single quotes
-    PromptStr = binary_to_list(Prompt),
-    Escaped = lists:map(fun($') -> "'\\''";
-                           (C) -> [C]
-                        end, PromptStr),
-    lists:flatten(["'" | Escaped] ++ ["'"]).
 
 %%--------------------------------------------------------------------
 %% @private

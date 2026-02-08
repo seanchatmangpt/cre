@@ -887,9 +887,10 @@ session_id_format_test_() ->
           %% Clear any existing sessions
           catch ets:delete(yawl_claude_bridge),
 
-          %% Create multiple sessions and verify ID format
+          %% Create multiple sessions and verify ID format (small delay to avoid timestamp collision)
           SessionIds = lists:map(fun(_) ->
               {ok, Sid} = yawl_claude_bridge:start_session(#{}),
+              timer:sleep(2),
               Sid
           end, lists:seq(1, 5)),
 

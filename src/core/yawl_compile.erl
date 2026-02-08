@@ -287,7 +287,9 @@ build_yaml_net_infos(Spec, Nets, PatternInstances, Context) ->
             _ -> <<"">>
         end,
         Tasks = wf_yaml_spec:tasks(Spec, NetId),
-        Expanded = yawl_pattern_expander:expand_patterns_for_net(PatternInstances, NetId, Context),
+        EntryOwnerId = compute_entry_owner_id(Spec, NetId, PatternInstances),
+        NetContext = maps:merge(Context, #{entry_owner_id => EntryOwnerId}),
+        Expanded = yawl_pattern_expander:expand_patterns_for_net(PatternInstances, NetId, NetContext),
         InputCond = wf_yaml_spec:net_input_condition(Spec, NetId),
         OutputCond = wf_yaml_spec:net_output_condition(Spec, NetId),
         Variables = wf_yaml_spec:variables(Spec, NetId),
@@ -428,6 +430,35 @@ build_region_places_map(Regions, ExpandedPlaces, PatternInstances, NetId, Spec) 
         end
     end, #{}, Regions);
 build_region_places_map(_, _, _, _, _) -> #{}.
+
+%% @private Compute pattern instance id that owns the net entry (split_task matches first flow target).
+%% Used for namespacing: entry owner keeps p_start unnamespaced.
+compute_entry_owner_id(Spec, NetId, PatternInstances) when is_tuple(Spec), element(1, Spec) =:= yawl_yaml_spec ->
+    FirstTarget = wf_yaml_spec:net_first_flow_target(Spec, NetId),
+    case FirstTarget of
+        undefined -> undefined;
+        _ ->
+            TargetBin = atom_to_binary(FirstTarget, utf8),
+            Filtered = [I || I <- PatternInstances, pattern_net_matches(I, NetId)],
+            case lists:search(fun(I) ->
+                ST = maps:get(split_task, I, maps:get(<<"split_task">>, I, undefined)),
+                (ST =:= FirstTarget) orelse (is_binary(ST) andalso ST =:= TargetBin)
+            end, Filtered) of
+                {value, Inst} ->
+                    maps:get(id, Inst, maps:get(<<"id">>, Inst, undefined));
+                false -> undefined
+            end
+    end;
+compute_entry_owner_id(_, _, _) -> undefined.
+
+pattern_net_matches(Instance, NetId) when is_binary(NetId) ->
+    N = maps:get(net, Instance, maps:get(<<"net">>, Instance, undefined)),
+    case N of
+        B when is_binary(B) -> B =:= NetId;
+        A when is_atom(A) -> atom_to_binary(A, utf8) =:= NetId;
+        _ -> false
+    end;
+pattern_net_matches(_, _) -> false.
 
 pi_pattern_is(I, P) when is_map(I) ->
     PN = maps:get(pattern, I, maps:get(<<"pattern">>, I, undefined)),
