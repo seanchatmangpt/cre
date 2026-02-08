@@ -3,10 +3,15 @@
     "allow": [
       "Bash(rebar3 compile)",
       "Bash(rebar3 eunit)",
+      "Bash(rebar3 eunit *)",
+      "Bash(rebar3 ct)",
+      "Bash(rebar3 ct *)",
       "Bash(rebar3 dialyzer)",
       "Bash(rebar3 xref)",
-      "Bash(rebar3 ct)",
-      "Bash(rebar3 cover)"
+      "Bash(rebar3 cover)",
+      "Bash(rebar3 efmt *)",
+      "Bash(rebar3 get-deps)",
+      "Bash(rebar3 shell)"
     ],
     "deny": [
       "Read(.env*)",
@@ -16,26 +21,34 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/SessionStart.sh 2>&1 || true",
+            "timeout": 600000
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Context restored. This is CRE, an Erlang/OTP YAWL workflow engine. Use rebar3 for builds. MUST run rebar3 compile after .erl/.hrl changes. See CLAUDE.md for architecture.'"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"$TOOL_INPUT\" | jq -r '.command // empty' | grep -q '\\-\\-no-verify' && echo '{\"decision\":\"block\",\"reason\":\"--no-verify is not allowed\"}' || true",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-bash-guard.sh",
             "timeout": 3000
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/hooks/SessionStart.sh 2>&1 || true",
-            "timeout": 600000,
-            "continueOnError": true
           }
         ]
       }
@@ -45,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-check.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-check.sh",
             "timeout": 10000
           }
         ]
