@@ -224,7 +224,7 @@ wf_verify_report_test() ->
     Report = wf_verify:woflan_report(sound_workflow_net()),
     ?assert(is_binary(Report)),
     ?assertNot(<<>> =:= Report),
-    ?assert(<<"SOUND">> =:= Report orelse binary:match(Report, <<"Status">>) = nomatch).
+    ?assert(<<"SOUND">> =:= Report orelse binary:match(Report, <<"Status">>) =:= nomatch).
 
 wf_verify_report_unsound_test() ->
     Report = wf_verify:woflan_report(no_input_net()),

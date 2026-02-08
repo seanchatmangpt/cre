@@ -15,10 +15,28 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/logger.hrl").
+-include("../src/ga/ga_constitution.hrl").
 
 %%====================================================================
 %% GA Constitution Tests
 %%====================================================================
+
+%% Define circuit_state record locally (from circuit_breaker.erl)
+-record(circuit_state, {
+    state :: closed | open | half_open,
+    failures = 0 :: non_neg_integer(),
+    successes = 0 :: non_neg_integer(),
+    last_failure_time :: undefined | integer(),
+    last_state_change :: integer()
+}).
+
+%% Define compilation record locally (from ga_compiler.erl)
+-record(compilation, {
+    constitution :: #constitution{},
+    warnings = [] :: list(),
+    errors = [] :: list(),
+    compilation_time :: non_neg_integer()
+}).
 
 ga_constitution_new_from_map_test() ->
     Map = #{
@@ -36,8 +54,8 @@ ga_constitution_new_from_map_test() ->
         }
     },
     Constitution = ga_constitution:from_map(Map),
-    ?assertEqual(<<"test_wf">>, Constitution#ga_constitution.id),
-    ?assertEqual(<<"1.0">>, Constitution#ga_constitution.version),
+    ?assertEqual(<<"test_wf">>, Constitution#constitution.id),
+    ?assertEqual(<<"1.0">>, Constitution#constitution.version),
     ?assertEqual(ok, ga_constitution:validate(Constitution)).
 
 ga_constitution_validate_test() ->
@@ -50,18 +68,18 @@ ga_constitution_validate_test() ->
 
 ga_constitution_add_refusal_test() ->
     Constitution = ga_constitution:new(<<"id">>, <<"1.0">>,
-       #ga_constitution.sigma{}, [], #ga_constitution.lambda{}),
-    Refusal = #ga_constitution:refusal{
+       #sigma{}, [], #lambda{}),
+    Refusal = #refusal{
         state = <<"pending">>,
-        refused_transitions => [<<"t_cancel">>],
-        refusal_reason => <<"Cannot cancel before approval">>
+        refused_transitions = [<<"t_cancel">>],
+        refusal_reason = <<"Cannot cancel before approval">>
     },
     Updated = ga_constitution:add_refusal(Constitution, Refusal),
-    ?assertEqual(1, length(Updated#ga_constitution.refusals)).
+    ?assertEqual(1, length(Updated#constitution.refusals)).
 
 ga_constitution_to_map_test() ->
     Constitution = ga_constitution:new(<<"test">>, <<"1.0">>,
-       #ga_constitution.sigma{}, [], #ga_constitution.lambda{}),
+       #sigma{}, [], #lambda{}),
     Map = ga_constitution:to_map(Constitution),
     ?assertEqual(<<"test">>, maps:get(<<"id">>, Map)),
     ?assertEqual(<<"1.0">>, maps:get(<<"version">>, Map)).
@@ -164,7 +182,7 @@ circuit_breaker_reset_test() ->
 circuit_breaker_get_state_test() ->
     {ok, _Breaker} = circuit_breaker:start_link(<<"test_breaker3">>, fun() -> ok end),
     {ok, State} = circuit_breaker:get_state(<<"test_breaker3">>),
-    ?assertEqual(closed, State#circuit_breaker_state.state),
+    ?assertEqual(closed, State#circuit_state.state),
     circuit_breaker:stop(<<"test_breaker3">>).
 
 %%====================================================================
@@ -370,19 +388,19 @@ ga_constitution_roundtrip_test_() ->
     %% Test that constitution -> map -> constitution preserves data
     Constitutions = [
         ga_constitution:new(<<"id1">>, <<"1.0">>,
-           #ga_constitution.sigma{}, [], #ga_constitution.lambda{}),
+           #sigma{}, [], #lambda{}),
         ga_constitution:new(<<"id2">>, <<"2.0">>,
-           #ga_constitution.sigma{},
-            [#ga_constitution:refusal{state = <<"s">>}],
-            #ga_constitution.lambda{})
+           #sigma{},
+            [#refusal{state = <<"s">>}],
+            #lambda{})
     ],
 
     [{Constitution,
       fun() ->
           Map = ga_constitution:to_map(Constitution),
           Roundtrip = ga_constitution:from_map(Map),
-          ?assertEqual(Constitution#ga_constitution.id, Roundtrip#ga_constitution.id),
-          ?assertEqual(Constitution#ga_constitution.version, Roundtrip#ga_constitution.version)
+          ?assertEqual(Constitution#constitution.id, Roundtrip#constitution.id),
+          ?assertEqual(Constitution#constitution.version, Roundtrip#constitution.version)
       end}
      || Constitution <- Constitutions].
 

@@ -9,18 +9,29 @@
 -author("CRE Team").
 
 -compile(nowarn_export_all).
+-include_lib("common_test/include/ct.hrl").
+-include_lib("eunit/include/eunit.hrl").
+-include("../src/ga/ga_constitution.hrl").
 
 %%====================================================================
 %% Suite Callbacks
 %%====================================================================
+
+%% Define compilation record locally (from ga_compiler.erl)
+-record(compilation, {
+    constitution :: #constitution{},
+    warnings = [] :: list(),
+    errors = [] :: list(),
+    compilation_time :: non_neg_integer()
+}).
 
 -export([suite/0]).
 -export([init_per_suite/1]).
 -export([end_per_suite/1]).
 -export([init_per_group/2]).
 -export([end_per_group/2]).
--export([init_per_testcase/1]).
--export([end_per_testcase/1]).
+-export([init_per_testcase/2]).
+-export([end_per_testcase/2]).
 
 %%====================================================================
 %% Test Cases
@@ -162,8 +173,8 @@ constitution:
 
     %% Parse the serialized version
     {ok, RoundtripConstitution} = ga_yaml:from_yaml(SerializedYaml),
-    ?assertEqual(ParsedConstitution#ga_constitution.id,
-                 RoundtripConstitution#ga_constitution.id),
+    ?assertEqual(ParsedConstitution#constitution.id,
+                 RoundtripConstitution#constitution.id),
 
     ok.
 

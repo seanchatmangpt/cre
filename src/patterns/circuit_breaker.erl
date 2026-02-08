@@ -91,7 +91,7 @@
 -spec start_link(breaker_name(), fun()) -> {ok, pid()} | {error, term()}.
 
 start_link(Name, Fun) when is_binary(Name), is_function(Fun) ->
-    start_link(Name, Fun, #breaker_config{}).
+    start_link(Name, Fun, []).  %% Pass empty proplist for default config
 
 %% @doc Starts a circuit breaker with custom config.
 -spec start_link(breaker_name(), fun(), proplists:proplist()) ->

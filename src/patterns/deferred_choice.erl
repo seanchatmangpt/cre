@@ -973,10 +973,10 @@ select_branch_empty_test() ->
 disable_other_branches_test() ->
     AllBranches = [branch_a, branch_b, branch_c, branch_d],
     Options = #{
-        branch_a => fun a/0,
-        branch_b => fun b/0,
-        branch_c => fun c/0,
-        branch_d => fun d/0
+        branch_a => fun() -> a end,
+        branch_b => fun() -> b end,
+        branch_c => fun() -> c end,
+        branch_d => fun() -> d end
     },
     Result = disable_other_branches(branch_b, AllBranches, Options),
     ?assertMatch({ok, ReducedMap, DisabledList}, Result),

@@ -89,14 +89,31 @@
 
 from_yaml(YamlBinary) when is_binary(YamlBinary) ->
     try
-        %% Parse YAML using yamerl
-        case yamerl:decode(YamlBinary) of
+        %% Ensure yamerl is started
+        case application:ensure_all_started(yamerl) of
+            {ok, _} -> ok;
+            {error, {already_started, _}} -> ok
+        end,
+        %% Parse YAML using yamerl:decode
+        %% yamerl:decode returns a generator (0-arity fun) that needs to be evaluated
+        ResultFun = yamerl:decode(YamlBinary),
+        Docs = case ResultFun of
+            Fun when is_function(Fun, 0) -> Fun();  %% Evaluate generator
+            _ -> ResultFun  %% Already evaluated or error
+        end,
+        case Docs of
+            [Doc | _] ->
+                %% Normalize yamerl output (may be proplist or map)
+                NormalizedData = normalize_yaml_data(Doc),
+                parse_constitution(NormalizedData);
+            [] ->
+                {error, [<<"Empty YAML document">>]};
+            Map when is_map(Map) ->
+                %% Single document
+                NormalizedData = normalize_yaml_data(Map),
+                parse_constitution(NormalizedData);
             {error, Reason} ->
-                {error, [iolist_to_binary(io_lib:format("YAML parse error: ~p", [Reason]))]};
-            Data when is_map(Data) ->
-                parse_constitution(Data);
-            _ ->
-                {error, [<<"YAML root must be a map">>]}
+                {error, [iolist_to_binary(io_lib:format("YAML parse error: ~p", [Reason]))]}
         end
     catch
         Type:Error:Stack ->
@@ -231,9 +248,23 @@ parse_type_binding(BindingMap) ->
     Term = maps:get(<<"term">>, BindingMap),
     Type = maps:get(<<"type">>, BindingMap),
     ContractMap = maps:get(<<"token_contract">>, BindingMap, #{}),
-    Contract = #{
-        shape => maps:get(<<"shape">>, ContractMap, singleton),
-        validity => maps:get(<<"validity">>, ContractMap, eager)
+    Shape = case maps:get(<<"shape">>, ContractMap, <<"singleton">>) of
+        <<"singleton">> -> singleton;
+        <<"multiple">> -> multiple;
+        <<"optional">> -> optional
+    end,
+    Validity = case maps:get(<<"validity">>, ContractMap, <<"eager">>) of
+        <<"eager">> -> eager;
+        <<"lazy">> -> lazy
+    end,
+    Lifespan = case maps:get(<<"lifespan">>, ContractMap, <<"temporary">>) of
+        <<"temporary">> -> temporary;
+        <<"permanent">> -> permanent
+    end,
+    Contract = #token_contract{
+        shape = Shape,
+        validity = Validity,
+        lifespan = Lifespan
     },
     #type_binding{
         term = Term,
@@ -425,3 +456,40 @@ validate_section(Map, Section, RequiredFields) ->
         _ ->
             [io_lib:format("Section ~p must be a map", [Section])]
     end.
+
+%% @private
+%% @doc Normalizes yamerl output to convert proplists to maps.
+%% Yamerl 0.10+ may return proplists for some structures.
+-spec normalize_yaml_data(term()) -> term().
+normalize_yaml_data({yamerl_map, Pairs}) when is_list(Pairs) ->
+    maps:from_list([{normalize_key(K), normalize_yaml_data(V)} || {K, V} <- Pairs]);
+normalize_yaml_data({yamerl_seq, Items}) when is_list(Items) ->
+    [normalize_yaml_data(Item) || Item <- Items];
+normalize_yaml_data(Value) when is_map(Value) ->
+    maps:map(fun(_K, V) -> normalize_yaml_data(V) end, Value);
+normalize_yaml_data(Value) when is_list(Value) ->
+    case is_proplist(Value) of
+        true ->
+            maps:from_list([{normalize_key(K), normalize_yaml_data(V)} || {K, V} <- Value]);
+        false ->
+            case io_lib:printable_list(Value) of
+                true -> list_to_binary(Value);
+                false -> [normalize_yaml_data(Item) || Item <- Value]
+            end
+    end;
+normalize_yaml_data(Value) ->
+    Value.
+
+%% @private
+%% @doc Normalizes YAML keys to binary format.
+-spec normalize_key(term()) -> binary().
+normalize_key(Atom) when is_atom(Atom) -> atom_to_binary(Atom, utf8);
+normalize_key(Binary) when is_binary(Binary) -> Binary;
+normalize_key(String) when is_list(String) -> list_to_binary(String);
+normalize_key(Other) -> Other.
+
+%% @private
+%% @doc Detects proplist format (common in yamerl output).
+is_proplist([]) -> true;
+is_proplist([{K, _} | Rest]) when is_list(K); is_atom(K) -> is_proplist(Rest);
+is_proplist(_) -> false.

@@ -476,11 +476,11 @@ execute_callback({Module, Function, Args}, Timer) ->
 %% @private
 adjust_for_calendar(TargetTimeMs, Calendar) ->
     %% Convert target time to configured timezone
-    TargetDateTime = calendar:system_time_to_universal_time(TargetTimeMs div 1000),
+    TargetDateTime = calendar:system_time_to_universal_time(TargetTimeMs div 1000, second),
 
     %% Check if target is on a weekend
     {Date, {Hour, _Min, _Sec}} = TargetDateTime,
-    DayOfWeek = calendar:day_of_week(Date),
+    DayOfWeek = calendar:day_of_the_week(Date),
 
     case lists:member(DayOfWeek, Calendar#calendar_settings.weekend_days) of
         true ->
@@ -512,7 +512,7 @@ adjust_for_calendar(TargetTimeMs, Calendar) ->
 add_days_until_workday(DateTime, Calendar) ->
     %% Add days until we hit a work day
     NewDateTime = add_day(DateTime),
-    DayOfWeek = calendar:day_of_week(element(1, NewDateTime)),
+    DayOfWeek = calendar:day_of_the_week(element(1, NewDateTime)),
 
     case lists:member(DayOfWeek, Calendar#calendar_settings.weekend_days) of
         true ->
