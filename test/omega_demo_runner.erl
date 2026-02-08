@@ -572,12 +572,25 @@ var_initial(_) -> undefined.
 check_completed(Marking, Executor) ->
     RootMod = wf_yawl_executor:get_root_module(Executor),
     try
-        Places = RootMod:place_lst(),
-        case Places of
-            [] -> false;
-            _ ->
-                EndPlace = lists:last(Places),
-                length(maps:get(EndPlace, Marking, [])) > 0
+        %% Compiled nets use namespaced places (e.g. p_pi51899780_end). Check marking directly
+        %% for any place ending with "_end" with tokens (most robust across compilers).
+        IsEndInMarking = maps:fold(fun(P, Tokens, Acc) ->
+            Acc orelse (place_is_end(P) andalso is_list(Tokens) andalso length(Tokens) > 0)
+        end, false, Marking),
+        case IsEndInMarking of
+            true -> true;
+            false ->
+                %% Fallback: place_lst last (legacy nets)
+                Places = RootMod:place_lst(),
+                case Places of
+                    [] -> false;
+                    _ ->
+                        EndPlace = lists:last(Places),
+                        length(maps:get(EndPlace, Marking, [])) > 0
+                end
         end
     catch _:_ -> false
     end.
+
+place_is_end(P) when is_atom(P) ->
+    lists:suffix("_end", atom_to_list(P)).

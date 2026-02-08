@@ -29,6 +29,7 @@ start_otel_logger() ->
 run_demo() ->
     case os:getenv("DEMO_OMEGA") of
         "1" ->
+            _ = application:ensure_all_started(cre),
             omega_demo_runner:run(),
             init:stop(0);
         _ ->
