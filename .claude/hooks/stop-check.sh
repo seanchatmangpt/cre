@@ -1,24 +1,24 @@
-#!/bin/bash
-# Stop hook: verify no uncommitted source changes are left behind.
-# Returns block decision if there are unstaged .erl changes.
+#!/usr/bin/env bash
+# Stop hook: block session exit if uncommitted Erlang source changes exist.
+# Uses exit code 2 + stderr to feed feedback back to Claude.
 
 INPUT=$(cat)
 
-# Prevent infinite loops
-if echo "$INPUT" | jq -e '.stop_hook_active' >/dev/null 2>&1; then
-  exit 0
+# Prevent infinite loop when stop hook triggers another stop
+if echo "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null | grep -q "true"; then
+    exit 0
 fi
 
-cd "$CLAUDE_PROJECT_DIR" 2>/dev/null || exit 0
+cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" 2>/dev/null || exit 0
 
-# Check for modified .erl source files not yet committed
+# Check for modified or untracked .erl files
 CHANGED=$(git diff --name-only 2>/dev/null | grep '\.erl$' || true)
 UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null | grep '\.erl$' || true)
 
-if [ -n "$CHANGED" ] || [ -n "$UNTRACKED" ]; then
-  FILES="${CHANGED}${UNTRACKED}"
-  jq -n --arg reason "Uncommitted Erlang source changes: $FILES" \
-    '{"decision": "block", "reason": $reason}'
-else
-  exit 0
+if [[ -n "$CHANGED" || -n "$UNTRACKED" ]]; then
+    ALL_FILES=$(printf '%s\n' $CHANGED $UNTRACKED | sort -u | head -20)
+    echo "Uncommitted Erlang source changes detected. Please commit or review before ending session: $ALL_FILES" >&2
+    exit 2
 fi
+
+exit 0
