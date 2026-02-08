@@ -25,6 +25,8 @@
     compilation_time :: non_neg_integer()
 }).
 
+%% all/0 must return list of test cases and/or groups
+-export([all/0]).
 -export([suite/0]).
 -export([init_per_suite/1]).
 -export([end_per_suite/1]).
@@ -50,6 +52,18 @@
 %%====================================================================
 %% Suite Callbacks
 %%====================================================================
+
+%% @doc Returns list of all test cases and groups
+all() ->
+    [
+        ga_constitution_validation_test,
+        ga_yaml_roundtrip_test,
+        ga_compiler_full_pipeline_test,
+        circuit_breaker_failure_recovery_test,
+        persistent_timer_calendar_test,
+        time_travel_debugger_test,
+        cancel_region_hierarchy_test
+    ].
 
 suite() ->
     [{timetrap, {seconds, 30}}].
