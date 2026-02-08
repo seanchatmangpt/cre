@@ -158,14 +158,16 @@ lookup_by_place(Place, TokenId) when is_atom(Place), is_binary(TokenId) ->
 -spec lookup_by_parent(binary()) -> [pid()].
 
 lookup_by_parent(ParentId) when is_binary(ParentId) ->
-    %% gproc doesn't support reverse lookup well, so we scan
-    %% In production, maintain an ets table for parent index
-    Pattern = [{{{token, '$1', '_'}, '_', '_', '_', '_', '_', '_}},
-               [{'=:=', '$1', ParentId}], ['$_']]],
-    case ets:select(token_registry_table, Pattern, 100) of
-        '$end_of_table' -> [];
-        {Results, _} -> [Info#token_info.pid || Info <- Results]
-    end.
+    %% Use ets:foldl for safe iteration
+    ets:foldl(
+        fun(#token_info{parent_id = Pid, pid = TokenPid}, Acc) when Pid =:= ParentId ->
+                [TokenPid | Acc];
+           (_, Acc) ->
+                Acc
+        end,
+        [],
+        token_registry_table
+    ).
 
 %%--------------------------------------------------------------------
 %% @doc Lists all tokens in a place.
@@ -175,11 +177,16 @@ lookup_by_parent(ParentId) when is_binary(ParentId) ->
 -spec list_tokens(atom()) -> [pid()].
 
 list_tokens(Place) when is_atom(Place) ->
-    Pattern = [{ Place, '_', '_', '_', '_', '_', '_', '_' }],
-    case ets:match(token_registry_table, Pattern, 100) of
-        '$end_of_table' -> [];
-        {Results, _} -> [Pid || [Pid] <- Results]
-    end.
+    %% Use ets:foldl for safe iteration
+    ets:foldl(
+        fun(#token_info{place = P, pid = TokenPid}, Acc) when P =:= Place ->
+                [TokenPid | Acc];
+           (_, Acc) ->
+                Acc
+        end,
+        [],
+        token_registry_table
+    ).
 
 %%--------------------------------------------------------------------
 %% @doc Counts tokens in a place.
@@ -329,7 +336,8 @@ handle_cast(_Msg, State) ->
 
 handle_info({'DOWN', _MonitorRef, process, Pid, _Reason}, State) ->
     %% Process died - clean up registry entries
-    case ets:match_object(token_registry_table, #token_info{pid = Pid, _ = '_'}) of
+    MatchSpec = [{#token_info{pid = Pid, _ = '_'}, [], ['$_']}],
+    case ets:select(token_registry_table, MatchSpec) of
         [TokenInfo] ->
             token_terminated(TokenInfo#token_info.token_id, TokenInfo#token_info.place);
         [] ->

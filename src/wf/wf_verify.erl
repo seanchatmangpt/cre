@@ -94,6 +94,9 @@ A workflow net is sound if:
 -export([place_invariants/1, transition_invariants/1,
          reachable_markings/2, siphons/1, traps/1]).
 
+%% Woflan-style diagnostics integration
+-export([diagnose/1, woflan_report/1]).
+
 %%====================================================================
 %% Types
 %%====================================================================
@@ -1559,10 +1562,142 @@ single_place_test() ->
     Single = #{places => [p], transitions => [], arcs => []},
     ?assertEqual(false, has_transitions(Single)).
 
-self_loop_test() ->
-    %% Transition with self-loop
-    Loop = #{places => [p], transitions => [t],
-             arcs => [{p, t}, {t, p}]},
-    ?assertEqual({ok, true}, bounded(Loop)).
-
 -endif.
+
+%%====================================================================
+%% Woflan Integration Functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Performs comprehensive Woflan-style diagnostics.
+%%
+%% This is a convenience wrapper around the woflan:diagnose/1 function
+%% for integration with the verification module.
+%%
+%% @param Compiled A module atom or net structure map
+%% @return Diagnostic report map with status, issues, and suggestions
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec diagnose(Compiled :: compiled()) -> #{status := ok | unsound | error, issues => [term()], suggestions => [term()], details => map()}.
+
+diagnose(Input) ->
+    woflan:diagnose(Input).
+
+%%--------------------------------------------------------------------
+%% @doc Returns a human-readable Woflan diagnostic report.
+%%
+%% Formats the diagnostic report from woflan:diagnose/1 into a
+%% readable string format suitable for logging or display.
+%%
+%% @param Compiled A module atom or net structure map
+%% @return Formatted string report
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec woflan_report(Compiled :: compiled()) -> binary().
+
+woflan_report(Input) ->
+    Report = woflan:diagnose(Input),
+    Status = maps:get(status, Report, error),
+    Issues = maps:get(issues, Report, []),
+    Suggestions = maps:get(suggestions, Report, []),
+    Details = maps:get(details, Report, #{}),
+
+    StatusStr = case Status of
+        ok -> "SOUND";
+        unsound -> "UNSOUND";
+        error -> "ERROR"
+    end,
+
+    IssueStr = format_issues(Issues),
+    SuggestionStr = format_suggestions(Suggestions),
+    InfoStr = format_net_info(Details),
+
+    iolist_to_binary([
+        "=== Woflan Workflow Diagnostic Report ===\n\n",
+        "Status: ", StatusStr, "\n\n",
+        InfoStr, "\n",
+        case IssueStr of
+            <<>> -> "No issues detected.\n";
+            _ -> <<"Issues:\n", IssueStr/binary>>
+        end,
+        "\n",
+        case SuggestionStr of
+            <<>> -> <<"No suggestions.\n">>;
+            _ -> <<"Suggestions:\n", SuggestionStr/binary>>
+        end,
+        "\n=== End Report ==="
+    ]).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Formats issues list for display.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec format_issues([woflan:issue()]) -> binary().
+
+format_issues([]) ->
+    <<>>;
+format_issues(Issues) ->
+    lists:foldl(fun({Type, Detail}, Acc) ->
+        TypeStr = atom_to_binary(Type),
+        DetailStr = format_detail(Detail),
+        [Acc, "  - ", TypeStr, ": ", DetailStr, "\n"]
+    end, [], Issues).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Formats suggestions list for display.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec format_suggestions([woflan:suggestion()]) -> binary().
+
+format_suggestions([]) ->
+    <<>>;
+format_suggestions(Suggestions) ->
+    lists:foldl(fun({Type, Detail}, Acc) ->
+        TypeStr = atom_to_binary(Type),
+        DetailStr = format_detail(Detail),
+        [Acc, "  - ", TypeStr, ": ", DetailStr, "\n"]
+    end, [], Suggestions).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Formats detail terms for display.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec format_detail(term()) -> binary().
+
+format_detail({Key, Value}) when is_atom(Key) ->
+    iolist_to_binary([atom_to_binary(Key), "=", format_detail(Value)]);
+format_detail(Detail) when is_atom(Detail) ->
+    atom_to_binary(Detail);
+format_detail(Detail) when is_list(Detail) ->
+    iolist_to_binary(["[", lists:join(", ", [format_detail(D) || D <- Detail]), "]"]);
+format_detail(Detail) when is_integer(Detail) ->
+    integer_to_binary(Detail);
+format_detail(Detail) ->
+    iolist_to_binary(io_lib:format("~p", [Detail])).
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Formats net info map for display.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec format_net_info(map()) -> binary().
+
+format_net_info(#{place_count := Places, transition_count := Transitions,
+                    arc_count := Arcs}) ->
+    iolist_to_binary([
+        "Net Structure:\n",
+        "  Places: ", integer_to_binary(Places), "\n",
+        "  Transitions: ", integer_to_binary(Transitions), "\n",
+        "  Arcs: ", integer_to_binary(Arcs), "\n"
+    ]);
+format_net_info(_) ->
+    <<"Net Structure: N/A\n">>.

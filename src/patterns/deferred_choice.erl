@@ -113,7 +113,11 @@ Getting the preset for a transition:
     run/1,
     get_state/1,
     execute/2,
-    select_option/2
+    select_option/2,
+    deferred_choice_trigger/2,
+    enabled_branches/2,
+    select_branch/2,
+    disable_other_branches/3
 ]).
 
 %%====================================================================
@@ -270,6 +274,153 @@ execute(Options, EvalData) when is_map(Options), map_size(Options) >= 2 ->
 
 select_option(Pid, OptionId) ->
     gen_yawl:cast(Pid, {select_option, OptionId}).
+
+%%--------------------------------------------------------------------
+%% @doc Triggers the deferred choice by executing the first branch
+%% that becomes enabled based on actual data/resource availability.
+%%
+%% This is the core of Deferred Choice: unlike Exclusive Choice where
+%% the decision is made based on data, here the first branch that
+%% becomes available (ready) at runtime is selected.
+%%
+%% @param Options Map of branch identifiers to {Fun, Priority} or just Fun.
+%%                Each Fun should take one argument (the trigger data).
+%%                Can also be {ConditionFun, ActionFun} or {ConditionFun, ActionFun, Priority}.
+%% @param TriggerData Data passed to evaluate which branches become enabled.
+%% @return {ok, {BranchId, Result}} | {error, Reason}
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec deferred_choice_trigger(Options :: map(), TriggerData :: term()) ->
+          {ok, {atom(), term()}} | {error, term()}.
+
+deferred_choice_trigger(Options, TriggerData) when is_map(Options), map_size(Options) >= 2 ->
+    %% First, determine which branches are enabled by the trigger data
+    Enabled = enabled_branches(Options, TriggerData),
+
+    case Enabled of
+        [] ->
+            {error, no_enabled_branches};
+        _ ->
+            %% Select a branch from enabled ones (non-deterministic)
+            Selected = select_branch(Enabled, TriggerData),
+
+            %% Execute the selected branch
+            case maps:get(Selected, Options) of
+                {ConditionFun, ActionFun, _Priority} when is_function(ConditionFun, 1),
+                                                         is_function(ActionFun, 1) ->
+                    %% Conditional branch with priority
+                    try
+                        Result = ActionFun(TriggerData),
+                        {ok, {Selected, Result}}
+                    catch
+                        Error:Reason:Stack ->
+                            {error, {branch_error, Selected, Error, Reason, Stack}}
+                    end;
+                {ConditionFun, ActionFun} when is_function(ConditionFun, 1),
+                                               is_function(ActionFun, 1) ->
+                    %% Conditional branch without priority
+                    try
+                        Result = ActionFun(TriggerData),
+                        {ok, {Selected, Result}}
+                    catch
+                        Error:Reason:Stack ->
+                            {error, {branch_error, Selected, Error, Reason, Stack}}
+                    end;
+                {Fun, _Priority} when is_function(Fun, 1) ->
+                    %% Function with priority
+                    try
+                        Result = Fun(TriggerData),
+                        {ok, {Selected, Result}}
+                    catch
+                        Error:Reason:Stack ->
+                            {error, {branch_error, Selected, Error, Reason, Stack}}
+                    end;
+                Fun when is_function(Fun, 1) ->
+                    %% Simple function
+                    try
+                        Result = Fun(TriggerData),
+                        {ok, {Selected, Result}}
+                    catch
+                        Error:Reason:Stack ->
+                            {error, {branch_error, Selected, Error, Reason, Stack}}
+                    end
+            end
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Determines which choice branches are currently enabled based on
+%% data conditions or resource availability.
+%%
+%% This evaluates each branch's enablement condition. A branch can be:
+%% - A function that returns true/false (enablement guard)
+%% - A tuple {Fun, Priority} where Fun is tested for enablement
+%% - A tuple {ConditionFun, ActionFun, Priority} where ConditionFun determines enablement
+%%
+%% @param Options Map of branch identifiers to functions or tuples.
+%% @param EvalData Data to evaluate enablement conditions against.
+%% @return List of enabled branch identifiers.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec enabled_branches(Options :: map(), EvalData :: term()) -> [atom()].
+
+enabled_branches(Options, EvalData) when is_map(Options) ->
+    maps:fold(fun(Key, Value, Acc) ->
+        case is_branch_enabled(Key, Value, EvalData) of
+            true -> [Key | Acc];
+            false -> Acc
+        end
+    end, [], Options).
+
+%%--------------------------------------------------------------------
+%% @doc Non-deterministic selection from enabled branches.
+%%
+%% Uses pick_from for truly non-deterministic selection when multiple
+%% branches are enabled. Can also use data-driven selection if
+%% eval_data provides selection criteria.
+%%
+%% @param EnabledBranches List of enabled branch identifiers.
+%% @param EvalData Optional data for data-driven selection (ignored for
+%%                 non-deterministic selection).
+%% @return The selected branch identifier.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec select_branch(EnabledBranches :: [atom()], EvalData :: term()) -> atom().
+
+select_branch([], _EvalData) ->
+    error(no_enabled_branches);
+select_branch([Single], _EvalData) ->
+    Single;
+select_branch(EnabledBranches, _EvalData) ->
+    %% Non-deterministic selection using pick_from
+    pick_from(EnabledBranches).
+
+%%--------------------------------------------------------------------
+%% @doc Once a branch is selected, disables/removes alternative branches.
+%%
+%% This is crucial for Deferred Choice semantics: after one branch is
+%% selected, all other alternatives must be disabled to ensure exactly
+%% one path is taken.
+%%
+%% @param SelectedBranch The branch that was selected.
+%% @param AllBranches All available branch identifiers.
+%% @param Options The original options map.
+%% @return Updated options map with only the selected branch remaining.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec disable_other_branches(SelectedBranch :: atom(),
+                             AllBranches :: [atom()],
+                             Options :: map()) ->
+          {ok, map(), [atom()]}.
+
+disable_other_branches(SelectedBranch, AllBranches, Options) when is_map(Options) ->
+    DisabledBranches = AllBranches -- [SelectedBranch],
+    %% Create new options map with only selected branch
+    ReducedOptions = maps:with([SelectedBranch], Options),
+    {ok, ReducedOptions, DisabledBranches}.
 
 %%====================================================================
 %% gen_pnet Callbacks
@@ -599,6 +750,58 @@ get_priority(Key, Options) ->
     end.
 
 %%--------------------------------------------------------------------
+%% @doc Checks if a branch is enabled based on its configuration and eval data.
+%%
+%% A branch is enabled if:
+%% - It's a simple function (always enabled)
+%% - It's a {Fun, Priority} tuple (Fun is always enabled)
+%% - It's a {ConditionFun, ActionFun, Priority} tuple (ConditionFun must return true)
+%%
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+-spec is_branch_enabled(Key :: atom(), Value :: term(), EvalData :: term()) -> boolean().
+
+is_branch_enabled(_Key, Fun, _EvalData) when is_function(Fun, 1) ->
+    %% Simple function - always enabled
+    true;
+is_branch_enabled(_Key, {Fun, _Priority}, _EvalData) when is_function(Fun, 1) ->
+    %% Function with priority - always enabled
+    true;
+is_branch_enabled(_Key, {ConditionFun, _ActionFun, _Priority}, EvalData)
+        when is_function(ConditionFun, 1) ->
+    %% Conditional branch - evaluate the condition
+    try
+        ConditionFun(EvalData)
+    catch
+        _:_:_ -> false
+    end;
+is_branch_enabled(_Key, {ConditionFun, _ActionFun}, EvalData)
+        when is_function(ConditionFun, 1) ->
+    %% Conditional branch without priority
+    try
+        ConditionFun(EvalData)
+    catch
+        _:_:_ -> false
+    end;
+is_branch_enabled(_, _, _) ->
+    %% Unknown format - not enabled
+    false.
+
+%%--------------------------------------------------------------------
+%% @doc Picks a random element from a non-empty list.
+%% Implements non-deterministic selection for deferred choice.
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+-spec pick_from([T, ...]) -> T.
+
+pick_from([]) ->
+    error(empty_list);
+pick_from(List) ->
+    lists:nth(rand:uniform(length(List)), List).
+
+%%--------------------------------------------------------------------
 %% @doc Generates a unique log ID.
 %% @private
 %% @end
@@ -639,13 +842,267 @@ log_event(_State, _Concept, _Lifecycle, _Data) ->
     ok.
 
 %%====================================================================
-%% Doctests
+%% Unit Tests
 %%====================================================================
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+%%--------------------------------------------------------------------
+%% @doc Runs all doctests for the module.
+%% @private
+%% @end
+%%--------------------------------------------------------------------
 doctest_test() ->
     {module, ?MODULE} = code:ensure_loaded(?MODULE),
     ok.
+
+%%--------------------------------------------------------------------
+%% Test: deferred_choice_trigger/2 with simple functions
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+deferred_choice_trigger_simple_test() ->
+    Options = #{
+        branch_a => fun(X) -> X * 2 end,
+        branch_b => fun(X) -> X + 10 end
+    },
+    Result = deferred_choice_trigger(Options, 5),
+    case Result of
+        {ok, {branch_a, 10}} -> ok;
+        {ok, {branch_b, 15}} -> ok;
+        _ -> ?assert(false, "Expected one of the branches to be selected")
+    end.
+
+%%--------------------------------------------------------------------
+%% Test: deferred_choice_trigger/2 with priority tuples
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+deferred_choice_trigger_priority_test() ->
+    Options = #{
+        high => {fun(X) -> X * 2 end, 10},
+        low => {fun(X) -> X + 10 end, 1}
+    },
+    Result = deferred_choice_trigger(Options, 5),
+    %% With priority-based selection, high priority branch should be selected
+    ?assertMatch({ok, {high, 10}}, Result).
+
+%%--------------------------------------------------------------------
+%% Test: enabled_branches/2 with simple functions
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+enabled_branches_all_enabled_test() ->
+    Options = #{
+        branch_a => fun(_) -> ok end,
+        branch_b => fun(_) -> ok end,
+        branch_c => fun(_) -> ok end
+    },
+    Enabled = enabled_branches(Options, some_data),
+    ?assertEqual(3, length(Enabled)),
+    ?assert(lists:member(branch_a, Enabled)),
+    ?assert(lists:member(branch_b, Enabled)),
+    ?assert(lists:member(branch_c, Enabled)).
+
+%%--------------------------------------------------------------------
+%% Test: enabled_branches/2 with conditional branches
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+enabled_branches_conditional_test() ->
+    Options = #{
+        branch_a => {fun(X) -> X > 0 end, fun(_) -> a_result end},
+        branch_b => {fun(X) -> X < 0 end, fun(_) -> b_result end},
+        branch_c => {fun(_) -> true end, fun(_) -> c_result end}
+    },
+    %% With positive data, only branch_a and branch_c should be enabled
+    Enabled = enabled_branches(Options, 5),
+    ?assert(lists:member(branch_a, Enabled)),
+    ?assertNot(lists:member(branch_b, Enabled)),
+    ?assert(lists:member(branch_c, Enabled)).
+
+%%--------------------------------------------------------------------
+%% Test: enabled_branches/2 with conditional branches (negative case)
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+enabled_branches_conditional_negative_test() ->
+    Options = #{
+        branch_a => {fun(X) -> X > 0 end, fun(_) -> a_result end},
+        branch_b => {fun(X) -> X < 0 end, fun(_) -> b_result end},
+        branch_c => {fun(_) -> true end, fun(_) -> c_result end}
+    },
+    %% With negative data, only branch_b and branch_c should be enabled
+    Enabled = enabled_branches(Options, -5),
+    ?assertNot(lists:member(branch_a, Enabled)),
+    ?assert(lists:member(branch_b, Enabled)),
+    ?assert(lists:member(branch_c, Enabled)).
+
+%%--------------------------------------------------------------------
+%% Test: select_branch/2 with single enabled branch
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+select_branch_single_test() ->
+    ?assertEqual(only_branch, select_branch([only_branch], ignored)).
+
+%%--------------------------------------------------------------------
+%% Test: select_branch/2 with multiple enabled branches (non-deterministic)
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+select_branch_multiple_test() ->
+    Enabled = [branch_a, branch_b, branch_c],
+    Selected = select_branch(Enabled, data),
+    ?assert(lists:member(Selected, Enabled)).
+
+%%--------------------------------------------------------------------
+%% Test: select_branch/2 error case
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+select_branch_empty_test() ->
+    ?assertError(no_enabled_branches, select_branch([], data)).
+
+%%--------------------------------------------------------------------
+%% Test: disable_other_branches/3
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+disable_other_branches_test() ->
+    AllBranches = [branch_a, branch_b, branch_c, branch_d],
+    Options = #{
+        branch_a => fun a/0,
+        branch_b => fun b/0,
+        branch_c => fun c/0,
+        branch_d => fun d/0
+    },
+    Result = disable_other_branches(branch_b, AllBranches, Options),
+    ?assertMatch({ok, ReducedMap, DisabledList}, Result),
+    {ok, ReducedMap, DisabledList} = Result,
+    ?assertEqual([branch_a, branch_c, branch_d], DisabledList),
+    ?assertEqual(1, map_size(ReducedMap)),
+    ?assert(maps:is_key(branch_b, ReducedMap)).
+
+%%--------------------------------------------------------------------
+%% Test: integration test - deferred choice with conditions
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+deferred_choice_integration_test() ->
+    Options = #{
+        fast => {fun(X) -> X > 100 end, fun(X) -> {fast, X div 2} end},
+        slow => {fun(X) -> X =< 100 end, fun(X) -> {slow, X * 2} end}
+    },
+    Result = deferred_choice_trigger(Options, 150),
+    ?assertMatch({ok, {fast, _}}, Result).
+
+%%--------------------------------------------------------------------
+%% Test: deferred_choice_trigger/2 with no enabled branches
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+deferred_choice_trigger_no_enabled_test() ->
+    Options = #{
+        branch_a => {fun(_) -> false end, fun(_) -> a end},
+        branch_b => {fun(_) -> false end, fun(_) -> b end}
+    },
+    Result = deferred_choice_trigger(Options, any_data),
+    ?assertEqual({error, no_enabled_branches}, Result).
+
+%%--------------------------------------------------------------------
+%% Test: new/2 constructor
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+new_constructor_test() ->
+    Options = #{a => fun(_) -> ok end, b => fun(_) -> ok end},
+    State = new(Options, 2),
+    ?assertEqual(2, map_size(State#deferred_choice_state.options)),
+    ?assertEqual(undefined, State#deferred_choice_state.selected),
+    ?assertEqual([], State#deferred_choice_state.discarded).
+
+%%--------------------------------------------------------------------
+%% Test: place_lst/0
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+place_lst_test() ->
+    Expected = [p_start, p_offer_pending, p_option_pool, p_selected, p_discarded, p_complete],
+    ?assertEqual(Expected, place_lst()).
+
+%%--------------------------------------------------------------------
+%% Test: trsn_lst/0
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+trsn_lst_test() ->
+    Expected = [t_offer, t_evaluate_option, t_select, t_discard_others, t_complete],
+    ?assertEqual(Expected, trsn_lst()).
+
+%%--------------------------------------------------------------------
+%% Test: preset/1 for all transitions
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+preset_t_offer_test() ->
+    ?assertEqual([p_start], preset(t_offer)).
+
+preset_t_evaluate_option_test() ->
+    ?assertEqual([p_option_pool], preset(t_evaluate_option)).
+
+preset_t_select_test() ->
+    ?assertEqual([p_offer_pending], preset(t_select)).
+
+preset_t_discard_others_test() ->
+    ?assertEqual([p_selected], preset(t_discard_others)).
+
+preset_t_complete_test() ->
+    ?assertEqual([p_discarded], preset(t_complete)).
+
+preset_unknown_test() ->
+    ?assertEqual([], preset(unknown)).
+
+%%--------------------------------------------------------------------
+%% Test: init_marking/2
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+init_marking_p_start_test() ->
+    State = new(#{a => fun(_) -> ok end}, 1),
+    ?assertEqual([start], init_marking(p_start, State)).
+
+init_marking_other_test() ->
+    State = new(#{a => fun(_) -> ok end}, 1),
+    ?assertEqual([], init_marking(p_offer_pending, State)),
+    ?assertEqual([], init_marking(p_complete, State)).
+
+%%--------------------------------------------------------------------
+%% Test: is_branch_enabled/3 helper
+%% @private
+%% @end
+%%--------------------------------------------------------------------
+is_branch_enabled_simple_fun_test() ->
+    Fun = fun(_) -> result end,
+    ?assert(is_branch_enabled(test, Fun, data)).
+
+is_branch_enabled_with_priority_test() ->
+    FunWithPriority = {fun(_) -> result end, 5},
+    ?assert(is_branch_enabled(test, FunWithPriority, data)).
+
+is_branch_enabled_conditional_true_test() ->
+    CondFun = fun(X) -> X > 0 end,
+    ActionFun = fun(_) -> result end,
+    Conditional = {CondFun, ActionFun},
+    ?assert(is_branch_enabled(test, Conditional, 5)),
+    ?assertNot(is_branch_enabled(test, Conditional, -5)).
+
+is_branch_enabled_conditional_with_priority_test() ->
+    CondFun = fun(X) -> X > 0 end,
+    ActionFun = fun(_) -> result end,
+    Conditional = {CondFun, ActionFun, 10},
+    ?assert(is_branch_enabled(test, Conditional, 5)),
+    ?assertNot(is_branch_enabled(test, Conditional, -5)).
+
 -endif.

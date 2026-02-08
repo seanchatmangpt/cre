@@ -17,12 +17,13 @@
 
 %% Strategy behavior
 -export([init/2]).
+-export([init/3]).
 -export([should_complete/2]).
 -export([on_branch_complete/2]).
 -export([get_result/1]).
 
 %%====================================================================
-==== Records
+%% Records
 %%====================================================================
 
 -record(quality_state, {

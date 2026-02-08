@@ -90,6 +90,32 @@ Get the preset for the trigger transition:
 - **Option to complete:** Always true (trigger fires on first completion)
 - **Proper completion:** Exactly one output token per N input tokens
 - **No dead transitions:** All branches complete and are consumed
+
+## Counter-Based Synchronization API
+
+The module also provides a counter-based synchronization API that allows
+waiting for N threads (often majority) before proceeding, without waiting
+for ALL threads:
+
+```erlang
+%% Set threshold and wait for N threads
+discriminator:discriminator_wait(Pid, 3).
+
+%% Notify that a thread has arrived (returns ok when threshold reached)
+discriminator:discriminator_trigger(Pid, BranchIndex).
+
+%% Get current count of arrived threads
+discriminator:discriminator_count(Pid).
+
+%% Calculate remaining threads before trigger
+discriminator:threads_remaining(Pid, Threshold).
+
+%% Reset for next iteration
+discriminator:discriminator_reset(Pid, NewThreshold).
+```
+
+This is useful for majority-based synchronization patterns where you want
+to proceed when a quorum is reached rather than waiting for all branches.
 """.
 
 %% gen_pnet callbacks
@@ -119,7 +145,13 @@ Get the preset for the trigger transition:
     run/1,
     get_state/1,
     execute/2,
-    reset/1
+    reset/1,
+    %% Counter-based synchronization API
+    discriminator_wait/2,
+    discriminator_trigger/2,
+    discriminator_reset/2,
+    discriminator_count/1,
+    threads_remaining/2
 ]).
 
 %%====================================================================
@@ -132,7 +164,11 @@ Get the preset for the trigger transition:
     completed = [] :: [pos_integer()],
     triggered_by :: undefined | pos_integer(),
     cycle_count = 0 :: non_neg_integer(),
-    log_id :: binary() | undefined
+    log_id :: binary() | undefined,
+    %% Counter-based synchronization fields
+    threshold :: undefined | pos_integer(),  %% N threads to wait for (N <= branch_count)
+    counter = 0 :: non_neg_integer(),         %% Current count of arrived threads
+    triggered = false :: boolean()            %% Whether downstream has been triggered
 }).
 
 -type discriminator_state() :: #discriminator_state{}.
@@ -496,6 +532,39 @@ init(DiscriminatorState) ->
 handle_call(get_state, _From, NetState) ->
     UsrInfo = gen_yawl:get_usr_info(NetState),
     {reply, {ok, UsrInfo}};
+handle_call(get_counter, _From, NetState) ->
+    UsrInfo = gen_yawl:get_usr_info(NetState),
+    Counter = case UsrInfo of
+        #discriminator_state{counter = C} -> C;
+        _ -> 0
+    end,
+    {reply, Counter, NetState};
+handle_call({branch_arrived, _BranchIndex}, _From, NetState) ->
+    UsrInfo = gen_yawl:get_usr_info(NetState),
+    case UsrInfo of
+        #discriminator_state{counter = Counter, threshold = Threshold, triggered = Triggered} = State ->
+            NewCounter = Counter + 1,
+            case NewCounter >= Threshold of
+                true when Triggered =:= false ->
+                    %% Threshold reached, trigger downstream
+                    {reply, ok, gen_yawl:set_usr_info(NetState,
+                        State#discriminator_state{counter = NewCounter, triggered = true})};
+                _ ->
+                    {reply, ok, gen_yawl:set_usr_info(NetState,
+                        State#discriminator_state{counter = NewCounter})}
+            end;
+        _ ->
+            {reply, {error, bad_state}, NetState}
+    end;
+handle_call({threads_remaining, Threshold}, _From, NetState) ->
+    UsrInfo = gen_yawl:get_usr_info(NetState),
+    Remaining = case UsrInfo of
+        #discriminator_state{counter = Counter} ->
+            Threshold - Counter;
+        _ ->
+            Threshold
+    end,
+    {reply, max(0, Remaining), NetState};
 handle_call(_Request, _From, _NetState) ->
     {reply, {error, bad_msg}}.
 
@@ -508,6 +577,24 @@ handle_call(_Request, _From, _NetState) ->
 
 handle_cast(reset_discriminator, _NetState) ->
     noreply;
+handle_cast({set_threshold, Threshold}, NetState) ->
+    UsrInfo = gen_yawl:get_usr_info(NetState),
+    case UsrInfo of
+        #discriminator_state{} = State ->
+            {noreply, gen_yawl:set_usr_info(NetState,
+                State#discriminator_state{threshold = Threshold})};
+        _ ->
+            noreply
+    end;
+handle_cast({reset_counter, NewThreshold}, NetState) ->
+    UsrInfo = gen_yawl:get_usr_info(NetState),
+    case UsrInfo of
+        #discriminator_state{} = State ->
+            {noreply, gen_yawl:set_usr_info(NetState,
+                State#discriminator_state{counter = 0, threshold = NewThreshold, triggered = false})};
+        _ ->
+            noreply
+    end;
 handle_cast(_Request, _NetState) ->
     noreply.
 
@@ -548,6 +635,64 @@ terminate(_Reason, NetState) ->
             ok
     end,
     ok.
+
+%%====================================================================
+%% Counter-Based Synchronization API
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Gets the current counter value.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec discriminator_count(pid()) -> non_neg_integer().
+
+discriminator_count(Pid) ->
+    gen_yawl:call(Pid, get_counter).
+
+%%--------------------------------------------------------------------
+%% @doc Waits for N threads to arrive before triggering.
+%%
+%% Sets the threshold and waits for that many threads.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec discriminator_wait(pid(), pos_integer()) -> ok.
+
+discriminator_wait(Pid, Threshold) ->
+    gen_yawl:cast(Pid, {set_threshold, Threshold}),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Triggers downstream when threshold is reached.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec discriminator_trigger(pid(), pos_integer()) -> ok | {error, term()}.
+
+discriminator_trigger(Pid, BranchIndex) ->
+    gen_yawl:call(Pid, {branch_arrived, BranchIndex}).
+
+%%--------------------------------------------------------------------
+%% @doc Resets the counter for next cycle.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec discriminator_reset(pid(), pos_integer()) -> ok.
+
+discriminator_reset(Pid, NewThreshold) ->
+    gen_yawl:cast(Pid, {reset_counter, NewThreshold}),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc Returns how many threads are yet to arrive.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec threads_remaining(pid(), pos_integer()) -> non_neg_integer().
+
+threads_remaining(Pid, Threshold) ->
+    gen_yawl:call(Pid, {threads_remaining, Threshold}).
 
 %%====================================================================
 %% Internal Helper Functions

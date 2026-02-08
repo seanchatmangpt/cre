@@ -71,8 +71,8 @@ analyze_block_reason(Pid, Executor, Marking) ->
     PresetMap = maps:from_list([{T, RootMod:preset(T)} || T <- Transitions]),
     FindResult = find_inject_place_analyze(Transitions, PresetMap, Marking),
     SubnetTokens = has_subnet_tokens(Executor, Marking),
-    PresetAnalysis = preset_analysis(Transitions, PresetMap, Marking,
-        [t_GoNoGo, t_CloseSymposium]),
+    HumanTasks = [T || T <- Transitions, length(maps:get(T, PresetMap, [])) >= 2],
+    PresetAnalysis = preset_analysis(Transitions, PresetMap, Marking, HumanTasks),
     Enabled = try gen_yawl:enabled_transitions(Pid) of
         L when is_list(L) -> L
     catch _:_ -> []
@@ -157,10 +157,20 @@ has_subnet_tokens(Executor, Marking) ->
             Index = subnet_index(NetId, SubnetModules),
             P42Place = list_to_atom("p_thread" ++ integer_to_list(Index)),
             BranchTokens = maps:get(BranchPlace, Marking, []) ++ maps:get(P42Place, Marking, []),
-            BranchTokens =/= []
+            EntryTokens = case wf_yawl_executor:get_subnet_info(Executor, NetId) of
+                #{entry := E} when E =/= undefined ->
+                    EntryAtom = to_place_atom(E),
+                    maps:get(EntryAtom, Marking, []);
+                _ -> []
+            end,
+            (BranchTokens ++ EntryTokens) =/= []
         end, SubnetModules)
     catch _:_ -> false
     end.
+
+to_place_atom(B) when is_binary(B) -> binary_to_atom(B, utf8);
+to_place_atom(A) when is_atom(A) -> A;
+to_place_atom(_) -> undefined.
 
 subnet_index(NetId, SubnetModules) ->
     I = find_index(NetId, SubnetModules, 1),

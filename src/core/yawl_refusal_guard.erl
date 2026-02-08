@@ -383,9 +383,9 @@ determine_guard_type(_) -> expr.
 
 evaluate_do_expr(true, _Context) -> true;
 evaluate_do_expr(false, _Context) -> false;
-evaluate_do_expr({not, Expr}, Context) ->
+evaluate_do_expr({'not', Expr}, Context) ->
     not evaluate_do_expr(Expr, Context);
-evaluate_do_expr({and, Left, Right}, Context) ->
+evaluate_do_expr({'and', Left, Right}, Context) ->
     evaluate_do_expr(Left, Context) andalso evaluate_do_expr(Right, Context);
 evaluate_do_expr({'or', Left, Right}, Context) ->
     evaluate_do_expr(Left, Context) orelse evaluate_do_expr(Right, Context);
