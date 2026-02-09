@@ -59,7 +59,7 @@ start_token(Place, Payload, Options, Opts) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec terminate_token(pid()) -> ok | {error, term()}.
+-spec terminate_token(pid()) -> ok | {error, not_found | simple_one_for_one | term()}.
 
 terminate_token(Pid) when is_pid(Pid) ->
     supervisor:terminate_child(?MODULE, Pid).
@@ -69,8 +69,7 @@ terminate_token(Pid) when is_pid(Pid) ->
 %%====================================================================
 
 %% @private
--spec init([]) -> {ok, {{supervisor:strategy(), non_neg_integer(), pos_integer()},
-                         [supervisor:child_spec()]}}.
+-spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 
 init([]) ->
     SupFlags = #{

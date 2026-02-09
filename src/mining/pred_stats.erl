@@ -69,7 +69,7 @@ fit_markov(Traces) ->
 predict_markov(Traces, LastActivity) when is_atom(LastActivity) ->
     Model = fit_markov(Traces),
     predict_markov(Model, LastActivity);
-predict_markov(#markov_model{transitions = Transitions}, LastActivity) ->
+predict_markov(#markov_model{transitions = Transitions, activities = _Activities}, LastActivity) ->
     %% Get all transitions from LastActivity
     case maps:get(LastActivity, Transitions, undefined) of
         undefined -> [];
@@ -143,6 +143,8 @@ predict_ema(#ema_model{last_ema = EMA}, _StepsAhead) ->
 
 %% @doc Fit linear regression to values.
 -spec fit_linear([float()]) -> #linear_model{}.
+fit_linear([]) ->
+    #linear_model{slope = 0.0, intercept = 0.0, r_squared = 0.0};
 fit_linear(Values) when is_list(Values) ->
     N = length(Values),
     X = lists:seq(1, N),
@@ -162,22 +164,27 @@ fit_linear(Values) when is_list(Values) ->
     Intercept = (SumY - Slope * SumX) / N,
 
     %% Calculate R-squared
-    YMean = lists:sum(Y) / N,
-    SST = lists:sum([(Yi - YMean) * (Yi - YMean) || Yi <- Y]),
-    SSR = case SST of
-        0.0 -> 0.0;
-        _ -> lists:sum([math:pow(Yi - (Intercept + Slope * Xi), 2) || {Yi, Xi} <- lists:zip(Y, X)])
-    end,
-    RSquared = case SST of
-        0.0 -> 1.0;
-        _ -> 1.0 - (SSR / SST)
-    end,
-
-    #linear_model{
-        slope = Slope,
-        intercept = Intercept,
-        r_squared = RSquared
-    }.
+    case N of
+        1 ->
+            %% Perfect fit for single point
+            #linear_model{slope = Slope, intercept = Intercept, r_squared = 1.0};
+        _ ->
+            YMean = lists:sum(Y) / N,
+            SST = lists:sum([(Yi - YMean) * (Yi - YMean) || Yi <- Y]),
+            SSR = case SST of
+                0.0 -> 0.0;
+                _ -> lists:sum([math:pow(Yi - (Intercept + Slope * Xi), 2) || {Yi, Xi} <- lists:zip(Y, X)])
+            end,
+            RSquared = case SST of
+                0.0 -> 1.0;
+                _ -> 1.0 - (SSR / SST)
+            end,
+            #linear_model{
+                slope = Slope,
+                intercept = Intercept,
+                r_squared = RSquared
+            }
+    end.
 
 %% @doc Predict using linear model.
 -spec predict_linear(#linear_model{}, integer()) -> float().

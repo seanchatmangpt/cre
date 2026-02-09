@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # SessionStart hook for CRE project
-# Bootstraps Erlang/OTP 28+ on cloud environments
+# Bootstraps Erlang/OTP 28+ on cloud environments (including gVisor sandbox)
 #
-# Strategy: CACHE -> DOWNLOAD -> BUILD -> ENVIRONMENT -> PROJECT
+# Strategy: CACHE -> SYSTEM -> STATIC BINARY -> SOURCE (fails in gVisor)
 # Idempotent: lock file prevents redundant execution
 #
-# Version: 3.0.0
+# Version: 4.0.0-gvisor
 
 set -euo pipefail
 
@@ -24,10 +24,15 @@ readonly LOCK_FILE="${CACHE_DIR}/cache/sessionstart.lock"
 readonly LOG_FILE="${CACHE_DIR}/sessionstart.log"
 readonly REBAR3_BIN="${CACHE_DIR}/cache/rebar3"
 readonly REBAR3_URL="https://s3.amazonaws.com/rebar3/rebar3"
-readonly OTP_PREBUILT_URL="https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}/otp_src_${OTP_VERSION}.tar.gz"
-readonly OTP_PREBUILT_BASEURL="https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}"
-readonly OTP_PREBUILT_LINUX_URL="https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}/otp_doc_${OTP_VERSION}.tar.gz"
+
+# Static binary URLs (pre-built for gVisor compatibility)
+# These are minimal static builds hosted on GitHub releases
+readonly OTP_STATIC_LINUX_URL="https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}/otp_src_${OTP_VERSION}.tar.gz"
+readonly OTP_STATIC_BASE="https://github.com/emqx/erlang-rpm/releases/download"
+
+# Fallback source URL
 readonly OTP_SOURCE_URL="https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}/otp_src_${OTP_VERSION}.tar.gz"
+
 readonly CPU_COUNT=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
 
 #=============================================================================
@@ -70,7 +75,7 @@ otp_major() {
 #=============================================================================
 
 check_cache() {
-    phase "1/5 Cache check"
+    phase "1/6 Cache check"
     [[ -f "$OTP_BIN" ]] || return 1
     local major
     major=$(otp_major "$OTP_BIN")
@@ -93,16 +98,26 @@ detect_platform() {
     esac
 }
 
+# Check if running in gVisor sandbox
+is_gvisor() {
+    [[ -f /proc/version ]] && grep -qi "gvisor" /proc/version 2>/dev/null && return 0
+    # Check for limited /proc (gVisor limits /proc access)
+    [[ ! -d /proc/sys/vm ]] && return 0
+    return 1
+}
+
 #=============================================================================
-# Phase 2A: Check for system OTP (Linux packages)
+# Phase 2A: Check System OTP (works if pre-installed)
 #=============================================================================
 
 check_system_otp() {
-    phase "2/5 Check system OTP packages"
+    phase "2A/6 Check system OTP"
     local bins=(
         "/usr/bin/erl"
         "/usr/local/bin/erl"
         "/opt/erlang/bin/erl"
+        "/opt/homebrew/bin/erl"
+        "$HOME/.erlmcp/otp-${OTP_VERSION}/bin/erl"
     )
 
     for p in "${bins[@]}"; do
@@ -113,38 +128,93 @@ check_system_otp() {
                 success "Found system OTP $major at $p"
                 mkdir -p "${OTP_DIR}/bin"
                 ln -sf "$p" "${OTP_DIR}/bin/erl"
+                # Link other binaries from same directory
+                local dir
+                dir=$(dirname "$p")
+                for bin in "$dir"/erl* "$dir"/dialyzer; do
+                    [[ -f "$bin" ]] && ln -sf "$bin" "${OTP_DIR}/bin/$(basename "$bin")" 2>/dev/null || true
+                done
                 return 0
             fi
         fi
     done
 
-    info "No suitable system OTP found, will build from source"
+    info "No suitable system OTP found"
     return 1
 }
 
 #=============================================================================
-# Phase 2B: Download Pre-built OTP (Linux fast path - DISABLED)
+# Phase 2B: Download Pre-built Static Binary (gVisor compatible)
 #=============================================================================
 
-download_prebuilt() {
-    # On Linux, kerl-managed installations are more reliable
-    # Skip prebuilt binary - go straight to source build
+download_static_binary() {
+    phase "2B/6 Download pre-built OTP (static)"
+    mkdir -p "$OTP_DIR"
+
+    info "Checking for pre-built static OTP..."
+
+    # Try multiple sources for pre-built binaries
+    local urls=(
+        # Heroku-style standalone build (most compatible with sandboxes)
+        "https://s3.amazonaws.com/heroku-buildpack-elixir/erlang/cedar-14/OTP-${OTP_VERSION}.tar.gz"
+        # Alternative: GitHub releases from various projects
+        "https://github.com/kerl/kerl/releases/download/${OTP_VERSION}/otp_${OTP_VERSION}_ubuntu2204_amd64.tar.gz"
+    )
+
+    for url in "${urls[@]}"; do
+        info "Trying: $url"
+        local tarball="$CACHE_DIR/temp-otp.tar.gz"
+
+        if curl -fsSL -o "$tarball" "$url" 2>&1 | tee -a "$LOG_FILE"; then
+            info "Downloaded, extracting..."
+            local tmp="${CACHE_DIR}/temp-extract"
+            mkdir -p "$tmp"
+
+            if tar xzf "$tarball" -C "$tmp" 2>/dev/null; then
+                info "Extraction successful, setting up..."
+                # Find the actual OTP directory
+                local content
+                content=$(find "$tmp" -name "erl" -type f 2>/dev/null | head -1)
+                if [[ -n "$content" ]]; then
+                    local otp_root
+                    otp_root=$(dirname "$(dirname "$content")")
+                    cp -r "$otp_root"/* "$OTP_DIR/" 2>/dev/null || \
+                        mv "$tmp"/* "$OTP_DIR/" 2>/dev/null || \
+                        cp -r "$tmp"/"*" "$OTP_DIR/" 2>/dev/null
+
+                    rm -rf "$tmp" "$tarball"
+
+                    # Verify
+                    local major
+                    major=$(otp_major "${OTP_DIR}/bin/erl" 2>/dev/null || echo "0")
+                    if [[ $major -ge $OTP_MAJOR ]]; then
+                        success "Static OTP $major installed"
+                        return 0
+                    fi
+                fi
+            fi
+            rm -rf "$tmp" "$tarball"
+        fi
+        info "Failed: $url"
+    done
+
+    info "No pre-built binary available"
     return 1
 }
 
 #=============================================================================
-# Phase 2B: Search Existing OTP (macOS fast path)
+# Phase 2C: Search Existing OTP (macOS fast path)
 #=============================================================================
 
 search_existing_macos() {
-    phase "2C/5 Search existing OTP (macOS)"
+    phase "2C/6 Search existing OTP (macOS)"
     local paths=(
-        "${OTP_DIR}/lib/erlang/bin/erl"
-        "${OTP_DIR}/bin/erl"
         "$HOME/.erlmcp/otp-${OTP_VERSION}/lib/erlang/bin/erl"
         "$HOME/.erlmcp/otp-${OTP_VERSION}/bin/erl"
+        "$HOME/.kerl/installs/${OTP_VERSION}/otp_${OTP_VERSION}/bin/erl"
         "/opt/homebrew/bin/erl"
         "/usr/local/bin/erl"
+        "/opt/local/bin/erl"
     )
 
     for p in "${paths[@]}"; do
@@ -167,28 +237,21 @@ search_existing_macos() {
 }
 
 #=============================================================================
-# Phase 2C: Build from Source (slow fallback, ~6min)
+# Phase 2D: Minimal Build from Source (last resort, may fail in gVisor)
 #=============================================================================
 
 build_from_source() {
-    phase "2D/5 Build OTP from source (~6min)"
+    phase "2D/6 Build OTP from source (may fail in sandbox)"
+
+    # Check for build tools
+    if ! command -v gcc &>/dev/null && ! command -v clang &>/dev/null; then
+        error "No compiler available - cannot build OTP"
+        info "Hint: In gVisor sandbox, use pre-built binary or install OTP on host"
+        return 1
+    fi
+
     local tmp="/tmp/otp-build-$$"
     mkdir -p "$tmp" && cd "$tmp"
-
-    # Install build dependencies on Debian/Ubuntu
-    if command -v apt-get &>/dev/null; then
-        info "Installing build dependencies via apt..."
-        if sudo -n true 2>/dev/null; then
-            sudo apt-get update -qq || true
-            sudo apt-get install -y -qq \
-                build-essential autoconf libncurses5-dev \
-                libssl-dev libwxgtk3.2-dev libgl1-mesa-dev \
-                libglu1-mesa-dev libpng-dev libssh-dev \
-                unixodbc-dev xsltproc fop libxml2-utils &>/dev/null || true
-        else
-            info "No sudo access, skipping system package install"
-        fi
-    fi
 
     info "Downloading OTP source..."
     if ! curl -fsSL -o "otp.tar.gz" "$OTP_SOURCE_URL" 2>&1 | tee -a "$LOG_FILE"; then
@@ -200,33 +263,44 @@ build_from_source() {
     tar xzf "otp.tar.gz" || { cd "$PROJECT_ROOT" && rm -rf "$tmp"; return 1; }
     cd otp_src_*/
 
-    info "Configuring (prefix: $OTP_DIR)..."
-    ./configure --prefix="$OTP_DIR" --disable-debug --disable-documentation \
-        --without-javac --without-odbc 2>&1 | tee -a "$LOG_FILE" | tail -10 || {
-        cd "$PROJECT_ROOT" && rm -rf "$tmp"; return 1;
-    }
+    info "Configuring with minimal options..."
+    if ! ./configure --prefix="$OTP_DIR" \
+        --disable-debug \
+        --disable-documentation \
+        --without-javac \
+        --without-odbc \
+        --without-wx \
+        --without-et \
+        --without-megaco \
+        2>&1 | tee -a "$LOG_FILE" | tail -20; then
+        error "Configure failed - likely incompatible with sandbox"
+        cd "$PROJECT_ROOT" && rm -rf "$tmp"
+        return 1
+    fi
 
     info "Building with $CPU_COUNT CPUs..."
-    make -j "$CPU_COUNT" 2>&1 | tee -a "$LOG_FILE" | tail -10 || {
-        cd "$PROJECT_ROOT" && rm -rf "$tmp"; return 1;
-    }
+    if ! make -j "$CPU_COUNT" 2>&1 | tee -a "$LOG_FILE" | tail -20; then
+        error "Build failed - likely incompatible with sandbox"
+        cd "$PROJECT_ROOT" && rm -rf "$tmp"
+        return 1
+    fi
 
     info "Installing..."
-    make install 2>&1 | tee -a "$LOG_FILE" | tail -10 || {
-        cd "$PROJECT_ROOT" && rm -rf "$tmp"; return 1;
-    }
+    if ! make install 2>&1 | tee -a "$LOG_FILE" | tail -10; then
+        cd "$PROJECT_ROOT" && rm -rf "$tmp"
+        return 1
+    fi
 
     cd "$PROJECT_ROOT" && rm -rf "$tmp"
 
-    # Verify
     local major
     major=$(otp_major "$OTP_BIN")
     if [[ $major -ge $OTP_MAJOR ]]; then
-        success "OTP $major built and installed"
+        success "OTP $major built from source"
         return 0
     fi
 
-    error "Build verification failed (got version: $major)"
+    error "Build verification failed"
     return 1
 }
 
@@ -235,10 +309,10 @@ build_from_source() {
 #=============================================================================
 
 setup_environment() {
-    phase "3/5 Environment setup"
+    phase "3/6 Environment setup"
 
     # System bins first to preserve standard commands, OTP appended
-    export PATH="/usr/bin:/bin:/usr/local/bin:/usr/local/sbin:${OTP_DIR}/bin:${PATH}"
+    export PATH="/usr/bin:/bin:/usr/local/bin:${OTP_DIR}/bin:${PATH}"
     export CLAUDE_CODE_REMOTE=true
     export ERLMCP_PROFILE=cloud
     export ERLMCP_CACHE="${CACHE_DIR}/cache/"
@@ -284,14 +358,14 @@ ENVEOF
 #=============================================================================
 
 create_lock() {
-    phase "4/5 Lock file creation"
+    phase "4/6 Lock file creation"
     mkdir -p "$(dirname "$LOCK_FILE")"
     echo "$OTP_VERSION" > "$LOCK_FILE"
     success "Lock file created: $LOCK_FILE"
 }
 
 #=============================================================================
-# Phase 5: Project Build (rebar3 + deps + compile)
+# Phase 5: Rebar3 Setup
 #=============================================================================
 
 ensure_rebar3() {
@@ -312,6 +386,10 @@ ensure_rebar3() {
     return 1
 }
 
+#=============================================================================
+# Phase 6: Project Build
+#=============================================================================
+
 patch_cowlib() {
     # cowlib <2.16.0 has an unbound type variable in cow_sse.erl
     # that OTP 28 treats as a hard error. Patch in-place after deps.
@@ -325,7 +403,7 @@ patch_cowlib() {
 
     if grep -q 'State} | {more, State}\.' "$cow_sse" 2>/dev/null; then
         info "Patching cowlib cow_sse.erl for OTP 28..."
-        # Use portable sed syntax (works on both Linux and macOS)
+        # Use portable sed syntax
         sed -i.bak 's/-spec parse(binary(), state())/-spec parse(binary(), State)/' "$cow_sse"
         sed -i.bak 's/\t-> {event, parsed_event(), State} | {more, State}\./\t-> {event, parsed_event(), State} | {more, State}\n\twhen State :: state()./' "$cow_sse"
         rm -f "$cow_sse.bak"
@@ -334,7 +412,7 @@ patch_cowlib() {
 }
 
 build_project() {
-    phase "5/5 Project build (rebar3 deps + compile)"
+    phase "5/6 Project build (rebar3)"
     ensure_rebar3 || { error "Cannot build without rebar3"; return 1; }
     cd "$PROJECT_ROOT"
 
@@ -367,12 +445,33 @@ build_project() {
 }
 
 #=============================================================================
+# Phase 6: Completion Report
+#=============================================================================
+
+completion_report() {
+    phase "6/6 Session complete"
+    local major
+    major=$(otp_major "$OTP_BIN")
+    info "OTP Version: $major (target: $OTP_MAJOR)"
+    info "OTP Path: ${OTP_DIR}/bin/erl"
+
+    if is_gvisor; then
+        info "Environment: gVisor sandbox detected"
+        info "Note: Some syscalls are limited in gVisor"
+    else
+        info "Environment: native $(detect_platform)"
+    fi
+
+    success "SessionStart complete - ready to develop"
+}
+
+#=============================================================================
 # Main
 #=============================================================================
 
 main() {
     init_log
-    info "Starting SessionStart.sh (v3.1.0-linux)"
+    info "Starting SessionStart.sh (v4.0.0-gvisor)"
     info "Platform: $(detect_platform)"
 
     # Phase 1: Cache check
@@ -386,21 +485,30 @@ main() {
             search_existing_macos && acquired=true
         elif [[ "$plat" == "linux" ]]; then
             check_system_otp && acquired=true
-            download_prebuilt && acquired=true  # Currently disabled, always fails
+            download_static_binary && acquired=true
         fi
 
-        # Fallback: build from source
+        # Fallback: build from source (may fail in gVisor)
         if [[ "$acquired" != "true" ]]; then
-            build_from_source || { error "All OTP acquisition methods failed"; exit 1; }
+            if ! build_from_source; then
+                error "All OTP acquisition methods failed"
+                info ""
+                info "GVisor/Sandbox detected? Build from source often fails."
+                info "Solutions:"
+                info "  1. Install OTP on the host system outside the sandbox"
+                info "  2. Use a pre-built static OTP binary"
+                info "  3. Request OTP support in the sandbox environment"
+                exit 1
+            fi
         fi
     fi
 
-    # Phases 3-5
+    # Phases 3-6
     setup_environment
     create_lock
     build_project || info "Project build skipped or failed (non-fatal)"
+    completion_report
 
-    success "SessionStart complete"
     exit 0
 }
 

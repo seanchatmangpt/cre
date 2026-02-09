@@ -434,7 +434,7 @@ transition_state(Token = #active_token{history = History}, NewState) ->
     }.
 
 %% @private
--spec generate_token_id() -> binary().
+-spec generate_token_id() -> <<_:128>>.
 
 generate_token_id() ->
     Time = erlang:system_time(microsecond),
@@ -442,7 +442,7 @@ generate_token_id() ->
     <<Time:64, Unique:64>>.
 
 %% @private
--spec register_with_place(pid(), atom(), binary()) -> ok | {error, term()}.
+-spec register_with_place(pid(), atom(), binary()) -> ok.
 
 register_with_place(_Pid, _Place, _TokenId) ->
     %% TODO: Integrate with place_coordinator

@@ -148,6 +148,7 @@ tanh_list(List) ->
 
 %% @doc Softmax normalization.
 -spec softmax([float()]) -> [float()].
+softmax([]) -> [];
 softmax(List) ->
     Max = lists:max(List),
     ExpList = [math:exp(X - Max) || X <- List],

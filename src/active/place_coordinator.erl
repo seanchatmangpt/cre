@@ -97,7 +97,7 @@ register_token(NetMod, Place, {TokenId, Pid}) when is_atom(NetMod), is_atom(Plac
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec unregister_token(atom(), atom()) -> ok.
+-spec unregister_token(atom(), binary()) -> ok.
 
 unregister_token(NetMod, TokenId) when is_atom(NetMod), is_binary(TokenId) ->
     %% Find which place the token is in
@@ -136,8 +136,7 @@ get_tokens(NetMod, Place) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec enable_transition(atom(), atom(), [binary()]) ->
-          {ok, [binary()]} | {error, term()}.
+-spec enable_transition(atom(), atom(), [binary()]) -> {ok, [binary()]}.
 
 enable_transition(_NetMod, _Transition, TokenIds) ->
     %% Find the place from the transition's preset
@@ -159,7 +158,7 @@ notify_tokens(Place, Message) when is_atom(Place) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec notify_tokens(atom() | undefined, atom(), term()) -> ok.
+-spec notify_tokens(undefined, atom(), term()) -> ok.
 
 notify_tokens(NetMod, Place, Message) ->
     CoordinatorName = place_coordinator_name(Place, NetMod),
