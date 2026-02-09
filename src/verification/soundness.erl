@@ -404,13 +404,15 @@ reduction_rules(Net) ->
 %% @private
 reduction_rules(Net, MaxIter) when MaxIter > 0 ->
     %% Try to apply each reduction rule in order
+    %% Note: eliminate_self_loop_transition must run before eliminate_self_loop_place
+    %% to avoid clearing preset/postset before transition detection
     Rules = [
         fusion_series_places,
         fusion_series_transitions,
         fusion_parallel_places,
         fusion_parallel_transitions,
-        eliminate_self_loop_place,
-        eliminate_self_loop_transition
+        eliminate_self_loop_transition,
+        eliminate_self_loop_place
     ],
 
     case apply_any_reduction(Rules, Net) of
@@ -667,15 +669,11 @@ build_adjacency(Preset, Postset, Transitions, Direction) ->
 do_bfs([], Visited, _Adj) ->
     sets:to_list(Visited);
 do_bfs([Node | Rest], Visited, Adj) ->
-    case sets:is_element(Node, Visited) of
-        true ->
-            do_bfs(Rest, Visited, Adj);
-        false ->
-            NewVisited = sets:add_element(Node, Visited),
-            Neighbors = maps:get(Node, Adj, sets:new()),
-            NewNodes = sets:to_list(Neighbors),
-            do_bfs(NewNodes ++ Rest, NewVisited, Adj)
-    end.
+    NewVisited = sets:add_element(Node, Visited),
+    Neighbors = maps:get(Node, Adj, sets:new()),
+    %% Filter out already-visited neighbors before adding to queue
+    NewNodes = sets:to_list(sets:subtract(Neighbors, NewVisited)),
+    do_bfs(Rest ++ NewNodes, NewVisited, Adj).
 
 %% @private
 %% Creates the initial marking with a token at the source place.
@@ -718,20 +716,77 @@ compute_reachable_states(Net, InitMarking, MaxStates, StartTime, Timeout) ->
     compute_reachable_states(Net, [InitMarking], sets:from_list([InitMarking]), MaxStates, StartTime, Timeout).
 
 compute_reachable_states(_Net, [], Visited, _MaxStates, _StartTime, _Timeout) ->
-    {sets:to_list(Visited), length(Visited)};
-compute_reachable_states(_Net, _Frontier, Visited, MaxStates, StartTime, _Timeout) ->
+    {sets:to_list(Visited), sets:size(Visited)};
+compute_reachable_states(Net, [Marking | Rest] = Frontier, Visited, MaxStates, StartTime, _Timeout) ->
+    %% Check limits
     CurrentTime = erlang:monotonic_time(millisecond),
     case CurrentTime - StartTime > 5000 of
         true ->
-            {sets:to_list(Visited), length(Visited)};
+            {sets:to_list(Visited), sets:size(Visited)};
         false ->
             case sets:size(Visited) >= MaxStates of
                 true ->
-                    {sets:to_list(Visited), length(Visited)};
+                    {sets:to_list(Visited), sets:size(Visited)};
                 false ->
-                    {sets:to_list(Visited), length(Visited)}
+                    %% Find all enabled transitions in this marking
+                    NewMarkings = fire_all_enabled(Net, Marking),
+                    %% Filter out already-visited markings
+                    UnvisitedNewMarkings = lists:filter(fun(M) ->
+                        not sets:is_element(M, Visited)
+                    end, NewMarkings),
+                    %% Add new markings to visited and frontier
+                    NewVisited = lists:foldl(fun(M, V) ->
+                        sets:add_element(M, V)
+                    end, Visited, UnvisitedNewMarkings),
+                    NewFrontier = Rest ++ UnvisitedNewMarkings,
+                    compute_reachable_states(Net, NewFrontier, NewVisited, MaxStates, StartTime, _Timeout)
             end
     end.
+
+%% @private
+%% Fires all enabled transitions and returns the resulting markings.
+fire_all_enabled(Net, Marking) ->
+    Preset = maps:get(preset, Net, #{}),
+    Postset = maps:get(postset, Net, #{}),
+    Transitions = maps:get(transitions, Net, []),
+
+    %% Find all enabled transitions
+    Enabled = lists:filter(fun(T) ->
+        InputPlaces = maps:get(T, Preset, []),
+        lists:all(fun(P) ->
+            case maps:get(P, Marking, []) of
+                [_ | _] -> true;
+                [] -> false
+            end
+        end, InputPlaces)
+    end, Transitions),
+
+    %% Fire each enabled transition and collect resulting markings
+    lists:map(fun(T) ->
+        fire_transition(Net, T, Marking, Preset, Postset)
+    end, Enabled).
+
+%% @private
+%% Fires a single transition and returns the resulting marking.
+fire_transition(_Net, Transition, Marking, Preset, Postset) ->
+    %% Consume tokens from input places
+    InputPlaces = maps:get(Transition, Preset, []),
+    AfterConsume = lists:foldl(fun(P, M) ->
+        case maps:get(P, M, []) of
+            [_Token] -> maps:remove(P, M);
+            [Token | Rest] -> maps:put(P, Rest, M);
+            [] -> M
+        end
+    end, Marking, InputPlaces),
+
+    %% Produce tokens to output places
+    OutputPlaces = maps:get(Transition, Postset, []),
+    lists:foldl(fun(P, M) ->
+        case maps:get(P, M, []) of
+            [] -> maps:put(P, [token], M);
+            Tokens -> maps:put(P, [token | Tokens], M)
+        end
+    end, AfterConsume, OutputPlaces).
 
 %% @private
 %% Checks option to complete property.
@@ -876,25 +931,43 @@ fuse_parallel_transitions(Net) ->
 
 %% @private
 %% Eliminates self-loop places (places that are both input and output of same transition).
+%% Only removes the place from the specific transition's preset/postset that creates the self-loop.
 eliminate_self_loop_places(Net) ->
     Preset = maps:get(preset, Net, #{}),
     Postset = maps:get(postset, Net, #{}),
-    Places = maps:get(places, Net, []),
+    Transitions = maps:get(transitions, Net, []),
 
-    %% Find places that are in both preset and postset of same transition
-    SelfLoopPlaces = lists:filter(fun(P) ->
-        lists:any(fun(T) ->
-            InPreset = lists:member(P, maps:get(T, Preset, [])),
-            InPostset = lists:member(P, maps:get(T, Postset, [])),
-            InPreset andalso InPostset
-        end, maps:keys(Preset))
-    end, Places),
+    %% Find (transition, place) pairs where the place is in both preset and postset
+    SelfLoopPairs = lists:flatmap(fun(T) ->
+        Ps = maps:get(T, Preset, []),
+        Pt = maps:get(T, Postset, []),
+        case lists:usort(Ps) =:= lists:usort(Pt) andalso Ps =/= [] of
+            true ->
+                %% This transition is a self-loop on all its input places
+                %% Return pairs to remove
+                [{T, P} || P <- Ps];
+            false ->
+                %% Find places that are in both preset and postset (partial self-loop)
+                Common = lists:filter(fun(P) ->
+                    lists:member(P, Ps) andalso lists:member(P, Pt)
+                end, Ps),
+                [{T, P} || P <- Common]
+        end
+    end, Transitions),
 
-    %% Remove self-loop places from preset and postset
-    NewPreset = remove_self_loops_from_arcs(Preset, SelfLoopPlaces),
-    NewPostset = remove_self_loops_from_arcs(Postset, SelfLoopPlaces),
+    %% Remove specific (transition, place) pairs from preset and postset
+    NewPreset = remove_self_loop_pairs_from_arcs(Preset, SelfLoopPairs),
+    NewPostset = remove_self_loop_pairs_from_arcs(Postset, SelfLoopPairs),
 
     Net#{preset => NewPreset, postset => NewPostset}.
+
+%% @private
+%% Removes specific (transition, place) pairs from arcs.
+remove_self_loop_pairs_from_arcs(ArcMap, Pairs) ->
+    maps:map(fun(T, Places) ->
+        PairsToRemove = [P || {Tx, P} <- Pairs, Tx =:= T],
+        lists:filter(fun(P) -> not lists:member(P, PairsToRemove) end, Places)
+    end, ArcMap).
 
 %% @private
 remove_self_loops_from_arcs(ArcMap, SelfLoopPlaces) ->

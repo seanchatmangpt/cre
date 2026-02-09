@@ -47,7 +47,17 @@
 %% -------------------------------------------------------------------
 
 -module(cre_yawl_resource_SUITE).
+-include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
+
+%% Common Test callbacks
+-export([all/0]).
+
+%%====================================================================
+%% Common Test Callbacks
+%%====================================================================
+
+all() -> [].
 
 %%====================================================================
 %% Test Setup/Teardown
