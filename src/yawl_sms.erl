@@ -681,9 +681,8 @@ doctest_get_delivery(MessageId) ->
 validate_phone_number(Phone) ->
     %% Basic E.164 format validation
     case Phone of
-        <<$+, _/binary>> when byte_size(Phone) >= 8, byte_size(Phone) =< 15 ->
+        <<$+, Rest/binary>> when byte_size(Phone) >= 8, byte_size(Phone) =< 15 ->
             %% Check remaining characters are digits
-            Rest = binary:part(Phone, 1, byte_size(Phone) - 1),
             is_digits(Rest);
         _ ->
             false

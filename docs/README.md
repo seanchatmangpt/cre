@@ -30,12 +30,15 @@ CRE is a **YAWL (Yet Another Workflow Language)** workflow engine implemented in
 
 ## 📚 Where to Start?
 
+See [INDEX.md](./INDEX.md) for the complete documentation index with all resources organized by category and learning path.
+
 ### 🚀 New Users (5 minutes)
 - **Start here**: [Quick Start Guide](./QUICK_START.md) - Get running immediately
+- **Documentation Index**: [INDEX.md](./INDEX.md) - Complete documentation catalog
 - **Try the examples**: [Basic Examples](../examples/)
 
 ### 🏗️ Developers & Architects
-- **API Reference**: [Complete API Documentation](./API_REFERENCE.md)
+- **API Reference**: [Complete API Documentation](./COMPLETE_API_REFERENCE.md)
 - **System Design**: [Architecture Overview](./ARCHITECTURE.md)
 - **Patterns Guide**: [YAWL Patterns Reference](./YAWL_PATTERNS_REFERENCE.md)
 - **Deployment**: [Production Guide](./DEPLOYMENT.md)
@@ -43,30 +46,32 @@ CRE is a **YAWL (Yet Another Workflow Language)** workflow engine implemented in
 ### 📖 Specific Topics
 - **Human-in-the-Loop**: [Approval Workflows](./HUMAN_IN_THE_LOOP.md)
 - **Telemetry**: [OpenTelemetry Integration](./YAWL_TELEMETRY_GUIDE.md)
-- **Migration**: [v0.1 to v0.2 Migration](./old/MIGRATION_V0.1_TO_V0.2.md) (archived)
+- **Migration**: [OTP 25-28 Migration](./OTP_25_28_MIGRATION.md)
 
 ## 🔗 Documentation Map
 
+For a complete documentation catalog, see [INDEX.md](./INDEX.md).
+
 ```
 docs/
-├── README.md                           # This file
+├── README.md                           # This file - Project overview
+├── INDEX.md                            # 📑 Complete documentation index
 ├── QUICK_START.md                     # 🚀 5-minute getting started
-├── API_REFERENCE.md                   # 📖 Complete API reference
+├── COMPLETE_API_REFERENCE.md          # 📖 Complete API reference
 ├── ARCHITECTURE.md                    # 🏗️ System architecture
 ├── DEPLOYMENT.md                      # 🚀 Production deployment
 ├── CONTRIBUTING.md                    # 🤝 Developer guide
-├── MIGRATION.md                       # 📥 Upgrade guides
 ├── YAWL_PATTERNS_REFERENCE.md         # 🔍 Pattern details
 ├── YAWL_PATTERN_EXAMPLES.md          # 💯 Pattern examples
 ├── YAWL_TELEMETRY_GUIDE.md          # 📊 Monitoring setup
-├── YAWL_TIMEOUT_REFERENCE.md          # ⏱️ Timeout configuration
 ├── HUMAN_IN_THE_LOOP.md               # 👥 Human approval flows
+├── tutorials/                         # 📚 Step-by-step tutorials
+├── patterns/                          # 🔧 Advanced pattern documentation
+├── reference/                         # 📖 Reference documentation
+├── yawl_patterns/                     # 🎯 YAWL pattern architecture
+├── diagrams/                          # 📊 Architecture diagrams
 ├── examples/                          # 💻 Working code examples
-│   ├── basic_workflow.erl
-│   ├── approval_workflow.erl
-│   └── parallel_processing.erl
 └── old/                               # 📦 Archived docs
-    └── PERSISTENT_TERM_OPTIMIZATIONS.md
 ```
 
 ## 🎯 Version Compatibility
