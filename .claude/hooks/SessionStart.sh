@@ -24,8 +24,9 @@ readonly LOCK_FILE="${CACHE_DIR}/cache/sessionstart.lock"
 readonly LOG_FILE="${CACHE_DIR}/sessionstart.log"
 readonly REBAR3_BIN="${CACHE_DIR}/cache/rebar3"
 readonly REBAR3_URL="https://s3.amazonaws.com/rebar3/rebar3"
-readonly OTP_PREBUILT_URL="https://github.com/seanchatmangpt/erlmcp/releases/download/erlang-28.3.1/erlang-28.3.1-linux-x86_64.tar.gz"
-readonly OTP_PREBUILT_SHA256="58f91a25499d962664dc8a5e94f52164524671d385baeebee72741c7748c57d8"
+readonly OTP_PREBUILT_URL="https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}/otp_src_${OTP_VERSION}.tar.gz"
+readonly OTP_PREBUILT_BASEURL="https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}"
+readonly OTP_PREBUILT_LINUX_URL="https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}/otp_doc_${OTP_VERSION}.tar.gz"
 readonly OTP_SOURCE_URL="https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}/otp_src_${OTP_VERSION}.tar.gz"
 readonly CPU_COUNT=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
 
@@ -93,64 +94,41 @@ detect_platform() {
 }
 
 #=============================================================================
-# Phase 2A: Download Pre-built OTP (Linux fast path)
+# Phase 2A: Check for system OTP (Linux packages)
+#=============================================================================
+
+check_system_otp() {
+    phase "2/5 Check system OTP packages"
+    local bins=(
+        "/usr/bin/erl"
+        "/usr/local/bin/erl"
+        "/opt/erlang/bin/erl"
+    )
+
+    for p in "${bins[@]}"; do
+        if [[ -f "$p" ]]; then
+            local major
+            major=$(otp_major "$p")
+            if [[ $major -ge $OTP_MAJOR ]]; then
+                success "Found system OTP $major at $p"
+                mkdir -p "${OTP_DIR}/bin"
+                ln -sf "$p" "${OTP_DIR}/bin/erl"
+                return 0
+            fi
+        fi
+    done
+
+    info "No suitable system OTP found, will build from source"
+    return 1
+}
+
+#=============================================================================
+# Phase 2B: Download Pre-built OTP (Linux fast path - DISABLED)
 #=============================================================================
 
 download_prebuilt() {
-    phase "2/5 Download pre-built OTP (Linux)"
-    mkdir -p "$OTP_DIR"
-    local tarball="$OTP_DIR/erlang-prebuilt.tar.gz"
-
-    info "Downloading pre-built OTP..."
-    if ! curl -fsSL -o "$tarball" "$OTP_PREBUILT_URL" 2>&1 | tee -a "$LOG_FILE"; then
-        info "Pre-built download failed"
-        rm -f "$tarball"
-        return 1
-    fi
-
-    # Verify checksum
-    local sha
-    sha=$(sha256sum "$tarball" 2>/dev/null | awk '{print $1}' || shasum -a 256 "$tarball" 2>/dev/null | awk '{print $1}')
-    if [[ "$sha" != "$OTP_PREBUILT_SHA256" ]]; then
-        error "SHA256 mismatch: expected $OTP_PREBUILT_SHA256, got $sha"
-        rm -f "$tarball"
-        return 1
-    fi
-    success "SHA256 verified"
-
-    # Extract
-    local tmp="${CACHE_DIR}/temp-extract"
-    mkdir -p "$tmp"
-    if ! tar xzf "$tarball" -C "$tmp"; then
-        rm -rf "$tmp" "$tarball"
-        return 1
-    fi
-
-    local content
-    content=$(ls -d "$tmp"/* 2>/dev/null | head -1)
-    rm -rf "$OTP_DIR"
-    if [[ -d "$content/bin" && -d "$content/lib" ]]; then
-        mv "$content" "$OTP_DIR"
-    else
-        mv "$tmp" "$OTP_DIR"
-    fi
-    rm -rf "$tmp" "$tarball"
-
-    # Patch ROOTDIR in erl script for relocatable install
-    if [[ -f "${OTP_DIR}/bin/erl" && -d "${OTP_DIR}/lib/erlang" ]]; then
-        sed -i "s|ROOTDIR=\".*\"|ROOTDIR=\"${OTP_DIR}/lib/erlang\"|" "${OTP_DIR}/bin/erl" 2>/dev/null || true
-    fi
-
-    # Verify binary runs on this platform
-    local test_major
-    test_major=$(otp_major "${OTP_DIR}/bin/erl")
-    if [[ $test_major -ge $OTP_MAJOR ]]; then
-        success "Pre-built OTP installed and verified"
-        return 0
-    fi
-
-    error "Pre-built binary failed (got version: $test_major)"
-    rm -rf "$OTP_DIR"
+    # On Linux, kerl-managed installations are more reliable
+    # Skip prebuilt binary - go straight to source build
     return 1
 }
 
@@ -159,7 +137,7 @@ download_prebuilt() {
 #=============================================================================
 
 search_existing_macos() {
-    phase "2/5 Search existing OTP (macOS)"
+    phase "2C/5 Search existing OTP (macOS)"
     local paths=(
         "${OTP_DIR}/lib/erlang/bin/erl"
         "${OTP_DIR}/bin/erl"
@@ -193,9 +171,24 @@ search_existing_macos() {
 #=============================================================================
 
 build_from_source() {
-    phase "2/5 Build OTP from source (~6min)"
+    phase "2D/5 Build OTP from source (~6min)"
     local tmp="/tmp/otp-build-$$"
     mkdir -p "$tmp" && cd "$tmp"
+
+    # Install build dependencies on Debian/Ubuntu
+    if command -v apt-get &>/dev/null; then
+        info "Installing build dependencies via apt..."
+        if sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq || true
+            sudo apt-get install -y -qq \
+                build-essential autoconf libncurses5-dev \
+                libssl-dev libwxgtk3.2-dev libgl1-mesa-dev \
+                libglu1-mesa-dev libpng-dev libssh-dev \
+                unixodbc-dev xsltproc fop libxml2-utils &>/dev/null || true
+        else
+            info "No sudo access, skipping system package install"
+        fi
+    fi
 
     info "Downloading OTP source..."
     if ! curl -fsSL -o "otp.tar.gz" "$OTP_SOURCE_URL" 2>&1 | tee -a "$LOG_FILE"; then
@@ -208,17 +201,18 @@ build_from_source() {
     cd otp_src_*/
 
     info "Configuring (prefix: $OTP_DIR)..."
-    ./configure --prefix="$OTP_DIR" --disable-debug --disable-documentation 2>&1 | tee -a "$LOG_FILE" | tail -5 || {
+    ./configure --prefix="$OTP_DIR" --disable-debug --disable-documentation \
+        --without-javac --without-odbc 2>&1 | tee -a "$LOG_FILE" | tail -10 || {
         cd "$PROJECT_ROOT" && rm -rf "$tmp"; return 1;
     }
 
     info "Building with $CPU_COUNT CPUs..."
-    make -j "$CPU_COUNT" 2>&1 | tee -a "$LOG_FILE" | tail -5 || {
+    make -j "$CPU_COUNT" 2>&1 | tee -a "$LOG_FILE" | tail -10 || {
         cd "$PROJECT_ROOT" && rm -rf "$tmp"; return 1;
     }
 
     info "Installing..."
-    make install 2>&1 | tee -a "$LOG_FILE" | tail -5 || {
+    make install 2>&1 | tee -a "$LOG_FILE" | tail -10 || {
         cd "$PROJECT_ROOT" && rm -rf "$tmp"; return 1;
     }
 
@@ -228,11 +222,11 @@ build_from_source() {
     local major
     major=$(otp_major "$OTP_BIN")
     if [[ $major -ge $OTP_MAJOR ]]; then
-        success "OTP built and installed"
+        success "OTP $major built and installed"
         return 0
     fi
 
-    error "Build verification failed"
+    error "Build verification failed (got version: $major)"
     return 1
 }
 
@@ -331,8 +325,10 @@ patch_cowlib() {
 
     if grep -q 'State} | {more, State}\.' "$cow_sse" 2>/dev/null; then
         info "Patching cowlib cow_sse.erl for OTP 28..."
-        sed -i 's/-spec parse(binary(), state())/-spec parse(binary(), State)/' "$cow_sse"
-        sed -i 's/\t-> {event, parsed_event(), State} | {more, State}\./\t-> {event, parsed_event(), State} | {more, State}\n\twhen State :: state()./' "$cow_sse"
+        # Use portable sed syntax (works on both Linux and macOS)
+        sed -i.bak 's/-spec parse(binary(), state())/-spec parse(binary(), State)/' "$cow_sse"
+        sed -i.bak 's/\t-> {event, parsed_event(), State} | {more, State}\./\t-> {event, parsed_event(), State} | {more, State}\n\twhen State :: state()./' "$cow_sse"
+        rm -f "$cow_sse.bak"
         success "cowlib patched"
     fi
 }
@@ -376,7 +372,7 @@ build_project() {
 
 main() {
     init_log
-    info "Starting SessionStart.sh (v3.0.0)"
+    info "Starting SessionStart.sh (v3.1.0-linux)"
     info "Platform: $(detect_platform)"
 
     # Phase 1: Cache check
@@ -389,7 +385,8 @@ main() {
         if [[ "$plat" == "macos" ]]; then
             search_existing_macos && acquired=true
         elif [[ "$plat" == "linux" ]]; then
-            download_prebuilt && acquired=true
+            check_system_otp && acquired=true
+            download_prebuilt && acquired=true  # Currently disabled, always fails
         fi
 
         # Fallback: build from source

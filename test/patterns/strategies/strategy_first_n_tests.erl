@@ -137,19 +137,19 @@ strategy_first_n_get_result_empty_test() ->
 
 strategy_first_n_get_result_partial_test() ->
     {ok, State0} = strategy_first_n:init(3, 5),
-    State1 = add_completions(State0, [{1, r1}, {2, r2}]),
+    State1 = add_completions(State0, [1, 2]),
     {ok, Results} = strategy_first_n:get_result(State1),
-    ?assertEqual(r1, maps:get(1, Results)),
-    ?assertEqual(r2, maps:get(2, Results)).
+    ?assertEqual({result, 1}, maps:get(1, Results)),
+    ?assertEqual({result, 2}, maps:get(2, Results)).
 
 strategy_first_n_get_result_full_n_test() ->
     {ok, State0} = strategy_first_n:init(3, 5),
-    State1 = add_completions(State0, [{1, r1}, {2, r2}, {3, r3}]),
+    State1 = add_completions(State0, [1, 2, 3]),
     {ok, Results} = strategy_first_n:get_result(State1),
     ?assertEqual(3, map_size(Results)),
-    ?assertEqual(r1, maps:get(1, Results)),
-    ?assertEqual(r2, maps:get(2, Results)),
-    ?assertEqual(r3, maps:get(3, Results)).
+    ?assertEqual({result, 1}, maps:get(1, Results)),
+    ?assertEqual({result, 2}, maps:get(2, Results)),
+    ?assertEqual({result, 3}, maps:get(3, Results)).
 
 strategy_first_n_get_result_all_m_test() ->
     {ok, State0} = strategy_first_n:init(2, 3),
@@ -240,7 +240,7 @@ strategy_first_n_completions_preserve_results_test_() ->
 %% Helper Functions
 %%====================================================================
 
-%% Helper to add multiple completions
+%% Helper to add multiple completions with indices only
 add_completions(State, Indices) when is_list(Indices) ->
     lists:foldl(
         fun(Index, Acc) ->

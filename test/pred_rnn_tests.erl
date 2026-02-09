@@ -2,6 +2,18 @@
 -module(pred_rnn_tests).
 -include_lib("eunit/include/eunit.hrl").
 
+%% Define the record locally for testing
+-record(rnn_cell, {
+    input_size :: pos_integer(),
+    hidden_size :: pos_integer(),
+    output_size :: pos_integer(),
+    wxh :: [[float()]],
+    whh :: [[float()]],
+    why :: [[float()]],
+    bh :: [float()],
+    by :: [float()]
+}).
+
 %% Test matrix_mult
 matrix_mult_test() ->
     A = [[1, 2], [3, 4]],
@@ -22,9 +34,9 @@ softmax_test() ->
 %% Test new_rnn
 new_rnn_test() ->
     RNN = pred_rnn:new_rnn(2, 3, 2),
-    ?assertEqual(2, RNN#pred_rnn.rnn_cell.input_size),
-    ?assertEqual(3, RNN#pred_rnn.rnn_cell.hidden_size),
-    ?assertEqual(2, RNN#pred_rnn.rnn_cell.output_size).
+    ?assertEqual(2, RNN#rnn_cell.input_size),
+    ?assertEqual(3, RNN#rnn_cell.hidden_size),
+    ?assertEqual(2, RNN#rnn_cell.output_size).
 
 %% Test forward_step
 forward_step_test() ->

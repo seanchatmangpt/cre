@@ -53,7 +53,7 @@ stop() ->
 -spec extract_sequences(map()) -> [[atom()]].
 extract_sequences(EventLog) ->
     Cases = maps:get(cases, EventLog, #{}),
-    lists:foldl(fun(_CaseId, CaseData, Acc) ->
+    lists:foldl(fun({CaseId, CaseData}, Acc) ->
         Events = maps:get(events, CaseData, []),
         Sequence = [maps:get(activity, E, undefined) || E <- Events],
         Acc ++ [Sequence]
@@ -210,9 +210,10 @@ encode_activities(Activities) ->
     lists:map(fun activity_to_float/1, Activities).
 
 %% @private
+-spec activity_to_float(term()) -> float().
 activity_to_float(undefined) -> 0.0;
 activity_to_float(A) when is_atom(A) -> float(erlang:phash2(A));
-activity_to_float(B) when is_binary(B) -> float(binary:decode_hex(B));
+activity_to_float(B) when is_binary(B) -> float(erlang:phash2(B));
 activity_to_float(N) when is_integer(N) -> float(N);
 activity_to_float(F) when is_float(F) -> F.
 

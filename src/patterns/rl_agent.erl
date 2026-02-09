@@ -11,7 +11,8 @@
 %% API
 -export([start_link/2, stop/1]).
 -export([recommend_action/2, record_reward/2, observe_next_state/2]).
--export([get_policy/1, set_learning_rate/2]).
+-export([get_policy/1, set_learning_rate/2, pause/1, resume/1]).
+-export([get_statistics/1]).
 
 %% gen_statem callbacks
 -export([init/1, callback_mode/0, terminate/3, code_change/4]).
@@ -34,7 +35,10 @@
     intervention_count :: non_neg_integer(),
     max_interventions :: pos_integer(),
     total_reward :: float(),
-    episode_count :: non_neg_integer()
+    episode_count :: non_neg_integer(),
+    last_state :: term() | undefined,
+    last_action :: atom() | undefined,
+    last_reward :: float() | undefined
 }).
 
 -record(rl_action, {
@@ -85,6 +89,21 @@ set_learning_rate(AgentId, Rate) when is_float(Rate), Rate > 0, Rate =< 1 ->
 set_learning_rate(_AgentId, _Rate) ->
     {error, invalid_rate}.
 
+%% @doc Pause the agent.
+-spec pause(binary()) -> ok.
+pause(AgentId) ->
+    gen_statem:call(AgentId, pause).
+
+%% @doc Resume the agent.
+-spec resume(binary()) -> ok.
+resume(AgentId) ->
+    gen_statem:cast(AgentId, resume).
+
+%% @doc Get agent statistics.
+-spec get_statistics(binary()) -> {ok, map()}.
+get_statistics(AgentId) ->
+    gen_statem:call(AgentId, get_statistics).
+
 %%====================================================================
 %% gen_statem callbacks
 %%====================================================================
@@ -109,10 +128,13 @@ init([AgentId, Options]) ->
         max_interventions = maps:get(max_interventions, Options, 100),
         intervention_count = 0,
         total_reward = 0.0,
-        episode_count = 0
+        episode_count = 0,
+        last_state = undefined,
+        last_action = undefined,
+        last_reward = undefined
     },
 
-    {ok, initializing, StateData}.
+    {ok, observing, StateData}.
 
 callback_mode() ->
     state_functions.
@@ -138,7 +160,14 @@ initializing(EventType, EventContent, State) ->
 
 observing(call, {recommend_action, StateFeatures}, State) ->
     Action = select_action_egreedy(StateFeatures, State),
-    {keep_state, State, [{reply, {ok, Action}}]};
+    %% Store state and action for learning
+    StateKey = encode_state(StateFeatures),
+    NewState = State#rl_agent_state{
+        last_state = StateKey,
+        last_action = Action#rl_action.action_type,
+        last_reward = undefined
+    },
+    {keep_state, NewState, [{reply, {ok, Action}}]};
 
 observing(call, get_policy, State) ->
     Policy = #{
@@ -150,6 +179,22 @@ observing(call, get_policy, State) ->
 
 observing(call, {set_learning_rate, Rate}, State) when is_float(Rate), Rate > 0, Rate =< 1 ->
     {keep_state, State#rl_agent_state{learning_rate = Rate}, [{reply, ok}]};
+
+observing(call, pause, State) ->
+    {next_state, paused, State, [{reply, ok}]};
+
+observing(call, get_statistics, State) ->
+    Stats = #{
+        agent_id => State#rl_agent_state.agent_id,
+        pattern_id => State#rl_agent_state.pattern_id,
+        workflow_id => State#rl_agent_state.workflow_id,
+        intervention_count => State#rl_agent_state.intervention_count,
+        total_reward => State#rl_agent_state.total_reward,
+        episode_count => State#rl_agent_state.episode_count,
+        exploration_rate => State#rl_agent_state.exploration_rate,
+        learning_rate => State#rl_agent_state.learning_rate
+    },
+    {keep_state, State, [{reply, {ok, Stats}}]};
 
 observing(cast, _Event, State) ->
     {keep_state, State};
@@ -174,6 +219,22 @@ selecting_action(call, get_policy, State) ->
 selecting_action(call, {set_learning_rate, Rate}, State) ->
     {keep_state, State#rl_agent_state{learning_rate = Rate}, [{reply, ok}]};
 
+selecting_action(call, pause, State) ->
+    {next_state, paused, State, [{reply, ok}]};
+
+selecting_action(call, get_statistics, State) ->
+    Stats = #{
+        agent_id => State#rl_agent_state.agent_id,
+        pattern_id => State#rl_agent_state.pattern_id,
+        workflow_id => State#rl_agent_state.workflow_id,
+        intervention_count => State#rl_agent_state.intervention_count,
+        total_reward => State#rl_agent_state.total_reward,
+        episode_count => State#rl_agent_state.episode_count,
+        exploration_rate => State#rl_agent_state.exploration_rate,
+        learning_rate => State#rl_agent_state.learning_rate
+    },
+    {keep_state, State, [{reply, {ok, Stats}}]};
+
 selecting_action(cast, {execute_action, _Action}, State) ->
     {next_state, intervening, State};
 
@@ -189,10 +250,43 @@ selecting_action(state_timeout, _, State) ->
 selecting_action(EventType, EventContent, State) ->
     handle_common_event(EventType, EventContent, State).
 
+intervening(call, get_policy, State) ->
+    Policy = #{
+        learning_rate => State#rl_agent_state.learning_rate,
+        exploration_rate => State#rl_agent_state.exploration_rate,
+        policy_type => State#rl_agent_state.policy
+    },
+    {keep_state, State, [{reply, {ok, Policy}}]};
+
+intervening(call, {set_learning_rate, Rate}, State) ->
+    {keep_state, State#rl_agent_state{learning_rate = Rate}, [{reply, ok}]};
+
+intervening(call, pause, State) ->
+    {next_state, paused, State, [{reply, ok}]};
+
+intervening(call, get_statistics, State) ->
+    Stats = #{
+        agent_id => State#rl_agent_state.agent_id,
+        pattern_id => State#rl_agent_state.pattern_id,
+        workflow_id => State#rl_agent_state.workflow_id,
+        intervention_count => State#rl_agent_state.intervention_count,
+        total_reward => State#rl_agent_state.total_reward,
+        episode_count => State#rl_agent_state.episode_count,
+        exploration_rate => State#rl_agent_state.exploration_rate,
+        learning_rate => State#rl_agent_state.learning_rate
+    },
+    {keep_state, State, [{reply, {ok, Stats}}]};
+
 intervening(cast, {record_reward, Reward}, State) when is_float(Reward) ->
     NewTotal = State#rl_agent_state.total_reward + Reward,
     NewCount = State#rl_agent_state.intervention_count + 1,
-    {next_state, learning, State#rl_agent_state{total_reward = NewTotal, intervention_count = NewCount}};
+    %% Store reward for learning step
+    UpdatedState = State#rl_agent_state{
+        total_reward = NewTotal,
+        intervention_count = NewCount,
+        last_reward = Reward
+    },
+    {next_state, learning, UpdatedState};
 
 intervening(cast, _Event, State) ->
     {keep_state, State};
@@ -206,8 +300,61 @@ intervening(state_timeout, _, State) ->
 intervening(EventType, EventContent, State) ->
     handle_common_event(EventType, EventContent, State).
 
+learning(call, get_policy, State) ->
+    Policy = #{
+        learning_rate => State#rl_agent_state.learning_rate,
+        exploration_rate => State#rl_agent_state.exploration_rate,
+        policy_type => State#rl_agent_state.policy
+    },
+    {keep_state, State, [{reply, {ok, Policy}}]};
+
+learning(call, {set_learning_rate, Rate}, State) ->
+    {keep_state, State#rl_agent_state{learning_rate = Rate}, [{reply, ok}]};
+
+learning(call, pause, State) ->
+    {next_state, paused, State, [{reply, ok}]};
+
+learning(call, get_statistics, State) ->
+    Stats = #{
+        agent_id => State#rl_agent_state.agent_id,
+        pattern_id => State#rl_agent_state.pattern_id,
+        workflow_id => State#rl_agent_state.workflow_id,
+        intervention_count => State#rl_agent_state.intervention_count,
+        total_reward => State#rl_agent_state.total_reward,
+        episode_count => State#rl_agent_state.episode_count,
+        exploration_rate => State#rl_agent_state.exploration_rate,
+        learning_rate => State#rl_agent_state.learning_rate
+    },
+    {keep_state, State, [{reply, {ok, Stats}}]};
+
+learning(cast, {observe_next_state, NextState}, #rl_agent_state{
+    q_table = QTable,
+    last_state = LastState,
+    last_action = LastAction,
+    last_reward = Reward,
+    learning_rate = Alpha,
+    discount_factor = Gamma,
+    exploration_rate = Epsilon,
+    exploration_decay = Decay
+} = State) when LastState =/= undefined, LastAction =/= undefined, Reward =/= undefined ->
+    %% Perform Q-learning update
+    NextStateKey = encode_state(NextState),
+    update_q_value(QTable, LastState, LastAction, Reward, NextStateKey, Alpha, Gamma),
+    %% Decay exploration rate
+    NewEpsilon = max(0.01, Epsilon * Decay),
+    NewEpisodeCount = State#rl_agent_state.episode_count + 1,
+    %% Return to observing state, reset learning fields
+    {next_state, observing, State#rl_agent_state{
+        exploration_rate = NewEpsilon,
+        episode_count = NewEpisodeCount,
+        last_state = undefined,
+        last_action = undefined,
+        last_reward = undefined
+    }};
+
 learning(cast, {observe_next_state, _NextState}, State) ->
-    {keep_state, State};
+    %% No previous state/action to learn from
+    {next_state, observing, State};
 
 learning(cast, _Event, State) ->
     {keep_state, State};
@@ -223,6 +370,22 @@ learning(EventType, EventContent, State) ->
 
 paused(cast, resume, State) ->
     {next_state, observing, State};
+
+paused(call, pause, State) ->
+    {keep_state, State, [{reply, ok}]};
+
+paused(call, get_statistics, State) ->
+    Stats = #{
+        agent_id => State#rl_agent_state.agent_id,
+        pattern_id => State#rl_agent_state.pattern_id,
+        workflow_id => State#rl_agent_state.workflow_id,
+        intervention_count => State#rl_agent_state.intervention_count,
+        total_reward => State#rl_agent_state.total_reward,
+        episode_count => State#rl_agent_state.episode_count,
+        exploration_rate => State#rl_agent_state.exploration_rate,
+        learning_rate => State#rl_agent_state.learning_rate
+    },
+    {keep_state, State, [{reply, {ok, Stats}}]};
 
 paused(cast, _Event, State) ->
     {keep_state, State};
@@ -319,7 +482,7 @@ select_random_action(Actions) ->
 -spec select_best_action(ets:tid(), term(), [atom()]) -> rl_action().
 select_best_action(QTable, StateKey, Actions) ->
     QValues = [{A, get_q_value(QTable, StateKey, A)} || A <- Actions],
-    {BestAction, _QValue} = lists:max(fun({_, Q1}, {_, Q2}) -> Q1 >= Q2 end, QValues),
+    {BestAction, _QValue} = max_by_q(QValues),
     #rl_action{action_type = BestAction, target = <<>>, parameters = #{}}.
 
 %% @private
@@ -336,3 +499,31 @@ encode_state(StateFeatures) ->
     %% Simple state encoding: sort keys and create tuple
     SortedKeys = lists:sort(maps:keys(StateFeatures)),
     list_to_tuple([maps:get(K, StateFeatures) || K <- SortedKeys]).
+
+%% @private
+-spec max_by_q([{atom(), float()}]) -> {atom(), float()}.
+max_by_q([{Action, Q}]) -> {Action, Q};
+max_by_q([{Action1, Q1}, {_Action2, Q2} | Rest]) when Q1 >= Q2 ->
+    max_by_q([{Action1, Q1} | Rest]);
+max_by_q([{_Action1, _Q1}, {Action2, Q2} | Rest]) ->
+    max_by_q([{Action2, Q2} | Rest]).
+
+%% @private
+-spec update_q_value(ets:tid(), term(), atom(), float(), term(), float(), float()) -> ok.
+update_q_value(QTable, StateKey, Action, Reward, NextStateKey, Alpha, Gamma) ->
+    CurrentQ = get_q_value(QTable, StateKey, Action),
+    %% Q-learning: Q(s,a) = Q(s,a) + alpha * (reward + gamma * max(Q(s',a')) - Q(s,a))
+    MaxNextQ = max_q_for_state(QTable, NextStateKey),
+    NewQ = CurrentQ + Alpha * (Reward + Gamma * MaxNextQ - CurrentQ),
+    ets:insert(QTable, {{StateKey, Action}, NewQ}),
+    ok.
+
+%% @private
+-spec max_q_for_state(ets:tid(), term()) -> float().
+max_q_for_state(QTable, StateKey) ->
+    Actions = [reroute, skip, prioritize, parallelize, no_action],
+    QValues = [get_q_value(QTable, StateKey, A) || A <- Actions],
+    case QValues of
+        [] -> 0.0;
+        _ -> lists:max(QValues)
+    end.

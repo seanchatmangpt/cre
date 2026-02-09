@@ -104,7 +104,7 @@ calculate_transition_probs(Transitions) ->
     %% Group by source activity
     BySource = lists:foldl(fun({{From, To}, Count}, Acc) ->
         Acc#{From => maps:put(To, Count, maps:get(From, Acc, #{}))}
-    end, #{}, maps:keys(Transitions)),
+    end, #{}, maps:to_list(Transitions)),
 
     %% Normalize to probabilities
     maps:map(fun(_From, ToMap) ->
@@ -154,8 +154,9 @@ fit_linear(Values) when is_list(Values) ->
     SumXY = lists:sum(lists:zipwith(fun(Xi, Yi) -> Xi * Yi end, X, Y)),
 
     Slope = case (N * SumXX - SumX * SumX) of
-        +0.0 -> +0.0;
-        Denom -> (N * SumXY - SumX * SumY) / Denom
+        0.0 -> 0.0;
+        Denom when Denom =/= 0.0 -> (N * SumXY - SumX * SumY) / Denom;
+        _ -> 0.0
     end,
 
     Intercept = (SumY - Slope * SumX) / N,
@@ -164,11 +165,11 @@ fit_linear(Values) when is_list(Values) ->
     YMean = lists:sum(Y) / N,
     SST = lists:sum([(Yi - YMean) * (Yi - YMean) || Yi <- Y]),
     SSR = case SST of
-        +0.0 -> +0.0;
-        _ -> lists:sum([math:pow(Yi - (Intercept + Slope * Xi), 2) || Yi <- Y, Xi <- X])
+        0.0 -> 0.0;
+        _ -> lists:sum([math:pow(Yi - (Intercept + Slope * Xi), 2) || {Yi, Xi} <- lists:zip(Y, X)])
     end,
     RSquared = case SST of
-        +0.0 -> 1.0;
+        0.0 -> 1.0;
         _ -> 1.0 - (SSR / SST)
     end,
 

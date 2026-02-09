@@ -139,7 +139,7 @@ get_tokens(NetMod, Place) ->
 -spec enable_transition(atom(), atom(), [binary()]) ->
           {ok, [binary()]} | {error, term()}.
 
-enable_transition(NetMod, Transition, TokenIds) ->
+enable_transition(_NetMod, _Transition, TokenIds) ->
     %% Find the place from the transition's preset
     %% This is a simplified implementation
     {ok, TokenIds}.

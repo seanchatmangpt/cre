@@ -86,7 +86,9 @@ init(N, M) when N =< M, N > 0, M > 0 ->
     {ok, #thompson_state{
         n = N,
         m = M,
-        arms = Arms
+        arms = Arms,
+        completed = [],
+        results = #{}
     }}.
 
 %%--------------------------------------------------------------------
@@ -140,9 +142,15 @@ select_branch(#thompson_state{arms = Arms}) ->
     Samples = [{Arm#bandit_arm.branch_id, sample_beta(Arm#bandit_arm.alpha, Arm#bandit_arm.beta)}
                || Arm <- Arms],
     %% Select arm with highest sample
-    {BranchId, _Sample} = lists:max(
-        fun({_, A}, {_, B}) -> A > B end,
-        Samples
+    {BranchId, _Sample} = lists:foldl(
+        fun({_, A} = Entry, {_, BestSample} = Acc) ->
+            case A > BestSample of
+                true -> Entry;
+                false -> Acc
+            end
+        end,
+        hd(Samples),
+        tl(Samples)
     ),
     BranchId.
 

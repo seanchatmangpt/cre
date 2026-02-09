@@ -70,8 +70,10 @@ forward_step({Input, Hidden}, #rnn_cell{wxh = Wxh, whh = Whh, why = Why, bh = Bh
     HiddenInput = matrix_mult([Input], Wxh),
     %% Hidden to hidden
     HiddenPrev = matrix_mult([Hidden], Whh),
-    %% Combine and activate
-    HiddenTotal = element(1, lists:unzip(matrix_add(HiddenInput, HiddenPrev))),
+    %% Combine and activate - flatten the matrices and add element-wise
+    HiddenInputFlat = lists:flatten(HiddenInput),
+    HiddenPrevFlat = lists:flatten(HiddenPrev),
+    HiddenTotal = lists:zipwith(fun(X, Y) -> X + Y end, HiddenInputFlat, HiddenPrevFlat),
     HiddenWithBias = lists:zipwith(fun(H, B) -> H + B end, HiddenTotal, Bh),
     NewHidden = tanh_list(HiddenWithBias),
     %% Output

@@ -34,6 +34,16 @@
     timestamp :: integer()
 }).
 
+%% Types
+-type state() :: #state{}.
+-type prediction() :: #prediction{}.
+-type prediction_mode() :: realtime | batch.
+-type model_type() :: statistical | markov | ensemble.
+-type prediction_type() :: next_activity | remaining_time | outcome.
+
+-export_type([state/0, prediction/0, prediction_mode/0,
+             model_type/0, prediction_type/0]).
+
 -define(SERVER, ?MODULE).
 
 %%====================================================================
@@ -94,7 +104,7 @@ init([]) ->
         markov_models = #{}
     }}.
 
-handle_call({predict_next_activity, CaseId, Trace}, _From, State) ->
+handle_call({predict_next_activity, _CaseId, Trace}, _From, State) ->
     %% Use Markov model for prediction
     Activities = extract_activities(Trace),
     case length(Activities) of
@@ -162,16 +172,30 @@ code_change(_OldVsn, State, _Extra) ->
 %%====================================================================
 
 %% @private
+-spec extract_activities([term()]) -> [atom()].
 extract_activities(Trace) ->
     [A || A <- Trace, is_atom(A)].
 
 %% @private
-get_markov_predictions(Activity, _State) ->
-    %% Placeholder: return common next activities
-    CommonNext = [
+-spec get_markov_predictions(atom(), #state{}) -> [{atom(), float()}].
+get_markov_predictions(Activity, State) ->
+    %% Get Markov model for this activity
+    Models = State#state.markov_models,
+    case maps:get(Activity, Models, undefined) of
+        undefined ->
+            %% Fallback to default predictions
+            get_default_predictions(Activity);
+        {ok, Predictions} ->
+            Predictions
+    end.
+
+%% @private
+-spec get_default_predictions(atom()) -> [{atom(), float()}].
+get_default_predictions(_Activity) ->
+    %% Default common transitions
+    [
         {complete, 0.4},
         {approve, 0.3},
         {reject, 0.2},
         {review, 0.1}
-    ],
-    CommonNext.
+    ].

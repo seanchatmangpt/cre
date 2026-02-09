@@ -239,14 +239,14 @@ strategy_thompson_get_result_empty_test() ->
 
 strategy_thompson_get_result_partial_test() ->
     {ok, State0} = strategy_thompson_sampling:init(3, 5),
-    State1 = add_completions(State0, [{1, r1}, {2, r2}]),
+    State1 = add_completions_with_results(State0, [{1, r1}, {2, r2}]),
     {ok, Results} = strategy_thompson_sampling:get_result(State1),
     ?assertEqual(r1, maps:get(1, Results)),
     ?assertEqual(r2, maps:get(2, Results)).
 
 strategy_thompson_get_result_full_test() ->
     {ok, State0} = strategy_thompson_sampling:init(3, 5),
-    State1 = add_completions(State0, [{1, r1}, {2, r2}, {3, r3}]),
+    State1 = add_completions_with_results(State0, [{1, r1}, {2, r2}, {3, r3}]),
     {ok, Results} = strategy_thompson_sampling:get_result(State1),
     ?assertEqual(3, map_size(Results)).
 
@@ -338,18 +338,27 @@ strategy_thompson_sample_beta_range_test_() ->
      end}.
 
 strategy_thompson_sample_beta_parameters_test_() ->
-    %% Test with different alpha/beta parameters
-    TestCases = [
-        {1, 1},  %% Uniform
-        {2, 1},  %% Skewed toward 1
-        {1, 2},  %% Skewed toward 0
-        {10, 10}, %% Peaked at 0.5
-        {5, 2}   %% Skewed toward 1
-    ],
-    lists:foreach(fun({Alpha, Beta}) ->
-        Samples = [sample_beta_for_test(Alpha, Beta) || _ <- lists:seq(1, 50)],
-        ?assert(lists:all(fun(S) -> S > 0.0 andalso S < 1.0 end, Samples))
-    end, TestCases).
+    {setup,
+     fun() -> ok end,
+     fun(_) -> ok end,
+     fun(_) ->
+         [
+          ?_test(begin
+              %% Test with different alpha/beta parameters
+              TestCases = [
+                  {1, 1},  %% Uniform
+                  {2, 1},  %% Skewed toward 1
+                  {1, 2},  %% Skewed toward 0
+                  {10, 10}, %% Peaked at 0.5
+                  {5, 2}   %% Skewed toward 1
+              ],
+              lists:foreach(fun({Alpha, Beta}) ->
+                  Samples = [sample_beta_for_test(Alpha, Beta) || _ <- lists:seq(1, 50)],
+                  ?assert(lists:all(fun(S) -> S > 0.0 andalso S < 1.0 end, Samples))
+              end, TestCases)
+           end)
+         ]
+     end}.
 
 %%====================================================================
 %% Edge Case Tests
@@ -395,7 +404,7 @@ add_completions(State, Indices) ->
     ).
 
 %% Helper to add completions with results
-add_completions(State, Pairs) ->
+add_completions_with_results(State, Pairs) ->
     lists:foldl(
         fun({Index, Result}, Acc) ->
             strategy_thompson_sampling:on_branch_complete(Acc, {Index, Result})
@@ -406,8 +415,8 @@ add_completions(State, Pairs) ->
 
 %% Helper to simulate pulls with success probability
 simulate_pulls(State, Branch, Count, SuccessProb) ->
-    Rand = rand:export_seed(),
-    rand:seed(exrop, {123, 456, 789}),  %% Use fixed seed for deterministic testing
+    %% Use fixed seed for deterministic testing (seed exrop with three integers)
+    rand:seed(exrop, {123, 456, 789}),
     State1 = lists:foldl(fun(_, Acc) ->
         Outcome = case rand:uniform() of
             X when X < SuccessProb -> success;
@@ -415,7 +424,6 @@ simulate_pulls(State, Branch, Count, SuccessProb) ->
         end,
         strategy_thompson_sampling:record_outcome(Acc, Branch, Outcome)
     end, State, lists:seq(1, Count)),
-    rand:seed(exrop, Rand),  %% Restore seed
     State1.
 
 %% Helper to test Beta sampling by accessing internal function
