@@ -1,0 +1,70 @@
+[package]
+name = "cre_rust_nif"
+version = "0.1.0"
+edition = "2021"
+authors = ["CRE Team <cre@common-runtime.org>"]
+description = "Rust NIF bindings for CRE - Process Mining Algorithms"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/cre/cre"
+
+[lib]
+name = "cre_rust_nif"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# NIF dependencies - rustler for safe Erlang<->Rust FFI
+rustler = "0.34"
+rustler_codegen = "0.34"
+lazy_static = "1.4"
+
+# Core algorithm dependencies
+itertools = "0.13.0"
+rayon = "1.8.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+crossbeam = "0.8"
+petgraph = "0.6"
+ndarray = "0.15"
+rand = "0.8"
+smallvec = "1.11"
+hashbrown = "0.14"
+parking_lot = "0.12"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# Chrono for timestamps
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+rustler = "0.34"
+
+[features]
+default = ["std"]
+std = []
+# Optional: include paper_algorithms crate when properly configured
+# with_paper_algorithms = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+
+# Rustler NIF settings
+[package.metadata.rustler]
+# Erlang OTP version to target
+otp_version = "25"
+# NIF version (2.15+ for Erlang 25+)
+nif_version = "2.15"

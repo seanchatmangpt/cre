@@ -7,11 +7,13 @@ Thank you for your interest in contributing to CRE (Common Runtime Environment)!
 - [Getting Started](#getting-started)
 - [Development Environment Setup](#development-environment-setup)
 - [Code Style Guidelines](#code-style-guidelines)
-- [Testing](#testing)
+- [Testing Requirements](#testing-requirements)
+- [Documentation Standards](#documentation-standards)
 - [Adding New YAWL Patterns](#adding-new-yawl-patterns)
 - [Implementing gen_pnet Behaviors](#implementing-gen_pnet-behaviors)
 - [Commit Message Conventions](#commit-message-conventions)
 - [Pull Request Process](#pull-request-process)
+- [Review Criteria](#review-criteria)
 - [Running Checks Before Contributing](#running-checks-before-contributing)
 - [Getting Help](#getting-help)
 
@@ -65,6 +67,9 @@ asdf local erlang 27.2
 kerl build 27.2 27.2
 kerl install 27.2 ~/kerl/27.2
 . ~/kerl/27.2/activate
+
+# Option 3: Using Homebrew (macOS)
+brew install erlang
 
 # Install rebar3
 # Download to project root for consistency
@@ -178,38 +183,9 @@ rebar3 efmt -c
 rebar3 efmt -c --check
 ```
 
-#### Documentation
-
-Every public function must have documentation:
-
-```erlang
-%% @doc
-%% Creates a new workflow with the given identifier.
-%%
-%% Parameters:
-%%   - WorkflowId: Unique binary identifier for the workflow
-%%   - Options: Proplist with optional configuration
-%%
-%% Returns:
-%%   - {ok, WorkflowPid}: Workflow started successfully
-%%   - {error, Reason}: Workflow failed to start
-%%
-%% Example:
-%%   ```erlang
-%%   > {ok, Pid} = my_module:start_workflow(<<"my_wf">>, []).
-%%   {ok, <0.123.0>}
-%%   ```
-%% @end
--spec start_workflow(WorkflowId :: binary(), Options :: proplists:proplist()) ->
-    {ok, pid()} | {error, term()}.
-start_workflow(WorkflowId, Options) ->
-    %% implementation
-    ok.
-```
-
 #### Type Specifications
 
-Always include `-spec` for exported functions:
+**CRITICAL**: Always include `-spec` for exported functions:
 
 ```erlang
 %% Type definitions
@@ -225,11 +201,35 @@ execute_workflow(WorkflowId) ->
     {ok, result}.
 ```
 
+#### OTP Behavior Guidelines
+
+- MUST follow OTP design principles. Use gen_server, gen_statem, supervisor behaviors.
+- This project uses `gen_pnet` (Petri Net) behavior for workflow pattern modules.
+- All gen_server handle_call/handle_cast clauses that destructure state records MUST bind `= State` and return the full `State`, not a partial record reconstruction.
+
+```erlang
+%% GOOD: Full state binding and return
+handle_call({get_state}, _From, State = #my_state{data = Data}) ->
+    {reply, {ok, Data}, State};
+
+%% BAD: Partial record reconstruction (losses other fields)
+handle_call({get_state}, _From, #my_state{data = Data}) ->
+    {reply, {ok, Data}, #my_state{data = Data}}.
+```
+
+#### Data Structures
+
+- Prefer `maps` over `proplists` for key-value data.
+- Use `logger` module for logging. NEVER use `io:format` or `error_logger` in production code.
+- Use `list_to_atom/1` (not `list_to_existing_atom/1`) when the atom may not exist yet.
+- All `case` expressions on user-facing format/type atoms MUST include a catch-all `_ ->` clause.
+- ETS tables: use `named_table` and `ets:whereis/1` for existence checks.
+
 ---
 
-## Testing
+## Testing Requirements
 
-CRE uses multiple testing frameworks:
+CRE uses multiple testing frameworks with strict coverage requirements:
 
 - **EUnit** - Unit testing
 - **Common Test** - Integration testing
@@ -346,6 +346,122 @@ workflow_execution_test(_Config) ->
 - **Workflow modules** (`wf_*`, `yawl_*`): 90%+
 - **Utility modules**: 85%+
 - **Integration modules**: 80%+
+
+### Testing Requirements Summary
+
+| Requirement | Description |
+|-------------|-------------|
+| Test file location | All tests MUST go in `test/`, never in project root or `src/` |
+| EUnit include | MUST include `-include_lib("eunit/include/eunit.hrl")` in test modules |
+| Test naming | Name test functions with `_test` suffix or use `_test_() -> [...]` generators |
+| Pre-compile | MUST run `rebar3 compile` before `rebar3 eunit` to verify compilation |
+| Assertions | Use `?assertEqual`, `?assertMatch`, `?assertException` macros for assertions |
+
+---
+
+## Documentation Standards
+
+Documentation is a first-class citizen in CRE. Every public API and module must be documented.
+
+### When to Document
+
+#### Module-Level Documentation
+
+REQUIRED for all modules:
+
+```erlang
+%% @doc
+%% This module provides YAWL workflow pattern implementations
+%% following the van der Aalst workflow patterns taxonomy.
+%%
+%% == Pattern Categories ==
+%%
+%% The patterns are organized into:
+%% - <b>Control Flow</b>: Basic routing constructs
+%% - <b>Advanced Branching</b>: Complex decision patterns
+%% - <b>Synchronization</b>: Multi-path coordination
+%%
+%% == Usage Example ==
+%%
+%% ```erlang
+%% > {ok, Pid} = parallel_split:new(#{}).
+%% > parallel_split:execute(Pid, Input).
+%% {ok, Result}
+%% ```
+%% @end
+-module(my_module).
+```
+
+#### Function Documentation
+
+REQUIRED for all exported functions:
+
+```erlang
+%% @doc
+%% Creates a new workflow with the given identifier.
+%%
+%% Parameters:
+%%   - WorkflowId: Unique binary identifier for the workflow
+%%   - Options: Proplist with optional configuration
+%%
+%% Returns:
+%%   - {ok, WorkflowPid}: Workflow started successfully
+%%   - {error, Reason}: Workflow failed to start
+%%
+%% Example:
+%%   ```erlang
+%%   > {ok, Pid} = my_module:start_workflow(<<"my_wf">>, []).
+%%   {ok, <0.123.0>}
+%%   ```
+%% @end
+-spec start_workflow(WorkflowId :: binary(), Options :: proplists:proplist()) ->
+    {ok, pid()} | {error, term()}.
+```
+
+#### Type Documentation
+
+REQUIRED for all custom types:
+
+```erlang
+%% @doc Workflow state enumeration
+-type workflow_state() :: running | completed | failed | cancelled.
+
+%% @doc Workflow execution result with success/failure indication
+-type workflow_result() :: {ok, term()} | {error, term()}.
+```
+
+### Documentation Format
+
+Use EDoc-compatible documentation with `-doc()` attributes:
+
+```erlang
+-module(my_module).
+-export([my_function/1]).
+
+-doc """
+Modern documentation string for the module.
+
+This uses the OTP 25+ -doc() attribute format which provides
+better tooling integration and cross-referencing.
+""".
+-doc(#{since => "0.3.0",
+      see => [{yawl_engine, "Related YAWL engine functions"}]}).
+```
+
+### Inline Documentation Guidelines
+
+- **Keep it concise**: One sentence summary, then details if needed
+- **Include examples**: For non-trivial functions
+- **Document parameters**: Name and describe each parameter
+- **Document returns**: All possible return values
+- **Cross-reference**: Link to related functions and modules
+
+### When Documentation is NOT Required
+
+- Private functions (not exported)
+- Test modules (test files are self-documenting)
+- `-ifdef(TEST)` sections
+- Obvious accessor functions for records
 
 ---
 
@@ -634,7 +750,7 @@ The `fire/3` callback returns:
 
 ## Commit Message Conventions
 
-CRE uses a structured commit message format:
+CRE uses a structured commit message format based on Conventional Commits:
 
 ### Format
 
@@ -706,6 +822,14 @@ Implements WCP-23 Structured Loop pattern with:
 Tests: 12 new tests in structured_loop_test.erl
 Docs: Updated YAWL_PATTERNS_REFERENCE.md
 ```
+
+### Commit Message Guidelines
+
+- **Subject line**: 50 characters or less
+- **Subject should**: Complete the sentence "If applied, this commit will..."
+- **Body**: Wrap at 72 characters
+- **Body should explain**: What and Why, not How
+- **Footer**: Reference issue numbers
 
 ---
 
@@ -780,6 +904,66 @@ Brief description of changes.
 ## Related Issues
 Closes #(issue number)
 ```
+
+---
+
+## Review Criteria
+
+Reviewers will check the following criteria when evaluating contributions:
+
+### Code Quality
+
+| Criterion | Description |
+|-----------|-------------|
+| **Type Specifications** | All exported functions have `-spec()` attributes |
+| **Documentation** | All public functions have `@doc` comments |
+| **Formatting** | Code formatted with `rebar3 efmt -c` |
+| **Naming** | Follows Erlang naming conventions |
+| **OTP Compliance** | Proper use of OTP behaviors and patterns |
+| **Error Handling** | Explicit error returns, not throws for expected conditions |
+
+### Architecture & Design
+
+| Criterion | Description |
+|-----------|-------------|
+| **State Management** | Only `gen_pnet` modules maintain state, others are pure |
+| **Modularity** | Changes are focused and minimal |
+| **Separation of Concerns** | Clear boundaries between modules |
+| **Petri Net Semantics** | Correct use of places, transitions, and modes |
+
+### Testing
+
+| Criterion | Description |
+|-----------|-------------|
+| **Test Coverage** | Meets coverage targets for the module type |
+| **Test Quality** | Tests cover edge cases and failure modes |
+| **Test Organization** | Tests in correct location (`test/` directory) |
+| **Doctests** | Documentation examples are tested |
+
+### Documentation
+
+| Criterion | Description |
+|-----------|-------------|
+| **API Docs** | All public APIs documented |
+| **Type Docs** | All custom types documented |
+| **Examples** | Non-trivial functions have usage examples |
+| **Changelog** | User-visible changes noted |
+
+### Static Analysis
+
+| Criterion | Description |
+|-----------|-------------|
+| **Dialyzer** | No type warnings |
+| **XRef** | No undefined functions or unused locals |
+| **Compilation** | Clean compilation with no warnings |
+
+### Integration
+
+| Criterion | Description |
+|-----------|-------------|
+| **Git Workflow** | Follows branch and commit conventions |
+| **Merge Conflicts** | Resolvable without major conflicts |
+| **Backwards Compatibility** | Breaking changes documented and justified |
 
 ---
 
@@ -859,9 +1043,9 @@ chmod +x .git/hooks/pre-commit
 ### Documentation
 
 - **Architecture**: See `docs/ARCHITECTURE.md`
-- **Testing Guide**: See `docs/TESTING.md`
+- **Build System**: See `docs/development/build_system.md`
 - **YAWL Patterns**: See `docs/YAWL_PATTERNS_REFERENCE.md`
-- **API Reference**: See `docs/API_REFERENCE.md`
+- **API Reference**: See `docs/api/`
 - **Quick Start**: See `docs/QUICK_START.md`
 
 ### Interactive Development

@@ -94,9 +94,9 @@
 %%--------------------------------------------------------------------
 -record(token_event, {
     timestamp :: integer(),
-    event_type :: atom(),
-    from_place :: atom() | undefined,
-    to_place :: atom() | undefined,
+    event_type :: atom() | {atom(), atom()},
+    from_place :: atom() | binary() | undefined,
+    to_place :: atom() | binary() | undefined,
     metadata = #{} :: map()
 }).
 
@@ -310,8 +310,8 @@ init({Token, []}) when is_record(Token, active_token) ->
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #active_token{}) ->
-          {reply, term(), #active_token{}} | {noreply, #active_token{}} |
-          {stop, term(), term(), #active_token{}}.
+          {reply, ok | {error, atom()} | {ok, #active_token{}} | {ok, [token_event()]}, #active_token{}} |
+          {noreply, #active_token{}}.
 
 handle_call({migrate, NewPlace}, _From, Token = #active_token{place = CurrentPlace, history = History}) ->
     %% Record migration event
@@ -365,7 +365,7 @@ handle_call(_Request, _From, Token) ->
 
 %% @private
 -spec handle_cast(term(), #active_token{}) ->
-          {noreply, #active_token{}} | {stop, term(), #active_token{}}.
+          {noreply, #active_token{}}.
 
 handle_cast({transition, NewState}, Token) ->
     {noreply, transition_state(Token, NewState)};
@@ -442,15 +442,27 @@ generate_token_id() ->
     <<Time:64, Unique:64>>.
 
 %% @private
--spec register_with_place(pid(), atom(), binary()) -> ok.
+%% @doc Registers a token with its place coordinator.
+%%
+%% Uses graceful degradation - logs warning but returns ok if coordinator unavailable.
+-spec register_with_place(pid(), atom(), <<_:128>>) -> ok.
 
-register_with_place(_Pid, _Place, _TokenId) ->
-    %% TODO: Integrate with place_coordinator
-    ok.
+register_with_place(Pid, Place, TokenId) ->
+    case place_coordinator:register_token(undefined, Place, {TokenId, Pid}) of
+        ok ->
+            ok;
+        {error, Reason} ->
+            logger:warning("Failed to register token ~s at ~p: ~p", [TokenId, Place, Reason]),
+            ok
+    end.
 
 %% @private
--spec unregister_from_place(pid(), atom(), binary()) -> ok.
+%% @doc Unregisters a token from its place coordinator.
+%%
+%% Uses graceful degradation - always returns ok even if coordinator unavailable.
+-spec unregister_from_place(pid(), atom(), <<_:128>>) -> ok.
 
-unregister_from_place(_Pid, _Place, _TokenId) ->
-    %% TODO: Integrate with place_coordinator
+unregister_from_place(_Pid, Place, TokenId) ->
+    %% place_coordinator:unregister_token/2 handles not_found gracefully
+    _ = place_coordinator:unregister_token(Place, TokenId),
     ok.

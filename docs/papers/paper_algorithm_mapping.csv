@@ -1,0 +1,167 @@
+paper_id,title,authors,year,algorithm_name,category,implementation_status,cre_module,rust_module,priority
+P001,Designing Workflows with Coloured Petri Nets,"Wil M. P. van der Aalst",1997,Colored Petri Net Modeling,Workflow Modeling,Implemented,src/pnet/pnet.erl,pnet.rs,Low
+P002,Effectiveness of Workflow Management Systems,"Wil M. P. van der Aalst",1999,YAWL Engine Evaluation,Workflow Execution,Implemented,src/core/gen_yawl.erl,,Low
+P003,Mining Process Models for Non-Free Choice,"Wil M. P. van der Aalst",2010,Non-Free-Choice Discovery,Process Discovery,Partially Implemented,src/mining/process_discovery.erl,,Medium
+P004,YAWL Technical Manual,"Wil M. P. van der Aalst, Arthur H. M. ter Hofstede",2008,YAWL Specification,Workflow Modeling,Implemented,src/core/gen_yawl.erl,src/yawl/,Low
+P005,YAWL Design and Implementation QUT,"Wil M. P. van der Aalst, Arthur H. M. ter Hofstede",2004,YAWL Language,Workflow Modeling,Implemented,src/core/gen_yawl.erl,src/yawl/,Low
+P006,Deciding Reachability Acyclic Free-Choice,"Thomas M. Prinz, Christopher T. Schwanen, Wil M. P. van der Aalst",2026,Acyclic Free-Choice Reachability,Petri Net Analysis,Implemented,src/verification/soundness.erl,,Medium
+P007,Revealing Inherent Concurrency Partial Order,"Humam Kourani, Gyunam Park, Wil M. P. van der Aalst",2025,Partial Order Process Discovery,Process Discovery,Planned,src/mining/process_discovery.erl,,High
+P008,Computing Alignments Partially-ordered Traces,"Ariba Siddiqui, Wil M. P. van der Aalst, Daniel Schuster",2025,Partial Order Alignment,Conformance Checking,Partially Implemented,src/mining/conformance.erl,,High
+P009,Knowledge-Driven Hallucination LLM Process Modeling,"Humam Kourani, Anton Antonov, Alessandro Berti, Wil M. P. van der Aalst",2025,LLM Hallucination Detection,AI/LLM Integration,Planned,src/rust_implementations/paper_algorithms/algorithms/llm_process_modeling/,llm_hallucination.rs,Medium
+P010,No AI Without PI,"Wil M. P. van der Aalst",2025,Generative Process Mining,AI/LLM Integration,Partially Implemented,src/mining/predictive_mining.erl,generative_ai.rs,Critical
+P011,No AI Without PI Extended,"Wil M. P. van der Aalst",2025,Generative Predictive Prescriptive AI,AI/LLM Integration,Partially Implemented,src/mining/predictive_mining.erl,,Critical
+P012,CPN-Py Colored Petri Nets Python,"Alessandro Berti, Wil M. P. van der Aalst",2025,Colored Petri Net Python,Petri Net Modeling,Planned,src/pnet/pnet.erl,,Medium
+P013,OCPQ Object-Centric Process Querying,"Aaron Kusters, Wil M. P. van der Aalst",2025,Object-Centric Querying,Object-Centric Mining,Planned,src/rust_implementations/object_centric.rs,ocpq.rs,High
+P014,Unlocking Non-Block-Structured Decisions,"Humam Kourani, Gyunam Park, Wil M. P. van der Aalst",2025,Choice Graph Inductive Miner,Process Discovery,In Progress,src/rust_implementations/paper_algorithms/algorithms/choice_graph_miner/,choice_graph_miner.rs,High
+P015,Releasing Differentially Private Event Logs,"Frederik Wangelik, Majid Rafiei, Mahsa Pourbafrani, Wil M. P. van der Aalst",2025,GAN Differential Privacy,Privacy Preservation,Planned,,gan_privacy.rs,Medium
+P016,Computing Alignments Partially-ordered Duplicate,"Ariba Siddiqui, Wil M. P. van der Aalst, Daniel Schuster",2025,FoldA Algorithm,Conformance Checking,Partially Implemented,src/mining/conformance.erl,,Medium
+P017,ProReco Process Discovery Recommender,"Tsung-Hao Huang, Tarek Junied, Marco Pegoraro, Wil M. P. van der Aalst",2025,Algorithm Recommender Engine,Process Discovery,In Progress,src/rust_implementations/paper_algorithms/algorithms/process_recommender/,process_recommender.rs,High
+P018,Control-flow Anomaly Detection Feature Extraction,"Francesco Vitale, Marco Pegoraro, Wil M. P. van der Aalst, Nicola Mazzocca",2025,Feature-Based Anomaly Detection,Anomaly Detection,Implemented,src/mining/anomaly_detection.erl,,Medium
+P019,Federated Conformance Checking,"Majid Rafiei, Mahsa Pourbafrani, Wil M. P. van der Aalst",2025,Federated Conformance,Conformance Checking,Planned,src/mining/conformance.erl,federated_conformance.rs,High
+P020,Evaluating LLMs Business Process Modeling,"Humam Kourani, Alessandro Berti, Daniel Schuster, Wil M. P. van der Aalst",2024,LLM BPM Evaluation,AI/LLM Integration,In Progress,src/rust_implementations/paper_algorithms/algorithms/llm_process_modeling/,llm_bpm_eval.rs,High
+P021,Object-Centric Local Process Models,"Viki Peeva, Marvin Porsil, Wil M. P. van der Aalst",2024,Object-Centric Local Process Model Discovery,Object-Centric Mining,In Progress,src/rust_implementations/paper_algorithms/algorithms/object_centric_local/,oc_local_pm.rs,High
+P022,Towards Simple Extensible Standard OCED,"Dirk Fahland, Marco Montali, Julian Lebherz, Wil M. P. van der Aalst",2024,OCEL 2.0 Standard,Object-Centric Mining,Planned,src/rust_implementations/object_centric.rs,ocel2.rs,Medium
+P023,Leveraging LLMs Process Model Comprehension,"Humam Kourani, Alessandro Berti, Jasmin Hennrich, Wolfgang Kratsch",2024,LLM Model Comprehension,AI/LLM Integration,Planned,src/rust_implementations/paper_algorithms/algorithms/llm_process_modeling/,llm_comprehension.rs,Low
+P024,PM-LLM-Benchmark LLMs Process Mining,"Alessandro Berti, Humam Kourani, Wil M. P. van der Aalst",2024,LLM Process Mining Benchmark,AI/LLM Integration,Planned,src/rust_implementations/paper_algorithms/algorithms/llm_process_modeling/,llm_benchmark.rs,Low
+P025,Challenges Anomaly Detection Object-Centric,"Alessandro Berti, Urszula Jessen, Wil M. P. van der Aalst, Dirk Fahland",2024,Object-Centric Anomaly Detection,Anomaly Detection,Planned,src/mining/anomaly_detection.erl,oc_anomaly_detection.rs,Medium
+P026,High-Level Event Mining Overview,"Bianka Bakullari, Wil M. P. van der Aalst",2024,High-Level Event Mining,Process Discovery,Planned,src/mining/process_discovery.erl,high_level_mining.rs,Low
+P027,Process-Aware Analysis Treatment Paths,"Harry H. Beyel, Marlo Verket, Viki Peeva, Christian Rennert",2024,Healthcare Process Mining,Process Discovery,Planned,src/mining/process_discovery.erl,,Low
+P028,Process Modeling Large Language Models,"Humam Kourani, Alessandro Berti, Daniel Schuster, Wil M. P. van der Aalst",2024,LLM Process Model Generation,AI/LLM Integration,In Progress,src/rust_implementations/paper_algorithms/algorithms/llm_process_modeling/,llm_modeling.rs,Critical
+P029,ProMoAI Process Modeling Generative AI,"Humam Kourani, Alessandro Berti, Daniel Schuster, Wil M. P. van der Aalst",2024,ProMoAI Generative AI,AI/LLM Integration,In Progress,src/rust_implementations/paper_algorithms/algorithms/generative_ai/,promoa_i.rs,High
+P030,OCEL 2.0 Specification,"Alessandro Berti, Istvan Koren, Jan Niklas Adams, Gyunam Park",2024,OCEL 2.0 Standard,Object-Centric Mining,Partially Implemented,src/rust_implementations/object_centric.rs,ocel2.rs,High
+P031,High-Performance Process Mining Rust,"Aaron Kusters, Wil M. P. van der Aalst",2024,Rust Process Mining Library,Performance,Planned,src/rust_implementations/,rust_pm.rs,Medium
+P032,Advancements Object-Centric Process Mining,"Alessandro Berti, Marco Montali, Wil M. P. van der Aalst",2023,Object-Centric SLR,Object-Centric Mining,Planned,src/rust_implementations/object_centric.rs,,Low
+P033,Grouping Local Process Models,"Viki Peeva, Wil M. P. van der Aalst",2023,LPM Grouping,Process Discovery,Planned,src/mining/process_discovery.erl,lpm_grouping.rs,Medium
+P034,Discovering High-Quality Process Models Data Scarcity,"Jan Niklas Adams, Jari Peeperkorn, Tobias Brockhoff",2023,Data-Scarce Discovery,Process Discovery,Planned,src/mining/process_discovery.erl,discovery_scarce.rs,Medium
+P035,Analyzing After-Sales Service Object-Centric,"Gyunam Park, Sevde Aydin, Cuneyt Ugur, Wil M. P. van der Aalst",2023,After-Sales OCPM,Object-Centric Mining,Partially Implemented,src/rust_implementations/object_centric.rs,,Low
+P036,Extracting Rules Event Data Study Planning,"Majid Rafiei, Duygu Bayrak, Mahsa Pourbafrani, Gyunam Park",2023,Rule Extraction,Predictive Mining,Planned,src/mining/predictive_mining.erl,rule_extraction.rs,Low
+P037,Interplay High-Level Problems Process Instances,"Bianka Bakullari, Jules van Thoor, Dirk Fahland, Wil M. P. van der Aalst",2023,High-Level Behavior Analysis,Process Discovery,Planned,src/mining/process_discovery.erl,high_level_analysis.rs,Low
+P038,Applying Process Mining Scientific Workflows,"Zahra Sadeghibogar, Alessandro Berti, Marco Pegoraro, Wil M. P. van der Aalst",2023,HPC Process Mining,Process Discovery,Planned,src/mining/process_discovery.erl,hpc_mining.rs,Low
+P039,Abstractions Scenarios Prompts LLMs Process Mining,"Alessandro Berti, Daniel Schuster, Wil M. P. van der Aalst",2023,LLM Process Mining,AI/LLM Integration,Planned,src/rust_implementations/paper_algorithms/algorithms/llm_process_modeling/,llm_prompts.rs,Medium
+P040,Collection Simulated Event Logs Fairness,"Timo Pohl, Alessandro Berti, Mahnaz Sadat Qafari, Wil M. P. van der Aalst",2023,Fairness Event Logs,Fairness Analysis,Planned,,fairness_logs.rs,Low
+P041,Revisiting Alpha Algorithm,"Aaron Kusters, Wil M. P. van der Aalst",2023,Alpha+++ Algorithm,Process Discovery,Implemented,src/mining/alpha_algorithm.erl,alpha_plus_plus.rs,Medium
+P042,Object-Centric Alignments,"Lukas Liss, Jan Niklas Adams, Wil M. P. van der Aalst",2023,Object-Centric Alignment,Conformance Checking,Partially Implemented,src/rust_implementations/object_centric.rs,oc_alignment.rs,High
+P043,TraVaG Differentially Private Trace Variants GANs,"Majid Rafiei, Frederik Wangelik, Mahsa Pourbafrani, Wil M. P. van der Aalst",2023,TraVaG GAN Privacy,Privacy Preservation,Planned,,travag_gan.rs,Medium
+P044,Performance-Preserving Event Log Sampling,"Mohammadreza Fani Sani, Mozhgan Vazifehdoostirani, Gyunam Park",2023,Log Sampling,Predictive Mining,Planned,src/mining/predictive_mining.erl,log_sampling.rs,Medium
+P045,Discovering Sound Free-Choice Non-Block,"Tsung-Hao Huang, Wil M. P. van der Aalst",2023,Non-Block Free-Choice Discovery,Process Discovery,Planned,src/mining/process_discovery.erl,non_block_discovery.rs,High
+P046,Comparing Ordering Strategies Process Discovery,"Tsung-Hao Huang, Wil M. P. van der Aalst",2023,Synthesis Rules Ordering,Process Discovery,Planned,src/mining/process_discovery.erl,synthesis_rules.rs,Medium
+P047,Advancements Object-Centric Process Mining Classic,"Wil M. P. van der Aalst",2023,Object-Centric Overview,Object-Centric Mining,Planned,src/rust_implementations/object_centric.rs,,Low
+P048,Discovering Process Models Long-Term Dependencies,"Lisa Luise Mannel, Wil M. P. van der Aalst",2022,eST-Miner Extended,Process Discovery,Planned,src/mining/process_discovery.erl,est_miner.rs,Medium
+P049,Resolving Uncertain Case Identifiers Interaction Logs,"Marco Pegoraro, Merih Seran Uysal, Tom-Hendrik Halsmann",2022,Case Correlation,Uncertain Data,Planned,,case_correlation.rs,Medium
+P050,Control-Flow-Based Querying Partially Ordered,"Daniel Schuster, Michael Martini, Sebastiaan J. van Zelst, Wil M. P. van der Aalst",2022,Partial Order Querying,Process Querying,Planned,src/mining/process_discovery.erl,po_querying.rs,Medium
+P051,High-Level Event Mining Framework,"Bianka Bakullari, Wil M. P. van der Aalst",2022,High-Level Event Framework,Process Discovery,Planned,src/mining/process_discovery.erl,high_level_framework.rs,Low
+P052,Explainable Predictive Decision Mining,"Gyunam Park, Aaron Kusters, Mara Tews, Cameron Pitsch",2022,Decision Mining,Predictive Mining,Planned,src/mining/predictive_mining.erl,decision_mining.rs,Medium
+P053,TraVaS Differentially Private Trace Variant Selection,"Majid Rafiei, Frederik Wangelik, Wil M. P. van der Aalst",2022,TraVaS Privacy,Privacy Preservation,Planned,,travas.rs,Medium
+P054,Monitoring Constraints Object-Centric Constraint Graphs,"Gyunam Park, Wil. M. P. van der Aalst",2022,Object-Centric Constraint Monitoring,Conformance Checking,Planned,src/rust_implementations/object_centric.rs,oc_constraint_monitor.rs,High
+P055,Process Modeling Conformance Checking Healthcare,"Elisabetta Benevento, Marco Pegoraro, Mattia Antoniazzi, Harry H. Beyel",2022,Healthcare Conformance,Conformance Checking,Implemented,src/mining/conformance.erl,,Low
+P056,Conformance Checking Trace Fragments,"Daniel Schuster, Niklas Ff6cking, Sebastiaan J. van Zelst, Wil M. P. van der Aalst",2022,Infix Postfix Alignments,Conformance Checking,Partially Implemented,src/mining/conformance.erl,infix_alignment.rs,Medium
+P057,Framework Extracting Encoding Features OCED,"Jan Niklas Adams, Gyunam Park, Sergej Levich, Daniel Schuster",2022,Object-Centric Feature Extraction,Object-Centric Mining,Planned,src/rust_implementations/object_centric.rs,oc_feature_extraction.rs,High
+P058,Detecting Surprising Situations Event Data,"Christian Kohlschmidt, Mahnaz Sadat Qafari, Wil M. P. van der Aalst",2022,Surprising Situations Detection,Anomaly Detection,Planned,src/mining/anomaly_detection.erl,surprising_detection.rs,Medium
+P059,Defining Cases Variants Object-Centric Event Data,"Jan Niklas Adams, Daniel Schuster, Seth Schmitz, Gunther Schuh",2022,Object-Centric Cases,Object-Centric Mining,Planned,src/rust_implementations/object_centric.rs,oc_cases.rs,High
+P060,Quantifying Temporal Privacy Leakage,"Majid Rafiei, Gamal Elkoumy, Wil M. P. van der Aalst",2022,Temporal Privacy Leakage,Privacy Preservation,Planned,,temporal_privacy.rs,Medium
+P061,Clustering Object-Centric Event Logs,"Anahita Farhang Ghahfarokhi, Fatemeh Akoochekian, Fareed Zandkarimi",2022,Object-Centric Clustering,Object-Centric Mining,Planned,src/rust_implementations/object_centric.rs,oc_clustering.rs,Medium
+P062,Predictive Object-Centric Process Monitoring,"Timo Rohrer, Anahita Farhang Ghahfarokhi, Mohamed Behery, Gerhard Lakemeyer",2022,Object-Centric Prediction,Predictive Mining,Planned,src/mining/predictive_mining.erl,oc_prediction.rs,High
+P063,Detecting Context-Aware Deviations,"Gyunam Park, Janik-Vasily Benzin, Wil M. P. van der Aalst",2022,Context-Aware Deviation Detection,Conformance Checking,Planned,src/mining/conformance.erl,context_aware_deviation.rs,Medium
+P064,OPerA Object-Centric Performance Analysis,"Gyunam Park, Jan Niklas Adams, Wil. M. P. van der Aalst",2022,Object-Centric Performance,Performance Analysis,Planned,src/rust_implementations/object_centric.rs,oc_performance.rs,High
+P065,PM4Py-GPU High-Performance Library,"Alessandro Berti, Minh Phan Nghia, Wil M. P. van der Aalst",2022,GPU Acceleration,Performance,Planned,,gpu_mining.rs,Low
+P066,Uncertain Case Identifiers User Study,"Marco Pegoraro, Merih Seran Uysal, Tom-Hendrik Halsmann",2022,Event-Case Correlation,Uncertain Data,Planned,,event_case_correlation.rs,Medium
+P067,XES Extension Uncertain Event Data,"Marco Pegoraro, Merih Seran Uysal, Wil M. P. van der Aalst",2022,Uncertain XES,Uncertain Data,Planned,,uncertain_xes.rs,Medium
+P068,Event Log Sampling Predictive Monitoring,"Mohammadreza Fani Sani, Mozhgan Vazifehdoostirani, Gyunam Park",2022,Predictive Sampling,Predictive Mining,Planned,src/mining/predictive_mining.erl,predictive_sampling.rs,Medium
+P069,Web-Based Tool Comparative Process Mining,"Madhavi Bangalore Shankara Narayana, Elisabetta Benevento, Marco Pegoraro",2022,Comparative Process Mining,Process Discovery,Planned,,comparative_mining.rs,Low
+P070,Analyzing Process-Aware IS Updates DTOs,"Gyunam Park, Marco Comuzzi, Wil M. P. van der Aalst",2022,Digital Twin Analysis,Process Discovery,Planned,src/mining/process_discovery.erl,digital_twin.rs,Low
+P071,How to Write Beautiful Papers,"Wil M. P. van der Aalst",2022,Academic Writing,General,Planned,,,Low
+P072,Python Tool Object-Centric Process Mining Comparison,"Anahita Farhang Ghahfarokhi, Wil M. P. van der Aalst",2022,Object-Centric Comparison,Object-Centric Mining,Planned,src/rust_implementations/object_centric.rs,oc_comparison.rs,Medium
+P073,Scalable Database Object-Centric Event Logs,"Alessandro Berti, Anahita Farhang Ghahfarokhi, Gyunam Park",2022,OCEL MongoDB,Object-Centric Mining,Planned,src/rust_implementations/object_centric.rs,ocel_mongodb.rs,Medium
+P074,Analyzing Medical Data Process Mining,"Marco Pegoraro, Madhavi Bangalore Shankara Narayana, Elisabetta Benevento",2022,Medical Process Mining,Process Discovery,Planned,src/mining/process_discovery.erl,medical_mining.rs,Low
+P075,Interactive Process Improvement Simulation,"Mahsa Pourbafrani, Wil M. P. van der Aalst",2022,Process Improvement Simulation,Simulation,Planned,src/mining/simulation.erl,process_improvement_sim.rs,Medium
+P076,How to Write Beautiful Papers Classic,"Wil M. P. van der Aalst",2022,Academic Writing Classic,General,Planned,,,Low
+P077,Precision Fitness Object-Centric Process Mining,"Jan Niklas Adams, Wil M. P. van der Aalst",2021,Object-Centric Quality Metrics,Conformance Checking,Planned,src/rust_implementations/object_centric.rs,oc_quality_metrics.rs,High
+P078,Trustworthy AI Process Mining,"Andrew Pery, Majid Rafiei, Michael Simon, Wil M. P. van der Aalst",2021,Trustworthy AI,AI/LLM Integration,Planned,,trustworthy_ai.rs,Medium
+P079,Visualizing Trace Variants Partially Ordered,"Daniel Schuster, Lukas Schade, Sebastiaan J. van Zelst, Wil M. P. van der Aalst",2021,Partial Order Visualization,Visualization,Planned,,po_visualization.rs,Low
+P080,Probability Estimation Uncertain Process Traces,"Marco Pegoraro, Bianka Bakullari, Merih Seran Uysal, Wil M. P. van der Aalst",2021,Uncertain Trace Probability,Uncertain Data,Planned,,uncertain_probability.rs,Medium
+P081,SIMPT Process Improvement Simulation,"Mahsa Pourbafrani, Shuai Jiao, Wil M. P. van der Aalst",2021,Process Tree Simulation,Simulation,Planned,src/mining/simulation.erl,process_tree_sim.rs,Medium
+P082,Freezing Sub-Models Incremental Process Discovery,"Daniel Schuster, Sebastiaan J. van Zelst, Wil M. P. van der Aalst",2021,Incremental Discovery,Process Discovery,Planned,src/mining/process_discovery.erl,incremental_discovery.rs,Medium
+P083,PC4PM Privacy Confidentiality Preservation,"Majid Rafiei, Alexander Schnitzler, Wil M. P. van der Aalst",2021,Privacy Preservation Tool,Privacy Preservation,Planned,,pc4pm.rs,Medium
+P084,May I Take Your Order Time Order,"Wil M. P. van der Aalst, Luis Santos",2021,Time Order Analysis,Process Discovery,Planned,src/mining/process_discovery.erl,time_order.rs,Medium
+P085,Reduction Induced Subnets Free-Choice Nets,"Wil M. P. van der Aalst",2021,T-net P-net Reduction,Petri Net Analysis,Implemented,src/pnet/pnet.erl,,Low
+P086,Free-Choice Nets Home Clusters Lucent,"Wil M. P. van der Aalst",2021,Lucent Nets,Petri Net Analysis,Implemented,src/pnet/pnet.erl,,Low
+P087,Framework Explainable Concept Drift Detection,"Jan Niklas Adams, Sebastiaan J. van Zelst, Lara Quack",2021,Explainable Concept Drift,Concept Drift,Planned,src/mining/concept_drift.erl,explainable_drift.rs,Medium
+P088,Privacy-Preserving Continuous Event Data Publishing,"Majid Rafiei, Wil M. P. van der Aalst",2021,Continuous Privacy Publishing,Privacy Preservation,Planned,,continuous_privacy.rs,Medium
+P089,Group-Based Privacy Preservation Process Mining,"Majid Rafiei, Wil M. P. van der Aalst",2021,Group-Based Privacy,Privacy Preservation,Planned,,group_privacy.rs,Medium
+P090,Cortado Interactive Data-Driven Discovery,"Daniel Schuster, Sebastiaan J. van Zelst, Wil M. P. van der Aalst",2021,Interactive Discovery,Process Discovery,Planned,src/mining/process_discovery.erl,interactive_discovery.rs,Medium
+P091,Text-Aware Predictive Monitoring,"Marco Pegoraro, Merih Seran Uysal, David Benedikt Georgi",2021,Text-Aware Prediction,Predictive Mining,Planned,src/mining/predictive_mining.erl,text_aware_prediction.rs,Medium
+P092,Model Independent Error Bound Conformance,"Mohammadreza Fani Sani, Martin Kabierski, Sebastiaan J. van Zelst",2021,Conformance Approximation,Conformance Checking,Planned,src/mining/conformance.erl,conformance_approx.rs,Medium
+P093,Process Comparison Object-Centric Process Cubes,"Anahita Farhang Ghahfarokhi, Alessandro Berti, Wil M. P. van der Aalst",2021,Object-Centric Process Cubes,Object-Centric Mining,Planned,src/rust_implementations/object_centric.rs,oc_process_cubes.rs,Medium
+P094,PROVED Tool Uncertain Event Data,"Marco Pegoraro, Merih Seran Uysal, Wil M. P. van der Aalst",2021,Uncertain Data Graph,Uncertain Data,Planned,,proved_graph.rs,Medium
+P095,Inferring Unobserved Events Shared Resources,"Dirk Fahland, Vadim Denisov, Wil. M. P. van der Aalst",2021,Unobserved Event Inference,Process Discovery,Planned,src/mining/process_discovery.erl,unobserved_inference.rs,Medium
+P096,Python Extension Simulate Petri Nets,"M. Pourbafrani, Sandhya Vasudevan, Faizan Zafar, Yuan Xingran",2021,Petri Net Simulation,Simulation,Planned,src/pnet/pnet.erl,petri_sim.rs,Medium
+P097,Privacy-Preserving Data Publishing,"Majid Rafiei, Wil M. P. van der Aalst",2021,Privacy Data Publishing,Privacy Preservation,Planned,,privacy_publishing.rs,Medium
+P098,Precision Fitness Object-Centric Classic,"Wil M. P. van der Aalst",2021,Object-Centric Quality Classic,Object-Centric Mining,Planned,src/rust_implementations/object_centric.rs,,Low
+P099,Towards Quantifying Privacy Process Mining,"Majid Rafiei, Wil M. P. van der Aalst",2020,Privacy Quantification,Privacy Preservation,Planned,,privacy_quantification.rs,Medium
+P100,OrgMining 2.0 Organizational Model Mining,"Jing Yang, Chun Ouyang, Wil M. P. van der Aalst, Arthur H. M. ter Hofstede",2020,Organizational Mining,Organizational Mining,Planned,,org_mining.rs,Medium
+P101,Discovering Object-Centric Petri Nets,"Wil M. P. van der Aalst, Alessandro Berti",2020,Object-Centric Petri Nets,Object-Centric Mining,Partially Implemented,src/rust_implementations/object_centric.rs,oc_petri_nets.rs,High
+P102,Discovering Object-Centric Petri Nets Classic,"Wil M. P. van der Aalst",2020,Object-Centric Petri Nets Classic,Object-Centric Mining,Partially Implemented,src/rust_implementations/object_centric.rs,,Low
+P103,PMSD Data-Driven Simulation System Dynamics,"Mahsa Pourbafrani, Wil M. P. van der Aalst",2020,System Dynamics Simulation,Simulation,Planned,src/mining/simulation.erl,system_dynamics.rs,Medium
+P104,Efficient Time Space Representation Uncertain Event Data,"Marco Pegoraro, Merih Seran Uysal, Wil M. P. van der Aalst",2020,Uncertain Data Efficiency,Uncertain Data,Planned,,uncertain_efficient.rs,Medium
+P105,Conformance Checking Uncertain Event Data,"Marco Pegoraro, Merih Seran Uysal, Wil M. P. van der Aalst",2020,Uncertain Conformance,Conformance Checking,Planned,src/mining/conformance.erl,uncertain_conformance.rs,Medium
+P106,Conformance Checking Uncertain Event Data Classic,"Wil M. P. van der Aalst",2020,Uncertain Conformance Classic,Conformance Checking,Planned,src/mining/conformance.erl,,Low
+P107,Alignment Approximation Process Trees,"Daniel Schuster, Sebastiaan van Zelst, Wil M. P. van der Aalst",2020,Process Tree Alignment,Conformance Checking,Partially Implemented,src/mining/conformance.erl,process_tree_alignment.rs,Medium
+P108,Practical Aspect Privacy-Preserving Data Publishing,"Majid Rafiei, Wil M. P. van der Aalst",2020,Privacy Publishing Practical,Privacy Preservation,Planned,,privacy_practical.rs,Medium
+P109,Efficient Construction Behavior Graphs Uncertain,"Marco Pegoraro, Merih Seran Uysal, Wil M. P. van der Aalst",2020,Uncertain Behavior Graphs,Uncertain Data,Planned,,uncertain_behavior_graph.rs,Medium
+P110,Conformance Checking Approximation Edit Distance,"Mohammadreza Fani Sani, Sebastiaan J. van Zelst, Wil M. P. van der Aalst",2019,Edit Distance Conformance,Conformance Checking,Planned,src/mining/conformance.erl,edit_distance_conformance.rs,Medium
+P111,Mining Uncertain Event Data Process Mining,"Marco Pegoraro, Wil M. P. van der Aalst",2019,Uncertain Event Mining,Uncertain Data,Planned,,uncertain_mining.rs,Medium
+P112,Discovering Process Models Uncertain Event Data,"Marco Pegoraro, Merih Seran Uysal, Wil M. P. van der Aalst",2019,Uncertain Process Discovery,Process Discovery,Planned,src/mining/process_discovery.erl,uncertain_discovery.rs,Medium
+P113,Evaluating Conformance Measures Process Mining,"Anja F. Syring, Niek Tax, Wil M. P. van der Aalst",2019,Conformance Measures Evaluation,Conformance Checking,Implemented,src/mining/conformance.erl,,Low
+P114,What If Process Predictions Not Followed Recommendations,"Marcus Dees, Massimiliano de Leoni, Wil M. P. van der Aalst, Hajo A. Reijers",2019,Process Recommender,Predictive Mining,Planned,src/mining/predictive_mining.erl,process_recommender.rs,Medium
+P115,Fairness-Aware Process Mining,"Wil M. P. van der Aalst",2019,Fairness Detection,Fairness Analysis,Planned,,fairness_detection.rs,Medium
+P116,Foundations Process Discovery,"Wil M. P. van der Aalst",2019,Process Discovery Foundations,Process Discovery,Implemented,src/mining/process_discovery.erl,,Low
+P117,Integrated Framework Process Discovery Evaluation,"Toon Jouck, Alfredo Bolt, Benoit Depaire, Massimiliano de Leoni",2018,Discovery Evaluation Framework,Process Discovery,Planned,,discovery_evaluation.rs,Low
+P118,Markings Perpetual Free-Choice Nets Lucent,"Wil M. P. van der Aalst",2018,Perpetual Free-Choice Lucent,Petri Net Analysis,Implemented,src/pnet/pnet.erl,,Low
+P119,Discovering Precise Process Models Filtering Chaotic,"Niek Tax, Natalia Sidorova, Wil M. P. van der Aalst",2017,Chaotic Activity Filtering,Process Discovery,Planned,src/mining/process_discovery.erl,chaotic_filter.rs,Medium
+P120,Recursion Aware Modeling Discovery Hierarchical,"Maikel Leemans, Wil M. P. van der Aalst, Mark G. J. van den Brand",2017,Recursion-Aware Discovery,Process Discovery,Planned,src/mining/process_discovery.erl,recursion_discovery.rs,Medium
+P121,Guided Interaction Exploration Artifact-Centric,"Maikel L. van Eck, Natalia Sidorova, Wil M. P. van der Aalst",2017,Artifact Interaction Mining,Process Discovery,Planned,src/mining/process_discovery.erl,artifact_interaction.rs,Medium
+P122,Mining Process Model Descriptions Daily Life,"Niek Tax, Natalia Sidorova, Reinder Haakma, Wil M. P. van der Aalst",2017,Event Abstraction,Process Discovery,Planned,src/mining/process_discovery.erl,event_abstraction.rs,Low
+P123,Generating Time-Based Label Refinements,"Niek Tax, Emin Alasgarov, Natalia Sidorova, Wil M. P. van der Aalst",2017,Time-Based Refinement,Process Discovery,Planned,src/mining/process_discovery.erl,time_refinement.rs,Medium
+P124,Imprecisions Precision Measures Process Mining,"Niek Tax, Xixi Lu, Natalia Sidorova, Dirk Fahland",2017,Precision Measures,Conformance Checking,Implemented,src/mining/conformance.erl,,Low
+P125,Event Stream-Based Process Discovery,"Sebastiaan J. van Zelst, Boudewijn F. van Dongen, Wil M. P. van der Aalst",2017,Stream Process Discovery,Stream Processing,Planned,src/mining/stream_mining.erl,stream_discovery.rs,Medium
+P126,Interest-Driven Discovery Local Process Models,"Niek Tax, Benjamin Dalmas, Natalia Sidorova, Wil M. P. van der Aalst",2017,Interest-Driven LPM,Process Discovery,Planned,src/mining/process_discovery.erl,interest_driven_lpm.rs,Medium
+P127,Discovering Relaxed Sound Workflow Nets ILP,"S. J. van Zelst, B. F. van Dongen, W. M. P. van der Aalst",2017,ILP Soundness Discovery,Process Discovery,Planned,src/mining/process_discovery.erl,ilp_soundness.rs,Medium
+P128,Learning Hybrid Process Models Events,"Wil M. P. van der Aalst, Riccardo De Masellis, Chiara Di Francescomarino",2017,Hybrid Process Models,Process Discovery,Planned,src/mining/process_discovery.erl,hybrid_models.rs,High
+P129,Object-Centric Behavioral Constraints,"Wil M. P. van der Aalst, Guangming Li, Marco Montali",2017,Object-Centric Constraints,Object-Centric Mining,Partially Implemented,src/rust_implementations/object_centric.rs,oc_constraints.rs,High
+P130,RapidProM Mine Your Processes,"Wil M. P. van der Aalst, Alfredo Bolt, Sebastiaan J. van Zelst",2017,RapidProM Framework,Process Mining Framework,Planned,,rapidprom.rs,Low
+P131,RapidProM Classic,"Wil M. P. van der Aalst",2017,RapidProM Classic,Process Mining Framework,Planned,,,Low
+P132,Heuristic Approaches Generating Local Process Models,"Niek Tax, Natalia Sidorova, Wil M. P. van der Aalst",2016,Heuristic LPM,Process Discovery,Planned,src/mining/process_discovery.erl,heuristic_lpm.rs,Medium
+P133,Event Abstraction Supervised Learning,"Niek Tax, Natalia Sidorova, Reinder Haakma, Wil M. P. van der Aalst",2016,Supervised Abstraction,Process Discovery,Planned,src/mining/process_discovery.erl,supervised_abstraction.rs,Medium
+P134,Log-Based Evaluation Label Splits,"Niek Tax, Natalia Sidorova, Reinder Haakma, Wil M. P. van der Aalst",2016,Label Split Evaluation,Process Discovery,Planned,src/mining/process_discovery.erl,label_split.rs,Low
+P135,Mining Local Process Models,"Niek Tax, Natalia Sidorova, Reinder Haakma, Wil M. P. van der Aalst",2016,Local Process Models,Process Discovery,Planned,src/mining/process_discovery.erl,local_pm.rs,Medium
+P136,Heuristic Approaches Local Process Models Classic,"Wil M. P. van der Aalst",2016,Heuristic LPM Classic,Process Discovery,Planned,src/mining/process_discovery.erl,,Low
+P137,Heuristics Miners Streaming Event Data,"Andrea Burattin, Alessandro Sperduti, Wil M. P. van der Aalst",2012,Streaming Heuristic Miner,Stream Processing,Planned,src/mining/stream_mining.erl,streaming_heuristic.rs,Medium
+P138,Process Mining Tutorial,"Wil M. P. van der Aalst",2012,Process Mining Tutorial,General,Planned,,,Low
+P139,Process Mining Manifesto,"Wil M. P. van der Aalst, et al.",2011,Process Mining Manifesto,General,Planned,,,Low
+P140,Process Mining Manifesto TUe,"Wil M. P. van der Aalst, et al.",2011,Process Mining Manifesto TUe,General,Planned,,,Low
+P141,Process Mining Overview Opportunities,"Wil M. P. van der Aalst",2011,Process Mining Overview,General,Planned,,,Low
+P142,Soundness Workflow Nets,"Wil M. P. van der Aalst",2011,Workflow Net Soundness,Petri Net Analysis,Implemented,src/verification/soundness.erl,,Low
+P143,Repairing Process Models,"Wil M. P. van der Aalst",2011,Process Model Repair,Process Discovery,Planned,src/mining/process_discovery.erl,model_repair.rs,Low
+P144,A Decade BPM Conferences,"Wil M. P. van der Aalst",2010,BPM Decade Review,General,Planned,,,Low
+P145,Supporting Full BPM Lifecycle,"Wil M. P. van der Aalst",2009,BPM Lifecycle,General,Planned,,,Low
+P146,Workflow Exception Patterns,"Noran Russell, Wil M. P. van der Aalst, et al.",2008,Exception Patterns,Workflow Patterns,Implemented,src/patterns/exception_patterns.erl,,Low
+P147,Business Process Mining Industrial Application,"Wil M. P. van der Aalst",2007,Industrial Process Mining,General,Planned,,,Low
+P148,YAWL Yet Another Workflow Language,"Wil M. P. van der Aalst, Arthur H. M. ter Hofstede",2005,YAWL Language,Workflow Modeling,Implemented,src/core/gen_yawl.erl,src/yawl/,Low
+P149,Process Mining Case Handling,"Wil M. P. van der Aalst",2005,Case Handling Mining,Process Discovery,Implemented,src/mining/process_discovery.erl,,Low
+P150,YAWL Design Implementation,"Wil M. P. van der Aalst, Arthur H. M. ter Hofstede",2004,YAWL Design,Workflow Modeling,Implemented,src/core/gen_yawl.erl,src/yawl/,Low
+P151,Tutorial Models Systems Standards Workflow,"Wil M. P. van der Aalst",2004,Workflow Tutorial,General,Planned,,,Low
+P152,Workflow Patterns,"Wil M. P. van der Aalst, Arthur H. M. ter Hofstede, et al.",2003,43 Workflow Patterns,Workflow Patterns,Implemented,src/patterns/*.erl,,Low
+P153,Discovering Process Models Empirical Data,"Wil M. P. van der Aalst",2003,Empirical Discovery,Process Discovery,Implemented,src/mining/process_discovery.erl,,Low
+P154,Process Mining Research Agenda,"Wil M. P. van der Aalst",2003,Research Agenda,General,Planned,,,Low
+P155,Workflow Mining Discovering Process Models,"Wil M. P. van der Aalst",2001,Workflow Mining,Process Discovery,Implemented,src/mining/process_discovery.erl,,Low
+P156,Process Mining Discovering Workflow Models,"Wil M. P. van der Aalst",2001,Process Mining Discovery,Process Discovery,Implemented,src/mining/process_discovery.erl,,Low
+P157,Rediscovering Workflow Models Event-Based Data,"Wil M. P. van der Aalst",2001,Event-Based Discovery,Process Discovery,Implemented,src/mining/process_discovery.erl,,Low
+P158,Diagnosing Workflow Processes Woflan,"Wil M. P. van der Aalst",2001,Woflan Diagnosis,Petri Net Analysis,Implemented,src/verification/soundness.erl,,Low
+P159,Fundamentals Control Flow Workflows,"Wil M. P. van der Aalst",2000,Control Flow Fundamentals,Workflow Modeling,Implemented,src/core/gen_yawl.erl,,Low
+P160,P2P Approach Interorganizational Workflows,"Wil M. P. van der Aalst",2000,P2P Workflows,Workflow Modeling,Planned,src/core/gen_yawl.erl,,Low
+P161,Verification Business Processes Petri Nets,"Wil M. P. van der Aalst",2000,Petri Net Verification,Petri Net Analysis,Implemented,src/verification/soundness.erl,,Low
+P162,Workflow Modeling Using Proclets,"Wil M. P. van der Aalst",2000,Proclet Modeling,Workflow Modeling,Planned,src/core/gen_yawl.erl,,Low
+P163,Business Process Management Survey,"Wil M. P. van der Aalst",2013,BPM Survey,General,Planned,,,Low
+P164,Business Process Simulation Survey,"Wil M. P. van der Aalst",2013,Process Simulation Survey,Simulation,Planned,src/mining/simulation.erl,,Low
+P165,Application Petri Nets Workflow Management,"Wil M. P. van der Aalst",1998,Petri Net Workflow,Petri Net Analysis,Implemented,src/pnet/pnet.erl,,Low
+P166,Verification Workflow Nets,"Wil M. P. van der Aalst",1997,Workflow Net Verification,Petri Net Analysis,Implemented,src/verification/soundness.erl,,Low

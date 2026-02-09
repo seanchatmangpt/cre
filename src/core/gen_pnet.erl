@@ -699,9 +699,9 @@ handle_call({drain, MaxSteps, Acc}, _From, NetState) ->
 %% delegates custom casts to the callback module's handle_cast/2.
 %% @end
 %%--------------------------------------------------------------------
--spec handle_cast(Request :: term(), NetState :: #net_state{}) ->
-          {noreply, #net_state{}} |
-          {stop, _, #net_state{}}.
+-spec handle_cast(continue | {cast, term()}, NetState :: #net_state{net_mod :: atom()}) ->
+          {noreply, #net_state{net_mod :: atom()}} |
+          {stop, term(), #net_state{net_mod :: atom()}}.
 
 handle_cast(continue,
             NetState = #net_state{

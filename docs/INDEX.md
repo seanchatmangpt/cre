@@ -28,6 +28,82 @@
 
 ---
 
+## API Reference
+
+### Core API Documentation
+
+| Document | Description | Scope |
+|----------|-------------|-------|
+| [api/core/COMPLETE_API_REFERENCE.md](api/core/COMPLETE_API_REFERENCE.md) | Full API documentation | All modules |
+| [api/core/CLIENT_API_COMPLETE_REFERENCE.md](api/core/CLIENT_API_COMPLETE_REFERENCE.md) | Client API comprehensive guide | Client APIs |
+| [reference/api_reference.md](reference/api_reference.md) | Reference section documentation | Core APIs |
+
+### Pattern APIs
+
+| Document | Description |
+|----------|-------------|
+| [api/patterns/patterns_api.md](api/patterns/patterns_api.md) | Patterns API reference |
+
+### Mining APIs
+
+| Document | Description |
+|----------|-------------|
+| [api/mining/MINING_MODULES_API_REFERENCE.md](api/mining/MINING_MODULES_API_REFERENCE.md) | Process mining modules API |
+
+### Core Behavior APIs
+
+| Document | Description |
+|----------|-------------|
+| [yawl_patterns/GEN_PNET_API_SPECIFICATION.md](yawl_patterns/GEN_PNET_API_SPECIFICATION.md) | gen_pnet behavior API |
+| [yawl_patterns/GEN_YAWL_API_SPECIFICATION.md](yawl_patterns/GEN_YAWL_API_SPECIFICATION.md) | gen_yawl behavior API |
+| [yawl_patterns/GEN_PNET_INTEGRATION_ARCHITECTURE.md](yawl_patterns/GEN_PNET_INTEGRATION_ARCHITECTURE.md) | Integration architecture |
+
+---
+
+## Guides
+
+### Feature Guides
+
+| Document | Description | Level |
+|----------|-------------|-------|
+| [guides/human_in_the_loop.md](guides/human_in_the_loop.md) | Approval workflows with LLM integration | Intermediate |
+| [guides/telemetry.md](guides/telemetry.md) | Monitoring and telemetry setup | Intermediate |
+| [guides/timeout_configuration.md](guides/timeout_configuration.md) | Timeout configuration | Beginner |
+| [guides/order_fulfillment_example.md](guides/order_fulfillment_example.md) | Real-world workflow example | Intermediate |
+| [guides/tool_configuration.md](guides/tool_configuration.md) | Tool configuration guide | Intermediate |
+
+### Migration Guides
+
+| Document | Description | Level |
+|----------|-------------|-------|
+| [guides/migration/migration_guide.md](guides/migration/migration_guide.md) | General migration guide | Advanced |
+| [guides/migration/otp_25_28.md](guides/migration/otp_25_28.md) | Erlang/OTP version migration | Advanced |
+
+### Integration & Deployment
+
+| Document | Description | Level |
+|----------|-------------|-------|
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Production deployment guide | Advanced |
+| [INTEGRATION.md](INTEGRATION.md) | System integration overview | Intermediate |
+| [HELPER_INTEGRATION_GUIDE.md](HELPER_INTEGRATION_GUIDE.md) | Helper module integration | Intermediate |
+| [WF_MODULES_INTEGRATION_GUIDE.md](WF_MODULES_INTEGRATION_GUIDE.md) | Workflow utilities integration | Intermediate |
+| [UTILITY_MODULES_GUIDE.md](UTILITY_MODULES_GUIDE.md) | Utility modules usage | Intermediate |
+
+---
+
+## Reference
+
+| Document | Description |
+|----------|-------------|
+| [reference/glossary.md](reference/glossary.md) | Terminology and definitions |
+| [reference/faq.md](reference/faq.md) | Frequently asked questions |
+| [reference/bibliography.md](reference/bibliography.md) | References and citations |
+| [reference/EXCEPTION_HANDLING.md](reference/EXCEPTION_HANDLING.md) | Exception handling reference |
+| [reference/QUICK_REFERENCE_CHEATSHEET.md](reference/QUICK_REFERENCE_CHEATSHEET.md) | Comprehensive cheatsheet |
+| [reference/quick_reference_cards.md](reference/quick_reference_cards.md) | Quick reference collection |
+
+---
+
 ## Tutorials
 
 ### Tutorial Series
@@ -112,33 +188,6 @@
 
 ---
 
-## API Reference
-
-### Complete API Documentation
-
-| Document | Description | Scope |
-|----------|-------------|-------|
-| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | Full API documentation | All modules |
-| [reference/api_reference.md](reference/api_reference.md) | Reference section documentation | Core APIs |
-| [patterns_api.md](patterns_api.md) | Patterns API reference | Pattern modules |
-| [MINING_MODULES_API_REFERENCE.md](MINING_MODULES_API_REFERENCE.md) | Process mining modules API | Mining |
-
-### Client API
-
-| Document | Description |
-|----------|-------------|
-| [CLIENT_API_COMPLETE_REFERENCE.md](CLIENT_API_COMPLETE_REFERENCE.md) | Client API comprehensive guide |
-
-### Core APIs
-
-| Document | Description |
-|----------|-------------|
-| [yawl_patterns/GEN_PNET_API_SPECIFICATION.md](yawl_patterns/GEN_PNET_API_SPECIFICATION.md) | gen_pnet behavior API |
-| [yawl_patterns/GEN_YAWL_API_SPECIFICATION.md](yawl_patterns/GEN_YAWL_API_SPECIFICATION.md) | gen_yawl behavior API |
-| [yawl_patterns/GEN_PNET_INTEGRATION_ARCHITECTURE.md](yawl_patterns/GEN_PNET_INTEGRATION_ARCHITECTURE.md) | Integration architecture |
-
----
-
 ## Petri Net Core
 
 ### Type System
@@ -177,31 +226,6 @@
 
 ---
 
-## Guides
-
-### Integration & Deployment
-
-| Document | Description | Level |
-|----------|-------------|-------|
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Production deployment guide | Advanced |
-| [INTEGRATION.md](INTEGRATION.md) | System integration overview | Intermediate |
-| [guides/migration/otp_25_28.md](guides/migration/otp_25_28.md) | Erlang/OTP version migration | Advanced |
-| [HELPER_INTEGRATION_GUIDE.md](HELPER_INTEGRATION_GUIDE.md) | Helper module integration | Intermediate |
-| [WF_MODULES_INTEGRATION_GUIDE.md](WF_MODULES_INTEGRATION_GUIDE.md) | Workflow utilities integration | Intermediate |
-| [UTILITY_MODULES_GUIDE.md](UTILITY_MODULES_GUIDE.md) | Utility modules usage | Intermediate |
-
-### Feature Guides
-
-| Document | Description |
-|----------|-------------|
-| [guides/human_in_the_loop.md](guides/human_in_the_loop.md) | Approval workflows with LLM integration |
-| [guides/telemetry.md](guides/telemetry.md) | Monitoring and telemetry setup |
-| [guides/timeout_configuration.md](guides/timeout_configuration.md) | Timeout configuration |
-| [guides/order_fulfillment_example.md](guides/order_fulfillment_example.md) | Real-world workflow example |
-| [guides/tool_configuration.md](guides/tool_configuration.md) | Tool configuration guide |
-
----
-
 ## Operations
 
 ### Testing & Quality
@@ -230,13 +254,27 @@
 | [operations/troubleshooting/debugging.md](operations/troubleshooting/debugging.md) | Debugging guide |
 | [operations/troubleshooting/debugging_quick_reference.md](operations/troubleshooting/debugging_quick_reference.md) | Debugging quick reference |
 
-### Reference
+---
+
+## Papers
+
+Research papers on process mining and workflow management:
 
 | Document | Description |
 |----------|-------------|
-| [reference/glossary.md](reference/glossary.md) | Terminology and definitions |
-| [reference/faq.md](reference/faq.md) | Frequently asked questions |
-| [reference/bibliography.md](reference/bibliography.md) | References and citations |
+| [papers/README.md](papers/README.md) | Process mining papers index |
+| [papers/PAPER_SUMMARIES.md](papers/PAPER_SUMMARIES.md) | Paper summaries |
+| [papers/algorithm_mapping.csv](papers/algorithm_mapping.csv) | Algorithm mapping |
+| [papers/analysis_readme.md](papers/analysis_readme.md) | Analysis documentation |
+| [papers/analysis_summary.md](papers/analysis_summary.md) | Analysis summary |
+
+The papers directory contains PDFs covering:
+- Workflow pattern research
+- Process mining fundamentals
+- Petri net theory
+- YAWL language specifications
+- Conformance checking
+- Object-centric process mining
 
 ---
 
@@ -269,15 +307,6 @@ High-performance Rust implementations:
 |----------|-------------|
 | [features/strategies/plugin_system.md](features/strategies/plugin_system.md) | Strategy plugin system |
 | [features/strategies/rl_strategies.md](features/strategies/rl_strategies.md) | RL strategies |
-
-### Process Mining
-
-| Document | Description |
-|----------|-------------|
-| [papers/README.md](papers/README.md) | Process mining papers index |
-| [papers/PAPER_SUMMARIES.md](papers/PAPER_SUMMARIES.md) | Paper summaries |
-| [papers/algorithm_mapping.csv](papers/algorithm_mapping.csv) | Algorithm mapping |
-| [papers/analysis_summary.md](papers/analysis_summary.md) | Analysis summary |
 
 ### Specialized Analysis
 
@@ -318,13 +347,6 @@ High-performance Rust implementations:
 | [analysis/other/pattern_implementation.md](analysis/other/pattern_implementation.md) | Pattern implementation analysis |
 | [analysis/other/pattern_enhancements.md](analysis/other/pattern_enhancements.md) | Pattern enhancements |
 | [analysis/other/token_protocol.md](analysis/other/token_protocol.md) | Token communication protocol |
-
-### Architecture Reference
-
-| Document | Description |
-|----------|-------------|
-| [architecture/comparison_matrices.md](architecture/comparison_matrices.md) | Comparison matrices |
-| [architecture/traceability_matrix.md](architecture/traceability_matrix.md) | Requirements traceability |
 
 ---
 
@@ -432,26 +454,6 @@ High-performance Rust implementations:
 
 ---
 
-## Quick References
-
-| Document | Description |
-|----------|-------------|
-| [QUICK_REFERENCE_CARD.md](QUICK_REFERENCE_CARD.md) | General quick reference |
-| [QUICK_REFERENCE_CHEATSHEET.md](QUICK_REFERENCE_CHEATSHEET.md) | Comprehensive cheatsheet |
-| [quick_reference_cards.md](quick_reference_cards.md) | Collection of quick references |
-
----
-
-## Archived Documentation
-
-| Document | Description |
-|----------|-------------|
-| [old/README.md](old/README.md) | Archived old README |
-| [old/PERSISTENT_TERM_OPTIMIZATIONS.md](old/PERSISTENT_TERM_OPTIMIZATIONS.md) | Persistent term optimizations |
-| [old/RELEASE_NOTES_0.2.0.md](old/RELEASE_NOTES_0.2.0.md) | Version 0.2.0 release notes |
-
----
-
 ## Documentation by Task
 
 | Task | Documents |
@@ -460,7 +462,7 @@ High-performance Rust implementations:
 | **First Workflow** | [tutorials/getting_started.md](tutorials/getting_started.md), [examples/](examples/) |
 | **Learn Patterns** | [WORKFLOW_PATTERNS_LEARNING_PATH.md](WORKFLOW_PATTERNS_LEARNING_PATH.md), [CORE_YAWL_PATTERNS_GUIDE.md](CORE_YAWL_PATTERNS_GUIDE.md) |
 | **Build Workflows** | [YAWL_PATTERNS_REFERENCE.md](YAWL_PATTERNS_REFERENCE.md), [YAWL_COMPILE_COMPLETE_GUIDE.md](YAWL_COMPILE_COMPLETE_GUIDE.md) |
-| **API Integration** | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md), [CLIENT_API_COMPLETE_REFERENCE.md](CLIENT_API_COMPLETE_REFERENCE.md) |
+| **API Integration** | [api/core/COMPLETE_API_REFERENCE.md](api/core/COMPLETE_API_REFERENCE.md), [api/core/CLIENT_API_COMPLETE_REFERENCE.md](api/core/CLIENT_API_COMPLETE_REFERENCE.md) |
 | **Production** | [DEPLOYMENT.md](DEPLOYMENT.md), [operations/testing/testing.md](operations/testing/testing.md), [guides/telemetry.md](guides/telemetry.md) |
 | **Troubleshooting** | [operations/troubleshooting/troubleshooting.md](operations/troubleshooting/troubleshooting.md), [operations/troubleshooting/known_issues.md](operations/troubleshooting/known_issues.md), [reference/faq.md](reference/faq.md) |
 
@@ -476,7 +478,7 @@ High-performance Rust implementations:
 3. tutorials/getting_started.md (30 min)
 4. tutorials/basic_patterns_tutorial.md (60 min)
 5. CORE_YAWL_PATTERNS_GUIDE.md (90 min)
-6. CLIENT_API_COMPLETE_REFERENCE.md (60 min)
+6. api/core/CLIENT_API_COMPLETE_REFERENCE.md (60 min)
 7. YAWL_PATTERNS_WORKBOOK.md (60 min)
 8. operations/testing/testing.md (45 min)
 9. DEPLOYMENT.md (60 min)
@@ -497,8 +499,8 @@ High-performance Rust implementations:
 ### Path 3: API Developer (1-2 days)
 
 ```
-1. COMPLETE_API_REFERENCE.md (90 min)
-2. CLIENT_API_COMPLETE_REFERENCE.md (60 min)
+1. api/core/COMPLETE_API_REFERENCE.md (90 min)
+2. api/core/CLIENT_API_COMPLETE_REFERENCE.md (60 min)
 3. PNET_CORE_COMPREHENSIVE_REFERENCE.md (60 min)
 4. GEN_PNET_USER_GUIDE.md (45 min)
 5. HELPER_INTEGRATION_GUIDE.md (45 min)
@@ -530,5 +532,3 @@ High-performance Rust implementations:
 ---
 
 **Last Updated:** 2026-02-08 | **Version:** 0.3.0 | **Pattern Count:** 43 YAWL patterns
-
-**Documentation Audit:** See [DOCUMENTATION_AUDIT.md](DOCUMENTATION_AUDIT.md) for details on the reorganization.

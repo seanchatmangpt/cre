@@ -551,8 +551,66 @@ format_date({Year, Month, Day}) ->
         [Year, Month, Day])).
 
 %% @private
-restore_timers_internal(_State) ->
-    %% TODO: Implement Mnesia restoration
+-spec restore_timers_internal(#timer_state{}) -> ok.
+restore_timers_internal(State) ->
+    %% Check if Mnesia table is available
+    case catch mnesia:table_info(wf_persistent_timer, where_to_write) of
+        {'EXIT', _Reason} ->
+            ?LOG_WARNING("Mnesia table wf_persistent_timer not available, skipping timer restoration"),
+            ok;
+        _Nodes ->
+            restore_scheduled_timers(State)
+    end.
+
+%% @private
+-spec restore_scheduled_timers(#timer_state{}) -> ok.
+restore_scheduled_timers(_State) ->
+    Now = erlang:system_time(millisecond),
+
+    %% Query all scheduled timers from Mnesia
+    case catch mnesia:dirty_match_object(#persistent_timer{_ = '_'}) of
+        {'EXIT', Reason} ->
+            ?LOG_ERROR("Failed to read timers from Mnesia: ~p", [Reason]),
+            ok;
+        Timers when is_list(Timers) ->
+            %% Filter for scheduled and unexpired timers
+            Unexpired = [T || T <- Timers,
+                             T#persistent_timer.status =:= scheduled,
+                             T#persistent_timer.target_time > Now],
+
+            ?LOG_INFO("Restoring ~p timers (found ~p total, ~p unexpired)",
+                      [length(Unexpired), length(Timers), length(Unexpired)]),
+
+            %% Recreate Erlang timers for each unexpired timer
+            lists:foreach(fun(Timer) ->
+                restore_single_timer(Timer, Now)
+            end, Unexpired),
+
+            ok
+    end.
+
+%% @private
+-spec restore_single_timer(#persistent_timer{}, integer()) -> ok.
+restore_single_timer(Timer, Now) ->
+    TimerId = Timer#persistent_timer.timer_id,
+    TargetTime = Timer#persistent_timer.target_time,
+
+    %% Calculate remaining delay
+    Delay = max(0, TargetTime - Now),
+
+    %% Recreate the Erlang timer
+    case timer:send_after(Delay, self(), {timer_fire, TimerId}) of
+        {ok, TRef} ->
+            ?LOG_INFO("Restored timer ~p, fires in ~p ms", [TimerId, Delay]),
+            %% Update timer_ref in Mnesia
+            UpdatedTimer = Timer#persistent_timer{timer_ref = TRef},
+            mnesia:dirty_write(wf_persistent_timer, UpdatedTimer);
+        {error, Reason} ->
+            ?LOG_ERROR("Failed to restore timer ~p: ~p", [TimerId, Reason]),
+            %% Mark as failed
+            FailedTimer = Timer#persistent_timer{status = failed},
+            mnesia:dirty_write(wf_persistent_timer, FailedTimer)
+    end,
     ok.
 
 %% @private

@@ -1,50 +1,101 @@
-# Wil M. P. van der Aalst Papers Download Complete
+# Process Mining Research Papers
 
-## Summary
-Successfully downloaded **121 papers** by Wil M. P. van der Aalst from arXiv to `/Users/sac/cre/docs/papers/`.
+Collection of research papers on process mining, workflow patterns, and YAWL.
 
-## Key Features of the Download Process
+---
 
-### 1. Systematic Pagination Handling
-- Handled multiple search pages (3 pages total)
-- Fetched all 121 results from arXiv author search
-- Extracted metadata including titles, authors, abstracts, and arXiv IDs
+## Overview
 
-### 2. Concurrent Download
-- Used 5 concurrent threads for efficient downloading
-- Resume capability for interrupted downloads
-- Proper error handling and retries
+This directory contains research papers (PDF format) covering:
 
-### 3. Metadata Management
-- Created comprehensive JSON metadata file (`papers_info.json`)
-- Generated detailed markdown summaries (`PAPER_SUMMARIES.md`)
-- Generated download report (`download_report.txt`)
+- **Workflow Patterns** - Foundational research on workflow control-flow patterns
+- **Process Mining** - Process discovery, conformance checking, and analysis
+- **Petri Net Theory** - Theoretical foundations of Petri nets
+- **YAWL Language** - YAWL specifications and technical manuals
+- **Object-Centric Process Mining** - Modern approaches to multi-object processes
 
-### 4. File Organization
-- Clean filename format: `van_der_aalst_[year]_[title]_[arxiv_id].pdf`
-- Automatic filename sanitization (removed special characters)
-- No duplicate downloads detected
+---
 
-### 5. Year Distribution
-- Papers span from 1996 to 2026 (30 years of research)
-- Recent papers include cutting-edge topics like:
-  - Object-centric process mining (2020-2026)
-  - Large language models in process mining (2022-2026)
-  - Privacy-preserving process mining (2019-2026)
-  - Process mining with AI/ML (2019-2026)
+## Wil M. P. van der Aalst Collection
 
-## Generated Files
-1. **PDF Files**: 166 PDF files (including some existing papers in the directory)
-2. **papers_info.json**: Complete metadata for all 121 papers
-3. **PAPER_SUMMARIES.md**: Organized summary by year and paper
-4. **download_report.txt**: Detailed download status report
-5. **README.md**: Instructions for the collection
+This directory includes **121 papers** by Wil M. P. van der Aalst downloaded from arXiv.
 
-## Papers Overview
-- **Total Papers**: 121 unique papers
-- **Date Range**: 1996-2026
-- **Main Topics**: Process mining, workflow patterns, Petri nets, business process management
-- **Current Focus**: Object-centric process mining, AI/ML integration
+### Key Features
 
-## Usage
-The collection is ready for research purposes. All papers can be accessed in `/Users/sac/cre/docs/papers/` with appropriate metadata for citation and reference.
+- **Date Range**: 1996-2026 (30 years of research)
+- **Topics**: Object-centric process mining, AI/ML integration, privacy-preserving mining
+- **Format**: Clean filenames with year, title, and arXiv ID
+
+### Generated Files
+
+| File | Description |
+|------|-------------|
+| `papers_info.json` | Complete metadata for all 121 papers |
+| `PAPER_SUMMARIES.md` | Organized summary by year and paper |
+| `download_report.txt` | Detailed download status report |
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [PAPER_SUMMARIES.md](PAPER_SUMMARIES.md) | Summaries of key papers |
+| [analysis_readme.md](analysis_readme.md) | Analysis documentation index |
+| [analysis_summary.md](analysis_summary.md) | Analysis summary |
+| [algorithm_mapping.csv](algorithm_mapping.csv) | Algorithm to implementation mapping |
+| [rust_implementation.md](rust_implementation.md) | Rust implementation notes |
+
+---
+
+## Key Papers
+
+### Foundational
+
+| Paper | Year | Topic |
+|-------|------|-------|
+| `workflow_patterns_2003.pdf` | 2003 | Original 20 workflow patterns |
+| `application_petri_nets_workflow_management_1998.pdf` | 1998 | Petri nets in workflow management |
+| `verification_of_workflow_nets_1997.pdf` | 1997 | Workflow net soundness verification |
+
+### YAWL
+
+| Paper | Year | Topic |
+|-------|------|-------|
+| `yawl_yet_another_workflow_language_2005.pdf` | 2005 | YAWL introduction |
+| `yawl_design_implementation_2004.pdf` | 2004 | YAWL design and implementation |
+| `YAWL_Technical_Manual.pdf` | - | Complete technical reference |
+
+### Process Mining
+
+| Paper | Year | Topic |
+|-------|------|-------|
+| `process_mining_manifesto_2011.pdf` | 2011 | Process mining manifesto |
+| `foundations_of_process_discovery_2019.pdf` | 2019 | Process discovery foundations |
+| `conformance_checking_uncertain_event_data_2020.pdf` | 2020 | Conformance checking with uncertain data |
+
+### Recent Van der Aalst Papers
+
+| Paper | Year | Topic |
+|-------|------|-------|
+| `van_der_aalst_2025_no_ai_without_pi.pdf` | 2025 | AI requires Process Intelligence |
+| `van_der_Aalst_2023_Advancements_and_Challenges_in_Object_Centric_Process_Mining.pdf` | 2023 | OCPM advances and challenges |
+| `van_der_Aalst_2021_Precision_and_Fitness_in_Object_Centric_Process_Mining.pdf` | 2021 | OCPM precision and fitness |
+
+---
+
+## Citation Information
+
+When referencing these papers, please use the original citation information provided in each PDF.
+
+---
+
+## Related Documentation
+
+- [Pattern Catalog](../yawl_pattern_catalog.md) - Implementation of patterns
+- [GEN_PNET_USER_GUIDE.md](../GEN_PNET_USER_GUIDE.md) - Petri net runtime guide
+- [Analysis](../analysis/) - Technical analysis documents
+
+---
+
+**Last Updated:** 2026-02-08 | **Paper Count:** 166+ papers | **Summaries Completed:** 15 high-quality paper summaries enhanced

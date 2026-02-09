@@ -278,9 +278,9 @@ terminate(_Reason, #place_coordinator{place = Place}) ->
 -spec place_coordinator_name(atom(), atom() | undefined) -> atom().
 
 place_coordinator_name(Place, undefined) ->
-    list_to_existing_atom(atom_to_list(Place) ++ "_coordinator");
+    list_to_atom(atom_to_list(Place) ++ "_coordinator");
 place_coordinator_name(Place, NetMod) when is_atom(NetMod) ->
-    list_to_existing_atom(
+    list_to_atom(
         atom_to_list(NetMod) ++ "_" ++
         atom_to_list(Place) ++ "_coordinator"
     ).
