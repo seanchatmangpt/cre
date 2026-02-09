@@ -1,0 +1,43 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cre-config
+  namespace: cre-prod
+data:
+  # CRE Configuration
+  CRE_DEFAULT_PORT: "4142"
+  CRE_CLIENT_POLL_INTERVAL: "250"
+  CRE_LOG_LEVEL: "info"
+
+  # YAWL Configuration
+  YAWL_STATELESS_CHECKPOINT_DIR: "/opt/cre/checkpoints"
+  YAWL_STATELESS_MAX_EXECUTIONS: "1000"
+  YAWL_TIMEOUT_DEFAULT_TIMEOUT: "30000"
+
+  # OpenTelemetry Configuration
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  OTEL_SERVICE_NAME: "cre-workflow-engine"
+  OTEL_RESOURCE_ATTRIBUTES: "service.name=cre,deployment.environment=production"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cre-config
+  namespace: cre-staging
+data:
+  # CRE Configuration
+  CRE_DEFAULT_PORT: "4142"
+  CRE_CLIENT_POLL_INTERVAL: "250"
+  CRE_LOG_LEVEL: "debug"
+
+  # YAWL Configuration
+  YAWL_STATELESS_CHECKPOINT_DIR: "/opt/cre/checkpoints"
+  YAWL_STATELESS_MAX_EXECUTIONS: "500"
+  YAWL_TIMEOUT_DEFAULT_TIMEOUT: "30000"
+
+  # OpenTelemetry Configuration
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  OTEL_SERVICE_NAME: "cre-workflow-engine-staging"
+  OTEL_RESOURCE_ATTRIBUTES: "service.name=cre,deployment.environment=staging"

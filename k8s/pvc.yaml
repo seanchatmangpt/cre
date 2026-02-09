@@ -1,0 +1,30 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cre-checkpoints-pvc
+  namespace: cre-prod
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+  selector:
+    matchLabels:
+      app: cre-checkpoints
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cre-logs-pvc
+  namespace: cre-prod
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard

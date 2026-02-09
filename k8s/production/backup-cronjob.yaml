@@ -1,0 +1,229 @@
+---
+# CronJob for daily Mnesia backups
+# Backs up CRE workflow state to S3-compatible storage
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cre-backup
+  labels:
+    app: cre
+    component: backup
+spec:
+  schedule: "0 2 * * *"  # Run at 2 AM daily
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    metadata:
+      labels:
+        app: cre
+        component: backup
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            app: cre
+            component: backup
+        spec:
+          serviceAccountName: cre-backup
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: cre:0.3.0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+
+                  # Configuration
+                  BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_DIR="/tmp/backup-${BACKUP_DATE}"
+                  MNESIA_DIR="/opt/cre/data/mnesia"
+                  S3_BUCKET="${S3_BUCKET:-s3://cre-backups}"
+                  RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
+
+                  echo "Starting CRE backup at ${BACKUP_DATE}"
+
+                  # Create backup directory
+                  mkdir -p "${BACKUP_DIR}"
+
+                  # Stop Mnesia writes (checkpoint)
+                  echo "Creating Mnesia checkpoint..."
+                  /opt/cre/bin/cre eval \
+                    "mnesia:checkpoint(), \
+                     mnesia:backup('${BACKUP_DIR}/mnesia_backup.')."
+
+                  # Copy checkpoint files
+                  echo "Copying checkpoint files..."
+                  cp -r /opt/cre/checkpoints "${BACKUP_DIR}/" || true
+
+                  # Create configuration backup
+                  echo "Backing up configuration..."
+                  kubectl get configmap cre-config -o json > "${BACKUP_DIR}/configmap.json"
+                  kubectl get secret cre-secrets -o json > "${BACKUP_DIR}/secret.json"
+
+                  # Compress backup
+                  echo "Compressing backup..."
+                  tar -czf "/tmp/cre-backup-${BACKUP_DATE}.tar.gz" -C "${BACKUP_DIR}" .
+
+                  # Upload to S3
+                  echo "Uploading to S3..."
+                  if [ -n "${AWS_ACCESS_KEY_ID}" ] && [ -n "${AWS_SECRET_ACCESS_KEY}" ]; then
+                    aws s3 cp \
+                      "/tmp/cre-backup-${BACKUP_DATE}.tar.gz" \
+                      "${S3_BUCKET}/cre-backup-${BACKUP_DATE}.tar.gz" \
+                      --storage-class STANDARD_IA
+
+                    # Set lifecycle policy
+                    aws s3api put-object-lifecycle-configuration \
+                      --bucket "${S3_BUCKET#s3://}" \
+                      --lifecycle-configuration \
+                      '{"Rules":[{"Id":"BackupExpiration","Status":"Enabled","Prefix":"cre-backup-","Expiration":{"Days":'${RETENTION_DAYS}'}}]}'
+                  else
+                    echo "Warning: AWS credentials not configured, skipping S3 upload"
+                    # Store locally if S3 not configured
+                    mv "/tmp/cre-backup-${BACKUP_DATE}.tar.gz" "/opt/cre/backups/"
+                  fi
+
+                  # Cleanup
+                  rm -rf "${BACKUP_DIR}"
+                  rm -f "/tmp/cre-backup-${BACKUP_DATE}.tar.gz"
+
+                  # Cleanup old backups
+                  echo "Cleaning up old backups (older than ${RETENTION_DAYS} days)..."
+                  if [ -n "${AWS_ACCESS_KEY_ID}" ]; then
+                    aws s3 ls "${S3_BUCKET}/" | while read -r line; do
+                      FILE_DATE=$(echo "$line" | awk '{print $4}' | grep -oP '\d{8}_\d{6}' || true)
+                      if [ -n "$FILE_DATE" ]; then
+                        FILE_AGE=$(( ($(date +%s) - $(date -d "${FILE_DATE}" +%s 2>/dev/null || echo 0)) / 86400 ))
+                        if [ $FILE_AGE -gt ${RETENTION_DAYS} ]; then
+                          FILE_NAME=$(echo "$line" | awk '{print $4}')
+                          aws s3 rm "${S3_BUCKET}/${FILE_NAME}"
+                        fi
+                      fi
+                    done
+                  fi
+
+                  # Cleanup local backups
+                  find /opt/cre/backups -name "cre-backup-*.tar.gz" -mtime +${RETENTION_DAYS} -delete || true
+
+                  echo "Backup completed successfully"
+
+                  # Send notification
+                  if [ -n "${WEBHOOK_URL}" ]; then
+                    curl -X POST "${WEBHOOK_URL}" \
+                      -H "Content-Type: application/json" \
+                      -d '{"text":"CRE backup completed successfully","date":"'${BACKUP_DATE}'"}'
+                  fi
+
+              env:
+                - name: S3_BUCKET
+                  value: "s3://cre-backups"
+                - name: BACKUP_RETENTION_DAYS
+                  value: "30"
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: cre-backup-credentials
+                      key: access-key-id
+                      optional: true
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cre-backup-credentials
+                      key: secret-access-key
+                      optional: true
+                - name: WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: cre-backup-credentials
+                      key: webhook-url
+                      optional: true
+                - name: AWS_REGION
+                  value: "us-east-1"
+                - name: CRE_COOKIE
+                  valueFrom:
+                    secretKeyRef:
+                      name: cre-secrets
+                      key: erlang-cookie
+              volumeMounts:
+                - name: mnesia-data
+                  mountPath: /opt/cre/data
+                  readOnly: true
+                - name: backups
+                  mountPath: /opt/cre/backups
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"
+          volumes:
+            - name: mnesia-data
+              persistentVolumeClaim:
+                claimName: mnesia-data
+            - name: backups
+              emptyDir: {}
+---
+# ServiceAccount for backup jobs
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cre-backup
+  labels:
+    app: cre
+    component: backup
+---
+# Role for backup operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cre-backup
+  labels:
+    app: cre
+    component: backup
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "get"]
+---
+# RoleBinding for backup service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cre-backup
+  labels:
+    app: cre
+    component: backup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cre-backup
+subjects:
+  - kind: ServiceAccount
+    name: cre-backup
+---
+# Backup credentials secret template
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cre-backup-credentials
+  labels:
+    app: cre
+    component: backup
+type: Opaque
+stringData:
+  # AWS credentials for S3 backup (optional)
+  access-key-id: ""
+  secret-access-key: ""
+  # Optional webhook URL for backup notifications
+  webhook-url: ""

@@ -1,0 +1,56 @@
+{{- if .Values.headlessService.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cre.fullname" . }}-headless
+  labels:
+    {{- include "cre.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: {{ .Values.headlessService.publishNotReadyAddresses }}
+  selector:
+    {{- include "cre.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: epmd
+      port: {{ .Values.service.epmdPort }}
+      targetPort: epmd
+      protocol: TCP
+    - name: dist
+      port: {{ .Values.service.distPort }}
+      targetPort: dist
+      protocol: TCP
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cre.fullname" . }}
+  labels:
+    {{- include "cre.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "cre.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+  {{- with .Values.service.sessionAffinity }}
+  sessionAffinity: {{ . }}
+  {{- end }}
+  {{- with .Values.service.sessionAffinityConfig }}
+  sessionAffinityConfig:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}

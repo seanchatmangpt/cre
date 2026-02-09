@@ -1,0 +1,194 @@
+# CRE Alerting Rules for Prometheus
+#
+# These rules define alert conditions for CRE system monitoring.
+# Alerts are evaluated at the interval specified in prometheus.yml.
+
+groups:
+  - name: cre_performance_alerts
+    interval: 30s
+    rules:
+      # High pattern execution time
+      - alert: CREPatternExecutionHigh
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(cre_pattern_execution_duration_bucket[5m])) by (le, pattern_name)
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: cre
+        annotations:
+          summary: "High pattern execution time detected"
+          description: "Pattern {{ $labels.pattern_name }} has p99 execution time of {{ $value }}s"
+
+      # Critical pattern execution time
+      - alert: CREPatternExecutionCritical
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(cre_pattern_execution_duration_bucket[5m])) by (le, pattern_name)
+          ) > 10
+        for: 2m
+        labels:
+          severity: critical
+          service: cre
+        annotations:
+          summary: "Critical pattern execution time detected"
+          description: "Pattern {{ $labels.pattern_name }} has p99 execution time of {{ $value }}s"
+
+      # Performance regression detected
+      - alert: CREPerformanceRegression
+        expr: |
+          100 * (
+            (rate(cre_pattern_execution_duration_sum{pattern_name=~".+"}[5m]) /
+             rate(cre_pattern_execution_duration_count{pattern_name=~".+"}[5m])) -
+            cre_baseline_duration_seconds{pattern_name=~".+"}
+          ) / cre_baseline_duration_seconds{pattern_name=~".+"} > 20
+        for: 10m
+        labels:
+          severity: warning
+          service: cre
+        annotations:
+          summary: "Performance regression detected"
+          description: "Pattern {{ $labels.pattern_name }} is more than 20% slower than baseline"
+
+  - name: cre_workflow_alerts
+    interval: 30s
+    rules:
+      # High workflow failure rate
+      - alert: CREWorkflowFailureRateHigh
+        expr: |
+          (rate(cre_workflow_failed_total[5m]) /
+           (rate(cre_workflow_completed_total[5m]) + rate(cre_workflow_failed_total[5m]))) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: cre
+        annotations:
+          summary: "High workflow failure rate"
+          description: "Workflow failure rate is {{ $value | humanizePercentage }}"
+
+      # Critical workflow failure rate
+      - alert: CREWorkflowFailureRateCritical
+        expr: |
+          (rate(cre_workflow_failed_total[5m]) /
+           (rate(cre_workflow_completed_total[5m]) + rate(cre_workflow_failed_total[5m]))) > 0.15
+        for: 2m
+        labels:
+          severity: critical
+          service: cre
+        annotations:
+          summary: "Critical workflow failure rate"
+          description: "Workflow failure rate is {{ $value | humanizePercentage }}"
+
+      # Too many active workflows
+      - alert: CREActiveWorkflowsHigh
+        expr: cre_workflow_active > 500
+        for: 10m
+        labels:
+          severity: warning
+          service: cre
+        annotations:
+          summary: "High number of active workflows"
+          description: "{{ $value }} active workflows detected"
+
+  - name: cre_mining_alerts
+    interval: 30s
+    rules:
+      # Mining algorithm slow
+      - alert: CREMiningSlow
+        expr: |
+          rate(cre_mining_duration_sum[5m]) /
+          rate(cre_mining_duration_count[5m]) > 60
+        for: 10m
+        labels:
+          severity: warning
+          service: cre
+        annotations:
+          summary: "Mining algorithm slow"
+          description: "Algorithm {{ $labels.algorithm }} averaging {{ $value }}s per execution"
+
+  - name: cre_resource_alerts
+    interval: 30s
+    rules:
+      # High memory usage
+      - alert: CREMemoryHigh
+        expr: erlang_memory_total > 2147483648
+        for: 10m
+        labels:
+          severity: warning
+          service: cre
+        annotations:
+          summary: "High memory usage detected"
+          description: "Total memory usage is {{ $value | humanize }}"
+
+      # Critical memory usage
+      - alert: CREMemoryCritical
+        expr: erlang_memory_total > 4294967296
+        for: 5m
+        labels:
+          severity: critical
+          service: cre
+        annotations:
+          summary: "Critical memory usage detected"
+          description: "Total memory usage is {{ $value | humanize }}"
+
+      # High process count
+      - alert: CREProcessCountHigh
+        expr: erlang_process_count > 50000
+        for: 10m
+        labels:
+          severity: warning
+          service: cre
+        annotations:
+          summary: "High process count"
+          description: "{{ $value }} processes running"
+
+      # High GC rate
+      - alert: CREGarbageCollectionHigh
+        expr: rate(erlang_gc_count[1m]) > 100
+        for: 10m
+        labels:
+          severity: warning
+          service: cre
+        annotations:
+          summary: "High garbage collection rate"
+          description: "{{ $value }} GC ops/sec"
+
+      # Mnesia transaction failure rate
+      - alert: CREMnesiaFailureRate
+        expr: |
+          (rate(mnesia_transactions_failed[5m]) /
+           (rate(mnesia_transactions_commited[5m]) + rate(mnesia_transactions_failed[5m]))) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          service: cre
+        annotations:
+          summary: "Mnesia transaction failure rate high"
+          description: "{{ $value | humanizePercentage }} of transactions failing"
+
+  - name: cre_availability_alerts
+    interval: 15s
+    rules:
+      # Exporter down
+      - alert: CREExporterDown
+        expr: up{job=~"cre-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: cre
+        annotations:
+          summary: "CRE exporter is down"
+          description: "Exporter {{ $labels.job }} on {{ $labels.instance }} is down"
+
+      # No metrics received
+      - alert: CRENoMetricsReceived
+        expr: |
+          absent_over_time(cre_workflow_active[5m])
+        for: 5m
+        labels:
+          severity: warning
+          service: cre
+        annotations:
+          summary: "No CRE metrics received"
+          description: "No metrics have been received for 5 minutes"

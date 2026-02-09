@@ -1,0 +1,152 @@
+{
+  "metadata": {
+    "created": "2026-02-09T00:00:00Z",
+    "version": "0.3.0",
+    "description": "Baseline performance metrics for CRE benchmark suite"
+  },
+  "patterns": {
+    "sequence": {
+      "category": "basic_control_flow",
+      "avg_time_us": 50.0,
+      "min_time_us": 45.0,
+      "max_time_us": 65.0,
+      "memory_bytes": 2048,
+      "throughput_per_sec": 20000.0,
+      "startup_us": 100.0
+    },
+    "parallel_split": {
+      "category": "basic_control_flow",
+      "avg_time_us": 75.0,
+      "min_time_us": 68.0,
+      "max_time_us": 95.0,
+      "memory_bytes": 3072,
+      "throughput_per_sec": 13333.0,
+      "startup_us": 120.0
+    },
+    "synchronization": {
+      "category": "basic_control_flow",
+      "avg_time_us": 80.0,
+      "min_time_us": 72.0,
+      "max_time_us": 100.0,
+      "memory_bytes": 3072,
+      "throughput_per_sec": 12500.0,
+      "startup_us": 125.0
+    },
+    "exclusive_choice": {
+      "category": "basic_control_flow",
+      "avg_time_us": 55.0,
+      "min_time_us": 48.0,
+      "max_time_us": 70.0,
+      "memory_bytes": 2048,
+      "throughput_per_sec": 18181.0,
+      "startup_us": 105.0
+    },
+    "simple_merge": {
+      "category": "basic_control_flow",
+      "avg_time_us": 45.0,
+      "min_time_us": 40.0,
+      "max_time_us": 58.0,
+      "memory_bytes": 1536,
+      "throughput_per_sec": 22222.0,
+      "startup_us": 95.0
+    },
+    "discriminator": {
+      "category": "basic_control_flow",
+      "avg_time_us": 90.0,
+      "min_time_us": 82.0,
+      "max_time_us": 115.0,
+      "memory_bytes": 4096,
+      "throughput_per_sec": 11111.0,
+      "startup_us": 140.0
+    },
+    "arbitrary_cycles": {
+      "category": "basic_control_flow",
+      "avg_time_us": 100.0,
+      "min_time_us": 90.0,
+      "max_time_us": 130.0,
+      "memory_bytes": 4608,
+      "throughput_per_sec": 10000.0,
+      "startup_us": 150.0
+    }
+  },
+  "mining": {
+    "alpha_small": {
+      "algorithm": "alpha",
+      "log_size": "small",
+      "num_cases": 100,
+      "num_activities": 5,
+      "avg_time_us": 5000.0,
+      "memory_bytes": 102400
+    },
+    "alpha_medium": {
+      "algorithm": "alpha",
+      "log_size": "medium",
+      "num_cases": 1000,
+      "num_activities": 10,
+      "avg_time_us": 25000.0,
+      "memory_bytes": 512000
+    },
+    "heuristic_small": {
+      "algorithm": "heuristic",
+      "log_size": "small",
+      "num_cases": 100,
+      "num_activities": 5,
+      "avg_time_us": 6500.0,
+      "memory_bytes": 153600
+    }
+  },
+  "compilation": {
+    "tiny": {
+      "spec_size": "tiny",
+      "num_tasks": 2,
+      "num_transitions": 5,
+      "parse_time_us": 1000.0,
+      "compile_time_us": 500.0,
+      "code_gen_time_us": 2000.0,
+      "total_time_us": 3500.0,
+      "memory_bytes": 8192
+    },
+    "small": {
+      "spec_size": "small",
+      "num_tasks": 5,
+      "num_transitions": 15,
+      "parse_time_us": 2000.0,
+      "compile_time_us": 1000.0,
+      "code_gen_time_us": 5000.0,
+      "total_time_us": 8000.0,
+      "memory_bytes": 16384
+    },
+    "medium": {
+      "spec_size": "medium",
+      "num_tasks": 20,
+      "num_transitions": 50,
+      "parse_time_us": 5000.0,
+      "compile_time_us": 3000.0,
+      "code_gen_time_us": 15000.0,
+      "total_time_us": 23000.0,
+      "memory_bytes": 49152
+    }
+  },
+  "nif": {
+    "alpha_discovery_medium": {
+      "operation": "alpha_discovery",
+      "data_size": "medium",
+      "nif_time_us": 15000.0,
+      "pure_time_us": 25000.0,
+      "speedup": 1.67,
+      "overhead_us": 10.0,
+      "nif_memory": 256000,
+      "pure_memory": 512000
+    },
+    "frequency_matrix_medium": {
+      "operation": "frequency_matrix",
+      "data_size": "medium",
+      "nif_time_us": 8000.0,
+      "pure_time_us": 15000.0,
+      "speedup": 1.88,
+      "overhead_us": 10.0,
+      "nif_memory": 128000,
+      "pure_memory": 256000
+    }
+  }
+}

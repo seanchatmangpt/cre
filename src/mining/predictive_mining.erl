@@ -61,17 +61,26 @@ stop() ->
 %% @doc Predict the next activity from a trace.
 -spec predict_next_activity(binary(), [atom()]) -> {ok, [{atom(), float()}]}.
 predict_next_activity(CaseId, Trace) when is_binary(CaseId), is_list(Trace) ->
-    gen_server:call(?SERVER, {predict_next_activity, CaseId, Trace}).
+    cre_metrics:mining_algorithm_started(predict_next_activity),
+    Result = gen_server:call(?SERVER, {predict_next_activity, CaseId, Trace}),
+    cre_metrics:mining_algorithm_completed(predict_next_activity, #{}),
+    Result.
 
 %% @doc Predict remaining time for case completion.
 -spec predict_remaining_time(binary(), [atom()]) -> {ok, integer()}.
 predict_remaining_time(CaseId, Trace) when is_binary(CaseId), is_list(Trace) ->
-    gen_server:call(?SERVER, {predict_remaining_time, CaseId, Trace}).
+    cre_metrics:mining_algorithm_started(predict_remaining_time),
+    Result = gen_server:call(?SERVER, {predict_remaining_time, CaseId, Trace}),
+    cre_metrics:mining_algorithm_completed(predict_remaining_time, #{}),
+    Result.
 
 %% @doc Predict outcome (success/failure).
 -spec predict_outcome(binary(), [atom()]) -> {ok, success | failure, float()}.
 predict_outcome(CaseId, Trace) when is_binary(CaseId), is_list(Trace) ->
-    gen_server:call(?SERVER, {predict_outcome, CaseId, Trace}).
+    cre_metrics:mining_algorithm_started(predict_outcome),
+    Result = gen_server:call(?SERVER, {predict_outcome, CaseId, Trace}),
+    cre_metrics:mining_algorithm_completed(predict_outcome, #{}),
+    Result.
 
 %% @doc Load a prediction model.
 -spec load_model(binary()) -> ok | {error, term()}.

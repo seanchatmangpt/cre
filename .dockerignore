@@ -1,0 +1,99 @@
+# CRE Docker .dockerignore
+# Excludes unnecessary files from Docker build context
+# This significantly improves build performance and reduces image size
+
+# Build artifacts
+_build/
+.rebar3/
+*.o
+.erl_crash.dump
+
+# Rust target directories (will be built in container)
+src/rust_nifs/target/
+src/rust_implementations/target/
+
+# Erlang compilation artifacts
+ebin/
+*.beam
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test files
+test/
+
+# Development and IDE files
+.git/
+.github/
+.gitignore
+.gitattributes
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Python artifacts (if any scripts use Python)
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Logs and temporary files
+*.log
+logs/
+log/
+
+# Database files
+Mnesia.*/
+*.db
+*.sqlite
+
+# Backup and temporary files
+*.bak
+*.backup
+*.tmp
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Docker-related
+Dockerfile.production
+Dockerfile.dev
+
+# Coverage reports
+.eunit/
+*.coverdata
+cover/
+
+# Dialyzer output
+*.plt
+*.plts
+dialyzer_report.*
+
+# Archives
+*.tar
+*.tar.gz
+*.zip
+
+# Erlang shell history
+.erlang.history
+
+# OTP release artifacts (will be generated in container)
+cre-*.tar.gz
+
+# Old or deprecated files
+old/
+deprecated/
+legacy/
+
+# Local config files
+.env
+.env.local
+sys.config
+
+# Demo and example artifacts
+demo

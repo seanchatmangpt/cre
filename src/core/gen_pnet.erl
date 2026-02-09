@@ -1075,6 +1075,7 @@ fire_transition(NetState = #net_state{
            net_mod = NetMod,
            usr_info = UsrInfo
           }) ->
+    StartTime = erlang:monotonic_time(microsecond),
     TrsnLst = NetMod:trsn_lst(),
     F = fun(T, Acc) ->
                 Preset = NetMod:preset(T),
@@ -1087,7 +1088,7 @@ fire_transition(NetState = #net_state{
                 end
         end,
     ModeMap = lists:foldl(F, #{}, TrsnLst),
-    attempt_fire_one(ModeMap, NetMod, UsrInfo, NetState).
+    attempt_fire_one(ModeMap, NetMod, UsrInfo, NetState, StartTime).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -1101,10 +1102,11 @@ fire_transition(NetState = #net_state{
 -spec attempt_fire_one(ModeMap :: #{atom() => [_]},
                        NetMod :: atom(),
                        UsrInfo :: _,
-                       NetState :: #net_state{}) ->
+                       NetState :: #net_state{},
+                       StartTime :: integer()) ->
           abort | {ok, Receipt :: #{atom() => [_]}, NetState :: #net_state{}}.
 
-attempt_fire_one(ModeMap, NetMod, UsrInfo, NetState) ->
+attempt_fire_one(ModeMap, NetMod, UsrInfo, NetState, StartTime) ->
     case maps:size(ModeMap) of
         0 ->
             abort;
@@ -1118,6 +1120,8 @@ attempt_fire_one(ModeMap, NetMod, UsrInfo, NetState) ->
                     %% Consume tokens, then produce new ones
                     NetState1 = cns(Mode, NetState),
                     NetState2 = handle_trigger(ProdMap, NetState1),
+                    %% Record telemetry for transition firing
+                    record_transition_telemetry(NetMod, Trsn, StartTime),
                     %% Receipt is the consumed mode
                     {ok, Mode, NetState2};
                 abort ->
@@ -1125,10 +1129,10 @@ attempt_fire_one(ModeMap, NetMod, UsrInfo, NetState) ->
                     case ModeLst1 of
                         [] ->
                             ModeMap1 = maps:remove(Trsn, ModeMap),
-                            attempt_fire_one(ModeMap1, NetMod, UsrInfo, NetState);
+                            attempt_fire_one(ModeMap1, NetMod, UsrInfo, NetState, StartTime);
                         [_ | _] ->
                             ModeMap1 = ModeMap#{Trsn := ModeLst1},
-                            attempt_fire_one(ModeMap1, NetMod, UsrInfo, NetState)
+                            attempt_fire_one(ModeMap1, NetMod, UsrInfo, NetState, StartTime)
                     end
             end
     end.
@@ -1144,3 +1148,29 @@ doctest_test() ->
     doctest:module(?MODULE, #{moduledoc => true, doc => true}).
 
 -endif.
+
+%%====================================================================
+%% Telemetry Functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Record transition telemetry.
+%%
+%% Records timing and count metrics for transition firing if telemetry
+%% is enabled.
+%% @end
+%%--------------------------------------------------------------------
+-spec record_transition_telemetry(atom(), atom(), integer()) -> ok.
+record_transition_telemetry(NetMod, Transition, StartTime) ->
+    case application:get_env(cre, telemetry_enabled, false) of
+        true ->
+            try
+                DurationMs = (erlang:monotonic_time(microsecond) - StartTime) / 1000,
+                cre_metrics:transition_fired(NetMod, Transition, DurationMs)
+            catch
+                _:_:_-> ok
+            end;
+        false ->
+            ok
+    end.

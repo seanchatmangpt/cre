@@ -1,0 +1,118 @@
+# Prometheus Configuration for CRE Monitoring
+#
+# This configuration scrapes metrics from the CRE OpenTelemetry exporter.
+#
+# Metrics endpoint: http://localhost:9091/metrics
+# Health endpoint: http://localhost:9091/health
+
+global:
+  # How frequently to scrape targets
+  scrape_interval: 15s
+  # How long until a scrape request times out
+  scrape_timeout: 10s
+  # How frequently to evaluate rules
+  evaluation_interval: 15s
+  # External labels
+  external_labels:
+    cluster: 'cre-cluster'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - localhost:9093
+
+# Rule files
+rule_files:
+  - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # CRE OpenTelemetry/Prometheus Exporter
+  - job_name: 'cre-otel-exporter'
+    static_configs:
+      - targets: ['localhost:9091']
+        labels:
+          service: 'cre'
+          env: 'production'
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # CRE Pattern Metrics (if running on separate port)
+  - job_name: 'cre-patterns'
+    static_configs:
+      - targets: ['localhost:9092']
+        labels:
+          service: 'cre-patterns'
+          env: 'production'
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # CRE Mining Metrics (if running on separate port)
+  - job_name: 'cre-mining'
+    static_configs:
+      - targets: ['localhost:9093']
+        labels:
+          service: 'cre-mining'
+          env: 'production'
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # CRE Telemetry (YAWL workflow metrics)
+  - job_name: 'cre-yawl-telemetry'
+    static_configs:
+      - targets: ['localhost:9094']
+        labels:
+          service: 'cre-yawl'
+          env: 'production'
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+# Storage configuration
+storage:
+  tsdb:
+    # Data retention period
+    retention.time: 15d
+    # Maximum memory chunks
+    memory_chunks: 1048576
+    # Maximum series
+    max_series_per_metric: 100000
+
+# Tracing configuration (optional)
+# tracing:
+#   endpoint: "localhost:4318"
+#   client_type: "grpc"
+#   headers:
+#     X-Trace-Header: "value"
+
+# Remote write configuration (for long-term storage)
+# remote_write:
+#   - url: "http://remote-storage/api/v1/write"
+#     queue_config:
+#       capacity: 10000
+#       max_shards: 200
+#       min_shards: 1
+#       max_samples_per_send: 5000
+#       batch_send_deadline: 5s
+#       min_backoff: 30ms
+#       max_backoff: 100ms
+
+# Remote read configuration
+# remote_read:
+#   - url: "http://remote-storage/api/v1/read"
+
+# Compression configuration
+# compress: "gzip"  # or "snappy", "zstd"
+
+# Enable or disable the Admin API
+# enable_admin_api: false
+
+# Enable or disable the feature to update runtime configuration
+# enable_runtime_reload: true

@@ -36,7 +36,7 @@ CRE is a **YAWL (Yet Another Workflow Language)** workflow engine implemented in
 | Resource | Time | Description |
 |----------|------|-------------|
 | [Quick Start Guide](QUICK_START.md) | 5 min | Get running immediately |
-| [Quick Reference Card](QUICK_REFERENCE_CARD.md) | 5 min | Essential commands |
+| [Quick Reference](reference/QUICK_REF.md) | 5 min | Essential commands & API |
 | [INDEX.md](INDEX.md) | - | Complete documentation catalog |
 
 ---
@@ -68,19 +68,17 @@ docs/
 |   |-- tool_configuration.md           # Tool configuration
 |
 |-- reference/                          # Reference Materials
+|   |-- QUICK_REF.md                    # Consolidated quick reference
 |   |-- api_reference.md                # API reference section
 |   |-- bibliography.md                 # References and citations
 |   |-- EXCEPTION_HANDLING.md           # Exception handling
 |   |-- faq.md                          # Frequently asked questions
 |   |-- glossary.md                     # Terminology and definitions
-|   |-- QUICK_REFERENCE_CHEATSHEET.md   # Comprehensive cheatsheet
-|   |-- quick_reference_cards.md        # Quick reference collection
 |
 |-- papers/                             # Research Papers
 |   |-- README.md                       # Papers index
 |   |-- PAPER_SUMMARIES.md              # Paper summaries
-|   |-- analysis_readme.md              # Analysis documentation
-|   |-- analysis_summary.md             # Analysis summary
+|   |-- paper_algorithm_mapping.csv    # Algorithm mapping
 |   |-- *.pdf                           # Process mining papers
 |
 |-- patterns/                           # YAWL Pattern Documentation
@@ -89,7 +87,6 @@ docs/
 |   |-- WDP_PATTERNS.md                 # Data patterns
 |   |-- WRP_PATTERNS.md                 # Resource patterns
 |   |-- anti_patterns_guide.md          # Anti-patterns
-|   |-- reference_card.md               # Pattern reference card
 |
 |-- pnet/                               # Petri Net Core
 |   |-- types/                          # Type system docs
@@ -126,9 +123,15 @@ docs/
 |-- features/                           # Feature Documentation
 |-- analysis/                           # Technical Analysis
 |-- yawl_patterns/                      # YAWL Architecture
-|-- tutorials/                          # Tutorial Materials
 |-- verification_scripts/               # Verification Scripts
-|-- old/                                # Archived Documentation
+|-- archive/                            # Archived Documentation
+|   |-- tutorials/                      # Superseded tutorials
+|   |-- papers/                         # Old paper analysis
+|   |-- architecture/                   # Duplicate architecture docs
+|   |-- reference/                      # Consolidated references
+|   |-- patterns/                       # Old pattern docs
+|   `-- yawl/                           # Superseded YAWL docs
+|-- old/                                # Legacy archived files
 ```
 
 ---
@@ -137,7 +140,7 @@ docs/
 
 ### New Users
 - [Quick Start Guide](QUICK_START.md) - Get running in 5 minutes
-- [Quick Reference Card](QUICK_REFERENCE_CARD.md) - Essential commands
+- [Quick Reference](reference/QUICK_REF.md) - Essential commands & API
 - [Basic Examples](../examples/) - Working code examples
 
 ### Developers
@@ -152,7 +155,8 @@ docs/
 
 ### Research
 - [Process Mining Papers](papers/) - Research paper collection
-- [Pattern Catalog](yawl_pattern_catalog.md) - Complete pattern catalog
+- [Pattern Catalog](YAWL_PATTERNS_REFERENCE.md) - Complete pattern catalog
+- [Archived Documentation](archive/) - Superseded materials
 
 ---
 

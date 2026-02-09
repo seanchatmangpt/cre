@@ -1,0 +1,19 @@
+# Grafana Dashboard Provisioning Configuration
+#
+# This file auto-loads CRE dashboards in Grafana.
+# Place in: /etc/grafana/provisioning/dashboards/cre-dashboards.yml
+
+apiVersion: 1
+
+providers:
+  - name: 'CRE Dashboards'
+    orgId: 1
+    folder: 'CRE'
+    folderUid: 'cre-folder'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/cre
+      foldersFromFilesStructure: true

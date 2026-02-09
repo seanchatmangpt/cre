@@ -23,7 +23,7 @@
 |----------|-------------|------|
 | [README.md](README.md) | Project overview, features, and introduction | 5 min |
 | [QUICK_START.md](QUICK_START.md) | Get running in 5 minutes | 5 min |
-| [QUICK_REFERENCE_CARD.md](QUICK_REFERENCE_CARD.md) | Essential commands and patterns | 5 min |
+| [reference/QUICK_REF.md](reference/QUICK_REF.md) | Essential commands and patterns | 5 min |
 | [EXAMPLES.md](EXAMPLES.md) | Working code examples | 15 min |
 
 ---
@@ -56,7 +56,7 @@
 |----------|-------------|
 | [yawl_patterns/GEN_PNET_API_SPECIFICATION.md](yawl_patterns/GEN_PNET_API_SPECIFICATION.md) | gen_pnet behavior API |
 | [yawl_patterns/GEN_YAWL_API_SPECIFICATION.md](yawl_patterns/GEN_YAWL_API_SPECIFICATION.md) | gen_yawl behavior API |
-| [yawl_patterns/GEN_PNET_INTEGRATION_ARCHITECTURE.md](yawl_patterns/GEN_PNET_INTEGRATION_ARCHITECTURE.md) | Integration architecture |
+| [archive/architecture/GEN_PNET_INTEGRATION_ARCHITECTURE.md](archive/architecture/GEN_PNET_INTEGRATION_ARCHITECTURE.md) | Integration architecture (archived) |
 
 ---
 
@@ -84,9 +84,7 @@
 | Document | Description | Level |
 |----------|-------------|-------|
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Production deployment guide | Advanced |
-| [INTEGRATION.md](INTEGRATION.md) | System integration overview | Intermediate |
-| [HELPER_INTEGRATION_GUIDE.md](HELPER_INTEGRATION_GUIDE.md) | Helper module integration | Intermediate |
-| [WF_MODULES_INTEGRATION_GUIDE.md](WF_MODULES_INTEGRATION_GUIDE.md) | Workflow utilities integration | Intermediate |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture overview | Intermediate |
 | [UTILITY_MODULES_GUIDE.md](UTILITY_MODULES_GUIDE.md) | Utility modules usage | Intermediate |
 
 ---

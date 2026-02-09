@@ -1,0 +1,519 @@
+---
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
+      - develop
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests (build only)'
+        required: false
+        default: false
+        type: boolean
+      deploy_env:
+        description: 'Deployment environment'
+        required: false
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  CACHE_VERSION: v1
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ============================================
+  # Stage 1: Build Pipeline
+  # ============================================
+  build:
+    name: Build (OTP ${{ matrix.otp }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        otp: ['26.3', '27.2', '28.0']
+        os: [ubuntu-latest]
+        include:
+          - otp: '27.2'
+            os: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Erlang/OTP
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp }}
+          rebar3-version: '3.24.0'
+          hexpm-mirror: true
+
+      - name: Cache Rebar3 dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            _build
+            ~/.cache/rebar3
+          key: ${{ runner.os }}-rebar3-${{ matrix.otp }}-${{ env.CACHE_VERSION }}-${{ hashFiles('**/rebar.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-rebar3-${{ matrix.otp }}-${{ env.CACHE_VERSION }}-
+            ${{ runner.os }}-rebar3-${{ matrix.otp }}-
+
+      - name: Compile
+        run: rebar3 compile
+
+      - name: Cache compiled BEAM files
+        uses: actions/cache/save@v4
+        with:
+          path: _build/default/lib/cre/ebin
+          key: beam-${{ github.sha }}-${{ matrix.otp }}-${{ runner.os }}
+
+  # ============================================
+  # Stage 2: Test Pipeline
+  # ============================================
+  test:
+    name: Test (OTP ${{ matrix.otp }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        otp: ['26.3', '27.2', '28.0']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Erlang/OTP
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp }}
+          rebar3-version: '3.24.0'
+
+      - name: Restore compiled BEAM files
+        uses: actions/cache/restore@v4
+        with:
+          path: _build
+          key: beam-${{ github.sha }}-${{ matrix.otp }}-ubuntu-latest
+          fail-on-cache-miss: true
+
+      - name: Run EUnit tests
+        run: rebar3 eunit --cover
+
+      - name: Generate coverage report
+        run: rebar3 cover
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: _build/test/cover/cre.coverdata
+          flags: eunit-${{ matrix.otp }}
+          name: codecov-${{ matrix.otp }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.otp }}
+          path: |
+            _build/test/cover/
+            _build/test/coverindex.html
+          retention-days: 30
+
+  # ============================================
+  # Stage 2b: Common Test Integration
+  # ============================================
+  integration-test:
+    name: Integration Test (OTP ${{ matrix.otp }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        otp: ['26.3', '27.2', '28.0']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Erlang/OTP
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp }}
+          rebar3-version: '3.24.0'
+
+      - name: Restore compiled BEAM files
+        uses: actions/cache/restore@v4
+        with:
+          path: _build
+          key: beam-${{ github.sha }}-${{ matrix.otp }}-ubuntu-latest
+          fail-on-cache-miss: true
+
+      - name: Run Common Test
+        run: rebar3 ct
+        continue-on-error: true
+
+      - name: Upload CT results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ct-results-${{ matrix.otp }}
+          path: |
+            _build/test/logs/
+          retention-days: 30
+
+  # ============================================
+  # Stage 3: Security & Quality
+  # ============================================
+  security:
+    name: Security & Quality (OTP ${{ matrix.otp }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        otp: ['27.2', '28.0']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Erlang/OTP
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp }}
+          rebar3-version: '3.24.0'
+
+      - name: Restore compiled BEAM files
+        uses: actions/cache/restore@v4
+        with:
+          path: _build
+          key: beam-${{ github.sha }}-${{ matrix.otp }}-ubuntu-latest
+
+      - name: Run Dialyzer (Type Analysis)
+        run: rebar3 dialyzer
+        continue-on-error: true
+
+      - name: Run XREF (Cross-reference checks)
+        run: rebar3 xref
+
+      - name: Check formatting with EFmt
+        run: rebar3 efmt -c
+
+      - name: Security audit
+        run: |
+          curl -sfL https://raw.githubusercontent.com/erlang/rebar3/HEAD/rebar3wc -o rebar3wc
+          chmod +x rebar3wc
+          ./rebar3wc audit || true
+
+      - name: Upload Dialyzer results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dialyzer-results-${{ matrix.otp }}
+          path: |
+            _build/default/rebar3_crash.dump
+            dialyzer_report.md
+          retention-days: 30
+
+  # ============================================
+  # Stage 4: Docker Build
+  # ============================================
+  docker:
+    name: Docker Build & Push
+    needs: [test, integration-test, security]
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json
+          retention-days: 90
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # ============================================
+  # Stage 5: Deploy to Staging
+  # ============================================
+  deploy-staging:
+    name: Deploy to Staging
+    needs: docker
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    environment:
+      name: staging
+      url: https://cre-staging.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.29.0'
+
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl set image deployment/cre \
+            cre=${{ needs.docker.outputs.image-tag }} \
+            -n cre-staging
+
+          kubectl rollout status deployment/cre -n cre-staging --timeout=5m
+
+      - name: Run smoke tests
+        run: |
+          # Wait for deployment to be ready
+          kubectl wait --for=condition=available --timeout=300s \
+            deployment/cre -n cre-staging
+
+          # Get service endpoint
+          ENDPOINT=$(kubectl get svc cre -n cre-staging -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          # Health check
+          curl -f http://${ENDPOINT}:4142/status.json || exit 1
+
+          echo "Smoke tests passed!"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          kubectl rollout undo deployment/cre -n cre-staging
+          echo "Deployment rolled back due to test failure"
+
+  # ============================================
+  # Stage 6: Deploy to Production (Manual)
+  # ============================================
+  deploy-production:
+    name: Deploy to Production
+    needs: docker
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://cre.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.29.0'
+
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 -d > ~/.kube/config
+
+      - name: Pre-deployment health check
+        run: |
+          ENDPOINT=$(kubectl get svc cre -n cre-prod -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          curl -f http://${ENDPOINT}:4142/status.json
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Create deployment snapshot for rollback
+          kubectl get deployment cre -n cre-prod -o yaml > deployment-backup.yaml
+
+          kubectl set image deployment/cre \
+            cre=${{ needs.docker.outputs.image-tag }} \
+            -n cre-prod
+
+          kubectl rollout status deployment/cre -n cre-prod --timeout=5m
+
+      - name: Post-deployment health verification
+        run: |
+          sleep 30  # Allow warmup
+
+          ENDPOINT=$(kubectl get svc cre -n cre-prod -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          # Health check with retries
+          for i in {1..10}; do
+            if curl -f http://${ENDPOINT}:4142/status.json; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Health check failed, retrying... ($i/10)"
+            sleep 10
+          done
+
+          echo "Health check failed after 10 attempts"
+          exit 1
+
+      - name: Verify deployment metrics
+        run: |
+          # Check pod status
+          kubectl get pods -n cre-prod -l app=cre
+
+          # Check deployment status
+          kubectl rollout status deployment/cre -n cre-prod
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          kubectl rollout undo deployment/cre -n cre-prod
+          echo "Production deployment rolled back due to verification failure"
+
+      - name: Create deployment notification
+        if: success()
+        run: |
+          echo "Deployment successful: ${{ needs.docker.outputs.image-tag }}"
+          echo "Digest: ${{ needs.docker.outputs.image-digest }}"
+
+  # ============================================
+  # Stage 7: Release
+  # ============================================
+  release:
+    name: Create Release
+    needs: deploy-production
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "## Changelog" > release-notes.md
+          echo "" >> release-notes.md
+          git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD^)..HEAD >> release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================
+  # Summary Report
+  # ============================================
+  summary:
+    name: CI/CD Summary
+    needs: [test, integration-test, security, docker]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "# CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Test | ${{ needs.integration-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security | ${{ needs.security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker | ${{ needs.docker.result }} |" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.security.result }}" != "success" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## :x: Pipeline Failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

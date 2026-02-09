@@ -9361,3 +9361,43 @@ If you specifically intend to match 0.0 alone, write +0.0 instead.
 
 [SUCCESS] Project compilation verified
 [SUCCESS] SessionStart complete
+--- SessionStart 2026-02-09T11:57:36-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (     268 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
+
+[SUCCESS] Project compilation verified
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /Users/sac/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: gVisor sandbox detected
+[INFO] Note: Some syscalls are limited in gVisor
+[SUCCESS] SessionStart complete - ready to develop

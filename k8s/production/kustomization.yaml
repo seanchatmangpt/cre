@@ -1,0 +1,67 @@
+# Production overlay for CRE deployment
+# Usage: kubectl apply -k k8s/production/
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base configuration
+namespace: cre
+resources:
+  - ../base
+  - ingress.yaml
+  - backup-cronjob.yaml
+
+# Production-specific configuration
+commonLabels:
+  environment: production
+
+# Production image
+images:
+  - name: cre
+    newName: your-registry.example.com/cre
+    newTag: "0.3.0"
+
+# Production patches
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 5
+    target:
+      kind: StatefulSet
+      name: cre
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "1000m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "1Gi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "4000m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "4Gi"
+    target:
+      kind: StatefulSet
+      name: cre
+  - patch: |-
+      - op: replace
+        path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+        value: 50Gi
+    target:
+      kind: StatefulSet
+      name: cre
+
+# Production ConfigMap overrides
+configMapGenerator:
+  - name: cre-config
+    behavior: merge
+    literals:
+      - log-level=warn
+      - yawl-stateless-max-executions=5000
+      - yawl-stateless-execution-ttl=7200000
+
+# Namespace
+namespace: cre
