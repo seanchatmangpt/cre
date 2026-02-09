@@ -1,0 +1,79 @@
+---
+# GKE Vertical Pod Autoscaler for Production
+# Automatically adjusts resource requests and limits
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: cre-vpa
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+  annotations:
+    # VPA recommendations for GKE e2-medium nodes
+    description: "VPA for CRE workflow engine - adjusts based on actual usage"
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cre
+  # Update policy: Off for production (use recommendations only)
+  # Change to Auto or Recreate for automatic updates
+  updatePolicy:
+    updateMode: "Off"  # Recommended for production - use recommendations manually
+    minReplicas: 3
+  # Resource policy to prevent VPA from reducing below minimum
+  resourcePolicy:
+    containerPolicies:
+      - containerName: cre
+        minAllowed:
+          cpu: "250m"
+          memory: "512Mi"
+        maxAllowed:
+          cpu: "2000m"
+          memory: "4Gi"
+        # Control which resources VPA can recommend
+        controlledResources: ["cpu", "memory"]
+        # Don't control requests and limits independently
+        controlledValues: RequestsAndLimits
+      - containerName: "*"
+        mode: "Off"
+  # Recommender configuration
+  recommender:
+    marginFraction: 0.15  # 15% buffer over recommended values
+
+---
+# GKE Vertical Pod Autoscaler for Staging
+# More aggressive updates for staging environment
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: cre-vpa
+  namespace: cre-staging
+  labels:
+    app: cre
+    environment: staging
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cre
+  # Auto mode for staging - automatically apply recommendations
+  updatePolicy:
+    updateMode: "Auto"
+    minReplicas: 2
+  resourcePolicy:
+    containerPolicies:
+      - containerName: cre
+        minAllowed:
+          cpu: "100m"
+          memory: "256Mi"
+        maxAllowed:
+          cpu: "1000m"
+          memory: "2Gi"
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+      - containerName: "*"
+        mode: "Off"
+  recommender:
+    marginFraction: 0.1  # Tighter buffer for staging

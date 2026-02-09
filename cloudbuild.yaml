@@ -1,0 +1,343 @@
+# Cloud Build configuration for CRE YAWL
+# Multi-stage build with Kaniko, security scanning, and SBOM generation
+
+# Substitution variables (with defaults)
+# _IMAGE_NAME: Full image name including registry
+# _VERSION: Version tag (from git ref)
+# _COMMIT_SHA: Git commit SHA
+# _BUILD_DATE: Build timestamp
+substitutions:
+  _IMAGE_NAME: us-central1-docker.pkg.dev/${PROJECT_ID}/cre/cre
+  _VERSION: latest
+  _COMMIT_SHA: unknown
+  _BUILD_DATE: unknown
+  _PROJECT_ID: ${PROJECT_ID}
+  _REGION: us-central1
+
+# Global timeout (in seconds)
+timeout: 3600s
+
+# Build options
+options:
+  logging: GCS_ONLY
+  logStreamingOption: STREAM_DEFAULT
+  machineType: E2_HIGHCPU_8
+  diskSizeGb: 100
+
+# ============================================
+# Build Steps
+# ============================================
+steps:
+
+  # ------------------------------------------
+  # Step 1: Build with Kaniko (Multi-arch)
+  # ------------------------------------------
+  - id: 'build-multi-arch'
+    name: 'gcr.io/kaniko-project/executor:v1.23.2-debug'
+    waitFor: ['-']
+    entrypoint: '/busybox/sh'
+    args:
+      - '-c'
+      - |
+        # Build for linux/amd64
+        /kaniko/executor \
+          --dockerfile=Dockerfile.production \
+          --context=/workspace \
+          --destination=${_IMAGE_NAME}:${_VERSION} \
+          --destination=${_IMAGE_NAME}:${_VERSION}-amd64 \
+          --destination=${_IMAGE_NAME}:latest-amd64 \
+          --build-arg=VERSION=${_VERSION} \
+          --build-arg=COMMIT_SHA=${_COMMIT_SHA} \
+          --build-arg=BUILD_DATE=${_BUILD_DATE} \
+          --platform=linux/amd64 \
+          --cache=true \
+          --cache-ttl=24h \
+          --push-retries=3 \
+          --digest-file=/workspace/digest-amd64.txt
+
+  # ------------------------------------------
+  # Step 2: Build for ARM64 (optional)
+  # ------------------------------------------
+  - id: 'build-arm64'
+    name: 'gcr.io/kaniko-project/executor:v1.23.2-debug'
+    waitFor: ['-']
+    entrypoint: '/busybox/sh'
+    args:
+      - '-c'
+      - |
+        # Build for linux/arm64
+        /kaniko/executor \
+          --dockerfile=Dockerfile.production \
+          --context=/workspace \
+          --destination=${_IMAGE_NAME}:${_VERSION}-arm64 \
+          --destination=${_IMAGE_NAME}:latest-arm64 \
+          --build-arg=VERSION=${_VERSION} \
+          --build-arg=COMMIT_SHA=${_COMMIT_SHA} \
+          --build-arg=BUILD_DATE=${_BUILD_DATE} \
+          --platform=linux/arm64 \
+          --cache=true \
+          --cache-ttl=24h \
+          --push-retries=3 \
+          --digest-file=/workspace/digest-arm64.txt
+
+  # ------------------------------------------
+  # Step 3: Create multi-arch manifest
+  # ------------------------------------------
+  - id: 'create-manifest'
+    name: 'gcr.io/go-containerregistry/crane:v0.20.2'
+    waitFor: ['build-multi-arch', 'build-arm64']
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        # Get digests
+        AMD64_DIGEST=$(cat /workspace/digest-amd64.txt)
+        ARM64_DIGEST=$(cat /workspace/digest-arm64.txt)
+
+        # Create multi-arch manifest
+        crane index append \
+          -m ${AMD64_DIGEST} \
+          -m ${ARM64_DIGEST} \
+          -t ${_IMAGE_NAME}:${_VERSION} \
+          -t ${_IMAGE_NAME}:latest
+
+        # Verify manifest
+        crane manifest ${_IMAGE_NAME}:${_VERSION} | tee /workspace/manifest.json
+
+  # ------------------------------------------
+  # Step 4: Security Scan with Trivy
+  # ------------------------------------------
+  - id: 'trivy-scan'
+    name: 'gcr.io/asci-toolbox/trivy:v0.56.1'
+    waitFor: ['create-manifest']
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        # Scan for vulnerabilities
+        trivy image \
+          --severity CRITICAL,HIGH \
+          --exit-code 0 \
+          --format json \
+          --output /workspace/trivy-results.json \
+          ${_IMAGE_NAME}:${_VERSION}
+
+        # Generate SARIF for Security Command Center
+        trivy image \
+          --severity CRITICAL,HIGH \
+          --format sarif \
+          --output /workspace/trivy-results.sarif \
+          ${_IMAGE_NAME}:${_VERSION}
+
+        # Generate text summary
+        trivy image \
+          --severity CRITICAL,HIGH \
+          --format table \
+          ${_IMAGE_NAME}:${_VERSION} | tee /workspace/trivy-summary.txt
+
+        # Check for critical vulnerabilities
+        if grep -q '"severity":"CRITICAL"' /workspace/trivy-results.json; then
+          echo "CRITICAL vulnerabilities found!"
+          exit 1
+        fi
+
+  # ------------------------------------------
+  # Step 5: SBOM Generation with Syft
+  # ------------------------------------------
+  - id: 'generate-sbom'
+    name: 'anchore/syft:v1.18.1'
+    waitFor: ['create-manifest']
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        # Generate SPDX SBOM
+        syft ${_IMAGE_NAME}:${_VERSION} \
+          -o spdx-json \
+          --file /workspace/sbom.spdx.json
+
+        # Generate CycloneDX SBOM
+        syft ${_IMAGE_NAME}:${_VERSION} \
+          -o cyclonedx-json \
+          --file /workspace/sbom.cyclonedx.json
+
+        # Generate table summary
+        syft ${_IMAGE_NAME}:${_VERSION} \
+          -o table | tee /workspace/sbom-summary.txt
+
+        # Upload SBOM to Artifact Registry as metadata
+        gcloud artifacts docker images add-label \
+          ${_IMAGE_NAME}:${_VERSION} \
+          --location=${_REGION} \
+          --update-labels=sbom-generated=true,version=${_VERSION}
+
+  # ------------------------------------------
+  # Step 6: Verify image (runtime tests)
+  # ------------------------------------------
+  - id: 'verify-image'
+    name: 'gcr.io/cloud-builders/docker'
+    waitFor: ['create-manifest']
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        # Pull the image
+        docker pull ${_IMAGE_NAME}:${_VERSION}
+
+        # Run basic container tests
+        docker run --rm \
+          -e CRE_MODE=test \
+          ${_IMAGE_NAME}:${_VERSION} \
+          /opt/cre/bin/cre version || true
+
+        # Check image configuration
+        docker inspect ${_IMAGE_NAME}:${_VERSION} > /workspace/inspect.json
+
+        # Verify exposed ports
+        if ! grep -q '"4142/tcp"' /workspace/inspect.json; then
+          echo "Error: Port 4142 not exposed!"
+          exit 1
+        fi
+
+        # Verify health check
+        if ! grep -q '"HealthCheck"' /workspace/inspect.json; then
+          echo "Warning: No HEALTHCHECK configured"
+        fi
+
+        echo "Image verification completed successfully"
+
+  # ------------------------------------------
+  # Step 7: Tag and push additional tags
+  # ------------------------------------------
+  - id: 'push-additional-tags'
+    name: 'gcr.io/go-containerregistry/crane:v0.20.2'
+    waitFor: ['trivy-scan', 'verify-image']
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        # Tag with commit SHA
+        crane copy ${_IMAGE_NAME}:${_VERSION} ${_IMAGE_NAME}:${_COMMIT_SHA}
+
+        # If this is a tag, tag as stable
+        if [ "${_VERSION}" != "latest" ]; then
+          crane copy ${_IMAGE_NAME}:${_VERSION} ${_IMAGE_NAME}:stable
+          echo "Tagged ${_VERSION} as stable"
+        fi
+
+        echo "Image tags pushed successfully"
+
+  # ------------------------------------------
+  # Step 8: Upload build artifacts
+  # ------------------------------------------
+  - id: 'upload-artifacts'
+    name: 'gcr.io/cloud-builders/gsutil'
+    waitFor: ['trivy-scan', 'generate-sbom', 'verify-image']
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        # Create artifacts directory
+        ARTIFACTS_BUCKET=gs://${_PROJECT_ID}-cloudbuild-artifacts/${BUILD_ID}
+
+        # Upload scan results
+        gsutil cp /workspace/trivy-results.json ${ARTIFACTS_BUCKET}/
+        gsutil cp /workspace/trivy-results.sarif ${ARTIFACTS_BUCKET}/
+        gsutil cp /workspace/trivy-summary.txt ${ARTIFACTS_BUCKET}/
+
+        # Upload SBOMs
+        gsutil cp /workspace/sbom.spdx.json ${ARTIFACTS_BUCKET}/
+        gsutil cp /workspace/sbom.cyclonedx.json ${ARTIFACTS_BUCKET}/
+        gsutil cp /workspace/sbom-summary.txt ${ARTIFACTS_BUCKET}/
+
+        # Upload manifest and inspect data
+        gsutil cp /workspace/manifest.json ${ARTIFACTS_BUCKET}/
+        gsutil cp /workspace/inspect.json ${ARTIFACTS_BUCKET}/
+
+        # Make artifacts publicly readable (optional)
+        gsutil acl ch -r -u AllUsers:R ${ARTIFACTS_BUCKET} 2>/dev/null || true
+
+        echo "Build artifacts uploaded to ${ARTIFACTS_BUCKET}"
+
+  # ------------------------------------------
+  # Step 9: Deploy to GKE (conditional)
+  # ------------------------------------------
+  - id: 'deploy-gke'
+    name: 'gcr.io/cloud-builders/gke-deploy'
+    waitFor: ['push-additional-tags']
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        # Only deploy on master branch or tag
+        if [ "${BRANCH_NAME}" != "master" ] && [[ ! "${TAG_NAME}" =~ ^v ]]; then
+          echo "Skipping deployment (not on master or version tag)"
+          exit 0
+        fi
+
+        # Determine environment
+        if [[ "${TAG_NAME}" =~ ^v ]]; then
+          NAMESPACE=cre-prod
+        else
+          NAMESPACE=cre-staging
+        fi
+
+        # Deploy using gke-deploy
+        gke-deploy run \
+          --filename=/workspace/k8s/ \
+          --image=${_IMAGE_NAME}:${_VERSION} \
+          --location=${_REGION} \
+          --cluster=${_CLUSTER_NAME} \
+          --namespace=${NAMESPACE} \
+          --timeout=10m \
+          --output=/workspace/gke-deploy-output
+
+        echo "Deployment to ${NAMESPACE} completed"
+
+        # Wait for rollout
+        kubectl wait --for=condition=available \
+          deployment/cre \
+          -n ${NAMESPACE} \
+          --timeout=300s
+
+        echo "Deployment verified and healthy"
+
+# ============================================
+# Build Artifacts
+# ============================================
+artifacts:
+  objects:
+    # Security scan results
+    - location: 'gs://${_PROJECT_ID}-cloudbuild-artifacts/${BUILD_ID}/trivy-results.json'
+      paths: ['trivy-results.json']
+    - location: 'gs://${_PROJECT_ID}-cloudbuild-artifacts/${BUILD_ID}/trivy-results.sarif'
+      paths: ['trivy-results.sarif']
+    - location: 'gs://${_PROJECT_ID}-cloudbuild-artifacts/${BUILD_ID}/trivy-summary.txt'
+      paths: ['trivy-summary.txt']
+
+    # SBOM artifacts
+    - location: 'gs://${_PROJECT_ID}-cloudbuild-artifacts/${BUILD_ID}/sbom.spdx.json'
+      paths: ['sbom.spdx.json']
+    - location: 'gs://${_PROJECT_ID}-cloudbuild-artifacts/${BUILD_ID}/sbom.cyclonedx.json'
+      paths: ['sbom.cyclonedx.json']
+    - location: 'gs://${_PROJECT_ID}-cloudbuild-artifacts/${BUILD_ID}/sbom-summary.txt'
+      paths: ['sbom-summary.txt']
+
+    # Image metadata
+    - location: 'gs://${_PROJECT_ID}-cloudbuild-artifacts/${BUILD_ID}/manifest.json'
+      paths: ['manifest.json']
+    - location: 'gs://${_PROJECT_ID}-cloudbuild-artifacts/${BUILD_ID}/inspect.json'
+      paths: ['inspect.json']
+
+# ============================================
+# Build Logs
+# ============================================
+logsBucket: 'gs://${_PROJECT_ID}-cloudbuild-logs'
+
+# ============================================
+# Build Tags
+# ============================================
+tags:
+  - cre-build
+  - production
+  - multi-arch

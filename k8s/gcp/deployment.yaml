@@ -1,0 +1,461 @@
+---
+# GKE-Optimized Deployment for Production
+# Optimized for e2-medium nodes (2 vCPU, 4GB memory)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cre
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+    environment: production
+  annotations:
+    # GKE-specific annotations
+    # Cloud Operations (Logging/Monitoring)
+    cloud.google.com/local-ssd-disk: "false"
+    # GKE rapid tier optimization
+    # GKE autoscaling annotations
+    autoscaling.gke.io/safe-to-evict: "true"
+    # GKE network tags for firewall rules
+    network.gke.io/dns-domain: "cre-prod.svc.cluster.local"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: cre
+      component: workflow-engine
+  template:
+    metadata:
+      labels:
+        app: cre
+        component: workflow-engine
+        environment: production
+      annotations:
+        # Prometheus scraping
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4142"
+        prometheus.io/path: "/metrics"
+        # Cloud Operations logging
+        logging.gke.io/log-entry: "true"
+        # GKE mesh injection label (if using Anthos Service Mesh)
+        # sidecar.istio.io/inject: "true"
+        # GKE Network Config Policy
+        networking.gke.io/pod-address-pool: "default-pool"
+    spec:
+      # Service account with Workload Identity
+      serviceAccountName: cre-ksa
+
+      # GKE Spot VM tolerations for stateless workloads
+      # Comment out if using preemptible/Spot VMs
+      # tolerations:
+      #   - key: "cloud.google.com/gke-spot"
+      #     operator: "Equal"
+      #     value: "true"
+      #     effect: "NoSchedule"
+
+      # Node affinity for GKE node pools
+      affinity:
+        # Anti-affinity to spread pods across nodes for HA
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: [cre]
+                topologyKey: kubernetes.io/hostname
+        # Node affinity for e2-medium nodes
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cloud.google.com/compute-class
+                    operator: In
+                    values: ["performance"]  # or "balanced" for e2-medium
+                  - key: cloud.google.com/machine-family
+                    operator: In
+                    values: ["e2"]
+
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Init containers
+      initContainers:
+        - name: init-directories
+          image: gcr.io/google-containers/busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /opt/cre/data /opt/cre/log /opt/cre/checkpoints
+              chown -R 1000:1000 /opt/cre
+          volumeMounts:
+            - name: data
+              mountPath: /opt/cre/data
+            - name: logs
+              mountPath: /opt/cre/log
+            - name: checkpoints
+              mountPath: /opt/cre/checkpoints
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 0
+
+      containers:
+        # Main CRE container
+        - name: cre
+          image: us-central1-docker.pkg.dev/REPLACE_WITH_YOUR_PROJECT_ID/cre/cre:0.3.0
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 4142
+              protocol: TCP
+            - name: epmd
+              containerPort: 4369
+              protocol: TCP
+            - name: dist
+              containerPort: 9100
+              protocol: TCP
+
+          env:
+            - name: CRE_DEFAULT_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: cre-config
+                  key: CRE_DEFAULT_PORT
+            - name: CRE_LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: cre-config
+                  key: CRE_LOG_LEVEL
+            - name: ERLANG_COOKIE
+              valueFrom:
+                secretKeyRef:
+                  name: cre-secrets
+                  key: erlang-cookie
+            - name: YAWL_STATELESS_CHECKPOINT_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: cre-config
+                  key: YAWL_STATELESS_CHECKPOINT_DIR
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: cre-config
+                  key: OTEL_EXPORTER_OTLP_ENDPOINT
+            - name: OTEL_SERVICE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: cre-config
+                  key: OTEL_SERVICE_NAME
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              valueFrom:
+                configMapKeyRef:
+                  name: cre-config
+                  key: OTEL_RESOURCE_ATTRIBUTES
+            # GCP-specific: Cloud Operations
+            - name: GOOGLE_CLOUD_PROJECT
+              value: "REPLACE_WITH_YOUR_PROJECT_ID"
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/var/run/secrets/cloud.google.com/service-account/token"
+            # Erlang node name for distributed Erlang
+            - name: ERLANG_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: ERLANG_FULL_NODE_NAME
+              value: "$(ERLANG_NODE_NAME)@$(ERLANG_NODE_NAME).cre-prod.svc.cluster.local"
+
+          # Resource limits for e2-medium (2 vCPU, 4GB RAM)
+          # Adjust based on actual node pool configuration
+          resources:
+            requests:
+              cpu: "500m"      # 0.5 vCPU (25% of e2-medium)
+              memory: "1Gi"    # 1GB (25% of e2-medium)
+              ephemeral-storage: "2Gi"
+            limits:
+              cpu: "1800m"     # 1.8 vCPU (90% of e2-medium, leave room for sidecars)
+              memory: "3500Mi" # 3.5GB (leave room for OS overhead)
+              ephemeral-storage: "4Gi"
+
+          # Health checks
+          livenessProbe:
+            httpGet:
+              path: /status.json
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /status.json
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+
+          startupProbe:
+            httpGet:
+              path: /status.json
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+
+          # Volume mounts
+          volumeMounts:
+            - name: data
+              mountPath: /opt/cre/data
+            - name: logs
+              mountPath: /opt/cre/log
+            - name: checkpoints
+              mountPath: /opt/cre/checkpoints
+            - name: cre-token
+              mountPath: /var/run/secrets/cloud.google.com/service-account
+              readOnly: true
+
+          # Lifecycle hooks for graceful shutdown
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    /opt/cre/bin/cre stop &
+                    sleep 15
+
+          # Security context
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false  # Set to true with proper volume mounts
+            capabilities:
+              drop:
+                - ALL
+
+      # Volumes
+      volumes:
+        - name: data
+          emptyDir:
+            sizeLimit: "1Gi"
+        - name: logs
+          emptyDir:
+            sizeLimit: "1Gi"
+        - name: checkpoints
+          persistentVolumeClaim:
+            claimName: cre-checkpoints-pvc
+        - name: cre-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: https://cloud.google.com/token
+
+      # Termination grace period
+      terminationGracePeriodSeconds: 30
+
+---
+# GKE Staging Deployment
+# Optimized for e2-small nodes
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cre
+  namespace: cre-staging
+  labels:
+    app: cre
+    component: workflow-engine
+    environment: staging
+  annotations:
+    autoscaling.gke.io/safe-to-evict: "true"
+    network.gke.io/dns-domain: "cre-staging.svc.cluster.local"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: cre
+      component: workflow-engine
+  template:
+    metadata:
+      labels:
+        app: cre
+        component: workflow-engine
+        environment: staging
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4142"
+        prometheus.io/path: "/metrics"
+        logging.gke.io/log-entry: "true"
+    spec:
+      serviceAccountName: cre-ksa
+
+      # Spot VM tolerations for staging (cost optimization)
+      tolerations:
+        - key: "cloud.google.com/gke-spot"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: [cre]
+                topologyKey: kubernetes.io/hostname
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      initContainers:
+        - name: init-directories
+          image: gcr.io/google-containers/busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /opt/cre/data /opt/cre/log /opt/cre/checkpoints
+              chown -R 1000:1000 /opt/cre
+          volumeMounts:
+            - name: data
+              mountPath: /opt/cre/data
+            - name: logs
+              mountPath: /opt/cre/log
+            - name: checkpoints
+              mountPath: /opt/cre/checkpoints
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 0
+
+      containers:
+        - name: cre
+          image: us-central1-docker.pkg.dev/REPLACE_WITH_YOUR_PROJECT_ID/cre/cre:0.3.0
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 4142
+              protocol: TCP
+            - name: epmd
+              containerPort: 4369
+              protocol: TCP
+            - name: dist
+              containerPort: 9100
+              protocol: TCP
+
+          env:
+            - name: CRE_DEFAULT_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: cre-config
+                  key: CRE_DEFAULT_PORT
+            - name: CRE_LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: cre-config
+                  key: CRE_LOG_LEVEL
+            - name: ERLANG_COOKIE
+              valueFrom:
+                secretKeyRef:
+                  name: cre-secrets
+                  key: erlang-cookie
+            - name: YAWL_STATELESS_CHECKPOINT_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: cre-config
+                  key: YAWL_STATELESS_CHECKPOINT_DIR
+            - name: GOOGLE_CLOUD_PROJECT
+              value: "REPLACE_WITH_YOUR_PROJECT_ID"
+
+          # Resource limits for e2-small (2 vCPU, 2GB RAM)
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+              ephemeral-storage: "1Gi"
+            limits:
+              cpu: "1800m"
+              memory: "1700Mi"
+              ephemeral-storage: "2Gi"
+
+          livenessProbe:
+            httpGet:
+              path: /status.json
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /status.json
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+
+          volumeMounts:
+            - name: data
+              mountPath: /opt/cre/data
+            - name: logs
+              mountPath: /opt/cre/log
+            - name: checkpoints
+              mountPath: /opt/cre/checkpoints
+
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    /opt/cre/bin/cre stop &
+                    sleep 15
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+      volumes:
+        - name: data
+          emptyDir:
+            sizeLimit: "512Mi"
+        - name: logs
+          emptyDir:
+            sizeLimit: "512Mi"
+        - name: checkpoints
+          emptyDir: {}
+
+      terminationGracePeriodSeconds: 30

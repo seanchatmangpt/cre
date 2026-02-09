@@ -1,16 +1,30 @@
-# CRE - Multi-Stage Production Dockerfile
+# CRE - Multi-Architecture Production Dockerfile
 # Common Runtime Environment for YAWL workflow engine
 # Target: OTP 28, Rust stable
+# Platforms: linux/amd64, linux/arm64
 #
 # Build Stages:
 #   1. rust-builder - Compile Rust NIFs
 #   2. erlang-builder - Compile Erlang/OTP release
 #   3. runtime - Minimal runtime image
+#   4. sbom - Generate SBOM for vulnerability scanning
+
+# Build arguments for multi-platform support
+ARG TARGETPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+ARG BUILDPLATFORM
+ARG VERSION=0.3.0
+ARG GIT_REVISION=unknown
+ARG BUILD_DATE=unknown
 
 # =============================================================================
-# Stage 1: Rust NIF Builder
+# Stage 1: Rust NIF Builder (Multi-Arch)
 # =============================================================================
-FROM rust:1.83-alpine AS rust-builder
+FROM --platform=$TARGETPLATFORM rust:1.83-alpine AS rust-builder
+
+ARG TARGETPLATFORM
+ARG TARGETARCH
 
 # Install build dependencies for Rust NIF compilation
 RUN apk add --no-cache \
@@ -23,16 +37,15 @@ RUN apk add --no-cache \
 WORKDIR /build/rust_nifs
 
 # Copy Rust NIF source files (layer caching optimization)
-# Note: Need to copy to current directory, not src/rust_nifs/
 COPY src/rust_nifs/Cargo.toml src/rust_nifs/Cargo.lock ./
 COPY src/rust_nifs/src ./src
 COPY src/rust_nifs/Makefile ./
 
-# Build Rust NIFs for the primary crate
-# Note: On Alpine Linux, the extension is always .so
+# Build Rust NIFs for the primary crate with target-specific optimizations
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/rust_nifs/target \
     apk add --no-cache openssl-dev build-base && \
+    echo "Building for platform: ${TARGETPLATFORM}" && \
     cargo build --release && \
     mkdir -p /build/priv/rust_nifs && \
     (cp target/release/libcre_rust_nif.so /build/priv/rust_nifs/ || \
@@ -41,7 +54,6 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     ls -la /build/priv/rust_nifs/ || echo "NIF directory contents:"
 
 # Build Rust paper algorithms
-# Note: rust_implementations has .rs files directly in the directory (not in a src/ subdirectory)
 WORKDIR /build/rust_implementations
 COPY src/rust_implementations/Cargo.toml src/rust_implementations/Cargo.lock ./
 COPY src/rust_implementations/*.rs ./
@@ -59,9 +71,15 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     ls -la /build/priv/rust_implementations/ || echo "Implementations directory contents:"
 
 # =============================================================================
-# Stage 2: Erlang/OTP Builder
+# Stage 2: Erlang/OTP Builder (Multi-Arch)
 # =============================================================================
-FROM erlang:28-alpine AS erlang-builder
+FROM --platform=$TARGETPLATFORM erlang:28-alpine AS erlang-builder
+
+ARG TARGETPLATFORM
+ARG TARGETARCH
+ARG VERSION
+ARG GIT_REVISION
+ARG BUILD_DATE
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -84,7 +102,7 @@ WORKDIR /build
 COPY rebar.config rebar.lock ./
 
 # Add prod profile to rebar.config for release generation
-RUN echo '{profiles, [{prod, [{relx, [{release, {cre, "0.3.0"}, [cre]}, \
+RUN echo '{profiles, [{prod, [{relx, [{release, {cre, "'${VERSION}'"}, [cre]}, \
     {dev_mode, false}, \
     {include_erts, true}, \
     {include_src, false}, \
@@ -147,9 +165,29 @@ RUN mkdir -p /tmp/cre && \
     rm -rf /tmp/cre
 
 # =============================================================================
-# Stage 3: Runtime
+# Stage 3: Runtime (Multi-Arch)
 # =============================================================================
-FROM erlang:28-alpine AS runtime
+FROM --platform=$TARGETPLATFORM erlang:28-alpine AS runtime
+
+ARG VERSION
+ARG GIT_REVISION
+ARG BUILD_DATE
+ARG TARGETPLATFORM
+
+# Runtime metadata labels
+LABEL org.opencontainers.image.title="CRE" \
+      org.opencontainers.image.description="Common Runtime Environment for YAWL workflow engine" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${GIT_REVISION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.source="https://github.com/joergen7/cre" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.vendor="CRE Project" \
+      org.opencontainers.image.authors="CRE Team <cre@common-runtime.org>" \
+      org.opencontainers.image.documentation="https://github.com/joergen7/cre/blob/main/docs/README.md" \
+      org.opencontainers.image.platform="${TARGETPLATFORM}" \
+      org.opencontainers.image.base.digest="erlang:28-alpine" \
+      org.opencontainers.image.base.name="docker.io/library/erlang:28-alpine"
 
 # Install runtime dependencies
 RUN apk add --no-cache \
@@ -158,7 +196,22 @@ RUN apk add --no-cache \
     tzdata \
     curl \
     bash \
+    ca-certificates \
+    openssl-libs-static \
     && rm -rf /var/cache/apk/*
+
+# Install Google Cloud SDK for Cloud Logging integration
+# Minimal install: only gcloud core components for authentication
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    && pip3 install --no-cache-dir google-cloud-logging \
+    && rm -rf /root/.cache/pip
+
+# Copy CA certificates bundle for GCP API HTTPS connections
+RUN update-ca-certificates \
+    && mkdir -p /etc/ssl/certs \
+    && chmod 755 /etc/ssl/certs
 
 # Create non-root user and group
 RUN addgroup -g 1000 cre && \
@@ -192,12 +245,13 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:4142/api/v1/health || exit 1
 
 # Environment variables for clustering
-ENV CRE_NODE_NAME=cre
-ENV CRE_HOSTNAME=cre
-ENV CRE_MODE=init
-ENV CRE_CLUSTER_PEERS=""
-ENV ERL_MAX_PORTS=65536
-ENV ERL_MAX_ETS_TABLES=2000
+ENV CRE_NODE_NAME=cre \
+    CRE_HOSTNAME=cre \
+    CRE_MODE=init \
+    CRE_CLUSTER_PEERS="" \
+    ERL_MAX_PORTS=65536 \
+    ERL_MAX_ETS_TABLES=2000 \
+    CRE_VERSION="${VERSION}"
 
 # Volume mount points for persistent data
 VOLUME ["/opt/cre/data", "/opt/cre/log", "/opt/cre/mnesia", "/opt/cre/checkpoints"]
@@ -211,12 +265,22 @@ ENTRYPOINT ["docker-entrypoint.sh"]
 # Default command - start CRE in foreground
 CMD ["foreground"]
 
-# Metadata labels
+# Additional metadata labels (legacy support)
 LABEL maintainer="CRE Team <cre@common-runtime.org>" \
-      version="0.3.0" \
-      description="CRE YAWL Workflow Engine - Production Multi-Stage Build" \
-      org.opencontainers.image.title="CRE" \
-      org.opencontainers.image.description="Common Runtime Environment for YAWL workflow engine" \
-      org.opencontainers.image.version="0.3.0" \
-      org.opencontainers.image.source="https://github.com/joergen7/cre" \
-      org.opencontainers.image.licenses="Apache-2.0"
+      version="${VERSION}" \
+      description="CRE YAWL Workflow Engine - Multi-Architecture Production Build"
+
+# =============================================================================
+# Stage 4: SBOM Generation (Optional, for GCP Artifact Registry)
+# =============================================================================
+FROM runtime AS sbom
+
+# Install Syft for SBOM generation
+USER root
+RUN apk add --no-cache wget && \
+    wget -qO /usr/local/bin/syft https://static.synopsys.com/npc/syft/linux/syft_${TARGETARCH}_v1.18.1 \
+    && chmod +x /usr/local/bin/syft
+USER cre
+
+# Generate SBOM in SPDX format
+RUN syft /opt/cre -o spdx-json > /opt/cre/sbom.spdx.json 2>/dev/null || echo "SBOM generation skipped"

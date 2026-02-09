@@ -1,0 +1,416 @@
+{
+  "displayName": "CRE Erlang VM Metrics",
+  "gridLabels": {},
+  "layout": {
+    "columns": "2",
+    "widgets": [
+      {
+        "title": "Scheduler CPU Utilization",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "groupByFields": ["metric.label.scheduler_id"],
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang_scheduler/utilization\"",
+                  "secondaryAggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "perSeriesAligner": "ALIGN_PERCENT_CHANGE"
+                  }
+                }
+              }
+            }
+          ],
+          "thresholds": [
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 70,
+              "color": "yellow"
+            },
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 90,
+              "color": "red"
+            }
+          ],
+          "yAxis": {
+            "label": "Utilization %",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Runtime Utilization",
+        "gaugeView": {
+          "lowerBound": 0,
+          "upperBound": 100
+        },
+        "scorecard": {
+          "gaugeView": {
+            "lowerBound": 0,
+            "upperBound": 100
+          },
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/statistics/runtime\""
+                }
+              },
+              "minAlignmentPeriod": "60s",
+              "plotType": "HEATMAP",
+              "targetAxis": "Y1"
+            }
+          ],
+          "thresholds": {
+            "colorStyle": "COLOR_STYLE_GREEN_TO_YELLOW_TO_RED",
+            "thresholds": [
+              {
+                "direction": "DIRECTION_INCREASING",
+                "value": 70
+              },
+              {
+                "direction": "DIRECTION_INCREASING",
+                "value": 90
+              }
+            ]
+          }
+        }
+      },
+      {
+        "title": "Memory Breakdown",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "STACKED_AREA",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/memory/total\" AND unit=\"By\""
+                }
+              }
+            },
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "STACKED_AREA",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/memory/processes\" AND unit=\"By\""
+                }
+              }
+            },
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "STACKED_AREA",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/memory/system\" AND unit=\"By\""
+                }
+              }
+            },
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "STACKED_AREA",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/memory/binary\" AND unit=\"By\""
+                }
+              }
+            },
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "STACKED_AREA",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/memory/ets\" AND unit=\"By\""
+                }
+              }
+            },
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "STACKED_AREA",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/memory/atom\" AND unit=\"By\""
+                }
+              }
+            },
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "STACKED_AREA",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/memory/code\" AND unit=\"By\""
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Bytes",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Process Count",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/process/count\""
+                }
+              }
+            }
+          ],
+          "thresholds": [
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 10000,
+              "color": "yellow"
+            },
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 50000,
+              "color": "red"
+            }
+          ],
+          "yAxis": {
+            "label": "Process Count",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Garbage Collection Rate",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/gc/count\""
+                }
+              }
+            },
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y2",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/gc/words_reclaimed\""
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "GC Rate",
+            "scale": "LINEAR"
+          },
+          "y2Axis": {
+            "label": "Words Reclaimed",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "GC Pause Time",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/gc/pause_seconds\" AND unit=\"s\""
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Pause Time (s)",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "ETS Memory by Table",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "groupByFields": ["metric.label.table_name"],
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/ets/memory\" AND unit=\"By\""
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Bytes",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Mnesia Table Size",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "groupByFields": ["metric.label.table_name"],
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/mnesia/table_size\""
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Record Count",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Mnesia Transaction Rate",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/mnesia/transactions_committed\""
+                }
+              }
+            },
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/mnesia/transactions_aborted\""
+                }
+              }
+            },
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/erlang/mnesia/transactions_failed\""
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Transactions/sec",
+            "scale": "LINEAR"
+          }
+        }
+      }
+    ]
+  }
+}

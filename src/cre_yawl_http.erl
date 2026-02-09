@@ -128,6 +128,15 @@ route_request(<<"GET">>, Path, Req, _State) ->
 route_request(<<"GET">>, <<"/yawl/health">>, Req, _State) ->
     handle_health_check(Req);
 
+route_request(<<"GET">>, <<"/health">>, Req, _State) ->
+    handle_gcp_liveness(Req);
+
+route_request(<<"GET">>, <<"/ready">>, Req, _State) ->
+    handle_gcp_readiness(Req);
+
+route_request(<<"GET">>, <<"/startup">>, Req, _State) ->
+    handle_gcp_startup(Req);
+
 route_request(<<"OPTIONS">>, _Path, Req, _State) ->
     handle_options(Req);
 
@@ -475,6 +484,93 @@ handle_health_check(Req) ->
         #{<<"content-type">> => <<"application/json">>},
         Response, Req),
     {ok, Req2}.
+
+%% @doc Handle GET /health - GCP liveness probe
+-spec handle_gcp_liveness(cowboy_req:req()) ->
+    {ok, cowboy_req:req()} | {error, term()}.
+handle_gcp_liveness(Req) ->
+    try
+        Response = cre_health:liveness(),
+        Status = maps:get(status, Response),
+        StatusCode = case Status of
+            healthy -> 200;
+            starting -> 202;
+            unhealthy -> 503
+        end,
+        ReqFinal = cowboy_req:reply(StatusCode,
+            #{<<"content-type">> => <<"application/json">>},
+            jsone:encode(Response), Req),
+        {ok, ReqFinal}
+    catch
+        _:Error ->
+            ErrorResponse = jsone:encode(#{
+                <<"status">> => <<"unhealthy">>,
+                <<"error">> => list_to_binary(io_lib:format("~p", [Error])),
+                <<"timestamp">> => erlang:system_time(millisecond)
+            }),
+            ReqError = cowboy_req:reply(503,
+                #{<<"content-type">> => <<"application/json">>},
+                ErrorResponse, Req),
+            {ok, ReqError}
+    end.
+
+%% @doc Handle GET /ready - GCP readiness probe
+-spec handle_gcp_readiness(cowboy_req:req()) ->
+    {ok, cowboy_req:req()} | {error, term()}.
+handle_gcp_readiness(Req) ->
+    try
+        Response = cre_health:readiness(),
+        Status = maps:get(status, Response),
+        StatusCode = case Status of
+            healthy -> 200;
+            starting -> 202;
+            unhealthy -> 503
+        end,
+        ReqFinal = cowboy_req:reply(StatusCode,
+            #{<<"content-type">> => <<"application/json">>},
+            jsone:encode(Response), Req),
+        {ok, ReqFinal}
+    catch
+        _:Error ->
+            ErrorResponse = jsone:encode(#{
+                <<"status">> => <<"unhealthy">>,
+                <<"error">> => list_to_binary(io_lib:format("~p", [Error])),
+                <<"timestamp">> => erlang:system_time(millisecond)
+            }),
+            ReqError = cowboy_req:reply(503,
+                #{<<"content-type">> => <<"application/json">>},
+                ErrorResponse, Req),
+            {ok, ReqError}
+    end.
+
+%% @doc Handle GET /startup - GCP startup probe
+-spec handle_gcp_startup(cowboy_req:req()) ->
+    {ok, cowboy_req:req()} | {error, term()}.
+handle_gcp_startup(Req) ->
+    try
+        Response = cre_health:startup(),
+        Status = maps:get(status, Response),
+        StatusCode = case Status of
+            healthy -> 200;
+            starting -> 202;
+            unhealthy -> 503
+        end,
+        ReqFinal = cowboy_req:reply(StatusCode,
+            #{<<"content-type">> => <<"application/json">>},
+            jsone:encode(Response), Req),
+        {ok, ReqFinal}
+    catch
+        _:Error ->
+            ErrorResponse = jsone:encode(#{
+                <<"status">> => <<"unhealthy">>,
+                <<"error">> => list_to_binary(io_lib:format("~p", [Error])),
+                <<"timestamp">> => erlang:system_time(millisecond)
+            }),
+            ReqError = cowboy_req:reply(503,
+                #{<<"content-type">> => <<"application/json">>},
+                ErrorResponse, Req),
+            {ok, ReqError}
+    end.
 
 %% @doc Handle OPTIONS request for CORS
 -spec handle_options(cowboy_req:req()) ->

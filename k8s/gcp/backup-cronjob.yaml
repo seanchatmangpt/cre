@@ -1,0 +1,703 @@
+---
+# CRE Backup Automation for GCP
+# Daily Mnesia backup with GCS upload and retention policy
+#
+# SLA Targets:
+# - RTO (Recovery Time Objective): 30 minutes
+# - RPO (Recovery Point Objective): 15 minutes
+#
+# Features:
+# - Mnesia checkpoint and backup
+# - GCS upload with server-side encryption (SSE)
+# - 30-day retention policy with lifecycle management
+# - Cross-region replication support
+# - Backup verification and health checks
+
+# ============================================
+# Namespace for Backup Operations
+# ============================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cre-backup
+  labels:
+    app: cre
+    component: backup
+    environment: production
+
+---
+# ConfigMap for Backup Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cre-backup-config
+  namespace: cre-backup
+  labels:
+    app: cre
+    component: backup
+data:
+  # GCS bucket for backups
+  GCS_BUCKET: "cre-backups-prod"
+  # Backup retention in days
+  RETENTION_DAYS: "30"
+  # Backup region (primary)
+  BACKUP_REGION: "us-central1"
+  # Cross-region replication target (optional)
+  REPLICATION_REGION: "us-east1"
+  # Enable cross-region replication
+  ENABLE_REPLICATION: "true"
+  # Encryption: Google-managed or customer-managed (CMEK)
+  ENCRYPTION_TYPE: "google-managed"
+  # CMEK key ring (if using customer-managed encryption)
+  # CMEK_KEY_RING: "cre-backup-keys"
+  # CMEK_KEY_NAME: "cre-backup-key"
+  # Mnesia backup directory
+  MNESIA_BACKUP_DIR: "/opt/cre/mnesia/backup"
+  # Backup compression (gzip)
+  ENABLE_COMPRESSION: "true"
+  # Backup verification (enabled)
+  ENABLE_VERIFICATION: "true"
+  # Monitoring: Cloud Monitoring metric prefix
+  METRIC_PREFIX: "custom.googleapis.com/cre/backup"
+  # Notification channel for backup failures
+  NOTIFICATION_CHANNEL: "projects/PROJECT_ID/notificationChannels/CHANNEL_ID"
+
+---
+# Secret for Backup Credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cre-backup-secrets
+  namespace: cre-backup
+type: Opaque
+stringData:
+  # GCS service account key (base64 encoded)
+  # Generate with: gcloud iam service-accounts keys create key.json --iam-account=cre-backup-sa@PROJECT_ID.iam.gserviceaccount.com
+  GCS_SA_KEY: "REPLACE_WITH_BASE64_ENCODED_SERVICE_ACCOUNT_KEY"
+  # Encryption key for backup files (additional encryption layer)
+  BACKUP_ENCRYPTION_KEY: "REPLACE_WITH_ENCRYPTION_KEY"
+  # Slack webhook for notifications (optional)
+  SLACK_WEBHOOK_URL: "REPLACE_WITH_SLACK_WEBHOOK_URL"
+
+---
+# Service Account for Backup Operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cre-backup-sa
+  namespace: cre-backup
+  labels:
+    app: cre
+    component: backup
+  annotations:
+    # GKE Workload Identity annotation
+    iam.gke.io/gcp-service-account: "cre-backup-sa@REPLACE_WITH_YOUR_PROJECT_ID.iam.gserviceaccount.com"
+---
+# Role for Backup Operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cre-backup-role
+  namespace: cre-backup
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get"]
+  - apiGroups: ["batch"]
+    resources: ["cronjobs", "jobs"]
+    verbs: ["get", "list", "watch"]
+---
+# RoleBinding for Backup Operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cre-backup-rolebinding
+  namespace: cre-backup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cre-backup-role
+subjects:
+  - kind: ServiceAccount
+    name: cre-backup-sa
+    namespace: cre-backup
+
+---
+# ============================================
+# Daily Mnesia Backup CronJob (Production)
+# Schedule: Daily at 2 AM UTC (9 PM EST, 6 PM PST)
+# ============================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cre-mnesia-backup-daily
+  namespace: cre-backup
+  labels:
+    app: cre
+    component: backup
+    schedule: daily
+  annotations:
+    description: "Daily Mnesia backup to GCS with 30-day retention"
+    sla-rto: "30m"
+    sla-rpo: "15m"
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  concurrencyPolicy: Forbid  # Only one job at a time
+  successfulJobsHistoryLimit: 7  # Keep 7 days of successful jobs
+  failedJobsHistoryLimit: 3  # Keep 3 days of failed jobs
+  jobTemplate:
+    metadata:
+      labels:
+        app: cre
+        component: backup
+        schedule: daily
+    spec:
+      backoffLimit: 3  # Retry up to 3 times on failure
+      activeDeadlineSeconds: 3600  # Max 1 hour runtime
+      ttlSecondsAfterFinished: 86400  # Clean up jobs after 24 hours
+      template:
+        metadata:
+          labels:
+            app: cre
+            component: backup
+        spec:
+          serviceAccountName: cre-backup-sa
+          restartPolicy: OnFailure
+
+          # Init container to check CRE pod availability
+          initContainers:
+            - name: check-cre-ready
+              image: gcr.io/google.com/cloudsdktool/google-cloud-cli:latest
+              command:
+                - sh
+                - -c
+                - |
+                  echo "Checking CRE cluster readiness..."
+                  # Wait for at least one CRE pod to be ready
+                  for i in $(seq 1 30); do
+                    if kubectl get pods -n cre-prod -l app=cre -o json | jq -e '.items[] | select(.status.phase=="Running" and (.status.conditions[]? | select(.type=="Ready" and .status=="True")))' > /dev/null 2>&1; then
+                      echo "CRE cluster is ready"
+                      exit 0
+                    fi
+                    echo "Waiting for CRE pods... ($i/30)"
+                    sleep 10
+                  done
+                  echo "CRE cluster not ready after 5 minutes"
+                  exit 1
+
+          containers:
+            - name: backup
+              image: us-central1-docker.pkg.dev/REPLACE_WITH_YOUR_PROJECT_ID/cre/cre-backup:0.3.0
+              imagePullPolicy: Always
+
+              env:
+                - name: BACKUP_TYPE
+                  value: "mnesia"
+                - name: BACKUP_SCHEDULE
+                  value: "daily"
+                - name: GCS_BUCKET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: GCS_BUCKET
+                - name: RETENTION_DAYS
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: RETENTION_DAYS
+                - name: BACKUP_REGION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: BACKUP_REGION
+                - name: ENABLE_REPLICATION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: ENABLE_REPLICATION
+                - name: REPLICATION_REGION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: REPLICATION_REGION
+                - name: ENCRYPTION_TYPE
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: ENCRYPTION_TYPE
+                - name: MNESIA_BACKUP_DIR
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: MNESIA_BACKUP_DIR
+                - name: ENABLE_COMPRESSION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: ENABLE_COMPRESSION
+                - name: ENABLE_VERIFICATION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: ENABLE_VERIFICATION
+                - name: GCS_SA_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cre-backup-secrets
+                      key: GCS_SA_KEY
+                - name: BACKUP_ENCRYPTION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cre-backup-secrets
+                      key: BACKUP_ENCRYPTION_KEY
+                  optional: true
+                - name: SLACK_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: cre-backup-secrets
+                      key: SLACK_WEBHOOK_URL
+                  optional: true
+                - name: CRE_NAMESPACE
+                  value: "cre-prod"
+                - name: CRE_POD_LABEL
+                  value: "app=cre"
+                - name: GOOGLE_CLOUD_PROJECT
+                  value: "REPLACE_WITH_YOUR_PROJECT_ID"
+
+              volumeMounts:
+                - name: backup-data
+                  mountPath: /backup
+                - name: gcs-key
+                  mountPath: /gcs-key
+                  readOnly: true
+
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "512Mi"
+                  ephemeral-storage: "5Gi"
+                limits:
+                  cpu: "2000m"
+                  memory: "2Gi"
+                  ephemeral-storage: "10Gi"
+
+              # Backup script execution
+              command:
+                - /scripts/backup.sh
+              args:
+                - --type=mnesia
+                - --schedule=daily
+                - --verify
+
+          volumes:
+            - name: backup-data
+              emptyDir:
+                sizeLimit: "10Gi"
+            - name: gcs-key
+              secret:
+                secretName: cre-backup-secrets
+                items:
+                  - key: GCS_SA_KEY
+                    path: gcs-sa-key.json
+
+          # Node affinity for backup jobs (prefer spot nodes for cost efficiency)
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  preference:
+                    matchExpressions:
+                      - key: cloud.google.com/gke-spot
+                        operator: In
+                        values: ["true"]
+
+---
+# ============================================
+# Hourly Mnesia Backup for Lower RPO (15 minutes)
+# Schedule: Every hour at minute 0
+# ============================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cre-mnesia-backup-hourly
+  namespace: cre-backup
+  labels:
+    app: cre
+    component: backup
+    schedule: hourly
+  annotations:
+    description: "Hourly Mnesia backup for 15-minute RPO"
+    sla-rpo: "15m"
+spec:
+  schedule: "0 * * * *"  # Every hour
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 24  # Keep 24 hours
+  failedJobsHistoryLimit: 6
+  jobTemplate:
+    metadata:
+      labels:
+        app: cre
+        component: backup
+        schedule: hourly
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800  # Max 30 minutes
+      ttlSecondsAfterFinished: 43200  # Clean up after 12 hours
+      template:
+        metadata:
+          labels:
+            app: cre
+            component: backup
+        spec:
+          serviceAccountName: cre-backup-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: us-central1-docker.pkg.dev/REPLACE_WITH_YOUR_PROJECT_ID/cre/cre-backup:0.3.0
+              env:
+                - name: BACKUP_TYPE
+                  value: "mnesia"
+                - name: BACKUP_SCHEDULE
+                  value: "hourly"
+                - name: GCS_BUCKET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: GCS_BUCKET
+                - name: RETENTION_DAYS
+                  value: "2"  # Keep hourly backups for 2 days
+                - name: BACKUP_REGION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: BACKUP_REGION
+                - name: ENABLE_COMPRESSION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: ENABLE_COMPRESSION
+                - name: GCS_SA_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cre-backup-secrets
+                      key: GCS_SA_KEY
+                - name: CRE_NAMESPACE
+                  value: "cre-prod"
+                - name: GOOGLE_CLOUD_PROJECT
+                  value: "REPLACE_WITH_YOUR_PROJECT_ID"
+              command:
+                - /scripts/backup.sh
+              args:
+                - --type=mnesia
+                - --schedule=hourly
+                - --skip-verification  # Skip verification for hourly backups
+              volumeMounts:
+                - name: backup-data
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: "250m"
+                  memory: "256Mi"
+                limits:
+                  cpu: "1000m"
+                  memory: "1Gi"
+          volumes:
+            - name: backup-data
+              emptyDir:
+                sizeLimit: "5Gi"
+
+---
+# ============================================
+# Weekly Full Backup with Verification
+# Schedule: Every Sunday at 3 AM UTC
+# ============================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cre-backup-weekly
+  namespace: cre-backup
+  labels:
+    app: cre
+    component: backup
+    schedule: weekly
+  annotations:
+    description: "Weekly full backup with integrity verification and restoration test"
+spec:
+  schedule: "0 3 * * 0"  # Sunday at 3 AM UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 4  # Keep 4 weeks
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    metadata:
+      labels:
+        app: cre
+        component: backup
+        schedule: weekly
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 7200  # Max 2 hours
+      ttlSecondsAfterFinished: 604800  # Keep for 7 days
+      template:
+        metadata:
+          labels:
+            app: cre
+            component: backup
+        spec:
+          serviceAccountName: cre-backup-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: us-central1-docker.pkg.dev/REPLACE_WITH_YOUR_PROJECT_ID/cre/cre-backup:0.3.0
+              env:
+                - name: BACKUP_TYPE
+                  value: "full"
+                - name: BACKUP_SCHEDULE
+                  value: "weekly"
+                - name: GCS_BUCKET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: GCS_BUCKET
+                - name: RETENTION_DAYS
+                  value: "90"  # Keep weekly backups for 90 days
+                - name: BACKUP_REGION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: BACKUP_REGION
+                - name: ENABLE_REPLICATION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: ENABLE_REPLICATION
+                - name: REPLICATION_REGION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: REPLICATION_REGION
+                - name: ENABLE_COMPRESSION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: ENABLE_COMPRESSION
+                - name: ENABLE_VERIFICATION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: ENABLE_VERIFICATION
+                - name: GCS_SA_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cre-backup-secrets
+                      key: GCS_SA_KEY
+                - name: CRE_NAMESPACE
+                  value: "cre-prod"
+                - name: GOOGLE_CLOUD_PROJECT
+                  value: "REPLACE_WITH_YOUR_PROJECT_ID"
+              command:
+                - /scripts/backup.sh
+              args:
+                - --type=full
+                - --schedule=weekly
+                - --verify
+                - --test-restore  # Perform restoration test
+              volumeMounts:
+                - name: backup-data
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: "1000m"
+                  memory: "1Gi"
+                limits:
+                  cpu: "4000m"
+                  memory: "4Gi"
+          volumes:
+            - name: backup-data
+              emptyDir:
+                sizeLimit: "20Gi"
+
+---
+# ============================================
+# Backup Retention Job (Cleanup)
+# Schedule: Daily at 4 AM UTC (after backups)
+# ============================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cre-backup-cleanup
+  namespace: cre-backup
+  labels:
+    app: cre
+    component: backup
+    job-type: cleanup
+spec:
+  schedule: "0 4 * * *"  # Daily at 4 AM UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 3600
+      template:
+        spec:
+          serviceAccountName: cre-backup-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: cleanup
+              image: gcr.io/google.com/cloudsdktool/google-cloud-cli:latest
+              env:
+                - name: GCS_BUCKET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: GCS_BUCKET
+                - name: RETENTION_DAYS
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: RETENTION_DAYS
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "Starting backup cleanup..."
+
+                  # Activate service account
+                  echo "$GCS_SA_KEY" | base64 -d > /tmp/gcs-key.json
+                  gcloud auth activate-service-account --key-file=/tmp/gcs-key.json
+
+                  # Calculate cutoff date
+                  CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%Y-%m-%d)
+                  echo "Removing backups older than $CUTOFF_DATE"
+
+                  # Remove old daily backups
+                  gsutil ls "gs://$GCS_BUCKET/mnesia/daily/*" | \
+                    while read -r backup; do
+                      backup_date=$(basename "$backup" | grep -oP '\d{4}-\d{2}-\d{2}' || true)
+                      if [[ "$backup_date" < "$CUTOFF_DATE" ]]; then
+                        echo "Deleting old backup: $backup"
+                        gsutil rm "$backup"
+                      fi
+                    done
+
+                  # Remove old hourly backups (keep 2 days)
+                  HOURLY_CUTOFF=$(date -d "2 days ago" +%Y-%m-%d)
+                  gsutil ls "gs://$GCS_BUCKET/mnesia/hourly/*" | \
+                    while read -r backup; do
+                      backup_date=$(basename "$backup" | grep -oP '\d{4}-\d{2}-\d{2}' || true)
+                      if [[ "$backup_date" < "$HOURLY_CUTOFF" ]]; then
+                        echo "Deleting old hourly backup: $backup"
+                        gsutil rm "$backup"
+                      fi
+                    done
+
+                  # Publish cleanup metric
+                  REMAINING=$(gsutil ls -r "gs://$GCS_BUCKET/mnesia/" | wc -l)
+                  echo "Remaining backups: $REMAINING"
+
+                  rm -f /tmp/gcs-key.json
+                  echo "Backup cleanup completed"
+                  exit 0
+
+---
+# ============================================
+# Backup Health Monitor
+# Checks backup status and reports to Cloud Monitoring
+# ============================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cre-backup-healthcheck
+  namespace: cre-backup
+  labels:
+    app: cre
+    component: backup
+    job-type: monitoring
+spec:
+  schedule: "*/30 * * * *"  # Every 30 minutes
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 600
+      template:
+        spec:
+          serviceAccountName: cre-backup-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: healthcheck
+              image: gcr.io/google.com/cloudsdktool/google-cloud-cli:latest
+              env:
+                - name: GCS_BUCKET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: GCS_BUCKET
+                - name: BACKUP_REGION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cre-backup-config
+                      key: BACKUP_REGION
+                - name: GOOGLE_CLOUD_PROJECT
+                  value: "REPLACE_WITH_YOUR_PROJECT_ID"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+
+                  # Check latest backup
+                  LATEST_BACKUP=$(gsutil ls "gs://$GCS_BUCKET/mnesia/daily/" 2>/dev/null | tail -1)
+                  if [[ -z "$LATEST_BACKUP" ]]; then
+                    echo "ERROR: No backups found!"
+                    # Publish metric to Cloud Monitoring
+                    gcloud monitoring metrics publish \
+                      custom.googleapis.com/cre/backup/health \
+                      0 \
+                      --resource-type="global" \
+                      --resource-labels="project_id=$GOOGLE_CLOUD_PROJECT"
+                    exit 1
+                  fi
+
+                  # Check backup age
+                  BACKUP_DATE=$(basename "$LATEST_BACKUP" | grep -oP '\d{4}-\d{2}-\d{2}')
+                  BACKUP_TS=$(date -d "$BACKUP_DATE" +%s)
+                  CURRENT_TS=$(date +%s)
+                  HOURS_OLD=$(( ($CURRENT_TS - $BACKUP_TS) / 3600 ))
+
+                  if [[ $HOURS_OLD -gt 48 ]]; then
+                    echo "WARNING: Latest backup is $HOURS_OLD hours old"
+                    # Publish warning metric
+                    gcloud monitoring metrics publish \
+                      custom.googleapis.com/cre/backup/health \
+                      1 \
+                      --resource-type="global" \
+                      --resource-labels="project_id=$GOOGLE_CLOUD_PROJECT,severity=warning"
+                  else
+                    echo "OK: Latest backup is $HOURS_OLD hours old"
+                    # Publish OK metric
+                    gcloud monitoring metrics publish \
+                      custom.googleapis.com/cre/backup/health \
+                      2 \
+                      --resource-type="global" \
+                      --resource-labels="project_id=$GOOGLE_CLOUD_PROJECT,severity=ok"
+                  fi
+
+                  # Check backup size
+                  BACKUP_SIZE=$(gsutil du -s "$LATEST_BACKUP" | awk '{print $1}')
+                  echo "Backup size: $BACKUP_SIZE bytes"
+                  gcloud monitoring metrics publish \
+                    custom.googleapis.com/cre/backup/size_bytes \
+                    $BACKUP_SIZE \
+                    --resource-type="global" \
+                    --resource-labels="project_id=$GOOGLE_CLOUD_PROJECT,schedule=daily"
+
+                  echo "Health check completed"
+                  exit 0

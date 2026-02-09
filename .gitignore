@@ -57,3 +57,9 @@ Mnesia.*/
 *.bak
 *_temp.erl
 *temp.erl
+
+# Terraform
+terraform/gcp/.terraform/
+terraform/gcp/**/.terraform/
+*.tfstate
+*.tfstate.*

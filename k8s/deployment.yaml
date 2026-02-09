@@ -142,8 +142,35 @@ spec:
                   - /bin/sh
                   - -c
                   - |
-                    /opt/cre/bin/cre stop &
-                    sleep 15
+                    # CRE GKE Pre-Stop Hook with Graceful Shutdown
+                    # Ensures active workflows complete before termination
+                    #
+                    # Environment Variables:
+                    #   CRE_SHUTDOWN_PORT - HTTP port for shutdown API (default: 4142)
+                    #   CRE_SHUTDOWN_TIMEOUT - Max wait time for shutdown (default: 25s)
+
+                    set -eo pipefail
+
+                    CRE_SHUTDOWN_PORT="${CRE_SHUTDOWN_PORT:-4142}"
+                    CRE_SHUTDOWN_TIMEOUT="${CRE_SHUTDOWN_TIMEOUT:-25}"
+                    CRE_HOME="/opt/cre"
+
+                    echo "[CRE PRE-STOP] Initiating graceful shutdown (timeout: ${CRE_SHUTDOWN_TIMEOUT}s)"
+
+                    # Trigger shutdown via Erlang RPC
+                    "${CRE_HOME}/bin/cre" eval \
+                        "cre_graceful_shutdown:initiate_shutdown(${CRE_SHUTDOWN_TIMEOUT}000, gke_preemption)." 2>/dev/null || true
+
+                    echo "[CRE PRE-STOP] Shutdown initiated, waiting for workflows..."
+
+                    # Wait for active workflows to complete
+                    sleep 5
+
+                    # Verify workflow count
+                    "${CRE_HOME}/bin/cre" eval \
+                        "io:format(\"Active workflows: ~p~n\", [cre_graceful_shutdown:get_active_workflow_count()])." 2>/dev/null || true
+
+                    echo "[CRE PRE-STOP] Pre-stop hook completed"
 
       # Volumes
       volumes:
@@ -290,8 +317,19 @@ spec:
                   - /bin/sh
                   - -c
                   - |
-                    /opt/cre/bin/cre stop &
-                    sleep 15
+                    # CRE GKE Pre-Stop Hook with Graceful Shutdown (Staging)
+                    CRE_SHUTDOWN_PORT="${CRE_SHUTDOWN_PORT:-4142}"
+                    CRE_SHUTDOWN_TIMEOUT="${CRE_SHUTDOWN_TIMEOUT:-25}"
+                    CRE_HOME="/opt/cre"
+
+                    echo "[CRE PRE-STOP] Initiating graceful shutdown (timeout: ${CRE_SHUTDOWN_TIMEOUT}s)"
+
+                    "${CRE_HOME}/bin/cre" eval \
+                        "cre_graceful_shutdown:initiate_shutdown(${CRE_SHUTDOWN_TIMEOUT}000, gke_preemption)." 2>/dev/null || true
+
+                    echo "[CRE PRE-STOP] Shutdown initiated, waiting for workflows..."
+                    sleep 5
+                    echo "[CRE PRE-STOP] Pre-stop hook completed"
 
       volumes:
         - name: data
@@ -302,3 +340,48 @@ spec:
           emptyDir: {}
 
       terminationGracePeriodSeconds: 30
+
+---
+# ConfigMap for graceful shutdown script (can be mounted as volume)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cre-graceful-scripts
+  namespace: cre-prod
+data:
+  gcp-pre-stop.sh: |
+    #!/bin/bash
+    # CRE GKE Pre-Stop Hook Script
+    # Triggers graceful shutdown before Kubernetes terminates the pod
+    #
+    # Environment Variables:
+    #   CRE_NODE_NAME    - Erlang node name (default: cre)
+    #   CRE_HOSTNAME     - Node hostname (default: hostname -f)
+    #   CRE_SHUTDOWN_PORT - HTTP port for shutdown API (default: 4142)
+    #   CRE_SHUTDOWN_TIMEOUT - Max wait time for shutdown (default: 25s)
+    #   CRE_COOKIE       - Erlang cookie for clustering
+
+    set -eo pipefail
+
+    CRE_NODE_NAME="${CRE_NODE_NAME:-cre}"
+    CRE_SHUTDOWN_PORT="${CRE_SHUTDOWN_PORT:-4142}"
+    CRE_SHUTDOWN_TIMEOUT="${CRE_SHUTDOWN_TIMEOUT:-25}"
+    CRE_HOME="/opt/cre"
+
+    echo "[CRE PRE-STOP] Initiating graceful shutdown for ${CRE_NODE_NAME}"
+    echo "[CRE PRE-STOP] Timeout: ${CRE_SHUTDOWN_TIMEOUT}s"
+
+    # Trigger shutdown via Erlang RPC
+    "${CRE_HOME}/bin/cre" eval \
+        "cre_graceful_shutdown:initiate_shutdown(${CRE_SHUTDOWN_TIMEOUT}000, gke_preemption)." 2>/dev/null || true
+
+    echo "[CRE PRE-STOP] Shutdown initiated, waiting for workflows..."
+
+    # Wait for active workflows to complete
+    sleep 5
+
+    # Get final workflow count
+    "${CRE_HOME}/bin/cre" eval \
+        "io:format(\"Active workflows: ~p~n\", [cre_graceful_shutdown:get_active_workflow_count()])." 2>/dev/null || true
+
+    echo "[CRE PRE-STOP] Pre-stop hook completed"

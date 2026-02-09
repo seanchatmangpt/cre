@@ -1,0 +1,304 @@
+{
+  "displayName": "CRE GKE Cluster Metrics",
+  "gridLabels": {},
+  "layout": {
+    "columns": "2",
+    "widgets": [
+      {
+        "title": "CPU Utilization",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_MEAN",
+                    "groupByFields": ["resource.label.node_name"],
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"k8s_node\" AND metric.type=\"kubernetes.io/container/cpu/usage_time\" AND unit=\"s\"",
+                  "secondaryAggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "perSeriesAligner": "ALIGN_FRACTION"
+                  }
+                }
+              }
+            }
+          ],
+          "thresholds": [
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 70,
+              "color": "yellow"
+            },
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 90,
+              "color": "red"
+            }
+          ],
+          "yAxis": {
+            "label": "CPU %",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Memory Utilization",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_MEAN",
+                    "groupByFields": ["resource.label.node_name"],
+                    "perSeriesAligner": "ALIGN_NONE"
+                  },
+                  "filter": "resource.type=\"k8s_node\" AND metric.type=\"kubernetes.io/node/memory/bytes_used\" AND unit=\"By\"",
+                  "secondaryAggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "perSeriesAligner": "ALIGN_FRACTION"
+                  }
+                }
+              }
+            }
+          ],
+          "thresholds": [
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 80,
+              "color": "yellow"
+            },
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 90,
+              "color": "red"
+            }
+          ],
+          "yAxis": {
+            "label": "Memory %",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Disk Usage",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "300s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "300s",
+                    "crossSeriesReducer": "REDUCE_MEAN",
+                    "groupByFields": ["resource.label.node_name", "metric.label.device_name"],
+                    "perSeriesAligner": "ALIGN_NONE"
+                  },
+                  "filter": "resource.type=\"k8s_node\" AND metric.type=\"kubernetes.io/volume/bytes_used\" AND unit=\"By\"",
+                  "secondaryAggregation": {
+                    "alignmentPeriod": "300s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "perSeriesAligner": "ALIGN_FRACTION"
+                  }
+                }
+              }
+            }
+          ],
+          "thresholds": [
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 80,
+              "color": "yellow"
+            },
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 90,
+              "color": "red"
+            }
+          ],
+          "yAxis": {
+            "label": "Disk %",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Pod Status",
+        "scorecard": {
+          "gaugeView": {
+            "lowerBound": 0,
+            "upperBound": 100
+          },
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_SUM",
+                    "groupByFields": ["metric.label.phase"],
+                    "perSeriesAligner": "ALIGN_DELTA"
+                  },
+                  "filter": "resource.type=\"k8s_pod\" AND metric.type=\"kubernetes.io/pod/status/phase\""
+                }
+              },
+              "minAlignmentPeriod": "60s",
+              "plotType": "HEATMAP",
+              "targetAxis": "Y1"
+            }
+          ],
+          "thresholds": {
+            "colorStyle": "COLOR_STYLE_GREEN_TO_YELLOW",
+            "thresholds": [
+              {
+                "direction": "DIRECTION_INCREASING",
+                "value": 10
+              },
+              {
+                "direction": "DIRECTION_INCREASING",
+                "value": 20
+              }
+            ]
+          }
+        }
+      },
+      {
+        "title": "Network Traffic (Received)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "STACKED_AREA",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_SUM",
+                    "groupByFields": ["resource.label.node_name"],
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"k8s_node\" AND metric.type=\"kubernetes.io/node/network/received_bytes_count\" AND unit=\"By\"",
+                  "secondaryAggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  }
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Bytes/sec",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Network Traffic (Sent)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "STACKED_AREA",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_SUM",
+                    "groupByFields": ["resource.label.node_name"],
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"k8s_node\" AND metric.type=\"kubernetes.io/node/network/sent_bytes_count\" AND unit=\"By\"",
+                  "secondaryAggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  }
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Bytes/sec",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Node Pool CPU by Pool",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_MEAN",
+                    "groupByFields": ["resource.label.node_name"],
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"k8s_node\" AND metric.type=\"kubernetes.io/container/cpu/usage_time\" AND unit=\"s\"",
+                  "secondaryAggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "perSeriesAligner": "ALIGN_FRACTION"
+                  }
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "CPU %",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Container Restart Count",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "300s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "300s",
+                    "crossSeriesReducer": "REDUCE_SUM",
+                    "groupByFields": ["resource.label.namespace_name", "resource.label.pod_name", "resource.label.container_name"],
+                    "perSeriesAligner": "ALIGN_DELTA"
+                  },
+                  "filter": "resource.type=\"k8s_container\" AND metric.type=\"kubernetes.io/container/restart_count\""
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Restarts",
+            "scale": "LINEAR"
+          }
+        }
+      }
+    ]
+  }
+}

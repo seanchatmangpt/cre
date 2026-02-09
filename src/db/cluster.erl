@@ -37,6 +37,7 @@
 %% <h3>Discovery Methods</h3>
 %%
 %% <ol>
+%%   <li><b>GCP Discovery:</b> GKE headless service and StatefulSet pod discovery</li>
 %%   <li><b>Environment Variable:</b> CRE_CLUSTER_NODES=node1@host,node2@host</li>
 %%   <li><b>DNS Query:</b> Query _erlang._tcp.service.namespace.svc.cluster.local</li>
 %%   <li><b>Headless Service:</b> K8s headless service returns all pod IPs</li>
@@ -87,13 +88,14 @@
 %% Type definitions
 %%====================================================================
 
--type discovery_method() :: dns | env | static | none.
+-type discovery_method() :: gcp | dns | env | static | none.
 -type cluster_state() :: #{discovery_method => discovery_method(),
                           cluster_nodes => [node()],
                           pending_joins => [node()],
                           retry_count => non_neg_integer(),
                           max_retries => pos_integer(),
-                          discovery_dns => string()}.
+                          discovery_dns => string(),
+                          watch_ref => {pid(), reference()} | undefined}.
 -type join_result() :: ok | {error, term()}.
 
 %%====================================================================
@@ -184,13 +186,15 @@ get_status() ->
 %% @doc Sets the discovery method for cluster joining.
 %%
 %%      Valid methods:
+%%      - `gcp' - GKE/GCP discovery (headless service + StatefulSet)
 %%      - `dns' - DNS-based service discovery (K8s headless service)
 %%      - `env' - Environment variable CRE_CLUSTER_NODES
 %%      - `static' - Pre-configured node list
 %%      - `none' - No auto-discovery (manual join only)
 %%
 -spec set_discovery_method(discovery_method()) -> ok.
-set_discovery_method(Method) when Method =:= dns;
+set_discovery_method(Method) when Method =:= gcp;
+                                  Method =:= dns;
                                   Method =:= env;
                                   Method =:= static;
                                   Method =:= none ->
@@ -215,7 +219,7 @@ discover_peers() ->
 init(Options) ->
     process_flag(trap_exit, true),
 
-    DiscoveryMethod = proplists:get_value(discovery_method, Options, dns),
+    DiscoveryMethod = proplists:get_value(discovery_method, Options, gcp),
     MaxRetries = proplists:get_value(max_retries, Options, 5),
     DnsName = proplists:get_value(dns_name, Options,
                                   application:get_env(cluster, dns_name, "localhost")),
@@ -225,7 +229,8 @@ init(Options) ->
               pending_joins => [],
               retry_count => 0,
               max_retries => MaxRetries,
-              discovery_dns => DnsName},
+              discovery_dns => DnsName,
+              watch_ref => undefined},
 
     logger:info("Cluster manager started: method=~p, dns=~p",
                 [DiscoveryMethod, DnsName],
@@ -263,10 +268,18 @@ handle_call(get_status, _From, State = #{discovery_method := Method,
                node_count => length(Nodes)},
     {reply, Status, State};
 
-handle_call({set_discovery_method, Method}, _From, State) ->
+handle_call({set_discovery_method, Method}, _From, State = #{watch_ref := WatchRef}) ->
+    %% Clean up existing watch if switching from gcp
+    NewState = case WatchRef of
+        undefined ->
+            State;
+        _ ->
+            gcp_discovery:stop_watch(WatchRef),
+            State#{watch_ref => undefined}
+    end,
     logger:info("Discovery method changed: ~p", [Method],
                 [{info, "discovery_change"}, {application, cre}]),
-    {reply, ok, State#{discovery_method => Method}};
+    {reply, ok, NewState#{discovery_method => Method}};
 
 handle_call(discover_peers, _From, State = #{discovery_method := Method}) ->
     Peers = discover_nodes(Method, State),
@@ -320,7 +333,12 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %% @private
-terminate(_Reason, _State) ->
+terminate(_Reason, State = #{watch_ref := WatchRef}) ->
+    %% Clean up GCP watch if active
+    case WatchRef of
+        undefined -> ok;
+        _ -> gcp_discovery:stop_watch(WatchRef)
+    end,
     logger:info("Cluster manager stopping", [],
                 [{info, "cluster_terminate"}, {application, cre}]),
     net_kernel:monitor_nodes(false),
@@ -464,6 +482,16 @@ do_leave_cluster() ->
 
 %% @private Discovers peer nodes based on method.
 -spec discover_nodes(discovery_method(), cluster_state()) -> [node()].
+discover_nodes(gcp, _State) ->
+    %% Use GCP/GKE discovery module
+    case gcp_discovery:discover_peers() of
+        Nodes when is_list(Nodes) ->
+            Nodes;
+        {error, Reason} ->
+            logger:info("GCP discovery failed: ~p", [Reason],
+                        [{info, "gcp_discovery_failed"}, {application, cre}]),
+            []
+    end;
 discover_nodes(env, _State) ->
     %% Read CRE_CLUSTER_NODES environment variable
     case os:getenv("CRE_CLUSTER_NODES") of
