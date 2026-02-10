@@ -77,3 +77,47 @@ directory = "generated"
 format = "structured"
 preserve_timestamps = true
 create_manifest = true
+
+# =============================================================================
+# A2A-CONSTRUCT GENERATION RULES
+# =============================================================================
+
+# Generate A2A protocol types and stations
+[[generation.rules]]
+name = "generate-a2a-protocols"
+description = "Generate A2A protocol definitions from ontology"
+query = { inline = """
+PREFIX a2a: <https://a2a-construct.dev/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?protocolName ?protocolId ?comment ?inputTypes ?outputTypes
+WHERE {
+  ?protocol rdfs:subClassOf a2a:Protocol ;
+    rdfs:label ?protocolName ;
+    a2a:protocolId ?protocolId ;
+    rdfs:comment ?comment ;
+    a2a:inputTypes ?inputTypes ;
+    a2a:outputTypes ?outputTypes .
+}
+ORDER BY ?protocolId
+""" }
+template = { file = "templates/erl/a2a_protocols.tera" }
+output_file = "src/generated/a2a_protocols.erl"
+mode = "Overwrite"
+
+# Generate A2A refusal types
+[[generation.rules]]
+name = "generate-a2a-refusals"
+description = "Generate A2A refusal type definitions from ontology"
+query = { inline = """
+PREFIX a2a: <https://a2a-construct.dev/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?refusalName ?comment
+WHERE {
+  ?refusal rdfs:subClassOf a2a:Refusal ;
+    rdfs:label ?refusalName ;
+    rdfs:comment ?comment .
+}
+""" }
+template = { file = "templates/erl/a2a_refusals.tera" }
+output_file = "src/generated/a2a_refusals.erl"
+mode = "Overwrite"
