@@ -63,16 +63,16 @@ variable "release_channel" {
 variable "node_pools" {
   description = "Node pool configurations"
   type = map(object({
-    machine_type    = string
-    node_count      = number
-    min_count       = number
-    max_count       = number
-    disk_size_gb    = number
-    disk_type       = string
-    auto_repair     = bool
-    auto_upgrade    = bool
-    spot           = bool
-    preemptible    = bool
+    machine_type      = string
+    node_count        = number
+    min_count         = number
+    max_count         = number
+    disk_size_gb      = number
+    disk_type         = string
+    auto_repair       = bool
+    auto_upgrade      = bool
+    spot              = bool
+    preemptible       = bool
     max_pods_per_node = number
   }))
   default = {
@@ -85,8 +85,8 @@ variable "node_pools" {
       disk_type         = "pd-standard"
       auto_repair       = true
       auto_upgrade      = true
-      spot             = false
-      preemptible      = false
+      spot              = false
+      preemptible       = false
       max_pods_per_node = 110
     }
     memory_optimized = {
@@ -98,8 +98,8 @@ variable "node_pools" {
       disk_type         = "pd-ssd"
       auto_repair       = true
       auto_upgrade      = true
-      spot             = false
-      preemptible      = false
+      spot              = false
+      preemptible       = false
       max_pods_per_node = 110
     }
   }
@@ -118,11 +118,11 @@ variable "logging_config" {
 variable "monitoring_config" {
   description = "Monitoring configuration"
   type = object({
-    enable_components = list(string)
+    enable_components  = list(string)
     managed_prometheus = bool
   })
   default = {
-    enable_components = ["SYSTEM_COMPONENTS"]
+    enable_components  = ["SYSTEM_COMPONENTS"]
     managed_prometheus = true
   }
 }
@@ -130,9 +130,15 @@ variable "monitoring_config" {
 variable "labels" {
   description = "Labels to apply to all resources"
   type        = map(string)
-  default     = {
+  default = {
     environment = "production"
     managed_by  = "terraform"
     project     = "cre"
   }
+}
+
+variable "block_metadata" {
+  description = "Block node metadata access for security (required for GCP Marketplace)"
+  type        = bool
+  default     = true
 }

@@ -7,11 +7,11 @@
 
 # Reserved IP for internal LB
 resource "google_compute_address" "internal_lb" {
-  count   = var.internal_lb_config.enabled ? 1 : 0
-  name    = "${var.internal_lb_config.name}-ip"
-  project = var.project_id
-  region  = var.region
-  subnetwork = var.subnetwork_name
+  count        = var.internal_lb_config.enabled ? 1 : 0
+  name         = "${var.internal_lb_config.name}-ip"
+  project      = var.project_id
+  region       = var.region
+  subnetwork   = var.subnetwork_name
   address_type = "INTERNAL"
   address      = var.internal_lb_config.ip_address
   purpose      = "GCE_ENDPOINT"
@@ -61,12 +61,12 @@ resource "google_compute_region_health_check" "internal" {
 
 # Internal forwarding rules
 resource "google_compute_forwarding_rule" "internal" {
-  count                = var.internal_lb_config.enabled ? length(var.internal_lb_config.ports) : 0
-  name                 = "${var.internal_lb_config.name}-${var.internal_lb_config.ports[count.index]}-${count.index}"
-  project              = var.project_id
-  region               = var.region
-  network              = var.network_name
-  subnetwork           = var.subnetwork_name
+  count      = var.internal_lb_config.enabled ? length(var.internal_lb_config.ports) : 0
+  name       = "${var.internal_lb_config.name}-${var.internal_lb_config.ports[count.index]}-${count.index}"
+  project    = var.project_id
+  region     = var.region
+  network    = var.network_name
+  subnetwork = var.subnetwork_name
 
   load_balancing_scheme = "INTERNAL"
   ip_protocol           = "TCP"
@@ -115,15 +115,15 @@ resource "google_compute_health_check" "external" {
 
 # External backend service
 resource "google_compute_backend_service" "external" {
-  count                   = var.external_lb_config.enabled ? 1 : 0
-  name                    = var.external_lb_config.name
-  project                 = var.project_id
+  count   = var.external_lb_config.enabled ? 1 : 0
+  name    = var.external_lb_config.name
+  project = var.project_id
 
-  protocol                = "HTTP"
-  port_name               = "http"
-  load_balancing_scheme   = "EXTERNAL"
-  timeout_sec             = 30
-  enable_cdn              = var.cdn_config.enabled
+  protocol              = "HTTP"
+  port_name             = "http"
+  load_balancing_scheme = "EXTERNAL"
+  timeout_sec           = 30
+  enable_cdn            = var.cdn_config.enabled
 
   health_checks = [google_compute_health_check.external[0].id]
 
@@ -131,10 +131,10 @@ resource "google_compute_backend_service" "external" {
 
   cdn_policy {
     cache_key_policy {
-      include_protocol           = true
-      include_host               = true
-      include_query_string       = true
-      include_http_headers      = []
+      include_protocol     = true
+      include_host         = true
+      include_query_string = true
+      include_http_headers = []
     }
 
     default_ttl = 3600
@@ -157,7 +157,7 @@ resource "google_compute_security_policy" "cloud_armor" {
   # Default: Allow all
   rule {
     action   = "allow"
-    priority = 2147483647  # Lowest priority (default rule)
+    priority = 2147483647 # Lowest priority (default rule)
     match {
       versioned_expr = "SRC_IPS_V1"
       config {
@@ -214,9 +214,9 @@ resource "google_compute_security_policy" "cloud_armor" {
         interval_sec = 60
       }
       ban_duration_sec = 3600
-      enforce_on_key = "IP"
+      enforce_on_key   = "IP"
       exceed_action    = "deny(403)"
-      conform_action  = "allow"
+      conform_action   = "allow"
     }
     description = "Rate limit: 100 requests per minute per IP"
   }
@@ -224,9 +224,9 @@ resource "google_compute_security_policy" "cloud_armor" {
 
 # External URL map
 resource "google_compute_url_map" "external" {
-  count          = var.external_lb_config.enabled ? 1 : 0
-  name           = var.external_lb_config.name
-  project        = var.project_id
+  count   = var.external_lb_config.enabled ? 1 : 0
+  name    = var.external_lb_config.name
+  project = var.project_id
 
   default_service = google_compute_backend_service.external[0].id
 
@@ -241,7 +241,7 @@ resource "google_compute_url_map" "external" {
     default_service = google_compute_backend_service.external[0].id
 
     path_rule {
-      paths   = ["/api/*", "/v1/*"]
+      paths = ["/api/*", "/v1/*"]
       route_action {
         url_rewrite {
           path_prefix_rewrite = "/"
@@ -250,7 +250,7 @@ resource "google_compute_url_map" "external" {
     }
 
     path_rule {
-      paths   = ["/health", "/ready", "/alive"]
+      paths = ["/health", "/ready", "/alive"]
       route_action {
         # Health checks get default timeout
       }
@@ -273,7 +273,7 @@ resource "google_compute_target_https_proxy" "external" {
   name    = "${var.external_lb_config.name}-https-proxy"
   project = var.project_id
 
-  url_map        = google_compute_url_map.external[0].id
+  url_map          = google_compute_url_map.external[0].id
   ssl_certificates = var.external_lb_config.ssl_certificates
 }
 

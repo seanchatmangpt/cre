@@ -145,7 +145,7 @@ variable "node_count_growth_threshold" {
 variable "storage_growth_threshold_bytes" {
   description = "Storage growth threshold in bytes (100GB = 107374182400)"
   type        = number
-  default     = 107374182400  # 100GB
+  default     = 107374182400 # 100GB
 }
 
 variable "storage_growth_percent_threshold" {
@@ -230,7 +230,7 @@ variable "enable_dashboard" {
 variable "labels" {
   description = "Labels to apply to all resources"
   type        = map(string)
-  default     = {
+  default = {
     managed_by = "terraform"
     project    = "cre"
   }

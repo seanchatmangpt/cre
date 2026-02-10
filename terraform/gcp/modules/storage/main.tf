@@ -10,9 +10,9 @@ locals {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type              = "pd-ssd"
-        fstype            = "ext4"
-        replication-type  = "none"
+        type             = "pd-ssd"
+        fstype           = "ext4"
+        replication-type = "none"
       }
     }
     ssd_regional = {
@@ -22,9 +22,9 @@ locals {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type              = "pd-ssd"
-        fstype            = "ext4"
-        replication-type  = "regional-pd"
+        type             = "pd-ssd"
+        fstype           = "ext4"
+        replication-type = "regional-pd"
       }
     }
     balanced = {
@@ -34,9 +34,9 @@ locals {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type              = "pd-balanced"
-        fstype            = "ext4"
-        replication-type  = "none"
+        type             = "pd-balanced"
+        fstype           = "ext4"
+        replication-type = "none"
       }
     }
     standard = {
@@ -46,9 +46,9 @@ locals {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type              = "pd-standard"
-        fstype            = "ext4"
-        replication-type  = "none"
+        type             = "pd-standard"
+        fstype           = "ext4"
+        replication-type = "none"
       }
     }
   }
@@ -73,10 +73,10 @@ data "google_client_config" "default" {}
 resource "google_compute_disk_resource_policy_attachment" "mnesia_snapshot" {
   count = var.enable_snapshots && var.snapshot_schedule.enabled ? 1 : 0
 
-  name        = google_compute_resource_policy.snapshot_schedule[0].name
-  project     = var.project_id
-  zone        = "${var.region}-a"
-  disk        = ""  # Will be attached to dynamically created disks
+  name    = google_compute_resource_policy.snapshot_schedule[0].name
+  project = var.project_id
+  zone    = "${var.region}-a"
+  disk    = "" # Will be attached to dynamically created disks
 }
 
 # Snapshot schedule policy
@@ -112,20 +112,20 @@ resource "google_compute_resource_policy" "snapshot_schedule" {
 # Actual backup would be implemented via Kubernetes CronJob
 
 resource "google_cloud_scheduler_job" "mnesia_backup" {
-  count            = var.backup_config.enabled ? 1 : 0
-  name             = "${var.cluster_name}-mnesia-backup"
-  project          = var.project_id
-  region           = var.region
-  description      = "Scheduled backup for Mnesia data"
+  count       = var.backup_config.enabled ? 1 : 0
+  name        = "${var.cluster_name}-mnesia-backup"
+  project     = var.project_id
+  region      = var.region
+  description = "Scheduled backup for Mnesia data"
 
-  schedule         = var.backup_config.schedule
-  time_zone        = "UTC"
+  schedule  = var.backup_config.schedule
+  time_zone = "UTC"
 
   http_target {
     http_method = "POST"
     uri         = "https://${var.cluster_name}.endpoints.${var.region}.cloud.goog/api/v1/backup/mnesia"
     oidc_token {
-      service_account_email = ""  # To be filled with actual service account
+      service_account_email = "" # To be filled with actual service account
     }
   }
 }

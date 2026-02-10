@@ -14,7 +14,7 @@ output "region" {
 # VPC Outputs
 output "vpc" {
   description = "VPC configuration"
-  value = module.vpc
+  value       = module.vpc
 }
 
 output "vpc_network_name" {
@@ -110,7 +110,7 @@ output "kubectl_context_set_command" {
 # Important Notes
 output "next_steps" {
   description = "Next steps after deployment"
-  value = <<-EOT
+  value       = <<-EOT
     1. Configure kubectl:
        gcloud container clusters regional get-credentials ${module.gke_cluster.cluster_name} --region ${module.gke_cluster.cluster_region}
 

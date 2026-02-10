@@ -84,10 +84,11 @@ spec:
                     operator: In
                     values: ["e2"]
 
-      # Security context
+      # CRITICAL: Security context for Pod Security Standards (restricted)
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        runAsGroup: 1000
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
@@ -329,9 +330,11 @@ spec:
                       values: [cre]
                 topologyKey: kubernetes.io/hostname
 
+      # CRITICAL: Security context for Pod Security Standards (restricted)
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        runAsGroup: 1000
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
@@ -444,6 +447,7 @@ spec:
 
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
             capabilities:
               drop:
                 - ALL

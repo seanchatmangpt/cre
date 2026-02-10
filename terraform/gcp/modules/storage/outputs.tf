@@ -5,13 +5,13 @@ output "storage_classes" {
   description = "StorageClass configurations"
   value = {
     for name, config in local.merged_storage_classes : name => {
-      name                 = "${var.cluster_name}-${name}"
-      provisioner          = config.provisioner
-      type                 = config.type
-      volume_binding_mode  = config.volume_binding_mode
+      name                   = "${var.cluster_name}-${name}"
+      provisioner            = config.provisioner
+      type                   = config.type
+      volume_binding_mode    = config.volume_binding_mode
       allow_volume_expansion = config.allow_volume_expansion
-      reclaim_policy       = config.reclaim_policy
-      parameters           = config.parameters
+      reclaim_policy         = config.reclaim_policy
+      parameters             = config.parameters
     }
   }
 }

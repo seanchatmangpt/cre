@@ -15,11 +15,11 @@ output "subnets" {
   description = "Subnet details"
   value = {
     for k, v in google_compute_subnetwork.primary : k => {
-      name            = v.name
-      id              = v.id
-      cidr            = v.ip_cidr_range
-      region          = v.region
-      gateway_ip      = v.gateway_address
+      name             = v.name
+      id               = v.id
+      cidr             = v.ip_cidr_range
+      region           = v.region
+      gateway_ip       = v.gateway_address
       secondary_ranges = v.secondary_ip_range
     }
   }
@@ -48,15 +48,15 @@ output "nat_name" {
 output "firewall_rules" {
   description = "Firewall rule names"
   value = {
-    erlang_epmd_internal            = google_compute_firewall.erlang_epmd_internal.name
-    erlang_distribution_internal    = google_compute_firewall.erlang_distribution_internal.name
+    erlang_epmd_internal             = google_compute_firewall.erlang_epmd_internal.name
+    erlang_distribution_internal     = google_compute_firewall.erlang_distribution_internal.name
     erlang_distribution_udp_internal = google_compute_firewall.erlang_distribution_udp_internal.name
-    mnesia_replication_internal     = google_compute_firewall.mnesia_replication_internal.name
-    gke_egress                      = google_compute_firewall.gke_egress.name
-    iap_ssh                         = google_compute_firewall.iap_ssh.name
-    health_checks                   = google_compute_firewall.health_checks.name
-    deny_all_ingress                = google_compute_firewall.deny_all_ingress.name
-    allow_all_egress                = google_compute_firewall.allow_all_egress.name
+    mnesia_replication_internal      = google_compute_firewall.mnesia_replication_internal.name
+    gke_egress                       = google_compute_firewall.gke_egress.name
+    iap_ssh                          = google_compute_firewall.iap_ssh.name
+    health_checks                    = google_compute_firewall.health_checks.name
+    deny_all_ingress                 = google_compute_firewall.deny_all_ingress.name
+    allow_all_egress                 = google_compute_firewall.allow_all_egress.name
   }
 }
 

@@ -4,10 +4,10 @@
 output "internal_lb" {
   description = "Internal load balancer details"
   value = var.internal_lb_config.enabled ? {
-    name        = var.internal_lb_config.name
-    ip_address  = google_compute_address.internal_lb[0].address
-    ports       = var.internal_lb_config.ports
-    backend_id  = google_compute_region_backend_service.internal[0].id
+    name         = var.internal_lb_config.name
+    ip_address   = google_compute_address.internal_lb[0].address
+    ports        = var.internal_lb_config.ports
+    backend_id   = google_compute_region_backend_service.internal[0].id
     health_check = google_compute_region_health_check.internal[0].id
   } : null
 }

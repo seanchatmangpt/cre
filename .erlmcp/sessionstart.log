@@ -9625,3 +9625,548 @@ src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
 [INFO] Environment: gVisor sandbox detected
 [INFO] Note: Some syscalls are limited in gVisor
 [SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-09T23:18:50-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (     322 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/mining/partial_order_align.erl:
+    │
+ 57 │  -type marking() :: #{place() => non_neg_integer()}.
+    │   ╰── Warning: type marking() is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │      ╰── Warning: variable 'Activities' is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │                    ╰── Warning: the result of calling map_get/2 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+[SUCCESS] Project compilation verified
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /Users/sac/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: gVisor sandbox detected
+[INFO] Note: Some syscalls are limited in gVisor
+[SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-10T09:18:02-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (     322 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/mining/partial_order_align.erl:
+    │
+ 57 │  -type marking() :: #{place() => non_neg_integer()}.
+    │   ╰── Warning: type marking() is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │      ╰── Warning: variable 'Activities' is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │                    ╰── Warning: the result of calling map_get/2 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+[SUCCESS] Project compilation verified
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /Users/sac/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: gVisor sandbox detected
+[INFO] Note: Some syscalls are limited in gVisor
+[SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-10T12:02:58-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (     322 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/mining/partial_order_align.erl:
+    │
+ 57 │  -type marking() :: #{place() => non_neg_integer()}.
+    │   ╰── Warning: type marking() is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │      ╰── Warning: variable 'Activities' is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │                    ╰── Warning: the result of calling map_get/2 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+[SUCCESS] Project compilation verified
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /Users/sac/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: gVisor sandbox detected
+[INFO] Note: Some syscalls are limited in gVisor
+[SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-10T12:04:08-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (     322 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/mining/partial_order_align.erl:
+    │
+ 57 │  -type marking() :: #{place() => non_neg_integer()}.
+    │   ╰── Warning: type marking() is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │      ╰── Warning: variable 'Activities' is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │                    ╰── Warning: the result of calling map_get/2 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+[SUCCESS] Project compilation verified
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /Users/sac/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: gVisor sandbox detected
+[INFO] Note: Some syscalls are limited in gVisor
+[SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-10T13:08:58-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (     322 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/mining/partial_order_align.erl:
+    │
+ 57 │  -type marking() :: #{place() => non_neg_integer()}.
+    │   ╰── Warning: type marking() is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │      ╰── Warning: variable 'Activities' is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │                    ╰── Warning: the result of calling map_get/2 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+[SUCCESS] Project compilation verified
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /Users/sac/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: gVisor sandbox detected
+[INFO] Note: Some syscalls are limited in gVisor
+[SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-10T14:41:16-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (      58 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+Compiling src/core/gen_wfnet.erl failed
+src/core/gen_wfnet.erl:{101,14}: can't find include lib "wfnet/wfnet_types.hrl"
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 402 │      end, #{}, lists:usort(Places)),
+     │                                   ╰── syntax error before: ')'
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 543 │      end.
+     │         ╰── syntax error before: '.'
+
+
+    ┌─ include/gen_pnet.hrl:
+    │
+ 17 │  -record(bad_place, {name}).
+    │   ╰── record bad_place already defined
+
+    ┌─ include/gen_pnet.hrl:
+    │
+ 30 │  -record(net_state, {
+    │   ╰── record net_state already defined
+
+    ┌─ include/gen_pnet.hrl:
+    │
+ 46 │  -record(stat, {t, fps}).
+    │   ╰── record stat already defined
+
+    ┌─ include/gen_pnet.hrl:
+    │
+ 56 │  -record(stats, {current, hi, lo}).
+    │   ╰── record stats already defined
+
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 523 │      find_enabled_transition(Transitions, Marking, Preset, NetMod, UsrInfo, []).
+     │      ╰── function find_enabled_transition/6 undefined, did you mean find_enabled_transition/5?
+
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 166 │  -type token() :: wfnet_types:token().
+     │   ╰── Warning: type token() is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 168 │  -type mode() :: wfnet_types:mode().
+     │   ╰── Warning: type mode() is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 435 │  handle_call(marking, _From, #net_state{marking = Marking} = State) ->
+     │  ╰── Warning: function handle_call/3 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 495 │  handle_cast(_Msg, State) ->
+     │  ╰── Warning: function handle_cast/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 499 │  handle_info(_Info, State) ->
+     │  ╰── Warning: function handle_info/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 503 │  handle_continue(_Info, State) ->
+     │  ╰── Warning: function handle_continue/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 507 │  terminate(_Reason, _State) ->
+     │  ╰── Warning: function terminate/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 511 │  code_change(_OldVsn, State, _Extra) ->
+     │  ╰── Warning: function code_change/3 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 522 │  find_enabled_transition(Transitions, Marking, Preset, NetMod, UsrInfo) ->
+     │  ╰── Warning: function find_enabled_transition/5 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 549 │  has_tokens([], _Marking) -> true;
+     │  ╰── Warning: function has_tokens/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 560 │  build_mode(PresetPlaces, Marking) ->
+     │  ╰── Warning: function build_mode/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 573 │  apply_produce_map(Marking, ProduceMap) ->
+     │  ╰── Warning: function apply_produce_map/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 583 │  drain_loop(0, Count, State) ->
+     │  ╰── Warning: function drain_loop/3 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 608 │  extract_spec_id(#net_state{net_mod = NetMod}) ->
+     │  ╰── Warning: function extract_spec_id/1 is unused
+
+
+[INFO] Re-compilation needed...
+[INFO] Fetching dependencies...
+Verifying dependencies...
+[INFO] Compiling project...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+Compiling src/core/gen_wfnet.erl failed
+src/core/gen_wfnet.erl:{101,14}: can't find include lib "wfnet/wfnet_types.hrl"
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 402 │      end, #{}, lists:usort(Places)),
+     │                                   ╰── syntax error before: ')'
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 543 │      end.
+     │         ╰── syntax error before: '.'
+
+
+    ┌─ include/gen_pnet.hrl:
+    │
+ 17 │  -record(bad_place, {name}).
+    │   ╰── record bad_place already defined
+
+    ┌─ include/gen_pnet.hrl:
+    │
+ 30 │  -record(net_state, {
+    │   ╰── record net_state already defined
+
+    ┌─ include/gen_pnet.hrl:
+    │
+ 46 │  -record(stat, {t, fps}).
+    │   ╰── record stat already defined
+
+    ┌─ include/gen_pnet.hrl:
+    │
+ 56 │  -record(stats, {current, hi, lo}).
+    │   ╰── record stats already defined
+
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 523 │      find_enabled_transition(Transitions, Marking, Preset, NetMod, UsrInfo, []).
+     │      ╰── function find_enabled_transition/6 undefined, did you mean find_enabled_transition/5?
+
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 166 │  -type token() :: wfnet_types:token().
+     │   ╰── Warning: type token() is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 168 │  -type mode() :: wfnet_types:mode().
+     │   ╰── Warning: type mode() is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 435 │  handle_call(marking, _From, #net_state{marking = Marking} = State) ->
+     │  ╰── Warning: function handle_call/3 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 495 │  handle_cast(_Msg, State) ->
+     │  ╰── Warning: function handle_cast/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 499 │  handle_info(_Info, State) ->
+     │  ╰── Warning: function handle_info/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 503 │  handle_continue(_Info, State) ->
+     │  ╰── Warning: function handle_continue/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 507 │  terminate(_Reason, _State) ->
+     │  ╰── Warning: function terminate/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 511 │  code_change(_OldVsn, State, _Extra) ->
+     │  ╰── Warning: function code_change/3 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 522 │  find_enabled_transition(Transitions, Marking, Preset, NetMod, UsrInfo) ->
+     │  ╰── Warning: function find_enabled_transition/5 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 549 │  has_tokens([], _Marking) -> true;
+     │  ╰── Warning: function has_tokens/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 560 │  build_mode(PresetPlaces, Marking) ->
+     │  ╰── Warning: function build_mode/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 573 │  apply_produce_map(Marking, ProduceMap) ->
+     │  ╰── Warning: function apply_produce_map/2 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 583 │  drain_loop(0, Count, State) ->
+     │  ╰── Warning: function drain_loop/3 is unused
+
+     ┌─ src/core/gen_wfnet.erl:
+     │
+ 608 │  extract_spec_id(#net_state{net_mod = NetMod}) ->
+     │  ╰── Warning: function extract_spec_id/1 is unused
+
+
+[ERROR] Compilation failed
+[INFO] Project build skipped or failed (non-fatal)
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /Users/sac/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: gVisor sandbox detected
+[INFO] Note: Some syscalls are limited in gVisor
+[SUCCESS] SessionStart complete - ready to develop

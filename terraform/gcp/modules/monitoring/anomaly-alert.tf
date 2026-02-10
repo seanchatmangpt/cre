@@ -12,10 +12,10 @@ locals {
 
 # Notification channel for alerts
 resource "google_monitoring_notification_channel" "cost_alerts" {
-  count          = var.enable_alerting ? 1 : 0
-  project        = var.project_id
-  type           = "pubsub"
-  display_name   = "CRE Cost Anomaly Alerts"
+  count        = var.enable_alerting ? 1 : 0
+  project      = var.project_id
+  type         = "pubsub"
+  display_name = "CRE Cost Anomaly Alerts"
   labels = {
     topic = google_pubsub_topic.budget_alerts.id
   }
@@ -54,7 +54,7 @@ resource "google_monitoring_alert_policy" "node_count_anomaly" {
   conditions {
     display_name = "Node count above threshold"
     condition_threshold {
-      filter          = "resource.type=\"gce_instance\" AND metric.type=\"compute.googleapis.com/instance/cpu/utilization\""
+      filter = "resource.type=\"gce_instance\" AND metric.type=\"compute.googleapis.com/instance/cpu/utilization\""
       aggregation {
         alignment_period     = "300s"
         per_series_aligner   = "ALIGN_FRACTION_TRUE"
@@ -90,7 +90,7 @@ resource "google_monitoring_alert_policy" "node_count_anomaly" {
   }
 
   # Alert severity and documentation
-  severity       = "WARNING"
+  severity = "WARNING"
   documentation {
     content = <<-EOT
       Node count anomaly detected in ${var.environment} environment.
@@ -172,7 +172,7 @@ resource "google_monitoring_alert_policy" "storage_growth_anomaly" {
     }
   }
 
-  severity       = "WARNING"
+  severity = "WARNING"
   documentation {
     content = <<-EOT
       Storage growth anomaly detected in ${var.environment} environment.
@@ -253,7 +253,7 @@ resource "google_monitoring_alert_policy" "cpu_waste_detection" {
     }
   }
 
-  severity       = "INFO"
+  severity = "INFO"
   documentation {
     content = <<-EOT
       CPU waste detected in ${var.environment} environment.
@@ -331,7 +331,7 @@ resource "google_monitoring_alert_policy" "daily_cost_spike" {
     }
   }
 
-  severity       = "ERROR"
+  severity = "ERROR"
   documentation {
     content = <<-EOT
       Daily cost spike detected in ${var.environment} environment!
@@ -388,7 +388,7 @@ resource "google_monitoring_alert_policy" "memory_waste_detection" {
     }
   }
 
-  severity       = "INFO"
+  severity = "INFO"
   documentation {
     content = <<-EOT
       Memory waste detected in ${var.environment} environment.
@@ -427,21 +427,21 @@ resource "google_monitoring_dashboard" "cost_monitoring" {
 
   grid_layout {
     widgets {
-      title       = "Estimated Cost Trend"
-      x_pos       = 0
-      y_pos       = 0
-      width       = 6
-      height      = 4
+      title  = "Estimated Cost Trend"
+      x_pos  = 0
+      y_pos  = 0
+      width  = 6
+      height = 4
 
       xy_chart {
         data_sets {
           time_series_query {
-            unit        = "USD"
+            unit = "USD"
             time_series_filter {
-              filter     = "resource.type=\"billing_account\" AND metric.type=\"billing.googleapis.com/cost_amount\""
+              filter = "resource.type=\"billing_account\" AND metric.type=\"billing.googleapis.com/cost_amount\""
               aggregation {
-                alignment_period     = "86400s"
-                per_series_aligner   = "ALIGN_SUM"
+                alignment_period   = "86400s"
+                per_series_aligner = "ALIGN_SUM"
               }
             }
           }
@@ -453,18 +453,18 @@ resource "google_monitoring_dashboard" "cost_monitoring" {
     }
 
     widgets {
-      title       = "Node Count"
-      x_pos       = 6
-      y_pos       = 0
-      width       = 6
-      height      = 4
+      title  = "Node Count"
+      x_pos  = 6
+      y_pos  = 0
+      width  = 6
+      height = 4
 
       xy_chart {
         data_sets {
           time_series_query {
-            unit        = "1"
+            unit = "1"
             time_series_filter {
-              filter     = "resource.type=\"gce_instance\""
+              filter = "resource.type=\"gce_instance\""
               aggregation {
                 alignment_period     = "300s"
                 per_series_aligner   = "ALIGN_COUNT"
@@ -477,18 +477,18 @@ resource "google_monitoring_dashboard" "cost_monitoring" {
     }
 
     widgets {
-      title       = "Storage Usage"
-      x_pos       = 0
-      y_pos       = 4
-      width       = 6
-      height      = 4
+      title  = "Storage Usage"
+      x_pos  = 0
+      y_pos  = 4
+      width  = 6
+      height = 4
 
       xy_chart {
         data_sets {
           time_series_query {
-            unit        = "By"
+            unit = "By"
             time_series_filter {
-              filter     = "resource.type=\"gce_instance\" AND metric.type=\"compute.googleapis.com/disk/bytes_used\""
+              filter = "resource.type=\"gce_instance\" AND metric.type=\"compute.googleapis.com/disk/bytes_used\""
               aggregation {
                 alignment_period     = "3600s"
                 per_series_aligner   = "ALIGN_SUM"
@@ -501,20 +501,20 @@ resource "google_monitoring_dashboard" "cost_monitoring" {
     }
 
     widgets {
-      title       = "CPU Utilization vs Request"
-      x_pos       = 6
-      y_pos       = 4
-      width       = 6
-      height      = 4
+      title  = "CPU Utilization vs Request"
+      x_pos  = 6
+      y_pos  = 4
+      width  = 6
+      height = 4
 
       scorecard {
         time_series_query {
-          unit        = "1"
+          unit = "1"
           time_series_filter {
-            filter     = "resource.type=\"k8s_container\" AND metric.type=\"kubernetes.io/container/cpu/utilization\""
+            filter = "resource.type=\"k8s_container\" AND metric.type=\"kubernetes.io/container/cpu/utilization\""
             aggregation {
-              alignment_period     = "1800s"
-              per_series_aligner   = "ALIGN_MEAN"
+              alignment_period   = "1800s"
+              per_series_aligner = "ALIGN_MEAN"
             }
           }
         }
@@ -526,20 +526,20 @@ resource "google_monitoring_dashboard" "cost_monitoring" {
     }
 
     widgets {
-      title       = "Budget Status"
-      x_pos       = 0
-      y_pos       = 8
-      width       = 12
-      height      = 4
+      title  = "Budget Status"
+      x_pos  = 0
+      y_pos  = 8
+      width  = 12
+      height = 4
 
       scorecard {
         time_series_query {
-          unit        = "USD"
+          unit = "USD"
           time_series_filter {
-            filter     = "resource.type=\"billing_account\" AND metric.type=\"billing.googleapis.com/budget_amount\""
+            filter = "resource.type=\"billing_account\" AND metric.type=\"billing.googleapis.com/budget_amount\""
             aggregation {
-              alignment_period     = "86400s"
-              per_series_aligner   = "ALIGN_FRACTION_TRUE"
+              alignment_period   = "86400s"
+              per_series_aligner = "ALIGN_FRACTION_TRUE"
             }
           }
         }

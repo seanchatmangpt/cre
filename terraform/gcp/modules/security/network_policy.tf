@@ -273,11 +273,11 @@ resource "kubernetes_network_policy" "allow_monitoring_egress" {
       }
       ports {
         protocol = "TCP"
-        port     = 4317  # OTLP gRPC
+        port     = 4317 # OTLP gRPC
       }
       ports {
         protocol = "TCP"
-        port     = 4318  # OTLP HTTP
+        port     = 4318 # OTLP HTTP
       }
     }
 
@@ -428,10 +428,10 @@ output "network_policy_names" {
   value = {
     default_deny_ingress    = var.enable_default_deny_policies ? "${var.name_prefix}-default-deny-ingress" : null
     default_deny_egress     = var.enable_default_deny_policies ? "${var.name_prefix}-default-deny-egress" : null
-    allow_dns              = "${var.name_prefix}-allow-dns"
-    cre_internal           = "${var.name_prefix}-cre-internal"
-    allow_ingress_gateway  = var.enable_istio ? "${var.name_prefix}-allow-ingress-gateway" : null
-    allow_health_checks    = "${var.name_prefix}-allow-health-checks"
+    allow_dns               = "${var.name_prefix}-allow-dns"
+    cre_internal            = "${var.name_prefix}-cre-internal"
+    allow_ingress_gateway   = var.enable_istio ? "${var.name_prefix}-allow-ingress-gateway" : null
+    allow_health_checks     = "${var.name_prefix}-allow-health-checks"
     allow_monitoring_egress = "${var.name_prefix}-allow-monitoring-egress"
     allow_secret_manager    = "${var.name_prefix}-allow-secret-manager-egress"
     allow_pubsub_egress     = "${var.name_prefix}-allow-pubsub-egress"

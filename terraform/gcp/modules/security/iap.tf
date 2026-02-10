@@ -113,9 +113,9 @@ resource "google_service_account_iam_member" "iap_bypass_token_creator" {
 # -----------------------------------------------------------------------------
 resource "google_project_iam_member" "iap_secure_web_proxy_users" {
   for_each = var.iap_config.enabled ? toset(var.iap_config.allowed_users) : toset([])
-  project   = var.project_id
-  role      = "roles/iap.secureWebProxyUser"
-  member    = "user:${each.value}"
+  project  = var.project_id
+  role     = "roles/iap.secureWebProxyUser"
+  member   = "user:${each.value}"
 }
 
 # -----------------------------------------------------------------------------
@@ -143,27 +143,27 @@ resource "google_project_iam_audit_config" "iap_audit" {
 # Enable required services for IAP
 # -----------------------------------------------------------------------------
 resource "google_project_service" "iap_service" {
-  count                    = var.iap_config.enabled && var.iap_config.enable_services ? 1 : 0
-  project                  = var.project_id
-  service                  = "iap.googleapis.com"
+  count                      = var.iap_config.enabled && var.iap_config.enable_services ? 1 : 0
+  project                    = var.project_id
+  service                    = "iap.googleapis.com"
   disable_dependent_services = false
-  disable_on_destroy       = false
+  disable_on_destroy         = false
 }
 
 resource "google_project_service" "identitytoolkit_service" {
-  count                    = var.iap_config.enabled && var.iap_config.enable_services ? 1 : 0
-  project                  = var.project_id
-  service                  = "identitytoolkit.googleapis.com"
+  count                      = var.iap_config.enabled && var.iap_config.enable_services ? 1 : 0
+  project                    = var.project_id
+  service                    = "identitytoolkit.googleapis.com"
   disable_dependent_services = false
-  disable_on_destroy       = false
+  disable_on_destroy         = false
 }
 
 resource "google_project_service" "oauth2_service" {
-  count                    = var.iap_config.enabled && var.iap_config.enable_services ? 1 : 0
-  project                  = var.project_id
-  service                  = "oauth2.googleapis.com"
+  count                      = var.iap_config.enabled && var.iap_config.enable_services ? 1 : 0
+  project                    = var.project_id
+  service                    = "oauth2.googleapis.com"
   disable_dependent_services = false
-  disable_on_destroy       = false
+  disable_on_destroy         = false
 }
 
 # -----------------------------------------------------------------------------

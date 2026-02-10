@@ -157,7 +157,7 @@ variable "enable_default_deny_policies" {
 variable "cre_app_selector" {
   description = "Label selector for CRE application pods"
   type        = map(string)
-  default     = {
+  default = {
     app = "cre"
   }
 }
@@ -167,7 +167,7 @@ variable "erlang_port_range" {
   type        = list(number)
   # Note: range() cannot be used in variable defaults
   # Use a list instead or provide via locals
-  default     = []
+  default = []
 }
 
 variable "enable_istio" {
@@ -281,7 +281,7 @@ variable "admin_impersonator_email" {
 variable "common_labels" {
   description = "Common labels to apply to all resources"
   type        = map(string)
-  default     = {
+  default = {
     managed_by = "terraform"
     component  = "security"
   }
@@ -293,38 +293,38 @@ variable "common_labels" {
 variable "iap_config" {
   description = "IAP configuration for securing external API access"
   type = object({
-    enabled                    = bool
-    backend_service_name       = string
-    oauth_brand_id             = string
-    allowed_users              = list(string)
-    allowed_groups             = list(string)
-    allowed_service_accounts   = list(string)
-    authorized_domain          = string
-    enable_audit_logs          = bool
-    enable_services            = bool
-    create_access_level        = bool
-    access_policy_id           = string
-    access_level_ip_ranges     = list(string)
-    require_device_trust       = bool
-    create_bypass_sa           = bool
-    bypass_caller_sa           = string
+    enabled                  = bool
+    backend_service_name     = string
+    oauth_brand_id           = string
+    allowed_users            = list(string)
+    allowed_groups           = list(string)
+    allowed_service_accounts = list(string)
+    authorized_domain        = string
+    enable_audit_logs        = bool
+    enable_services          = bool
+    create_access_level      = bool
+    access_policy_id         = string
+    access_level_ip_ranges   = list(string)
+    require_device_trust     = bool
+    create_bypass_sa         = bool
+    bypass_caller_sa         = string
   })
   default = {
-    enabled                    = false
-    backend_service_name       = ""
-    oauth_brand_id             = ""
-    allowed_users              = []
-    allowed_groups             = []
-    allowed_service_accounts   = []
-    authorized_domain          = ""
-    enable_audit_logs          = true
-    enable_services            = true
-    create_access_level        = false
-    access_policy_id           = ""
-    access_level_ip_ranges     = []
-    require_device_trust       = false
-    create_bypass_sa           = false
-    bypass_caller_sa           = ""
+    enabled                  = false
+    backend_service_name     = ""
+    oauth_brand_id           = ""
+    allowed_users            = []
+    allowed_groups           = []
+    allowed_service_accounts = []
+    authorized_domain        = ""
+    enable_audit_logs        = true
+    enable_services          = true
+    create_access_level      = false
+    access_policy_id         = ""
+    access_level_ip_ranges   = []
+    require_device_trust     = false
+    create_bypass_sa         = false
+    bypass_caller_sa         = ""
   }
 }
 

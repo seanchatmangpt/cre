@@ -34,17 +34,23 @@ variable "credentials_file" {
   default     = ""
 }
 
+variable "billing_account_id" {
+  description = "GCP billing account ID (format: 123456-7890AB-CDEF12)"
+  type        = string
+  default     = ""
+}
+
 # VPC Configuration
 variable "vpc_config" {
   description = "VPC configuration"
   type = object({
-    name        = string
-    cidr        = string
-    enable_nat  = bool
+    name       = string
+    cidr       = string
+    enable_nat = bool
     subnets = map(object({
-      cidr                           = string
-      availability_zones             = list(string)
-      enable_flow_logs              = bool
+      cidr                            = string
+      availability_zones              = list(string)
+      enable_flow_logs                = bool
       enable_private_ip_google_access = bool
     }))
   })
@@ -54,9 +60,9 @@ variable "vpc_config" {
     enable_nat = true
     subnets = {
       primary = {
-        cidr                        = "10.0.1.0/24"
-        availability_zones          = ["us-central1-a", "us-central1-b", "us-central1-c"]
-        enable_flow_logs           = true
+        cidr                            = "10.0.1.0/24"
+        availability_zones              = ["us-central1-a", "us-central1-b", "us-central1-c"]
+        enable_flow_logs                = true
         enable_private_ip_google_access = true
       }
     }
@@ -67,37 +73,37 @@ variable "vpc_config" {
 variable "gke_config" {
   description = "GKE cluster configuration"
   type = object({
-    cluster_name = string
-    release_channel = string
+    cluster_name           = string
+    release_channel        = string
     master_ipv4_cidr_block = string
     private_cluster = object({
-      enable_private_endpoint  = bool
-      enable_private_nodes     = bool
-      master_global_access     = bool
+      enable_private_endpoint    = bool
+      enable_private_nodes       = bool
+      master_global_access       = bool
       master_authorized_networks = list(string)
     })
     node_pools = map(object({
-      machine_type    = string
-      node_count      = number
-      min_count       = number
-      max_count       = number
-      disk_size_gb    = number
-      disk_type       = string
-      auto_repair     = bool
-      auto_upgrade    = bool
-      spot           = bool
-      preemptible    = bool
+      machine_type      = string
+      node_count        = number
+      min_count         = number
+      max_count         = number
+      disk_size_gb      = number
+      disk_type         = string
+      auto_repair       = bool
+      auto_upgrade      = bool
+      spot              = bool
+      preemptible       = bool
       max_pods_per_node = number
     }))
   })
   default = {
-    cluster_name = "cre-cluster"
-    release_channel = "STABLE"
+    cluster_name           = "cre-cluster"
+    release_channel        = "STABLE"
     master_ipv4_cidr_block = "172.16.0.0/28"
     private_cluster = {
-      enable_private_endpoint  = true
-      enable_private_nodes     = true
-      master_global_access     = false
+      enable_private_endpoint    = true
+      enable_private_nodes       = true
+      master_global_access       = false
       master_authorized_networks = []
     }
     node_pools = {
@@ -110,8 +116,8 @@ variable "gke_config" {
         disk_type         = "pd-standard"
         auto_repair       = true
         auto_upgrade      = true
-        spot             = false
-        preemptible      = false
+        spot              = false
+        preemptible       = false
         max_pods_per_node = 110
       }
       memory_optimized = {
@@ -123,8 +129,8 @@ variable "gke_config" {
         disk_type         = "pd-ssd"
         auto_repair       = true
         auto_upgrade      = true
-        spot             = false
-        preemptible      = false
+        spot              = false
+        preemptible       = false
         max_pods_per_node = 110
       }
     }
@@ -181,9 +187,9 @@ variable "lb_config" {
       health_check_path = string
     })
     external = object({
-      enabled           = bool
-      name              = string
-      ports             = map(object({
+      enabled = bool
+      name    = string
+      ports = map(object({
         port     = number
         target   = number
         protocol = string
@@ -203,8 +209,8 @@ variable "lb_config" {
       health_check_path = "/health"
     }
     external = {
-      enabled           = true
-      name              = "cre-external-lb"
+      enabled = true
+      name    = "cre-external-lb"
       ports = {
         http = {
           port     = 80
@@ -229,9 +235,16 @@ variable "lb_config" {
 variable "labels" {
   description = "Common labels for all resources"
   type        = map(string)
-  default     = {
+  default = {
     environment = "production"
     managed_by  = "terraform"
     project     = "cre"
   }
+}
+
+# GitHub Configuration for Workload Identity
+variable "github_repository" {
+  description = "GitHub repository in format 'owner/repo' for Workload Identity Federation"
+  type        = string
+  default     = "joergen7/cre"
 }

@@ -51,9 +51,9 @@ variable "internal_lb_config" {
 variable "external_lb_config" {
   description = "External load balancer configuration"
   type = object({
-    enabled           = bool
-    name              = string
-    ports             = map(object({
+    enabled = bool
+    name    = string
+    ports = map(object({
       port     = number
       target   = number
       protocol = string
@@ -63,8 +63,8 @@ variable "external_lb_config" {
     ssl_certificates  = list(string)
   })
   default = {
-    enabled           = true
-    name              = "cre-external-lb"
+    enabled = true
+    name    = "cre-external-lb"
     ports = {
       http = {
         port     = 80
@@ -86,21 +86,21 @@ variable "external_lb_config" {
 variable "neg_config" {
   description = "Network Endpoint Group configuration"
   type = object({
-    enabled          = bool
+    enabled           = bool
     cloud_run_enabled = bool
-    gke_enabled      = bool
+    gke_enabled       = bool
   })
   default = {
-    enabled          = true
+    enabled           = true
     cloud_run_enabled = false
-    gke_enabled      = true
+    gke_enabled       = true
   }
 }
 
 variable "labels" {
   description = "Labels to apply to all resources"
   type        = map(string)
-  default     = {
+  default = {
     environment = "production"
     managed_by  = "terraform"
     project     = "cre"
@@ -116,13 +116,13 @@ variable "enable_cloud_armor" {
 variable "cdn_config" {
   description = "Cloud CDN configuration"
   type = object({
-    enabled            = bool
-    cache_policy       = string
+    enabled                 = bool
+    cache_policy            = string
     custom_response_headers = map(string)
   })
   default = {
-    enabled  = false
-    cache_policy = "CACHE_ALL_STATIC"
+    enabled                 = false
+    cache_policy            = "CACHE_ALL_STATIC"
     custom_response_headers = {}
   }
 }

@@ -6,18 +6,18 @@
 output "service_accounts" {
   description = "All service account emails created by this module"
   value = {
-    gke_node    = google_service_account.gke_node.email
+    gke_node     = google_service_account.gke_node.email
     gke_workload = google_service_account.gke_workload.email
-    terraform   = google_service_account.terraform.email
+    terraform    = google_service_account.terraform.email
   }
 }
 
 output "service_account_ids" {
   description = "All service account resource IDs"
   value = {
-    gke_node    = google_service_account.gke_node.id
+    gke_node     = google_service_account.gke_node.id
     gke_workload = google_service_account.gke_workload.id
-    terraform   = google_service_account.terraform.id
+    terraform    = google_service_account.terraform.id
   }
 }
 
@@ -63,8 +63,8 @@ output "secret_annotations" {
 output "network_policies" {
   description = "Network policies created"
   value = {
-    default_deny_ingress     = var.enable_default_deny_policies ? "${var.name_prefix}-default-deny-ingress" : null
-    default_deny_egress      = var.enable_default_deny_policies ? "${var.name_prefix}-default-deny-egress" : null
+    default_deny_ingress    = var.enable_default_deny_policies ? "${var.name_prefix}-default-deny-ingress" : null
+    default_deny_egress     = var.enable_default_deny_policies ? "${var.name_prefix}-default-deny-egress" : null
     allow_dns               = "${var.name_prefix}-allow-dns"
     cre_internal            = "${var.name_prefix}-cre-internal"
     allow_ingress_gateway   = var.enable_istio ? "${var.name_prefix}-allow-ingress-gateway" : null
@@ -79,12 +79,12 @@ output "network_policies" {
 output "github_actions_config" {
   description = "Configuration for GitHub Actions Workload Identity Federation"
   value = {
-    provider                = "google"
-    project_number          = var.project_number != "" ? var.project_number : null
-    project_id              = var.project_id
-    pool_id                 = google_iam_workload_identity_pool.github.workload_identity_pool_id
-    provider_id             = google_iam_workload_identity_pool_provider.github_oidc.workload_identity_pool_provider_id
-    service_account_email   = google_service_account.terraform.email
+    provider              = "google"
+    project_number        = var.project_number != "" ? var.project_number : null
+    project_id            = var.project_id
+    pool_id               = google_iam_workload_identity_pool.github.workload_identity_pool_id
+    provider_id           = google_iam_workload_identity_pool_provider.github_oidc.workload_identity_pool_provider_id
+    service_account_email = google_service_account.terraform.email
     # Example usage in GitHub Actions:
     # - name: Authenticate to GCP
     #   uses: google-github-actions/auth@v2

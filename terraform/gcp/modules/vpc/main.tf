@@ -29,11 +29,11 @@ resource "google_compute_shared_vpc_host_project" "shared_vpc_host" {
 resource "google_compute_subnetwork" "primary" {
   for_each = var.subnets
 
-  name                     = each.key
-  project                  = var.project_id
-  region                   = var.region
-  network                  = google_compute_network.primary.id
-  ip_cidr_range            = each.value.cidr
+  name          = each.key
+  project       = var.project_id
+  region        = var.region
+  network       = google_compute_network.primary.id
+  ip_cidr_range = each.value.cidr
 
   dynamic "secondary_ip_range" {
     for_each = try(var.secondary_ranges[each.key], [])
@@ -202,8 +202,8 @@ resource "google_compute_firewall" "gke_egress" {
   priority  = 1000
 
   destination_ranges = [
-    "199.36.153.8/30",   # Restricted Google API
-    "199.36.153.4/30"    # Private Google Access
+    "199.36.153.8/30", # Restricted Google API
+    "199.36.153.4/30"  # Private Google Access
   ]
 
   allow {

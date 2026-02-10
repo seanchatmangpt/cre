@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "008-define-upgrade-and-lifecycle-management-strategy",
+  "title": "Define upgrade and lifecycle management strategy",
+  "section": "ops",
+  "state": "idea",
+  "overview": "Production CRE deployments on Marketplace need clear upgrade paths, lifecycle management, and migration strategies to minimize disruption and ensure data safety.\n\n**Motivation:** Customers need upgrade paths without downtime. Data migration and decommissioning must be safe and predictable.\n\n**Success criteria:**\n- Semantic versioning with immutable releases\n- Rolling upgrades supported\n- Data migration strategy documented and tested\n- Downgrade policy defined\n- Clean uninstall with data retention options\n\n**Signals:** priority: medium, urgency: Required for production lifecycle management",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": null,
+  "created_at": "2026-02-10T07:04:09.911Z",
+  "updated_at": "2026-02-10T07:04:09.911Z",
+  "problem_statement": "Production CRE deployments on Marketplace need clear upgrade paths, lifecycle management, and migration strategies to minimize disruption and ensure data safety.",
+  "motivation": "Customers need upgrade paths without downtime. Data migration and decommissioning must be safe and predictable.",
+  "success_criteria": [
+    "Semantic versioning with immutable releases",
+    "Rolling upgrades supported",
+    "Data migration strategy documented and tested",
+    "Downgrade policy defined",
+    "Clean uninstall with data retention options"
+  ],
+  "priority_hint": "medium",
+  "urgency_hint": "Required for production lifecycle management"
+}

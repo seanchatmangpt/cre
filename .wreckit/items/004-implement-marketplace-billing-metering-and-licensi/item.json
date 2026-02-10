@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "004-implement-marketplace-billing-metering-and-licensi",
+  "title": "Implement Marketplace billing, metering, and licensing",
+  "section": "backend",
+  "state": "idea",
+  "overview": "Marketplace distribution requires billing integration, usage metering, and license enforcement to support commercial deployment models.\n\n**Motivation:** Enables commercial distribution models via Google Marketplace with proper usage tracking and license enforcement.\n\n**Success criteria:**\n- Metering integration via Marketplace Metering API\n- Usage metrics defined: active workflows, worker-hours, task executions\n- License enforcement with startup validation and grace periods\n- Clear failure modes for licensing issues\n\n**Technical constraints:**\n- Must choose one billing model initially: BYOL, usage-based, or free OSS with paid support\n- Metering unit definition must be resolved\n\n**In scope:**\n- Metering API integration\n- Usage metric definition and reporting\n- License enforcement logic\n**Out of scope:**\n- Advanced IAM federation\n- Multi-region HA with SLA\n\n**Signals:** priority: critical, urgency: Open decision required - must resolve billing model before implementation",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": null,
+  "created_at": "2026-02-10T07:04:09.909Z",
+  "updated_at": "2026-02-10T07:04:09.909Z",
+  "problem_statement": "Marketplace distribution requires billing integration, usage metering, and license enforcement to support commercial deployment models.",
+  "motivation": "Enables commercial distribution models via Google Marketplace with proper usage tracking and license enforcement.",
+  "success_criteria": [
+    "Metering integration via Marketplace Metering API",
+    "Usage metrics defined: active workflows, worker-hours, task executions",
+    "License enforcement with startup validation and grace periods",
+    "Clear failure modes for licensing issues"
+  ],
+  "technical_constraints": [
+    "Must choose one billing model initially: BYOL, usage-based, or free OSS with paid support",
+    "Metering unit definition must be resolved"
+  ],
+  "scope_in_scope": [
+    "Metering API integration",
+    "Usage metric definition and reporting",
+    "License enforcement logic"
+  ],
+  "scope_out_of_scope": [
+    "Advanced IAM federation",
+    "Multi-region HA with SLA"
+  ],
+  "priority_hint": "critical",
+  "urgency_hint": "Open decision required - must resolve billing model before implementation"
+}

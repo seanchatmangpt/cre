@@ -21,12 +21,12 @@ variable "cluster_name" {
 variable "storage_classes" {
   description = "Storage class configurations"
   type = map(object({
-    provisioner           = string
-    type                  = string
-    volume_binding_mode   = string
+    provisioner            = string
+    type                   = string
+    volume_binding_mode    = string
     allow_volume_expansion = bool
-    reclaim_policy        = string
-    parameters            = map(string)
+    reclaim_policy         = string
+    parameters             = map(string)
   }))
   default = {
     ssd = {
@@ -36,9 +36,9 @@ variable "storage_classes" {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type                      = "pd-ssd"
-        fstype                    = "ext4"
-        replication-type          = "none"
+        type             = "pd-ssd"
+        fstype           = "ext4"
+        replication-type = "none"
       }
     }
     ssd_regional = {
@@ -48,9 +48,9 @@ variable "storage_classes" {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type                      = "pd-ssd"
-        fstype                    = "ext4"
-        replication-type          = "regional-pd"
+        type             = "pd-ssd"
+        fstype           = "ext4"
+        replication-type = "regional-pd"
       }
     }
     balanced = {
@@ -60,9 +60,9 @@ variable "storage_classes" {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type                      = "pd-balanced"
-        fstype                    = "ext4"
-        replication-type          = "none"
+        type             = "pd-balanced"
+        fstype           = "ext4"
+        replication-type = "none"
       }
     }
     standard = {
@@ -72,9 +72,9 @@ variable "storage_classes" {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type                      = "pd-standard"
-        fstype                    = "ext4"
-        replication-type          = "none"
+        type             = "pd-standard"
+        fstype           = "ext4"
+        replication-type = "none"
       }
     }
   }
@@ -101,8 +101,8 @@ variable "pvcs" {
     mnesia_logs = {
       storage_class_name = "ssd"
       size               = "50Gi"
-      access_modes       = ["ReadWriteOnce"
-]
+      access_modes = ["ReadWriteOnce"
+      ]
       labels = {
         app       = "cre"
         component = "mnesia"
@@ -129,7 +129,7 @@ variable "backup_config" {
   })
   default = {
     enabled        = false
-    schedule       = "0 2 * * *"  # Daily at 2 AM
+    schedule       = "0 2 * * *" # Daily at 2 AM
     retention_days = 30
   }
 }
@@ -137,7 +137,7 @@ variable "backup_config" {
 variable "labels" {
   description = "Labels to apply to all resources"
   type        = map(string)
-  default     = {
+  default = {
     environment = "production"
     managed_by  = "terraform"
     project     = "cre"

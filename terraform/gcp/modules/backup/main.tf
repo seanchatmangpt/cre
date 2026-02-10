@@ -13,10 +13,10 @@ locals {
 
   # Backup storage classes based on access frequency
   storage_classes = {
-    hourly  = "NEARLINE"   # Accessed frequently
-    daily   = "NEARLINE"   # Accessed occasionally
-    weekly  = "COLDLINE"   # Accessed rarely
-    monthly = "ARCHIVE"    # Accessed very rarely
+    hourly  = "NEARLINE" # Accessed frequently
+    daily   = "NEARLINE" # Accessed occasionally
+    weekly  = "COLDLINE" # Accessed rarely
+    monthly = "ARCHIVE"  # Accessed very rarely
   }
 }
 
@@ -198,25 +198,25 @@ resource "google_service_account" "backup" {
 # ============================================
 
 resource "google_kms_key_ring" "backup" {
-  count   = var.create_cmek ? 1 : 0
-  name    = "cre-backup-keyring"
+  count    = var.create_cmek ? 1 : 0
+  name     = "cre-backup-keyring"
   location = var.backup_location
 
   depends_on = [google_project_service.enabled]
 }
 
 resource "google_kms_crypto_key" "backup" {
-  count     = var.create_cmek ? 1 : 0
-  name      = "cre-backup-key"
-  key_ring  = google_kms_key_ring.backup[0].id
-  purpose   = "ENCRYPT_DECRYPT"
+  count    = var.create_cmek ? 1 : 0
+  name     = "cre-backup-key"
+  key_ring = google_kms_key_ring.backup[0].id
+  purpose  = "ENCRYPT_DECRYPT"
 
   version_template {
     algorithm        = "GOOGLE_SYMMETRIC_ENCRYPTION"
     protection_level = "SOFTWARE"
   }
 
-  rotation_period = "7776000s"  # 90 days
+  rotation_period = "7776000s" # 90 days
 
   lifecycle {
     prevent_destroy = true
@@ -230,9 +230,9 @@ resource "google_kms_crypto_key" "backup" {
 resource "google_spanner_database" "cre_db" {
   count = var.create_spanner_resources ? 1 : 0
 
-  name                 = var.spanner_database_name
-  instance             = google_spanner_instance.cre[0].name
-  deletion_protection  = true
+  name                = var.spanner_database_name
+  instance            = google_spanner_instance.cre[0].name
+  deletion_protection = true
 
   version_retention_period = "7d"
   enable_drop_protection   = true
@@ -257,10 +257,10 @@ resource "google_spanner_database" "cre_db" {
 resource "google_spanner_instance" "cre" {
   count = var.create_spanner_resources ? 1 : 0
 
-  name          = var.spanner_instance_name
-  config        = var.spanner_config
-  display_name  = "CRE Spanner Instance"
-  num_nodes     = var.spanner_num_nodes
+  name         = var.spanner_instance_name
+  config       = var.spanner_config
+  display_name = "CRE Spanner Instance"
+  num_nodes    = var.spanner_num_nodes
 
   processing_units = null
 
@@ -294,13 +294,13 @@ resource "google_filestore_instance" "backup" {
   tier     = "BASIC_HDD"
 
   file_shares {
-    name = "cre-backups"
+    name        = "cre-backups"
     capacity_gb = var.filestore_capacity_gb
   }
 
   networks {
-    network     = var.network_name
-    modes       = ["MODE_IPV4"]
+    network = var.network_name
+    modes   = ["MODE_IPV4"]
   }
 
   labels = var.labels
@@ -324,17 +324,17 @@ resource "google_storage_bucket_iam_member" "backup_object_admin" {
 }
 
 resource "google_storage_bucket_iam_member" "backup_replica" {
-  count   = var.enable_cross_region_replication ? 1 : 0
-  bucket  = google_storage_bucket.backup_replica[0].name
-  role    = "roles/storage.objectAdmin"
-  member  = "serviceAccount:${google_service_account.backup.email}"
+  count  = var.enable_cross_region_replication ? 1 : 0
+  bucket = google_storage_bucket.backup_replica[0].name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.backup.email}"
 }
 
 resource "google_storage_bucket_iam_member" "backup_logging" {
-  count   = var.enable_logging ? 1 : 0
-  bucket  = google_storage_bucket.logs[0].name
-  role    = "roles/storage.objectCreator"
-  member  = "serviceAccount:${google_service_account.backup.email}"
+  count  = var.enable_logging ? 1 : 0
+  bucket = google_storage_bucket.logs[0].name
+  role   = "roles/storage.objectCreator"
+  member = "serviceAccount:${google_service_account.backup.email}"
 }
 
 # Spanner backup permissions
@@ -347,17 +347,17 @@ resource "google_project_iam_member" "backup_spanner_admin" {
 
 # KMS permissions for CMEK
 resource "google_kms_crypto_key_iam_member" "backup_encrypter" {
-  count     = var.create_cmek ? 1 : 0
+  count         = var.create_cmek ? 1 : 0
   crypto_key_id = google_kms_crypto_key.backup[0].id
-  role      = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
-  member    = "serviceAccount:${google_service_account.backup.email}"
+  role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  member        = "serviceAccount:${google_service_account.backup.email}"
 }
 
 resource "google_kms_crypto_key_iam_member" "backup_viewer" {
-  count     = var.create_cmek ? 1 : 0
+  count         = var.create_cmek ? 1 : 0
   crypto_key_id = google_kms_crypto_key.backup[0].id
-  role      = "roles/cloudkms.viewer"
-  member    = "serviceAccount:${google_service_account.backup.email}"
+  role          = "roles/cloudkms.viewer"
+  member        = "serviceAccount:${google_service_account.backup.email}"
 }
 
 # ============================================
@@ -376,17 +376,17 @@ resource "google_monitoring_notification_channel" "backup_alerts" {
 }
 
 resource "google_monitoring_alert_policy" "backup_failure" {
-  count       = var.enable_alerting && var.alert_email != "" ? 1 : 0
+  count        = var.enable_alerting && var.alert_email != "" ? 1 : 0
   display_name = "CRE Backup Failure Alert"
   combiner     = "OR"
 
   conditions {
     display_name = "Backup job failure"
     condition_threshold {
-      filter          = "resource.type=\"k8s_container\" AND metric.type=\"custom.googleapis.com/cre/backup/complete\" AND metric.labels.status=\"failed\""
-      aggregations     {
-        alignment_period     = "300s"
-        per_series_aligner  = "ALIGN_COUNT"
+      filter = "resource.type=\"k8s_container\" AND metric.type=\"custom.googleapis.com/cre/backup/complete\" AND metric.labels.status=\"failed\""
+      aggregations {
+        alignment_period   = "300s"
+        per_series_aligner = "ALIGN_COUNT"
       }
       comparison      = "COMPARISON_GT"
       threshold_value = 0
@@ -406,20 +406,20 @@ resource "google_monitoring_alert_policy" "backup_failure" {
 }
 
 resource "google_monitoring_alert_policy" "backup_age" {
-  count       = var.enable_alerting && var.alert_email != "" ? 1 : 0
+  count        = var.enable_alerting && var.alert_email != "" ? 1 : 0
   display_name = "CRE Backup Age Warning"
   combiner     = "OR"
 
   conditions {
     display_name = "Backup too old"
     condition_threshold {
-      filter          = "resource.type=\"k8s_container\" AND metric.type=\"custom.googleapis.com/cre/backup/age_hours\""
+      filter = "resource.type=\"k8s_container\" AND metric.type=\"custom.googleapis.com/cre/backup/age_hours\""
       aggregations {
-        alignment_period     = "3600s"
-        per_series_aligner  = "ALIGN_MEAN"
+        alignment_period   = "3600s"
+        per_series_aligner = "ALIGN_MEAN"
       }
       comparison      = "COMPARISON_GT"
-      threshold_value = 48  # Alert if backup is older than 48 hours
+      threshold_value = 48 # Alert if backup is older than 48 hours
       duration        = "3600s"
       trigger {
         count = 1
@@ -435,13 +435,13 @@ resource "google_monitoring_alert_policy" "backup_age" {
 # ============================================
 
 resource "google_cloud_scheduler_job" "mnesia_backup_daily" {
-  name             = "cre-mnesia-backup-daily"
-  description      = "Daily Mnesia backup job"
-  schedule         = "0 2 * * *"
-  time_zone        = "UTC"
+  name        = "cre-mnesia-backup-daily"
+  description = "Daily Mnesia backup job"
+  schedule    = "0 2 * * *"
+  time_zone   = "UTC"
 
   retry_config {
-    retry_count = 3
+    retry_count   = 3
     max_doublings = 5
   }
 
@@ -458,13 +458,13 @@ resource "google_cloud_scheduler_job" "mnesia_backup_daily" {
 }
 
 resource "google_cloud_scheduler_job" "mnesia_backup_hourly" {
-  name             = "cre-mnesia-backup-hourly"
-  description      = "Hourly Mnesia backup job for RPO compliance"
-  schedule         = "0 * * * *"
-  time_zone        = "UTC"
+  name        = "cre-mnesia-backup-hourly"
+  description = "Hourly Mnesia backup job for RPO compliance"
+  schedule    = "0 * * * *"
+  time_zone   = "UTC"
 
   retry_config {
-    retry_count = 2
+    retry_count   = 2
     max_doublings = 3
   }
 

@@ -48,7 +48,7 @@ variable "replica_retention_days" {
 variable "soft_delete_seconds" {
   description = "Soft delete retention period for backup bucket"
   type        = number
-  default     = 604800  # 7 days
+  default     = 604800 # 7 days
 }
 
 variable "enable_cross_region_replication" {

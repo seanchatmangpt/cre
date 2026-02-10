@@ -8,17 +8,17 @@ locals {
 
 # Regional GKE Cluster
 resource "google_container_cluster" "primary" {
-  name               = var.cluster_name
-  location           = var.region
-  project            = var.project_id
-  network            = var.network_name
-  subnetwork         = var.subnet_name
+  name       = var.cluster_name
+  location   = var.region
+  project    = var.project_id
+  network    = var.network_name
+  subnetwork = var.subnet_name
 
-  # Private cluster configuration
+  # CRITICAL: Private cluster configuration for GCP Marketplace compliance
   private_cluster_config {
-    enable_private_endpoint    = var.private_cluster_config.enable_private_endpoint
-    enable_private_nodes       = var.private_cluster_config.enable_private_nodes
-    master_ipv4_cidr_block     = var.master_ipv4_cidr_block
+    enable_private_endpoint = var.private_cluster_config.enable_private_endpoint
+    enable_private_nodes    = var.private_cluster_config.enable_private_nodes
+    master_ipv4_cidr_block  = var.master_ipv4_cidr_block
   }
 
   # Release channel for automatic upgrades
@@ -87,13 +87,20 @@ resource "google_container_cluster" "primary" {
   remove_default_node_pool = true
 
   # Initial node count (will be removed)
-  initial_node_count       = 1
+  initial_node_count = 1
 
   # Authentication and authorization
   master_auth {
     client_certificate_config {
       issue_client_certificate = false
     }
+  }
+
+  # CRITICAL: Pod Security Standards enforcement for GCP Marketplace
+  # GKE Security Posture enables automated security compliance
+  security_posture_config {
+    mode               = "ENTERPRISE"
+    vulnerability_mode = "VULNERABILITY_BASIC"
   }
 
   # Binary authorization
@@ -124,11 +131,11 @@ resource "google_container_cluster" "primary" {
 
 # General purpose node pool
 resource "google_container_node_pool" "general" {
-  count     = contains(keys(var.node_pools), "general") ? 1 : 0
-  name      = "general"
-  project   = var.project_id
-  location  = var.region
-  cluster   = google_container_cluster.primary.name
+  count    = contains(keys(var.node_pools), "general") ? 1 : 0
+  name     = "general"
+  project  = var.project_id
+  location = var.region
+  cluster  = google_container_cluster.primary.name
 
   node_count = var.node_pools["general"].node_count
 
@@ -152,7 +159,7 @@ resource "google_container_node_pool" "general" {
       effect = "NO_SCHEDULE"
     }
 
-    # Enable shielded nodes
+    # CRITICAL: Enable shielded nodes for GCP Marketplace compliance
     shielded_instance_config {
       enable_secure_boot          = true
       enable_integrity_monitoring = true
@@ -161,16 +168,22 @@ resource "google_container_node_pool" "general" {
     # Spot instance configuration
     spot = var.node_pools["general"].spot
 
-    preemptible  = var.node_pools["general"].preemptible
+    preemptible = var.node_pools["general"].preemptible
 
     # OAuth scopes
     oauth_scopes = [
       "https://www.googleapis.com/auth/cloud-platform"
     ]
 
-    # Metadata
+    # CRITICAL: Block legacy metadata endpoints for security
     metadata = {
       disable-legacy-endpoints = "true"
+    }
+
+    # CRITICAL: GKE_METADATA server prevents node metadata access (GCP Marketplace requirement)
+    # This blocks pods from accessing the node's IAM credentials via metadata server
+    workload_metadata_config {
+      mode = "GKE_METADATA"
     }
   }
 
@@ -191,11 +204,11 @@ resource "google_container_node_pool" "general" {
 
 # Memory optimized node pool for Mnesia
 resource "google_container_node_pool" "memory_optimized" {
-  count     = contains(keys(var.node_pools), "memory_optimized") ? 1 : 0
-  name      = "memory-optimized"
-  project   = var.project_id
-  location  = var.region
-  cluster   = google_container_cluster.primary.name
+  count    = contains(keys(var.node_pools), "memory_optimized") ? 1 : 0
+  name     = "memory-optimized"
+  project  = var.project_id
+  location = var.region
+  cluster  = google_container_cluster.primary.name
 
   node_count = var.node_pools["memory_optimized"].node_count
 
@@ -222,7 +235,7 @@ resource "google_container_node_pool" "memory_optimized" {
     # Local SSDs for Mnesia performance
     local_ssd_count = 0
 
-    # Enable shielded nodes
+    # CRITICAL: Enable shielded nodes for GCP Marketplace compliance
     shielded_instance_config {
       enable_secure_boot          = true
       enable_integrity_monitoring = true
@@ -231,14 +244,21 @@ resource "google_container_node_pool" "memory_optimized" {
     # Spot instance configuration
     spot = var.node_pools["memory_optimized"].spot
 
-    preemptible  = var.node_pools["memory_optimized"].preemptible
+    preemptible = var.node_pools["memory_optimized"].preemptible
 
     oauth_scopes = [
       "https://www.googleapis.com/auth/cloud-platform"
     ]
 
+    # CRITICAL: Block legacy metadata endpoints for security
     metadata = {
       disable-legacy-endpoints = "true"
+    }
+
+    # CRITICAL: GKE_METADATA server prevents node metadata access (GCP Marketplace requirement)
+    # This blocks pods from accessing the node's IAM credentials via metadata server
+    workload_metadata_config {
+      mode = "GKE_METADATA"
     }
   }
 

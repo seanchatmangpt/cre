@@ -10,9 +10,9 @@ module "vpc" {
   project_id = var.project_id
   region     = var.region
 
-  network_name         = var.vpc_config.name
-  vpc_cidr             = var.vpc_config.cidr
-  cloud_nat_enabled    = var.vpc_config.enable_nat
+  network_name      = var.vpc_config.name
+  vpc_cidr          = var.vpc_config.cidr
+  cloud_nat_enabled = var.vpc_config.enable_nat
 
   subnets = var.vpc_config.subnets
 
@@ -49,7 +49,7 @@ module "gke_cluster" {
 
   cluster_name = var.gke_config.cluster_name
   network_name = module.vpc.network_name
-  subnet_name  = "primary"  # Matches the subnet key in VPC module
+  subnet_name  = "primary" # Matches the subnet key in VPC module
 
   master_ipv4_cidr_block = var.gke_config.master_ipv4_cidr_block
 
@@ -64,7 +64,7 @@ module "gke_cluster" {
   }
 
   monitoring_config = {
-    enable_components = ["SYSTEM_COMPONENTS"]
+    enable_components  = ["SYSTEM_COMPONENTS"]
     managed_prometheus = true
   }
 
@@ -83,11 +83,11 @@ module "gke_cluster" {
 module "storage" {
   source = "./modules/storage"
 
-  project_id    = var.project_id
-  region        = var.region
-  cluster_name  = var.gke_config.cluster_name
+  project_id   = var.project_id
+  region       = var.region
+  cluster_name = var.gke_config.cluster_name
 
-  enable_snapshots   = var.storage_config.enable_snapshots
+  enable_snapshots = var.storage_config.enable_snapshots
   snapshot_schedule = {
     enabled           = var.storage_config.enable_snapshots
     schedule          = var.storage_config.backup_schedule
@@ -112,12 +112,12 @@ module "storage" {
 module "loadbalancer" {
   source = "./modules/loadbalancer"
 
-  project_id    = var.project_id
-  region        = var.region
-  cluster_name  = var.gke_config.cluster_name
+  project_id   = var.project_id
+  region       = var.region
+  cluster_name = var.gke_config.cluster_name
 
   network_name    = module.vpc.network_name
-  subnetwork_name = "primary"  # Matches the subnet key
+  subnetwork_name = "primary" # Matches the subnet key
 
   internal_lb_config = {
     enabled           = var.lb_config.internal.enabled
@@ -139,8 +139,8 @@ module "loadbalancer" {
 
   enable_cloud_armor = var.lb_config.enable_cloud_armor
   cdn_config = {
-    enabled  = var.lb_config.enable_cdn
-    cache_policy = "CACHE_ALL_STATIC"
+    enabled                 = var.lb_config.enable_cdn
+    cache_policy            = "CACHE_ALL_STATIC"
     custom_response_headers = {}
   }
 
@@ -160,9 +160,9 @@ module "loadbalancer" {
 module "backup" {
   source = "./modules/backup"
 
-  project_id       = var.project_id
-  backup_location  = var.region
-  replication_location  = var.backup_config.replication_region
+  project_id           = var.project_id
+  backup_location      = var.region
+  replication_location = var.backup_config.replication_region
 
   labels = merge(var.labels, {
     module = "backup"
@@ -170,43 +170,31 @@ module "backup" {
 }
 
 # ============================================
-# Additional Resources
+# Security Module (GCP Marketplace Compliance)
 # ============================================
+# CRITICAL: This module creates explicit service accounts with minimal IAM
+# GCP Marketplace requires no default service account usage
+module "security" {
+  source = "./modules/security"
 
-# Service account for GKE nodes
-resource "google_service_account" "gke_nodes" {
-  project      = var.project_id
-  account_id   = "${var.gke_config.cluster_name}-nodes"
-  display_name = "Service account for CRE GKE nodes"
+  project_id   = var.project_id
+  region       = var.region
+  cluster_name = var.gke_config.cluster_name
 
-  description = "Service account used by GKE nodes for CRE workloads"
+  name_prefix                = "cre"
+  gke_namespace              = "cre-prod"
+  kubernetes_service_account = "cre-ksa"
 
-  depends_on = [
-    module.gke_cluster
-  ]
-}
+  # GitHub Actions Workload Identity
+  github_pool_id    = "github-actions-pool"
+  github_repository = var.github_repository
 
-# IAM role bindings for node service account
-resource "google_project_iam_member" "gke_nodes_logging" {
-  project = var.project_id
-  role    = "roles/logging.logWriter"
-  member  = "serviceAccount:${google_service_account.gke_nodes.email}"
-}
+  # GKE Workload Identity
+  gke_cluster_issuer_uri  = ""
+  gke_allowed_audiences   = []
+  gke_attribute_condition = ""
 
-resource "google_project_iam_member" "gke_nodes_monitoring" {
-  project = var.project_id
-  role    = "roles/monitoring.metricWriter"
-  member  = "serviceAccount:${google_service_account.gke_nodes.email}"
-}
-
-resource "google_project_iam_member" "gke_nodes_trace" {
-  project = var.project_id
-  role    = "roles/cloudtrace.agent"
-  member  = "serviceAccount:${google_service_account.gke_nodes.email}"
-}
-
-resource "google_project_iam_member" "gke_nodes_storage" {
-  project = var.project_id
-  role    = "roles/storage.objectViewer"
-  member  = "serviceAccount:${google_service_account.gke_nodes.email}"
+  # Admin access (optional)
+  enable_admin_impersonation = false
+  admin_impersonator_email   = ""
 }

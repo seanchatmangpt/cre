@@ -49,8 +49,6 @@ resource "google_logging_sink" "budget_alerts" {
   filter = "resource.type=\"billing_account\" AND protoPayload.serviceName=\"cloudbilling.googleapis.com\""
 
   unique_writer_identity = true
-
-  depends_on = [google_pubsub_topic_iam_binding.budget_alert_sink]
 }
 
 # IAM binding for billing account to publish to Pub/Sub
@@ -84,7 +82,7 @@ resource "google_billing_budget" "cre_budget" {
   budget_amount {
     specified_amount {
       currency_code = var.budget_currency
-      units         = var.budget_amount * 1000000  # Convert to micros
+      units         = var.budget_amount * 1000000 # Convert to micros
     }
   }
 
@@ -118,7 +116,7 @@ resource "google_billing_budget" "cre_budget" {
     for_each = var.budget_thresholds
     content {
       threshold_percent = threshold_rule.value
-      spend_basis      = "CURRENT_SPEND"
+      spend_basis       = "CURRENT_SPEND"
     }
   }
 
@@ -143,7 +141,7 @@ resource "google_billing_budget" "cre_budget" {
 
 # Forecasting budget (for prediction)
 resource "google_billing_budget" "cre_forecast" {
-  count          = var.enable_forecasting ? 1 : 0
+  count           = var.enable_forecasting ? 1 : 0
   billing_account = var.billing_account_id
   display_name    = "${var.environment}-CRE Forecast Budget"
 
@@ -168,7 +166,7 @@ resource "google_billing_budget" "cre_forecast" {
   # Forecast threshold (typically lower to catch overages earlier)
   threshold_rule {
     threshold_percent = var.forecast_threshold_percent
-    spend_basis      = "FORECASTED_SPEND"
+    spend_basis       = "FORECASTED_SPEND"
   }
 
   calendar_period = var.budget_period
@@ -178,10 +176,10 @@ resource "google_billing_budget" "cre_forecast" {
 
 # Cost aggregation query for per-environment tracking
 resource "google_bigquery_table" "cost_tracking" {
-  count           = var.enable_cost_tracking ? 1 : 0
-  project         = var.project_id
-  dataset_id      = var.cost_dataset_id
-  table_id        = "cre_cost_tracking"
+  count               = var.enable_cost_tracking ? 1 : 0
+  project             = var.project_id
+  dataset_id          = var.cost_dataset_id
+  table_id            = "cre_cost_tracking"
   deletion_protection = false
 
   schema {
@@ -210,11 +208,11 @@ resource "google_bigquery_table" "cost_tracking" {
 
 # Scheduled query for daily cost reporting
 resource "google_bigquery_data_transfer_config" "daily_cost_report" {
-  count              = var.enable_cost_tracking ? 1 : 0
-  display_name       = "Daily CRE Cost Report"
-  location           = var.region
-  data_source_id     = "scheduled_query"
-  schedule           = "every 24 hours"
+  count                  = var.enable_cost_tracking ? 1 : 0
+  display_name           = "Daily CRE Cost Report"
+  location               = var.region
+  data_source_id         = "scheduled_query"
+  schedule               = "every 24 hours"
   destination_dataset_id = var.cost_dataset_id
 
   params {

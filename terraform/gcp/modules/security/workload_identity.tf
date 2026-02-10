@@ -85,7 +85,7 @@ resource "google_iam_workload_identity_pool_provider" "gke_oidc" {
   # The issuer URI for the GKE cluster will be set after cluster creation
   # This is a placeholder that must be updated with the actual cluster issuer
   oidc {
-    issuer_uri        = var.gke_cluster_issuer_uri != "" ? var.gke_cluster_issuer_uri : "https://container.googleapis.com/v1/projects/${var.project_id}/locations/${var.region}/clusters/${var.cluster_name}"
+    issuer_uri = var.gke_cluster_issuer_uri != "" ? var.gke_cluster_issuer_uri : "https://container.googleapis.com/v1/projects/${var.project_id}/locations/${var.region}/clusters/${var.cluster_name}"
     # The JWKs URI is derived from the issuer
     # Allow issuance of OIDC tokens
     allowed_audiences = var.gke_allowed_audiences
@@ -93,8 +93,8 @@ resource "google_iam_workload_identity_pool_provider" "gke_oidc" {
 
   # Map Kubernetes service account attributes
   attribute_mapping = {
-    "google.subject"              = "assertion.sub"
-    "attribute.kubernetes_namespace" = "assertion.kubernetes.namespace"
+    "google.subject"                       = "assertion.sub"
+    "attribute.kubernetes_namespace"       = "assertion.kubernetes.namespace"
     "attribute.kubernetes_service_account" = "assertion.kubernetes.serviceaccount"
   }
 
@@ -191,10 +191,10 @@ output "terraform_github_identity" {
 output "workload_identity_federation_config" {
   description = "Configuration values for GitHub Actions workflow setup"
   value = {
-    project_number          = var.project_number != "" ? var.project_number : null
-    pool_id                = google_iam_workload_identity_pool.github.workload_identity_pool_id
-    provider_id            = google_iam_workload_identity_pool_provider.github_oidc.workload_identity_pool_provider_id
-    service_account_email  = google_service_account.terraform.email
-    github_repository      = var.github_repository
+    project_number        = var.project_number != "" ? var.project_number : null
+    pool_id               = google_iam_workload_identity_pool.github.workload_identity_pool_id
+    provider_id           = google_iam_workload_identity_pool_provider.github_oidc.workload_identity_pool_provider_id
+    service_account_email = google_service_account.terraform.email
+    github_repository     = var.github_repository
   }
 }

@@ -50,7 +50,7 @@ output "spanner_backup_schedule_name" {
   description = "Name of the Spanner backup schedule (if created)"
   # Note: Spanner backup schedules are created via native Spanner backup API
   # The daily backups are managed by Spanner's automated backup system
-  value       = var.create_spanner_resources ? "automated-daily-backup" : null
+  value = var.create_spanner_resources ? "automated-daily-backup" : null
 }
 
 output "filestore_instance_name" {
@@ -104,9 +104,9 @@ output "backup_bucket_sync_command" {
 output "restore_commands" {
   description = "Commands for backup restoration"
   value = {
-    list_backups     = "gsutil ls gs://${google_storage_bucket.backup.name}/mnesia/daily/"
-    download_latest  = "LATEST=$(gsutil ls gs://${google_storage_bucket.backup.name}/mnesia/daily/ | tail -1) && gsutil cp $LATEST ./restore.tar.gz"
-    spanner_restore  = var.create_spanner_resources ? "gcloud spanner databases restore-operations describe --instance=${google_spanner_instance.cre[0].name} --database=${google_spanner_database.cre_db[0].name} --restore-type=FULL" : null
+    list_backups    = "gsutil ls gs://${google_storage_bucket.backup.name}/mnesia/daily/"
+    download_latest = "LATEST=$(gsutil ls gs://${google_storage_bucket.backup.name}/mnesia/daily/ | tail -1) && gsutil cp $LATEST ./restore.tar.gz"
+    spanner_restore = var.create_spanner_resources ? "gcloud spanner databases restore-operations describe --instance=${google_spanner_instance.cre[0].name} --database=${google_spanner_database.cre_db[0].name} --restore-type=FULL" : null
   }
 }
 
@@ -117,10 +117,10 @@ output "restore_commands" {
 output "monitoring_dashboard_links" {
   description = "Links to relevant monitoring dashboards"
   value = {
-    backup_jobs   = "https://console.cloud.google.com/monitoring/dashboards?project=${var.project_id}"
-    gcs_bucket    = "https://console.cloud.google.com/storage/browser/${google_storage_bucket.backup.name}?project=${var.project_id}"
-    spanner       = var.create_spanner_resources ? "https://console.cloud.google.com/spanner/instances/${google_spanner_instance.cre[0].name}?project=${var.project_id}" : null
-    scheduler     = "https://console.cloud.google.com/cloudscheduler?project=${var.project_id}"
+    backup_jobs = "https://console.cloud.google.com/monitoring/dashboards?project=${var.project_id}"
+    gcs_bucket  = "https://console.cloud.google.com/storage/browser/${google_storage_bucket.backup.name}?project=${var.project_id}"
+    spanner     = var.create_spanner_resources ? "https://console.cloud.google.com/spanner/instances/${google_spanner_instance.cre[0].name}?project=${var.project_id}" : null
+    scheduler   = "https://console.cloud.google.com/cloudscheduler?project=${var.project_id}"
   }
 }
 
@@ -131,10 +131,10 @@ output "monitoring_dashboard_links" {
 output "sla_targets" {
   description = "Service Level Agreement targets for backup operations"
   value = {
-    rto = "30 minutes"  # Recovery Time Objective
-    rpo = "15 minutes"  # Recovery Point Objective (hourly backups)
-    retention = "${var.retention_days} days"
+    rto                      = "30 minutes" # Recovery Time Objective
+    rpo                      = "15 minutes" # Recovery Point Objective (hourly backups)
+    retention                = "${var.retention_days} days"
     cross_region_replication = var.enable_cross_region_replication
-    encryption = var.create_cmek ? "Customer-managed (CMEK)" : "Google-managed"
+    encryption               = var.create_cmek ? "Customer-managed (CMEK)" : "Google-managed"
   }
 }

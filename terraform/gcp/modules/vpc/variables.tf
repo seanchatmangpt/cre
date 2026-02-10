@@ -27,16 +27,16 @@ variable "vpc_cidr" {
 variable "subnets" {
   description = "Subnet configurations"
   type = map(object({
-    cidr                     = string
-    availability_zones       = list(string)
-    enable_flow_logs        = bool
+    cidr                            = string
+    availability_zones              = list(string)
+    enable_flow_logs                = bool
     enable_private_ip_google_access = bool
   }))
   default = {
     primary = {
-      cidr                        = "10.0.1.0/24"
-      availability_zones          = ["us-central1-a", "us-central1-b", "us-central1-c"]
-      enable_flow_logs           = true
+      cidr                            = "10.0.1.0/24"
+      availability_zones              = ["us-central1-a", "us-central1-b", "us-central1-c"]
+      enable_flow_logs                = true
       enable_private_ip_google_access = true
     }
   }
@@ -77,14 +77,14 @@ variable "enable_shared_vpc_host" {
 variable "firewall_rules" {
   description = "Custom firewall rules"
   type = map(object({
-    description          = string
-    direction           = string
-    priority            = number
-    ranges              = list(string)
-    allow_rules         = list(string)
-    deny_rules          = list(string)
-    source_tags         = list(string)
-    target_tags         = list(string)
+    description             = string
+    direction               = string
+    priority                = number
+    ranges                  = list(string)
+    allow_rules             = list(string)
+    deny_rules              = list(string)
+    source_tags             = list(string)
+    target_tags             = list(string)
     source_service_accounts = list(string)
     target_service_accounts = list(string)
   }))
@@ -94,7 +94,7 @@ variable "firewall_rules" {
 variable "labels" {
   description = "Labels to apply to all resources"
   type        = map(string)
-  default     = {
+  default = {
     environment = "production"
     managed_by  = "terraform"
     project     = "cre"
@@ -132,38 +132,38 @@ variable "cre_node_service_accounts" {
 variable "cre_api_authorized_networks" {
   description = "Authorized networks for CRE API access (VPN, bastion, corporate CIDRs)"
   type        = list(string)
-  default     = [
-    "10.0.0.0/8",      # Private networks
-    "172.16.0.0/12",   # Private networks
-    "192.168.0.0/16",  # Private networks
+  default = [
+    "10.0.0.0/8",     # Private networks
+    "172.16.0.0/12",  # Private networks
+    "192.168.0.0/16", # Private networks
   ]
 }
 
 variable "gcp_health_check_ranges" {
   description = "GCP health check IP ranges"
   type        = list(string)
-  default     = [
-    "130.211.0.0/22",   # US health check ranges
-    "35.191.0.0/16",    # Health check ranges
-    "209.85.152.0/22",  # Health check ranges
-    "209.85.204.0/22",  # Health check ranges
+  default = [
+    "130.211.0.0/22",  # US health check ranges
+    "35.191.0.0/16",   # Health check ranges
+    "209.85.152.0/22", # Health check ranges
+    "209.85.204.0/22", # Health check ranges
   ]
 }
 
 variable "gcp_lb_ranges" {
   description = "GCP load balancer IP ranges"
   type        = list(string)
-  default     = [
-    "35.191.0.0/16",    # LB ranges
-    "130.211.0.0/22",   # LB ranges
+  default = [
+    "35.191.0.0/16",  # LB ranges
+    "130.211.0.0/22", # LB ranges
   ]
 }
 
 variable "proxy_subnet_ranges" {
   description = "Proxy subnet ranges for internal load balancer (ILB)"
   type        = list(string)
-  default     = [
-    "10.0.128.0/24",   # Example proxy subnet (configure based on your VPC)
+  default = [
+    "10.0.128.0/24", # Example proxy subnet (configure based on your VPC)
   ]
 }
 
@@ -176,10 +176,10 @@ variable "pod_ip_cidr_range" {
 variable "dns_servers" {
   description = "DNS server IPs for egress rules"
   type        = list(string)
-  default     = [
-    "169.254.169.254",  # Metadata server (internal DNS resolver)
-    "8.8.8.8",          # Google DNS (fallback)
-    "8.8.4.4",          # Google DNS (fallback)
+  default = [
+    "169.254.169.254", # Metadata server (internal DNS resolver)
+    "8.8.8.8",         # Google DNS (fallback)
+    "8.8.4.4",         # Google DNS (fallback)
   ]
 }
 
@@ -198,20 +198,20 @@ variable "cloud_sql_private_ranges" {
 variable "cloud_sql_ports" {
   description = "Cloud SQL database ports"
   type        = list(string)
-  default     = ["3306", "5432"]  # MySQL, PostgreSQL
+  default     = ["3306", "5432"] # MySQL, PostgreSQL
 }
 
 variable "private_google_access_exceptions" {
   description = "Exceptions for private Google access (ranges that bypass direct internet deny)"
   type        = list(string)
-  default     = [
-    "199.36.153.8/30",  # Restricted Google API
-    "199.36.153.4/30",  # Private Google Access
+  default = [
+    "199.36.153.8/30", # Restricted Google API
+    "199.36.153.4/30", # Private Google Access
   ]
 }
 
 variable "cre_metrics_ports" {
   description = "Ports for CRE metrics/monitoring scraping"
   type        = list(string)
-  default     = ["9090", "9100", "9101"]  # Prometheus, node exporter, custom
+  default     = ["9090", "9100", "9101"] # Prometheus, node exporter, custom
 }

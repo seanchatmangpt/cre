@@ -34,11 +34,11 @@ output "budget_pubsub_topic_name" {
 output "alert_policies" {
   description = "IDs of all alert policies"
   value = var.enable_alerting ? {
-    node_count_anomaly      = try(google_monitoring_alert_policy.node_count_anomaly[0].id, null)
-    storage_growth_anomaly  = try(google_monitoring_alert_policy.storage_growth_anomaly[0].id, null)
-    cpu_waste_detection     = try(google_monitoring_alert_policy.cpu_waste_detection[0].id, null)
-    memory_waste_detection  = try(google_monitoring_alert_policy.memory_waste_detection[0].id, null)
-    daily_cost_spike        = try(google_monitoring_alert_policy.daily_cost_spike[0].id, null)
+    node_count_anomaly     = try(google_monitoring_alert_policy.node_count_anomaly[0].id, null)
+    storage_growth_anomaly = try(google_monitoring_alert_policy.storage_growth_anomaly[0].id, null)
+    cpu_waste_detection    = try(google_monitoring_alert_policy.cpu_waste_detection[0].id, null)
+    memory_waste_detection = try(google_monitoring_alert_policy.memory_waste_detection[0].id, null)
+    daily_cost_spike       = try(google_monitoring_alert_policy.daily_cost_spike[0].id, null)
   } : {}
 }
 

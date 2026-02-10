@@ -204,8 +204,8 @@ resource "google_secret_manager_secret_iam_member" "terraform_secret_admin" {
 resource "google_secret_manager_secret_version" "erlang_cookie_rotation" {
   # This resource is used to trigger rotation via external automation
   # The actual rotation is handled by Cloud Scheduler or external rotation jobs
-  count   = var.enable_auto_rotation ? 1 : 0
-  secret  = google_secret_manager_secret.erlang_cookie.id
+  count  = var.enable_auto_rotation ? 1 : 0
+  secret = google_secret_manager_secret.erlang_cookie.id
 
   # The secret_data should be provided by the rotation job
   # This is a placeholder for the rotation mechanism
@@ -263,8 +263,8 @@ output "secret_access_instructions" {
   description = "Instructions for accessing secrets in Kubernetes pods"
   value = {
     secret_store_csi = {
-      driver           = "secretmanager.csi.k8s.io"
-      read_only        = true
+      driver             = "secretmanager.csi.k8s.io"
+      read_only          = true
       secret_volume_type = "secret"
       # Example volume mount configuration:
       # volumes:

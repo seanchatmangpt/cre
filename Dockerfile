@@ -1,6 +1,6 @@
 # CRE - Multi-Architecture Production Dockerfile
 # Common Runtime Environment for YAWL workflow engine
-# Target: OTP 27 (OTP 28 has rebar3 compatibility issues with multi-arch builds)
+# Target: OTP 28
 # Platforms: linux/amd64, linux/arm64
 #
 # Build Stages:
@@ -8,9 +8,6 @@
 #   2. erlang-builder - Compile Erlang/OTP release
 #   3. runtime - Minimal runtime image
 #   4. sbom - Generate SBOM for vulnerability scanning
-#
-# Note: OTP 28 uses Debian-based images but has rebar3 'nouser' errors in multi-arch builds.
-# Reverting to OTP 27 Alpine until OTP 28 compatibility is resolved.
 
 # Build arguments for multi-platform support
 ARG TARGETPLATFORM
@@ -79,7 +76,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # =============================================================================
 # Stage 2: Erlang/OTP Builder (Multi-Arch)
 # =============================================================================
-FROM --platform=$TARGETPLATFORM erlang:27-alpine AS erlang-builder
+FROM --platform=$TARGETPLATFORM erlang:28-alpine AS erlang-builder
 
 ARG TARGETPLATFORM
 ARG TARGETARCH
@@ -185,7 +182,7 @@ RUN mkdir -p /tmp/cre && \
 # =============================================================================
 # Stage 3: Runtime (Multi-Arch)
 # =============================================================================
-FROM --platform=$TARGETPLATFORM erlang:27-alpine AS runtime
+FROM --platform=$TARGETPLATFORM erlang:28-alpine AS runtime
 
 ARG VERSION
 ARG GIT_REVISION
@@ -207,8 +204,8 @@ LABEL org.opencontainers.image.title="CRE" \
       org.opencontainers.image.authors="CRE Team <cre@common-runtime.org>" \
       org.opencontainers.image.documentation="https://github.com/joergen7/cre/blob/main/docs/README.md" \
       org.opencontainers.image.platform="${TARGETPLATFORM}" \
-      org.opencontainers.image.base.digest="erlang:27-alpine" \
-      org.opencontainers.image.base.name="docker.io/library/erlang:27-alpine"
+      org.opencontainers.image.base.digest="erlang:28-alpine" \
+      org.opencontainers.image.base.name="docker.io/library/erlang:28-alpine"
 
 # Install runtime dependencies
 RUN apk add --no-cache \
