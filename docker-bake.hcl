@@ -59,11 +59,11 @@ target "cre" {
   ]
 
   cache-from = [
-    "type=registry,ref=${REGISTRY}/${GCP_PROJECT}/${REPO_NAME}/cre:buildcache"
+    "type=local,src=/tmp/.buildx-cache"
   ]
 
   cache-to = [
-    "type=registry,ref=${REGISTRY}/${GCP_PROJECT}/${REPO_NAME}/cre:buildcache,mode=max"
+    "type=local,dest=/tmp/.buildx-cache"
   ]
 }
 

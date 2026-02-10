@@ -601,31 +601,37 @@ drain(Name, MaxSteps) when is_integer(MaxSteps), MaxSteps >= 0 ->
 %% Net state accessor functions (forwarded from gen_pnet)
 %%====================================================================
 
--doc """
-Extract tokens on a place from a net state.
-
-Throws an error if the place does not exist.
-""".
+%%--------------------------------------------------------------------
+%% @doc Extract tokens on a place from a net state.
+%%
+%%      Throws an error if the place does not exist.
+%%
+%% @end
+%%--------------------------------------------------------------------
 -spec get_ls(Place :: atom(), NetState :: #net_state{}) -> [term()].
 
 get_ls(Place, #net_state{marking = Marking}) ->
     maps:get(Place, Marking).
 
--doc """
-Extract user info from a net state.
-
-Returns the user info field from the net_state record.
-""".
+%%--------------------------------------------------------------------
+%% @doc Extract user info from a net state.
+%%
+%%      Returns the user info field from the net_state record.
+%%
+%% @end
+%%--------------------------------------------------------------------
 -spec get_usr_info(NetState :: #net_state{}) -> term().
 
 get_usr_info(#net_state{usr_info = UsrInfo}) ->
     UsrInfo.
 
--doc """
-Extract stats from a net state.
-
-Returns the statistics record from the net_state.
-""".
+%%--------------------------------------------------------------------
+%% @doc Extract stats from a net state.
+%%
+%%      Returns the statistics record from the net_state.
+%%
+%% @end
+%%--------------------------------------------------------------------
 -spec get_stats(NetState :: #net_state{}) -> #stats{}.
 
 get_stats(#net_state{stats = Stats}) ->
