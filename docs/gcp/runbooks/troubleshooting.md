@@ -77,7 +77,7 @@ kubectl describe nodes | grep -A 5 "Allocated resources"
 
 ```bash
 #!/bin/bash
-# scripts/runbooks/diagnostics.sh
+# scripts/runbooks/diagnose.sh
 
 set -euo pipefail
 

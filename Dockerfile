@@ -1,6 +1,6 @@
 # CRE - Multi-Architecture Production Dockerfile
 # Common Runtime Environment for YAWL workflow engine
-# Target: OTP 28, Rust stable
+# Target: OTP 27 (OTP 28 has rebar3 compatibility issues with multi-arch builds)
 # Platforms: linux/amd64, linux/arm64
 #
 # Build Stages:
@@ -8,6 +8,9 @@
 #   2. erlang-builder - Compile Erlang/OTP release
 #   3. runtime - Minimal runtime image
 #   4. sbom - Generate SBOM for vulnerability scanning
+#
+# Note: OTP 28 uses Debian-based images but has rebar3 'nouser' errors in multi-arch builds.
+# Reverting to OTP 27 Alpine until OTP 28 compatibility is resolved.
 
 # Build arguments for multi-platform support
 ARG TARGETPLATFORM
@@ -84,7 +87,7 @@ ARG VERSION
 ARG GIT_REVISION
 ARG BUILD_DATE
 
-# Ensure we're running as root - erlang:28-alpine may have issues in multi-arch builds
+# Ensure running as root
 USER root
 
 # Install build dependencies
@@ -156,9 +159,10 @@ RUN mkdir -p ./src/rust_nifs/priv ./src/rust_implementations/priv
 # The rebar.config has pre-hooks that will attempt to build NIFs.
 # If NIFs are not available, CRE will still function in pure Erlang mode.
 
-# Add compiler option to suppress warnings for OTP 27 compatibility
+# Add compiler option to suppress warnings for OTP 28 compatibility
+# Note: Just suppress warnings, don't try to define macros here
 RUN echo '{erl_opts, [nowarn_missing_spec, nowarn_missing_doc, nowarn_export_all]}.' >> rebar.config && \
-    echo "Added compiler options for OTP 27 compatibility"
+    echo "Added compiler options for OTP 28 compatibility"
 
 # Compile dependencies
 RUN --mount=type=cache,target=/root/.cache/rebar3 \
@@ -167,10 +171,6 @@ RUN --mount=type=cache,target=/root/.cache/rebar3 \
 # Compile project with pre-built Rust NIFs
 RUN --mount=type=cache,target=/root/.cache/rebar3 \
     rebar3 compile
-
-# Create production release
-RUN --mount=type=cache,target=/root/.cache/rebar3 \
-    rebar3 as prod tar
 
 # Create production release
 RUN --mount=type=cache,target=/root/.cache/rebar3 \
@@ -192,7 +192,7 @@ ARG GIT_REVISION
 ARG BUILD_DATE
 ARG TARGETPLATFORM
 
-# Switch to root for setup operations
+# Ensure running as root
 USER root
 
 # Runtime metadata labels
@@ -207,8 +207,8 @@ LABEL org.opencontainers.image.title="CRE" \
       org.opencontainers.image.authors="CRE Team <cre@common-runtime.org>" \
       org.opencontainers.image.documentation="https://github.com/joergen7/cre/blob/main/docs/README.md" \
       org.opencontainers.image.platform="${TARGETPLATFORM}" \
-      org.opencontainers.image.base.digest="erlang:28-alpine" \
-      org.opencontainers.image.base.name="docker.io/library/erlang:28-alpine"
+      org.opencontainers.image.base.digest="erlang:27-alpine" \
+      org.opencontainers.image.base.name="docker.io/library/erlang:27-alpine"
 
 # Install runtime dependencies
 RUN apk add --no-cache \
@@ -296,18 +296,20 @@ LABEL maintainer="CRE Team <cre@common-runtime.org>" \
 # =============================================================================
 FROM runtime AS sbom
 
-# Install Syft for SBOM generation
+# Install Syft for SBOM generation (from official GitHub releases)
 USER root
-# Detect architecture for syft download
-RUN apk add --no-cache wget && \
+RUN apk add --no-cache wget tar && \
     ARCH=$(uname -m) && \
     case "$ARCH" in \
         x86_64) SYFT_ARCH="amd64" ;; \
         aarch64) SYFT_ARCH="arm64" ;; \
         *) SYFT_ARCH="$ARCH" ;; \
     esac && \
-    wget -qO /usr/local/bin/syft "https://static.synopsys.com/npc/syft/linux/syft_${SYFT_ARCH}_v1.18.1" \
-    && chmod +x /usr/local/bin/syft
+    wget -qO /tmp/syft.tar.gz "https://github.com/anchore/syft/releases/download/v1.18.1/syft_1.18.1_linux_${SYFT_ARCH}.tar.gz" \
+    && tar -xzf /tmp/syft.tar.gz -C /tmp \
+    && mv /tmp/syft /usr/local/bin/syft \
+    && chmod +x /usr/local/bin/syft \
+    && rm -f /tmp/syft.tar.gz
 USER cre
 
 # Generate SBOM in SPDX format

@@ -9457,3 +9457,171 @@ src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
 [INFO] Environment: gVisor sandbox detected
 [INFO] Note: Some syscalls are limited in gVisor
 [SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-09T20:27:48-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (     322 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/mining/partial_order_align.erl:
+    │
+ 57 │  -type marking() :: #{place() => non_neg_integer()}.
+    │   ╰── Warning: type marking() is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │      ╰── Warning: variable 'Activities' is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │                    ╰── Warning: the result of calling map_get/2 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+[SUCCESS] Project compilation verified
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /Users/sac/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: gVisor sandbox detected
+[INFO] Note: Some syscalls are limited in gVisor
+[SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-09T21:26:28-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (     322 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/mining/partial_order_align.erl:
+    │
+ 57 │  -type marking() :: #{place() => non_neg_integer()}.
+    │   ╰── Warning: type marking() is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │      ╰── Warning: variable 'Activities' is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │                    ╰── Warning: the result of calling map_get/2 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+[SUCCESS] Project compilation verified
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /Users/sac/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: gVisor sandbox detected
+[INFO] Note: Some syscalls are limited in gVisor
+[SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-09T21:56:01-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (     322 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
+
+    ┌─ src/mining/partial_order_align.erl:
+    │
+ 57 │  -type marking() :: #{place() => non_neg_integer()}.
+    │   ╰── Warning: type marking() is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │      ╰── Warning: variable 'Activities' is unused
+
+     ┌─ src/mining/partial_order_align.erl:
+     │
+ 332 │      Activities = [maps:get(activity, E) || E <- PO],
+     │                    ╰── Warning: the result of calling map_get/2 is ignored (suppress the warning by assigning the expression to the _ variable)
+
+
+[SUCCESS] Project compilation verified
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /Users/sac/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: gVisor sandbox detected
+[INFO] Note: Some syscalls are limited in gVisor
+[SUCCESS] SessionStart complete - ready to develop

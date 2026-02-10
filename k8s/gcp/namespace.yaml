@@ -9,7 +9,7 @@ metadata:
     environment: production
     app: cre-workflow-engine
     # GKE-specific labels for Network Policies
-    networking.gke.io/simulator-mode: false
+    networking.gke.io/simulator-mode: "false"
     # Cloud Operations labels
     cloud.google.com/usage: production
   annotations:
@@ -26,7 +26,7 @@ metadata:
     name: cre-staging
     environment: staging
     app: cre-workflow-engine
-    networking.gke.io/simulator-mode: false
+    networking.gke.io/simulator-mode: "false"
     cloud.google.com/usage: development
   annotations:
     contact: "platform-team@example.com"

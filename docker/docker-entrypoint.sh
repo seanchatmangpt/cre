@@ -55,7 +55,7 @@ wait_for_peer() {
 
     log_info "Waiting for peer node: ${peer}"
 
-    while [ $count -lt $max_wait ]; do
+    while [ "$count" -lt "$max_wait" ]; do
         if "${CRE_HOME}/bin/cre" ping "${peer}" 2>/dev/null; then
             log_info "Peer node ${peer} is available"
             return 0

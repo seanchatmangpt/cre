@@ -20,7 +20,7 @@ output "subnets" {
       cidr            = v.ip_cidr_range
       region          = v.region
       gateway_ip      = v.gateway_address
-      secondary_ranges = v.secondary_ip_ranges
+      secondary_ranges = v.secondary_ip_range
     }
   }
 }

@@ -149,14 +149,45 @@ autoscaling:
   maxReplicas: 10
   targetCPUUtilizationPercentage: 80
   targetMemoryUtilizationPercentage: 80
+  # -- Custom metrics for autoscaling (e.g., based on workflow queue depth)
+  customMetrics: []
+  # - type: Pods
+  #   pods:
+  #     metric:
+  #       name: cre_workflow_queue_depth
+  #     target:
+  #       type: AverageValue
+  #       averageValue: "100"
+  # -- Autoscaling behavior policies
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 2
+          periodSeconds: 15
+      selectPolicy: Max
 
 # -- Persistent volume configuration
 persistence:
   # -- Enable persistent storage
   enabled: true
 
-  # -- Storage class
-  storageClass: standard
+  # -- Storage class (GKE: standard-rwo, premium-rwo, standard, premium)
+  storageClass: standard-rwo
 
   # -- Access modes
   accessModes:
