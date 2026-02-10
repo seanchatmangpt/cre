@@ -96,15 +96,15 @@ compile(AST, Options) ->
                     {ok, PNet} ->
                         case validate_pnet(PNet) of
                             ok -> {ok, PNet};
-                            {error, Reason} -> {error, {validation_error, Reason}}
+                            {error, ValidationError} -> {error, {validation_error, ValidationError}}
                         end;
-                    {error, Reason} -> {error, {compilation_error, Reason}}
+                    {error, CompileError} -> {error, {compilation_error, CompileError}}
                 end;
-            {error, Reason} -> {error, {macro_expansion_error, Reason}}
+            {error, MacroError} -> {error, {macro_expansion_error, MacroError}}
         end
     catch
-        error:Reason:Stack ->
-            {error, {compilation_exception, Reason, Stack}}
+        error:Error:Stack ->
+            {error, {compilation_exception, Error, Stack}}
     end.
 
 -spec to_pnet(binary() | ast_node()) -> {ok, pnet_spec()} | {error, term()}.

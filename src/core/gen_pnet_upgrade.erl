@@ -176,10 +176,10 @@ handle_call({execute_upgrade, UpgradeId}, _From,
             catch
                 _:Error:Stack ->
                     FailedPlan = Plan#upgrade_plan{status = failed},
-                    NewState = State#state{
+                    FailedState = State#state{
                         upgrade_plans = Plans#{UpgradeId => FailedPlan}
                     },
-                    {reply, {error, {upgrade_failed, Error, Stack}}, NewState}
+                    {reply, {error, {upgrade_failed, Error, Stack}}, FailedState}
             end;
 
         #upgrade_plan{status = Status} ->
@@ -200,10 +200,10 @@ handle_call({rollback, UpgradeId}, _From,
             try
                 ok = restore_checkpoint(Pid, Checkpoint),
                 UpdatedPlan = Plan#upgrade_plan{status = rolled_back},
-                NewState = State#state{
+                RolledBackState = State#state{
                     upgrade_plans = Plans#{UpgradeId => UpdatedPlan}
                 },
-                {reply, ok, NewState}
+                {reply, ok, RolledBackState}
             catch
                 _:Error:Stack ->
                     {reply, {error, {rollback_failed, Error, Stack}}, State}

@@ -278,8 +278,8 @@ setup_trace(Pid) ->
                 {ok, Module}
         end
     catch
-        _:Reason ->
-            {error, Reason}
+        _:Error:_Stack ->
+            {error, Error}
     end.
 
 teardown_trace(Pid) ->
@@ -319,8 +319,8 @@ capture_snapshot(Pid, Session = #trace_session{snapshots = Snapshots, options = 
                 {ok, Snapshot, Session#trace_session{snapshots = TrimmedSnapshots}}
         end
     catch
-        _:Reason ->
-            {error, Reason}
+        _:Error:_Stack ->
+            {error, Error}
     end.
 
 extract_marking(State) when is_tuple(State) ->
