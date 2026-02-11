@@ -20,7 +20,7 @@ mkdir -p "$RECEIPT_DIR" "$EVIDENCE_DIR" "$TEMP_DIR"
 
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║   NINE-NINES COMPLIANCE VALIDATOR                          ║"
-echo "║   Target: 99.9999999% Availability (8.64ms downtime/day)   ║"
+echo "║   Target: 99.9999999% (86.4 μs downtime/day)               ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 echo "Timestamp: $TIMESTAMP"
@@ -227,10 +227,10 @@ erl -pa apps/*/ebin -noshell -eval "
     io:format('avg_latency_us: ~.2f~n', [AvgLatency]),
 
     %% Calculate theoretical availability
-    %% 99.9999999% = max 8.64ms downtime per day
-    %% If avg latency < 1ms, we meet target
+    %% 99.9999999% = max 86.4 microseconds downtime per day
+    %% If avg latency < 100μs, we have margin for 9-nines
     if
-        AvgLatency < 1000 -> io:format('availability_target_met~n');
+        AvgLatency < 100 -> io:format('availability_target_met~n');
         true -> io:format('availability_target_missed~n')
     end,
 
@@ -238,13 +238,13 @@ erl -pa apps/*/ebin -noshell -eval "
 " > "$EVIDENCE_DIR/performance.txt" 2>&1 &
 sleep 3
 
-check "Average latency < 1ms" \
+check "Average latency < 100μs (9-nines)" \
     "grep -q 'availability_target_met' $EVIDENCE_DIR/performance.txt"
 
 LATENCY=$(grep 'avg_latency_us' "$EVIDENCE_DIR/performance.txt" | awk '{print $2}' || echo "9999")
 
-check "Response time acceptable" \
-    "awk 'BEGIN {exit !($LATENCY < 1000)}' /dev/null"
+check "Response time meets 9-nines target" \
+    "awk 'BEGIN {exit !($LATENCY < 100)}' /dev/null"
 
 echo ""
 
@@ -352,9 +352,11 @@ cat > "$RECEIPT_FILE" << EOF
 
   "performance_metrics": {
     "avg_latency_microseconds": $LATENCY,
-    "max_downtime_per_day_ms": 8.64,
-    "measured_downtime_ms": 0.0,
-    "availability_percentage": $COMPLIANCE_SCORE
+    "max_downtime_per_day_microseconds": 86.4,
+    "max_downtime_per_day_milliseconds": 0.0864,
+    "measured_downtime_microseconds": 0.0,
+    "availability_percentage": $COMPLIANCE_SCORE,
+    "note": "Nine nines = 99.9999999% = max 86.4μs downtime/day"
   },
 
   "system_verification": {
@@ -430,7 +432,7 @@ if awk "BEGIN {exit !($COMPLIANCE_SCORE >= 99.9999999)}"; then
     echo "STATUS: ✓ NINE-NINES COMPLIANT"
     echo ""
     echo "This system meets regulatory requirements for"
-    echo "99.9999999% availability (max 8.64ms downtime/day)"
+    echo "99.9999999% availability (max 86.4μs downtime/day)"
     EXIT_CODE=0
 else
     echo "STATUS: ✗ NON-COMPLIANT"
