@@ -1,0 +1,18 @@
+PREFIX ln: <http://lnctrl.io/ontology#>
+PREFIX f5: <http://fortune5.lnctrl.io/ontology#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?connectorId ?name ?authScheme ?rateLimit
+       (GROUP_CONCAT(?operation; separator=",") AS ?operations)
+WHERE {
+    ?connector a ln:Connector ;
+               ln:connectorId ?connectorId ;
+               ln:name ?name ;
+               ln:authScheme ?authScheme ;
+               ln:rateLimit ?rateLimit ;
+               ln:operations ?opList .
+
+    ?opList rdf:rest*/rdf:first ?operation .
+}
+GROUP BY ?connectorId ?name ?authScheme ?rateLimit
+ORDER BY ?connectorId

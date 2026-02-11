@@ -1,0 +1,3 @@
+OTP: 28
+ERTS: 16.2
+Schedulers: 16

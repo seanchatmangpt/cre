@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-02-11T05:42:21Z",
+  "duration_ms": 1892,
+  "evidence_files": [
+    "system_info.txt",
+    "etop.txt",
+    "observer_snapshot.txt",
+    "ttb_trace/ttb_summary.txt",
+    "sys_stats.json",
+    "cancel_proof.json",
+    "replay_proof.json",
+    "crash_restart_proof.json",
+    "evidence.sha256"
+  ],
+  "evidence_hash": "b7ee078e8a74e1c1467b5946c115484b840188a046bf7a4b35a070646be052e9",
+  "status": "collected"
+}

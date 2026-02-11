@@ -1,0 +1,125 @@
+F5 Connectors Analysis Report
+==============================
+Generated: Wed Feb 11 05:42:45 UTC 2026
+Task: List all f5_connector_*.erl files and count operations per connector
+
+CONNECTOR FILES LISTING AND OPERATION COUNTS
+=============================================
+
+File Name                                          | Exports | Functions | Lines
+------------------------------------------------------------------------------------
+f5_connector_case_mgmt.erl                         |    3    |    52     | 325
+f5_connector_connector_01.erl                      |    3    |    52     | 325
+f5_connector_connector_02.erl                      |    3    |    52     | 325
+f5_connector_connector_03.erl                      |    3    |    52     | 325
+f5_connector_connector_04.erl                      |    3    |    52     | 325
+f5_connector_connector_05.erl                      |    3    |    52     | 325
+f5_connector_connector_06.erl                      |    3    |    52     | 325
+f5_connector_connector_07.erl                      |    3    |    52     | 325
+f5_connector_connector_08.erl                      |    3    |    52     | 325
+f5_connector_connector_09.erl                      |    3    |    52     | 325
+f5_connector_connector_10.erl                      |    3    |    52     | 325
+f5_connector_connector_11.erl                      |    3    |    52     | 325
+f5_connector_connector_12.erl                      |    3    |    52     | 325
+f5_connector_connector_13.erl                      |    3    |    52     | 325
+f5_connector_connector_14.erl                      |    3    |    52     | 325
+f5_connector_connector_15.erl                      |    3    |    52     | 325
+f5_connector_connector_16.erl                      |    3    |    52     | 325
+f5_connector_connector_17.erl                      |    3    |    52     | 325
+f5_connector_connector_18.erl                      |    3    |    52     | 325
+f5_connector_connector_19.erl                      |    3    |    52     | 325
+f5_connector_connector_20.erl                      |    3    |    52     | 325
+f5_connector_core_ledger.erl                       |    3    |    52     | 325
+f5_connector_credit_bureau.erl                     |    3    |    52     | 325
+f5_connector_crm.erl                               |    3    |    52     | 325
+f5_connector_data_warehouse.erl                    |    3    |    52     | 325
+f5_connector_document.erl                          |    3    |    52     | 325
+f5_connector_kyc_aml.erl                           |    3    |    52     | 325
+f5_connector_notification.erl                      |    3    |    52     | 325
+f5_connector_policy_engine.erl                     |    3    |    52     | 325
+f5_connector_treasury.erl                          |    3    |    52     | 325
+
+SUMMARY STATISTICS
+==================
+
+Total Connector Files: 30
+Total Exported Operations: 90 (3 per connector)
+Total Internal Functions: 1560 (52 per connector)
+Total Lines of Code: 9,750
+Average Lines per Connector: 325
+
+CONNECTOR CATEGORIES
+====================
+
+DOMAIN-SPECIFIC CONNECTORS (10 files):
+  1. f5_connector_case_mgmt.erl         - Case Management System
+  2. f5_connector_core_ledger.erl       - Core Banking Ledger
+  3. f5_connector_credit_bureau.erl     - Credit Bureau Integration
+  4. f5_connector_crm.erl               - Customer Relationship Management
+  5. f5_connector_data_warehouse.erl    - Data Warehouse
+  6. f5_connector_document.erl          - Document Management
+  7. f5_connector_kyc_aml.erl           - Know Your Customer / Anti-Money Laundering
+  8. f5_connector_notification.erl      - Notification Service
+  9. f5_connector_policy_engine.erl     - Policy Engine
+ 10. f5_connector_treasury.erl          - Treasury System
+
+GENERIC CONNECTORS (20 files):
+  1. f5_connector_connector_01.erl      - Generic Connector 01
+  2. f5_connector_connector_02.erl      - Generic Connector 02
+  3. f5_connector_connector_03.erl      - Generic Connector 03
+  4. f5_connector_connector_04.erl      - Generic Connector 04
+  5. f5_connector_connector_05.erl      - Generic Connector 05
+  6. f5_connector_connector_06.erl      - Generic Connector 06
+  7. f5_connector_connector_07.erl      - Generic Connector 07
+  8. f5_connector_connector_08.erl      - Generic Connector 08
+  9. f5_connector_connector_09.erl      - Generic Connector 09
+ 10. f5_connector_connector_10.erl      - Generic Connector 10
+ 11. f5_connector_connector_11.erl      - Generic Connector 11
+ 12. f5_connector_connector_12.erl      - Generic Connector 12
+ 13. f5_connector_connector_13.erl      - Generic Connector 13
+ 14. f5_connector_connector_14.erl      - Generic Connector 14
+ 15. f5_connector_connector_15.erl      - Generic Connector 15
+ 16. f5_connector_connector_16.erl      - Generic Connector 16
+ 17. f5_connector_connector_17.erl      - Generic Connector 17
+ 18. f5_connector_connector_18.erl      - Generic Connector 18
+ 19. f5_connector_connector_19.erl      - Generic Connector 19
+ 20. f5_connector_connector_20.erl      - Generic Connector 20
+
+OPERATIONS PER CONNECTOR
+========================
+
+Each connector file exports 3 operations:
+  - init/1       - Initialize connector state
+  - call/2       - Execute connector operation
+  - handle_info/2 - Handle asynchronous messages
+
+Each connector contains 52 internal functions supporting:
+  - Message handling and routing
+  - State management
+  - Data transformation
+  - Error handling and retry logic
+  - Request/response serialization
+  - Timeout management
+  - Connection pooling
+
+KEY INSIGHTS
+============
+
+1. Uniform Architecture: All 30 connectors follow an identical pattern with:
+   - 3 exported operations
+   - 52 internal functions
+   - 325 lines of code
+
+2. Scalability: The modular design allows easy addition of new connectors by
+   duplicating the connector template and customizing domain-specific logic
+
+3. Operations Density: Average of 52 operations (functions) per 325 lines = 
+   6.4 lines per operation, indicating well-factored, reusable code
+
+4. Total Codebase: 9,750 lines of connector code implementing 30 distinct
+   system integrations with consistent patterns and interfaces
+
+5. Connector Distribution:
+   - 33% Domain-specific connectors (banking, KYC, CRM, etc.)
+   - 67% Generic connectors (extensible templates)
+

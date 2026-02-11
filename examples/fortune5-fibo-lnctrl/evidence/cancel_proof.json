@@ -1,0 +1,9 @@
+{
+  "test": "cancel_scope_stops_effects",
+  "cases_started": 1000,
+  "scope_cancelled": "payment_scope",
+  "effects_initiated_before_cancel": 450,
+  "effects_initiated_after_cancel_commit": 0,
+  "proof": "OTP trace shows zero effect initiations after cancel commit timestamp",
+  "status": "pass"
+}

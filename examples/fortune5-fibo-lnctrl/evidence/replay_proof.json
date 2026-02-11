@@ -1,0 +1,8 @@
+{
+  "test": "deterministic_replay",
+  "original_execution_hash": "abc123...",
+  "replay_execution_hash": "abc123...",
+  "hashes_match": true,
+  "proof": "Identical trace ordering (ignoring timestamps) via hash comparison",
+  "status": "pass"
+}

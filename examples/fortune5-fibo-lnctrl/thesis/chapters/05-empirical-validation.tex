@@ -1,0 +1,96 @@
+\chapter{Empirical Validation}
+\label{ch:empirical}
+
+\section{Experimental Design}
+
+\subsection{Research Hypothesis}
+
+$H_0$: Ontology-driven generation cannot produce $\geq 300,000$ LOC of syntactically valid, semantically coherent OTP code in $< 10$ seconds.
+
+$H_1$: Manufacturing achieves target scale with verifiable correctness.
+
+\subsection{Apparatus}
+
+\begin{itemize}
+    \item \textbf{Hardware}: GVisor container on Linux 4.4.0
+    \item \textbf{Software}: Python 3.x, Erlang/OTP 28.3.1
+    \item \textbf{Ontology}: FIBO-aligned control ontology (f5\_line\_control.ttl)
+    \item \textbf{Generator}: Direct Python generator (scripts/generate.py)
+\end{itemize}
+
+\subsection{Measurement Protocol}
+
+\begin{enumerate}
+    \item \textbf{Pre-generation}: Hash ontology inputs for chain-of-custody
+    \item \textbf{Generation}: Execute generator with high-resolution timing
+    \item \textbf{Post-generation}: Count LOC, modules, apps via file system scan
+    \item \textbf{Hashing}: Compute SHA-256 of all generated artifacts
+    \item \textbf{Evidence}: Collect OTP-native runtime traces
+    \item \textbf{Receipt}: Write JSON receipt with cryptographic hash chain
+\end{enumerate}
+
+\subsection{Success Criteria}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metric} & \textbf{Target} & \textbf{Criterion} \\
+\midrule
+LOC & $\geq 300,000$ & Must meet or exceed \\
+Modules & $\geq 2,000$ & Must meet or exceed \\
+Apps & $\geq 50$ & Must meet or exceed \\
+Time & $< 10s$ & Must be under \\
+Validity & 100\% & All files must compile \\
+Hash chain & Intact & No breaks allowed \\
+\bottomrule
+\end{tabular}
+\caption{Success criteria for empirical validation}
+\label{tab:criteria}
+\end{table}
+
+\section{Experimental Procedure}
+
+\begin{algorithm}
+\caption{Manufacturing Experiment Procedure}
+\begin{algorithmic}[1]
+\STATE Clean workspace: \texttt{rm -rf apps/}
+\STATE Start timer $t_0$
+\STATE Execute \texttt{python3 scripts/generate.py}
+\STATE Stop timer $t_1$
+\STATE Compute $\Delta t = t_1 - t_0$
+\STATE Count LOC: \texttt{find apps -name "*.erl" | xargs wc -l}
+\STATE Count modules: \texttt{find apps -name "*.erl" | wc -l}
+\STATE Count apps: \texttt{find apps -name "*.app.src" | wc -l}
+\STATE Hash all artifacts: \texttt{sha256sum apps/**/*.erl > receipt.sha}
+\STATE Collect OTP evidence: \texttt{./bin/dot evidence}
+\STATE Write receipt: \texttt{receipts/build.last.json}
+\STATE Verify hash chain integrity
+\end{algorithmic}
+\end{algorithm}
+
+\section{Threats to Validity}
+
+\subsection{Internal Validity}
+
+\textbf{Threat}: Generator may produce syntactically invalid code.
+
+\textbf{Mitigation}: We execute \texttt{rebar3 compile} on sample modules to verify syntax.
+
+\subsection{External Validity}
+
+\textbf{Threat}: Results may not generalize beyond FIBO-aligned financial ontologies.
+
+\textbf{Mitigation}: Architecture is domain-agnostic; can be applied to other ontologies.
+
+\subsection{Construct Validity}
+
+\textbf{Threat}: LOC may not be meaningful metric for code quality.
+
+\textbf{Mitigation}: We supplement with module count, app count, and behavioral evidence.
+
+\subsection{Conclusion Validity}
+
+\textbf{Threat}: Single experimental run may be statistical anomaly.
+
+\textbf{Mitigation}: Deterministic generation ensures reproducibility; hash receipts enable verification by third parties.
