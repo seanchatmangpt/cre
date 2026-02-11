@@ -385,13 +385,65 @@ execute_opcode({cancel_scope_exit, ScopeId}, PC, State) ->
     end;
 
 %% Multiple instances
-execute_opcode({mi_spawn, {fixed, N}}, PC, State) ->
-    NewState = wf_vm:exec_add_trace_event(State, mi_spawn, mi_spawn),
-    {continue, wf_vm:exec_set_pc(NewState, PC + 1)};
+execute_opcode({mi_spawn, Policy}, PC, State) ->
+    Ctx = wf_vm:exec_ctx(State),
+    case wf_mi:spawn_instances(Policy, Ctx) of
+        {ok, Count, Contexts} ->
+            %% Create MI state and push frame
+            MIState = #{
+                policy => Policy,
+                total => Count,
+                completed => 0,
+                instances => #{},
+                contexts => Contexts
+            },
+            Frame = wf_vm:frame(mi, MIState),
+            %% Initialize join counter for the MI_JOIN ahead
+            Joins = wf_vm:exec_joins(State),
+            %% Find the MI_JOIN opcode location (scan forward)
+            JoinPC = find_mi_join_pc(wf_vm:exec_program(State), PC + 1),
+            NewJoins = maps:put(JoinPC, {0, Count}, Joins),
+            NewState = wf_vm:exec_add_trace_event(State, mi_spawn, mi_spawn),
+            {continue, wf_vm:exec_set_pc(
+                wf_vm:exec_push_frame(
+                    wf_vm:exec_set_joins(NewState, NewJoins),
+                    Frame
+                ),
+                PC + 1
+            )};
+        {error, Reason} ->
+            NewState = wf_vm:exec_add_trace_event(State, mi_spawn_error, mi_spawn),
+            {error, {mi_spawn_failed, Reason}, NewState}
+    end;
 
-execute_opcode({mi_join, _Policy}, PC, State) ->
-    NewState = wf_vm:exec_add_trace_event(State, mi_join, mi_join),
-    {continue, wf_vm:exec_set_pc(NewState, PC + 1)};
+execute_opcode({mi_join, Policy}, PC, State) ->
+    %% Pop MI frame
+    {Frame, State1} = wf_vm:exec_pop_frame(State),
+    MIState = wf_vm:frame_data(Frame),
+    Total = wf_mi:get_instance_count(MIState),
+    Completed = wf_mi:get_completed_count(MIState),
+
+    %% Check if join condition is met
+    case wf_mi:should_join(Policy, Total, Completed) of
+        true ->
+            %% All instances completed, collect contexts
+            Contexts = maps:get(contexts, MIState),
+            MergedCtx = wf_mi:collect_contexts(Contexts),
+            Joins = wf_vm:exec_joins(State1),
+            NewJoins = wf_vm:join_reset(Joins, PC),
+            NewState = wf_vm:exec_add_trace_event(State1, mi_join_done, mi_join),
+            {continue, wf_vm:exec_set_pc(
+                wf_vm:exec_set_ctx(
+                    wf_vm:exec_set_joins(NewState, NewJoins),
+                    MergedCtx
+                ),
+                PC + 1
+            )};
+        false ->
+            %% Not all instances done yet, wait
+            NewState = wf_vm:exec_add_trace_event(State1, mi_join_wait, mi_join),
+            {continue, wf_vm:exec_push_frame(NewState, Frame)}
+    end;
 
 %% Halt
 execute_opcode(halt, _PC, State) ->
@@ -407,5 +459,29 @@ execute_opcode({error, Reason}, _PC, State) ->
 execute_opcode(Op, _PC, State) ->
     NewState = wf_vm:exec_add_trace_event(State, error, unknown),
     {error, {unknown_opcode, Op}, NewState}.
+
+%%% HELPER FUNCTIONS ========================================================
+
+%% @doc Find the PC of the next MI_JOIN opcode (for join counter setup).
+-spec find_mi_join_pc(Program :: [wf_vm:opcode()], StartPC :: non_neg_integer()) ->
+    non_neg_integer().
+find_mi_join_pc(Program, StartPC) ->
+    find_mi_join_pc_loop(Program, StartPC, 0).
+
+-spec find_mi_join_pc_loop(
+    Program :: [wf_vm:opcode()],
+    CurrentPC :: non_neg_integer(),
+    Depth :: non_neg_integer()
+) -> non_neg_integer().
+find_mi_join_pc_loop([], _PC, _Depth) ->
+    %% Not found, return 0 as fallback
+    0;
+find_mi_join_pc_loop([Op | Rest], PC, Depth) ->
+    case wf_vm:opcode_type(Op) of
+        mi_join ->
+            PC;
+        _ ->
+            find_mi_join_pc_loop(Rest, PC + 1, Depth)
+    end.
 
 

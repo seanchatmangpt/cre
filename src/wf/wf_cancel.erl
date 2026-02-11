@@ -140,160 +140,184 @@ inherit the cancellation flag.
 -export_type([scope_id/0, scope_path/0, cancel_flags/0, region_spec/0]).
 
 %%====================================================================
-%% Token Validation Functions
+%% Scope Cancellation API
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Checks if a term is a valid cancel token.
+%% @doc Cancel a specific scope by setting its cancel flag.
 %%
-%% A valid cancel token is a 2-tuple where the first element is the
-%% atom `cancel` and the second element is a list of place atoms.
-%% The function never crashes.
+%% Sets the cancel flag for the specified scope ID in the exec_state.
+%% The scope will be checked for cancellation on the next reduction step.
 %%
-%% ```erlang
-%% > wf_cancel:is_cancel_token({cancel, [p1, p2]}).
-%% true
-%% > wf_cancel:is_cancel_token({cancel, "not_a_list"}).
-%% false
-%% > wf_cancel:is_cancel_token({other, [p1]}).
-%% false
-%% ```
+%% @param State The current execution state
+%% @param ScopeId The scope identifier to cancel
+%% @return Updated execution state with cancel flag set
+%%
 %% @end
 %%--------------------------------------------------------------------
--spec is_cancel_token(term()) -> boolean().
+-spec cancel_scope(State :: wf_vm:exec_state(), ScopeId :: scope_id()) ->
+    wf_vm:exec_state().
 
-is_cancel_token({cancel, Targets}) when is_list(Targets) ->
-    %% Verify all targets are atoms (places)
-    lists:all(fun(T) -> is_atom(T) end, Targets);
-is_cancel_token(_) ->
-    false.
-
-%%====================================================================
-%% Token Creation Functions
-%%====================================================================
+cancel_scope(State, ScopeId) when is_atom(ScopeId) ->
+    CancelFlags = wf_vm:exec_cancel(State),
+    NewCancelFlags = CancelFlags#{ScopeId => true},
+    wf_vm:exec_set_cancel(State, NewCancelFlags).
 
 %%--------------------------------------------------------------------
-%% @doc Creates a cancel token for the specified target or targets.
+%% @doc Cancel a specific activity (alias for cancel_scope).
 %%
-%% The target can be a single place atom or a list of place atoms.
-%% When a single atom is provided, it is wrapped in a list.
+%% Activities are the finest-grained cancellation unit. This is
+%% a semantic alias for cancel_scope/2.
 %%
-%% ```erlang
-%% > wf_cancel:create_cancel_token(p1).
-%% {cancel, [p1]}
-%% > wf_cancel:create_cancel_token([p1, p2, p3]).
-%% {cancel, [p1, p2, p3]}
-%% ```
+%% @param State The current execution state
+%% @param ActivityId The activity identifier to cancel
+%% @return Updated execution state with cancel flag set
+%%
 %% @end
 %%--------------------------------------------------------------------
--spec create_cancel_token(Target :: atom() | [atom()]) -> cancel_token().
+-spec cancel_activity(State :: wf_vm:exec_state(), ActivityId :: scope_id()) ->
+    wf_vm:exec_state().
 
-create_cancel_token(Target) when is_atom(Target) ->
-    {cancel, [Target]};
-create_cancel_token(Targets) when is_list(Targets) ->
-    {cancel, Targets}.
-
-%%====================================================================
-%% Token Inspection Functions
-%%====================================================================
+cancel_activity(State, ActivityId) ->
+    cancel_scope(State, ActivityId).
 
 %%--------------------------------------------------------------------
-%% @doc Extracts the list of target places from a cancel token.
+%% @doc Cancel a region and all scopes within it (cascading).
 %%
-%% Returns the list of places that will be affected by the cancellation.
-%% The function is total and returns an empty list for invalid tokens.
+%% Region cancellation cascades to all scopes contained in the region.
+%% All scope IDs in the region's scope list are marked as cancelled.
 %%
-%% ```erlang
-%% > Token = {cancel, [p1, p2, p3]}.
-%% > wf_cancel:cancel_targets(Token).
-%% [p1, p2, p3]
-%% > wf_cancel:cancel_targets(not_a_token).
-%% []
-%% ```
+%% @param State The current execution state
+%% @param RegionId The region identifier
+%% @param ScopeIds List of scope IDs in the region
+%% @return Updated execution state with all region scopes cancelled
+%%
 %% @end
 %%--------------------------------------------------------------------
--spec cancel_targets(Token :: cancel_token() | term()) -> [atom()].
+-spec cancel_region(
+    State :: wf_vm:exec_state(),
+    RegionId :: atom(),
+    ScopeIds :: [scope_id()]
+) -> wf_vm:exec_state().
 
-cancel_targets({cancel, Targets}) when is_list(Targets) ->
-    Targets;
-cancel_targets(_) ->
-    [].
-
-%%====================================================================
-%% Cancellation Application Functions
-%%====================================================================
+cancel_region(State, RegionId, ScopeIds) when is_atom(RegionId), is_list(ScopeIds) ->
+    CancelFlags = wf_vm:exec_cancel(State),
+    %% Mark region itself as cancelled
+    CancelFlags1 = CancelFlags#{RegionId => true},
+    %% Mark all contained scopes as cancelled
+    NewCancelFlags = lists:foldl(fun(ScopeId, Acc) ->
+        Acc#{ScopeId => true}
+    end, CancelFlags1, ScopeIds),
+    wf_vm:exec_set_cancel(State, NewCancelFlags).
 
 %%--------------------------------------------------------------------
-%% @doc Applies cancellation to a marking for a set of places.
+%% @doc Cancel the entire case (root scope cancellation).
 %%
-%% All places in the cancellation set have their tokens removed
-%% (set to empty lists). Places not in the set are preserved unchanged.
+%% Case cancellation is the highest-level cancellation. Sets the
+%% special 'root_case' flag which causes the entire execution to halt.
 %%
-%% ```erlang
-%% > Marking = #{p1 => [a, b], p2 => [c], p3 => [d]}.
-%% > wf_cancel:apply_cancellation(Marking, [p1, p3]).
-%% #{p1 => [], p2 => [c], p3 => []}
-%% ```
+%% @param State The current execution state
+%% @return Updated execution state with root case cancelled
+%%
 %% @end
 %%--------------------------------------------------------------------
--spec apply_cancellation(Marking :: marking(), CancelSet :: cancellation_set()) ->
-    marking().
+-spec cancel_case(State :: wf_vm:exec_state()) -> wf_vm:exec_state().
 
-apply_cancellation(Marking, CancelSet) when is_map(Marking), is_list(CancelSet) ->
-    %% Set all places in CancelSet to empty lists
-    lists:foldl(fun(Place, Acc) ->
-        Acc#{Place => []}
-    end, Marking, CancelSet).
-
-%%--------------------------------------------------------------------
-%% @doc Cancels all tokens in a region defined by a list of places.
-%%
-%% This is a convenience function that applies cancellation to a
-%% specific region of the workflow. All places in the region have
-%% their tokens removed.
-%%
-%% ```erlang
-%% > Marking = #{a => [1], b => [2], c => [3], d => [4]}.
-%% > Region = [b, c].
-%% > wf_cancel:cancel_region(Marking, Region).
-%% #{a => [1], b => [], c => [], d => [4]}
-%% ```
-%% @end
-%%--------------------------------------------------------------------
--spec cancel_region(Marking :: marking(), Region :: [atom()]) -> marking().
-
-cancel_region(Marking, Region) when is_map(Marking), is_list(Region) ->
-    apply_cancellation(Marking, Region).
+cancel_case(State) ->
+    cancel_scope(State, root_case).
 
 %%====================================================================
-%% Validation Functions
+%% Cancellation Query Functions
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Checks if a term is a valid cancellation set.
+%% @doc Check if a specific scope is cancelled.
 %%
-%% A valid cancellation set is a non-empty list of place atoms.
-%% The function never crashes.
+%% Returns true if the scope ID is present in cancel flags and set to true.
 %%
-%% ```erlang
-%% > wf_cancel:is_cancellation_set([p1, p2, p3]).
-%% true
-%% > wf_cancel:is_cancellation_set([]).
-%% true
-%% > wf_cancel:is_cancellation_set([p1, "not_an_atom"]).
-%% false
-%% > wf_cancel:is_cancellation_set(not_a_list).
-%% false
-%% ```
+%% @param ScopeId The scope identifier to check
+%% @param CancelFlags The cancel flags map from exec_state
+%% @return true if scope is cancelled, false otherwise
+%%
 %% @end
 %%--------------------------------------------------------------------
--spec is_cancellation_set(Term :: term()) -> boolean().
+-spec is_cancelled(ScopeId :: scope_id(), CancelFlags :: cancel_flags()) ->
+    boolean().
 
-is_cancellation_set(Term) when is_list(Term) ->
-    %% Check that all elements are atoms (places)
-    lists:all(fun(E) -> is_atom(E) end, Term);
-is_cancellation_set(_) ->
-    false.
+is_cancelled(ScopeId, CancelFlags) when is_atom(ScopeId), is_map(CancelFlags) ->
+    maps:get(ScopeId, CancelFlags, false) =:= true.
+
+%%--------------------------------------------------------------------
+%% @doc Check if any scope in a scope path is cancelled.
+%%
+%% Checks the cancellation status of all scopes in the path (innermost
+%% to outermost). Returns true if any scope in the path is cancelled,
+%% implementing hierarchical cancellation semantics.
+%%
+%% @param ScopePath List of scope IDs from innermost to outermost
+%% @param CancelFlags The cancel flags map from exec_state
+%% @return true if any scope in path is cancelled
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec is_scope_cancelled(
+    ScopePath :: scope_path(),
+    CancelFlags :: cancel_flags()
+) -> boolean().
+
+is_scope_cancelled([], _CancelFlags) ->
+    false;
+is_scope_cancelled([ScopeId | Rest], CancelFlags) ->
+    case is_cancelled(ScopeId, CancelFlags) of
+        true -> true;
+        false -> is_scope_cancelled(Rest, CancelFlags)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Check if the entire case is cancelled.
+%%
+%% Returns true if the root_case cancel flag is set.
+%%
+%% @param State The current execution state
+%% @return true if case is cancelled
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec is_case_cancelled(State :: wf_vm:exec_state()) -> boolean().
+
+is_case_cancelled(State) ->
+    CancelFlags = wf_vm:exec_cancel(State),
+    is_cancelled(root_case, CancelFlags).
+
+%%--------------------------------------------------------------------
+%% @doc Determine if a scope should be cancelled based on parent hierarchy.
+%%
+%% Checks if the scope or any of its parent scopes are cancelled.
+%% This implements cascading cancellation: if a parent is cancelled,
+%% all children are implicitly cancelled.
+%%
+%% @param ScopeId The scope to check
+%% @param Stack The execution stack (used to find parent scopes)
+%% @param CancelFlags The cancel flags map
+%% @return true if scope should be cancelled
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec should_cancel_scope(
+    ScopeId :: scope_id(),
+    Stack :: [wf_vm:stack_frame()],
+    CancelFlags :: cancel_flags()
+) -> boolean().
+
+should_cancel_scope(ScopeId, Stack, CancelFlags) ->
+    %% Check if this scope is directly cancelled
+    case is_cancelled(ScopeId, CancelFlags) of
+        true -> true;
+        false ->
+            %% Check if any parent scope is cancelled
+            ParentScopes = get_parent_scopes(ScopeId, Stack),
+            is_scope_cancelled(ParentScopes, CancelFlags)
+    end.
 
 %%====================================================================
 %% EUnit Tests
