@@ -1,0 +1,3 @@
+#!/bin/bash
+# Shortcut for ./dot bench
+exec "$(dirname "$0")/dot" bench "$@"

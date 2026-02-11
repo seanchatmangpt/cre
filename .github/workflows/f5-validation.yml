@@ -1,0 +1,298 @@
+# =============================================================================
+# Fortune-5 Line Controller Factory Validation Workflow
+# =============================================================================
+#
+# CI workflow that runs all F5 quality gates on push to main branch.
+# Builds Docker image, runs dot commands, and uploads evidence pack.
+#
+# Quality Gates:
+#   - . validate  - Compile with warnings as errors
+#   - . sync      - Sync evidence directory
+#   - . evidence  - Collect full evidence pack
+#   - . prove     - Run all proofs
+#   - . bench     - Run benchmarks
+#   - . andon     - Final andon gate check
+#
+# =============================================================================
+
+name: F5 Validation
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      skip-compile:
+        description: 'Skip compilation check'
+        required: false
+        type: boolean
+        default: false
+      skip-sync:
+        description: 'Skip evidence sync'
+        required: false
+        type: boolean
+        default: false
+      skip-evidence:
+        description: 'Skip evidence collection'
+        required: false
+        type: boolean
+        default: false
+      skip-prove:
+        description: 'Skip proof verification'
+        required: false
+        type: boolean
+        default: false
+      skip-bench:
+        description: 'Skip benchmarks'
+        required: false
+        type: boolean
+        default: false
+      skip-andon:
+        description: 'Skip andon gate check'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # =============================================================================
+  # Build Docker Image
+  # =============================================================================
+  build:
+    name: Build CRE Docker Image
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/cre
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build multi-arch image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          load: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/cre-image.tar
+
+      - name: Export image
+        run: |
+          echo "Image built successfully"
+          echo "Tags: ${{ steps.meta.outputs.tags }}"
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/cre-image.tar
+          retention-days: 1
+
+  # =============================================================================
+  # Run F5 Validation in Container
+  # =============================================================================
+  validate:
+    name: Run F5 Validation
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: |
+          docker load < /tmp/cre-image.tar
+          docker images
+
+      - name: Create evidence directory
+        run: mkdir -p evidence evidence-pack
+
+      - name: Prepare validation script arguments
+        id: args
+        run: |
+          ARGS="--output-dir=./evidence-pack"
+          if [ "${{ github.event.inputs.skip-compile }}" = "true" ]; then
+            ARGS="$ARGS --skip-compile"
+          fi
+          if [ "${{ github.event.inputs.skip-sync }}" = "true" ]; then
+            ARGS="$ARGS --skip-sync"
+          fi
+          if [ "${{ github.event.inputs.skip-evidence }}" = "true" ]; then
+            ARGS="$ARGS --skip-evidence"
+          fi
+          if [ "${{ github.event.inputs.skip-prove }}" = "true" ]; then
+            ARGS="$ARGS --skip-prove"
+          fi
+          if [ "${{ github.event.inputs.skip-bench }}" = "true" ]; then
+            ARGS="$ARGS --skip-bench"
+          fi
+          if [ "${{ github.event.inputs.skip-andon }}" = "true" ]; then
+            ARGS="$ARGS --skip-andon"
+          fi
+          echo "args=$ARGS" >> $GITHUB_OUTPUT
+
+      - name: Run F5 validation script in container
+        id: validate
+        run: |
+          docker run --rm \
+            -v "${PWD}:/work:rw" \
+            -w /work \
+            --entrypoint /bin/sh \
+            ghcr.io/${{ github.repository }}/cre:latest \
+            -c "chmod +x scripts/f5_validate.sh && scripts/f5_validate.sh ${{ steps.args.outputs.args }} --verbose" || EXIT_CODE=$?
+
+          # Capture exit code
+          echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+          # Check exit code
+          if [ $EXIT_CODE -eq 2 ]; then
+            echo "::error::Quality gate failed (andon check)"
+            exit 2
+          elif [ $EXIT_CODE -ne 0 ]; then
+            echo "::error::Validation failed"
+            exit 1
+          fi
+
+      - name: Display validation results
+        if: always()
+        run: |
+          echo "### Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f evidence-pack/quality-summary.json ]; then
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat evidence-pack/quality-summary.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload evidence pack
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidence-pack-${{ github.sha }}
+          path: evidence-pack/
+          retention-days: 30
+
+      - name: Upload validation log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-log-${{ github.sha }}
+          path: |
+            evidence-pack/validation.log
+            evidence-pack/quality-summary.json
+          retention-days: 30
+
+  # =============================================================================
+  # Quality Gate Check
+  # =============================================================================
+  quality-gate:
+    name: Quality Gate Check
+    runs-on: ubuntu-latest
+    needs: validate
+    if: always()
+
+    outputs:
+      status: ${{ steps.check.outputs.status }}
+
+    steps:
+      - name: Check validation status
+        id: check
+        run: |
+          if [ "${{ needs.validate.result }}" = "success" ]; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+            echo "### :white_check_mark: Quality Gate Passed" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          else
+            echo "status=fail" >> $GITHUB_OUTPUT
+            echo "### :x: Quality Gate Failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  # =============================================================================
+  # Report Results
+  # =============================================================================
+  report:
+    name: Generate Validation Report
+    runs-on: ubuntu-latest
+    needs: [validate, quality-gate]
+    if: always()
+
+    steps:
+      - name: Download evidence pack
+        uses: actions/download-artifact@v4
+        with:
+          name: evidence-pack-${{ github.sha }}
+          path: evidence-pack
+
+      - name: Generate validation report
+        run: |
+          cat > validation-report.md <<EOF
+          # F5 Validation Report
+
+          **Workflow Run:** ${{ github.run_number }}
+          **Commit:** ${{ github.sha }}
+          **Branch:** ${{ github.ref_name }}
+          **Actor:** ${{ github.actor }}
+          **Timestamp:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          ## Quality Gate Status
+
+          - Overall: **${{ needs.quality-gate.outputs.status }}**
+          - Validation Job: **${{ needs.validate.result }}**
+
+          ## Evidence Pack Contents
+          EOF
+
+          echo "" >> validation-report.md
+          echo '```' >> validation-report.md
+          ls -la evidence-pack/ >> validation-report.md || true
+          echo '```' >> validation-report.md
+
+          cat validation-report.md >> $GITHUB_STEP_SUMMARY
+          cat validation-report.md
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report-${{ github.sha }}
+          path: validation-report.md
+          retention-days: 90

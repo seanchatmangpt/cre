@@ -1025,6 +1025,34 @@ format_errors(Errors) ->
         ])
     end, Errors).
 
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Performs bounded model checking on the workflow specification.
+%%
+%% Checks for:
+%% - Deadlock states
+%% - Dead (unreachable) transitions
+%% - Completion problems
+%%
+%% This check is opt-in via application environment variable.
+%%--------------------------------------------------------------------
+-spec check_model_properties(specification()) -> [validation_error()].
+
+check_model_properties(Spec) ->
+    case application:get_env(cre, enable_model_checking, false) of
+        true ->
+            try
+                case yawl_model_checker:validate(Spec) of
+                    {ok, ModelWarnings} -> ModelWarnings;
+                    {error, ModelErrors} -> ModelErrors
+                end
+            catch
+                _:_ -> []  %% Silently skip if model checker is not available
+            end;
+        false ->
+            []
+    end.
+
 %%====================================================================
 %% EUnit Tests
 %%====================================================================
@@ -1192,34 +1220,6 @@ match(Prefix, Binary) ->
     case Binary of
         <<Prefix:PrefixSize/binary, _/binary>> -> true;
         _ -> false
-    end.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc Performs bounded model checking on the workflow specification.
-%%
-%% Checks for:
-%% - Deadlock states
-%% - Dead (unreachable) transitions
-%% - Completion problems
-%%
-%% This check is opt-in via application environment variable.
-%%--------------------------------------------------------------------
--spec check_model_properties(specification()) -> [validation_error()].
-
-check_model_properties(Spec) ->
-    case application:get_env(cre, enable_model_checking, false) of
-        true ->
-            try
-                case yawl_model_checker:validate(Spec) of
-                    {ok, ModelWarnings} -> ModelWarnings;
-                    {error, ModelErrors} -> ModelErrors
-                end
-            catch
-                _:_:[] -> []  %% Silently skip if model checker is not available
-            end;
-        false ->
-            []
     end.
 
 -endif.
