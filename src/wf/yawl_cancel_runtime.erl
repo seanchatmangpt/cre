@@ -72,6 +72,9 @@ The runtime operates in three phases:
 %% Cancellation application
 -export([apply_cancellation/2, process_cancel_tokens/1]).
 
+%% Trigger-based cancellation processing
+-export([handle_cancel_token/4]).
+
 %% Specification-based operations
 -export([get_cancellation_regions/1, should_cancel/3]).
 
@@ -383,6 +386,103 @@ should_cancel(Marking, TaskId, Regions) ->
     ).
 
 %%====================================================================
+%% Trigger-Based Cancellation Processing
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Handles a cancellation token during trigger callback.
+%%
+%% This function is called by gen_yawl:trigger/3 when a cancellation
+%% token is produced. It resolves scopes, applies cancellation to the
+%% marking, and returns the updated net state.
+%%
+%% Returns {pass, UpdatedNetState} to allow the token to proceed,
+%% or {drop, UpdatedNetState} to prevent it from entering the marking.
+%%
+%% ```erlang
+%% > NetState = #net_state{marking = Marking, usr_info = UsrInfo},
+%% > WrapperState = #wrapper_state{spec = Spec, binding_table = BT},
+%% > yawl_cancel_runtime:handle_cancel_token(p_trigger, {cancel, {activity, task1}},
+%% ..                                       NetState, WrapperState).
+%% {pass, NetState1}
+%% ```
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec handle_cancel_token(Place :: atom(),
+                         Token :: wf_cancel:cancel_token(),
+                         NetState :: map(),
+                         WrapperState :: term()) ->
+    {pass, map()} |
+    {drop, map()} |
+    pass.
+
+handle_cancel_token(_Place, {cancel, CancelSet}, NetState, _WrapperState)
+  when is_list(CancelSet) ->
+    %% Legacy token format - apply directly
+    Marking = maps:get(marking, NetState, #{}),
+    UpdatedMarking = wf_cancel:apply_cancellation(Marking, CancelSet),
+    {pass, maps:update(marking, UpdatedMarking, NetState)};
+
+handle_cancel_token(_Place, {cancel, Scope}, NetState, WrapperState) ->
+    %% Scope-based cancellation token
+    %% Extract spec and binding table from wrapper state
+    Spec = get_spec(WrapperState),
+    BindingTable = get_binding_table(WrapperState),
+
+    case Spec of
+        undefined ->
+            %% No spec available - can't resolve scope, return pass
+            pass;
+        _ ->
+            %% Resolve scope to concrete places
+            CancelSet = wf_cancel:resolve_scope(Scope, BindingTable, Spec),
+
+            case CancelSet of
+                [] ->
+                    %% Empty cancellation set - nothing to cancel
+                    pass;
+                _ ->
+                    %% Apply cancellation to marking
+                    Marking = maps:get(marking, NetState, #{}),
+                    UpdatedMarking = wf_cancel:apply_cancellation(Marking, CancelSet),
+                    {pass, maps:update(marking, UpdatedMarking, NetState)}
+            end
+    end;
+
+handle_cancel_token(_Place, _Token, _NetState, _WrapperState) ->
+    %% Not a cancellation token - pass through
+    pass.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Extracts spec from wrapper state.
+%%
+%% Handles different wrapper state structures for compatibility.
+%%--------------------------------------------------------------------
+-spec get_spec(WrapperState :: term()) -> wf_spec:yawl_spec() | undefined.
+
+get_spec(#{spec := Spec}) when is_map(Spec) ->
+    Spec;
+get_spec(#{spec := Spec}) ->
+    Spec;
+get_spec(_) ->
+    undefined.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Extracts binding table from wrapper state.
+%%
+%% Handles different wrapper state structures for compatibility.
+%%--------------------------------------------------------------------
+-spec get_binding_table(WrapperState :: term()) -> wf_scope:binding_table().
+
+get_binding_table(#{binding_table := BT}) when is_map(BT) ->
+    BT;
+get_binding_table(_) ->
+    #{}.
+
+%%====================================================================
 %% Internal Functions
 %%====================================================================
 
@@ -631,6 +731,41 @@ cascade_cancellation_test() ->
     ?assertEqual([safe], maps:get(region_c, Updated)),
     %% Two cancellations occurred
     ?assertEqual(2, length(Regions)).
+
+%%--------------------------------------------------------------------
+%% @doc Test handle_cancel_token/4 with legacy token format
+%%--------------------------------------------------------------------
+handle_cancel_token_legacy_test() ->
+    NetState = #{marking => #{p1 => [a], p2 => [b], p3 => [c]}},
+    WrapperState = #{},
+
+    %% Legacy token with list of places
+    ?assertEqual({pass, #{marking => #{p1 => [], p2 => [b], p3 => [c]}}},
+                 handle_cancel_token(p_trigger, {cancel, [p1]}, NetState, WrapperState)),
+
+    %% Multiple places
+    ?assertEqual({pass, #{marking => #{p1 => [], p2 => [], p3 => [c]}}},
+                 handle_cancel_token(p_trigger, {cancel, [p1, p2]}, NetState, WrapperState)).
+
+%%--------------------------------------------------------------------
+%% @doc Test handle_cancel_token/4 with scope tokens (no spec)
+%%--------------------------------------------------------------------
+handle_cancel_token_scope_test() ->
+    NetState = #{marking => #{p1 => [a], p2 => [b], p3 => [c]}},
+    WrapperState = #{},  % No spec
+
+    %% Scope token without spec should return pass (can't resolve)
+    ?assertEqual(pass, handle_cancel_token(p_trigger, {cancel, {'case', all}}, NetState, WrapperState)).
+
+%%--------------------------------------------------------------------
+%% @doc Test handle_cancel_token/4 with non-cancel token
+%%--------------------------------------------------------------------
+handle_cancel_token_passthrough_test() ->
+    NetState = #{marking => #{p1 => [a]}},
+    WrapperState = #{},
+
+    %% Non-cancel token should pass through
+    ?assertEqual(pass, handle_cancel_token(p_trigger, normal_token, NetState, WrapperState)).
 
 %%--------------------------------------------------------------------
 %% @doc Test cancellation case (all places)

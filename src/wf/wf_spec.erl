@@ -101,6 +101,7 @@ true
 -export([task_params/2, task_param/3]).
 -export([conditions/1, condition_expr/2]).
 -export([all_decompositions/1, decomposition_tasks/2]).
+-export([task_places/2, all_places/1]).
 
 %% Validation and compilation
 -export([validate/1, compile/1]).
@@ -653,6 +654,41 @@ decomposition_tasks(#yawl_spec{decompositions = Decomps}, DecompositionId) ->
         #decomposition_info{tasks = Tasks} -> {ok, Tasks};
         _ -> {error, not_found}
     end.
+
+%%--------------------------------------------------------------------
+%% @doc Gets all places for a specific task.
+%%
+%% Returns a list of place atoms associated with the task.
+%% This includes input, output, and any internal places for the task.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec task_places(Spec :: yawl_spec(), TaskId :: task_id()) -> [place()] | undefined.
+
+task_places(#yawl_spec{tasks = Tasks, places = AllPlaces}, TaskId) ->
+    case maps:get(TaskId, Tasks, undefined) of
+        #task_info{} ->
+            %% Filter places that belong to this task
+            %% Task places typically have names like: taskName_in, taskName_out, etc.
+            TaskPrefix = atom_to_list(TaskId),
+            [Place || Place <- AllPlaces,
+                      is_atom(Place),
+                      lists:prefix(TaskPrefix, atom_to_list(Place))];
+        undefined ->
+            undefined
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Gets all places in the workflow specification.
+%%
+%% Returns a complete list of all place atoms in the Petri net.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec all_places(Spec :: yawl_spec()) -> [place()].
+
+all_places(#yawl_spec{places = Places}) ->
+    Places.
 
 %%====================================================================
 %% Validation Functions
