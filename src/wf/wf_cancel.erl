@@ -20,122 +20,124 @@
 
 -module(wf_cancel).
 -moduledoc """
-Cancellation token handling for YAWL cancellation regions.
+Cancellation semantics for WF Substrate bytecode VM.
 
-Manages cancellation tokens that terminate workflow regions when
-specific conditions are met. Cancellation regions are used in YAWL
-workflows to model scenarios where the occurrence of a specific event
-(e.g., cancellation, timeout, or error) should terminate all activities
-within a designated region.
+Implements cancellation flag propagation, scope cleanup, and soundness
+guarantees for workflow cancellation. Cancellation is hierarchical:
+when a scope is cancelled, all nested scopes are also cancelled.
+
+According to WF_ARCHITECTURE.md:
+
+- Activity cancellation: Cancels a single activity/task
+- Region cancellation: Cancels all activities in a region (cascading)
+- Case cancellation: Cancels the entire workflow case (root scope)
+- Soundness: Cancelled tokens never fire transitions
 
 ```erlang
-> wf_cancel:is_cancel_token({cancel, [p1, p2]}).
-true
-> wf_cancel:is_cancel_token({other, tuple}).
-false
+%% Cancel a specific scope
+State = wf_vm:exec_state(Program, PC, Stack, Ctx, #{}, #{}, []).
+State1 = wf_cancel:cancel_scope(State, scope_id).
+CancelFlags = wf_vm:exec_cancel(State1).
+true = wf_cancel:is_cancelled(scope_id, CancelFlags).
 
-> Token = wf_cancel:create_cancel_token([region_place1, region_place2]).
-{cancel, [region_place1, region_place2]}
+%% Check if any scope in path is cancelled
+Stack = [{seq, seq1, _}, {cancel_scope, region1, _}].
+Scope = [seq1, region1].
+true = wf_cancel:is_scope_cancelled(Scope, #{region1 => true}).
 
-> wf_cancel:cancel_targets(Token).
-[region_place1, region_place2]
+%% Cancel case (root scope)
+State2 = wf_cancel:cancel_case(State).
+true = wf_cancel:is_case_cancelled(State2).
 
-> Marking = #{p1 => [a], p2 => [b], p3 => [c]}.
-> wf_cancel:apply_cancellation(Marking, [p1, p2]).
-#{p1 => [], p2 => [], p3 => [c]}
-
-> Marking = #{p1 => [a], p2 => [b], p3 => [c], p4 => [d]}.
-> Region = [p2, p3].
-> wf_cancel:cancel_region(Marking, Region).
-#{p1 => [a], p2 => [], p3 => [], p4 => [d]}
-
-> wf_cancel:is_cancellation_set([p1, p2, p3]).
-true
-> wf_cancel:is_cancellation_set(not_a_list).
-false
-> wf_cancel:is_cancellation_set([p1, "not_an_atom"]).
-false
+%% Cascade cancellation to nested scopes
+CancelFlags = #{parent => true}.
+Stack = [{cancel_scope, child, _}, {cancel_scope, parent, _}].
+true = wf_cancel:should_cancel_scope(child, Stack, CancelFlags).
 ```
 
-<h3>Token Types</h3>
-<ul>
-  <li><strong>cancel_token:</strong> `{cancel, [atom()]}` - Identifies targets to cancel</li>
-  <li><strong>cancel_region:</strong> `{cancel_region, atom(), [atom()]}` - Named region with places</li>
-</ul>
+<h3>Cancellation Semantics</h3>
 
-<h3>Cancellation Behavior</h3>
-When a cancel token is processed:
-<ol>
-  <li>Remove all tokens from places in the cancellation set</li>
-  <li>Set those places to empty lists</li>
-  <li>Return the updated marking</li>
-</ol>
+1. **Activity Cancellation**: Sets cancel flag for single scope ID
+2. **Region Cancellation**: Cascades to all scopes in region hierarchy
+3. **Case Cancellation**: Sets root case cancel flag
+4. **Scope Cleanup**: Removes cancelled scope frames from stack
+5. **Soundness**: Cancelled tokens never enable transitions
 
-<h3>Usage in YAWL Workflows</h3>
-Cancellation tokens are typically used in workflow patterns such as:
-<ul>
-  <li><strong>Cancel Case:</strong> Terminate an entire workflow case</li>
-  <li><strong>Cancel Region:</strong> Terminate activities within a specific region</li>
-  <li><strong>Cancel Activity:</strong> Terminate a specific task or activity</li>
-</ul>
+<h3>Cancel Flag Propagation</h3>
+
+Cancel flags are stored in exec_state.cancel as a map #{ScopeId => bool}.
+When a scope is cancelled, all child scopes in the stack hierarchy
+inherit the cancellation flag.
 """.
 
 %%====================================================================
 %% Exports
 %%====================================================================
 
-%% Token validation
--export([is_cancel_token/1]).
+%% Scope cancellation
+-export([
+    cancel_scope/2,
+    cancel_activity/2,
+    cancel_region/3,
+    cancel_case/1
+]).
 
-%% Token creation
--export([create_cancel_token/1]).
+%% Cancellation queries
+-export([
+    is_cancelled/2,
+    is_scope_cancelled/2,
+    is_case_cancelled/1,
+    should_cancel_scope/3
+]).
 
-%% Token inspection
--export([cancel_targets/1]).
+%% Scope cleanup
+-export([
+    cleanup_cancelled_scopes/1,
+    remove_scope_flag/2
+]).
 
-%% Cancellation application
--export([apply_cancellation/2, cancel_region/2]).
-
-%% Validation
--export([is_cancellation_set/1]).
+%% Stack introspection
+-export([
+    find_scope_in_stack/2,
+    get_nested_scopes/2,
+    get_parent_scopes/2
+]).
 
 %%====================================================================
 %% Types
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc A cancel token identifies places to be cleared.
+%% @doc A scope identifier (activity, region, or case ID).
 %%
-%% The first element is the atom `cancel` and the second is a list
-%% of place atoms that should have their tokens removed.
+%% Scope IDs are atoms that uniquely identify cancellation boundaries.
 %%--------------------------------------------------------------------
--type cancel_token() :: {cancel, [atom()]}.
+-type scope_id() :: atom().
 
 %%--------------------------------------------------------------------
-%% @doc A cancel region defines a named region with its places.
+%% @doc A scope path is a list of scope IDs from innermost to outermost.
 %%
-%% Used for defining cancellation regions in workflow specifications.
+%% Used to check if any ancestor scope is cancelled.
 %%--------------------------------------------------------------------
--type cancel_region() :: {cancel_region, atom(), [atom()]}.
+-type scope_path() :: [scope_id()].
 
 %%--------------------------------------------------------------------
-%% @doc A cancellation set is a list of place atoms to be cancelled.
+%% @doc Cancel flags map scope IDs to cancellation status.
 %%
-%% All places in the set will have their tokens removed when the
-%% cancellation is applied.
+%% This is the cancel field in exec_state: #{ScopeId => boolean()}.
+%% true = scope is cancelled, false or missing = not cancelled.
 %%--------------------------------------------------------------------
--type cancellation_set() :: [atom()].
+-type cancel_flags() :: #{scope_id() => boolean()}.
 
 %%--------------------------------------------------------------------
-%% @doc A marking maps places to their token multisets.
+%% @doc Region specification for region cancellation.
 %%
-%% This is the standard Petri net marking representation used
-%% throughout the workflow engine.
+%% Identifies a named region that may contain multiple scopes.
 %%--------------------------------------------------------------------
--type marking() :: #{atom() => [term()]}.
+-type region_spec() :: {region, atom(), [scope_id()]}.
 
 %% Export types
--export_type([cancel_token/0, cancel_region/0, cancellation_set/0]).
+-export_type([scope_id/0, scope_path/0, cancel_flags/0, region_spec/0]).
 
 %%====================================================================
 %% Token Validation Functions
