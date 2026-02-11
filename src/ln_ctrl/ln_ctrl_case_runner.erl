@@ -210,9 +210,9 @@ step_execution(State) ->
         {continue, NewExecState} ->
             {State#state{exec_state = NewExecState}, continue};
         {yield, Spec, NewExecState} ->
-            %% Effect issued, queue it
-            NewEffectsQueue = State#state.effects_queue ++ [Spec],
-            {State#state{exec_state = NewExecState, effects_queue = NewEffectsQueue}, continue};
+            %% Effect issued, execute it and collect result
+            NewState = execute_effect(State#state{exec_state = NewExecState}, Spec),
+            {NewState, continue};
         {halt, ok, NewExecState} ->
             NewState = State#state{
                 exec_state = NewExecState,
@@ -227,6 +227,109 @@ step_execution(State) ->
             },
             {NewState, halt}
     end.
+
+%% Execute an effect and update state
+-spec execute_effect(#state{}, term()) -> #state{}.
+execute_effect(State, Spec) ->
+    %% Extract effect details
+    EffectID = extract_effect_id(Spec),
+    Connector = extract_connector(Spec),
+    Params = extract_params(Spec),
+
+    %% Check budget before executing
+    Budget = State#state.budget,
+    case ln_ctrl_budget:check_effect(Budget, Params) of
+        {ok, NewBudget} ->
+            %% Execute effect with idempotency check
+            StartTime = erlang:monotonic_time(millisecond),
+            Handle = ln_receipt_effect:start_effect(EffectID, Connector, Params),
+
+            case ln_receipt_effect:idempotent_receipt(EffectID, Params) of
+                {ok, CachedReceipt} ->
+                    %% Idempotent: return cached result
+                    Result = maps:get(result, CachedReceipt, ok),
+                    update_with_effect_result(State, EffectID, Result, NewBudget);
+                not_found ->
+                    %% Execute effect via connector
+                    case execute_connector_call(Connector, Params) of
+                        {ok, Result} ->
+                            Latency = erlang:monotonic_time(millisecond) - StartTime,
+                            {ok, Receipt} = ln_receipt_effect:complete(Handle, Result, Latency),
+                            ln_receipt_andon:set_green(State#state.receipt_log),
+                            update_with_effect_result(State, EffectID, Result, NewBudget);
+                        {error, Reason} ->
+                            Latency = erlang:monotonic_time(millisecond) - StartTime,
+                            {ok, Receipt} = ln_receipt_effect:failed(Handle, Reason, Latency),
+                            ln_receipt_andon:set_red(State#state.receipt_log, Reason),
+                            State#state{
+                                case_status = error,
+                                error_reason = {effect_failed, EffectID, Reason},
+                                budget = NewBudget
+                            }
+                    end
+            end;
+        {budget_exceeded, Details, NewBudget} ->
+            %% Budget exceeded, halt execution
+            ln_receipt_andon:set_red(State#state.receipt_log, Details),
+            State#state{
+                case_status = error,
+                error_reason = {budget_exceeded, Details},
+                budget = NewBudget
+            }
+    end.
+
+%% Update state with effect result
+-spec update_with_effect_result(#state{}, atom(), term(), ln_ctrl_budget:budget()) -> #state{}.
+update_with_effect_result(State, EffectID, Result, NewBudget) ->
+    NewEffectResults = maps:put(EffectID, Result, State#state.effect_results),
+    ExecState = State#state.exec_state,
+    %% Update execution context with result
+    ExecCtx = wf_vm:exec_ctx(ExecState),
+    NewExecCtx = maps:put(EffectID, Result, ExecCtx),
+    NewExecState = wf_vm:exec_set_ctx(ExecState, NewExecCtx),
+    State#state{
+        exec_state = NewExecState,
+        effect_results = NewEffectResults,
+        budget = NewBudget
+    }.
+
+%% Execute connector call
+-spec execute_connector_call(atom(), map()) -> {ok, term()} | {error, term()}.
+execute_connector_call(Connector, Params) ->
+    case Connector of
+        siem -> incident_connector_siem:ingest(maps:get(alert, Params, #{}));
+        edr -> incident_connector_edr:quarantine(maps:get(device_id, Params, unknown));
+        ticket -> incident_connector_ticket:create(maps:get(ticket_data, Params, #{}));
+        notify -> incident_connector_notify:notify(maps:get(recipient, Params, unknown), maps:get(message, Params, <<>>));
+        _ -> {error, unknown_connector}
+    end.
+
+%% Extract effect ID from spec
+-spec extract_effect_id(term()) -> atom().
+extract_effect_id(Spec) when is_map(Spec) ->
+    maps:get(effect_id, Spec, erlang:unique_integer([positive]));
+extract_effect_id({effect, ID, _Connector, _Params}) ->
+    ID;
+extract_effect_id(_) ->
+    erlang:unique_integer([positive]).
+
+%% Extract connector from spec
+-spec extract_connector(term()) -> atom().
+extract_connector(Spec) when is_map(Spec) ->
+    maps:get(connector, Spec, unknown);
+extract_connector({effect, _ID, Connector, _Params}) ->
+    Connector;
+extract_connector(_) ->
+    unknown.
+
+%% Extract params from spec
+-spec extract_params(term()) -> map().
+extract_params(Spec) when is_map(Spec) ->
+    maps:get(params, Spec, #{});
+extract_params({effect, _ID, _Connector, Params}) when is_map(Params) ->
+    Params;
+extract_params(_) ->
+    #{}.
 
 %% Cancel root scope
 -spec cancel_root_scope(#state{}) -> #state{}.
