@@ -336,7 +336,10 @@ start_cre_webservice(Port)
 
     Dispatch =
         cowboy_router:compile(
-          [{'_', [{"/[status.json]", cre_status_handler, []},
+          [{'_', [{"/health", cre_health, []},
+                  {"/ready", cre_health, []},
+                  {"/startup", cre_health, []},
+                  {"/[status.json]", cre_status_handler, []},
                   {"/history.json", cre_history_handler, []}]}]),
 
     Reply = cowboy:start_clear(cre_status_listener,
