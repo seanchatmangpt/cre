@@ -126,6 +126,9 @@ cancellation for complex workflow exception handling.
 %% Region information
 -export([region_places/1, region_transitions/1, region_name/1]).
 
+%% XES logging integration
+-export([log_cancel_event/2, log_cancel_event/3]).
+
 %%====================================================================
 %% Types
 %%====================================================================
@@ -520,6 +523,78 @@ region_places(_) -> [].
 
 region_transitions(#{transitions := Transitions}) when is_list(Transitions) -> Transitions;
 region_transitions(_) -> [].
+
+%%====================================================================
+%% XES Logging Integration
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Logs a cancellation event to XES.
+%%
+%% Logs when a region, activity, or case is cancelled for
+%% process mining and audit trail purposes.
+%%
+%% ```erlang
+%% > Region = cancellation:define_region(my_region, [p1, p2]),
+%% > cancellation:log_cancel_event(Region, cancel_activity, p1).
+%% > cancellation:log_cancel_event(Region, cancel_case, undefined).
+%% '''
+%%
+%% @param Region The region being cancelled
+%% @param CancelType Type of cancellation (cancel_activity, cancel_case, cancel_region)
+%% @param Target The specific target being cancelled (place, transition, or undefined)
+%% @return ok
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec log_cancel_event(region(), atom()) -> ok.
+log_cancel_event(Region, CancelType) ->
+    log_cancel_event(Region, CancelType, undefined).
+
+%%--------------------------------------------------------------------
+%% @doc Logs a cancellation event to XES with target.
+%%
+%% @param Region The region being cancelled
+%% @param CancelType Type of cancellation
+%% @param Target The specific target being cancelled
+%% @return ok
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec log_cancel_event(region(), atom(), term()) -> ok.
+log_cancel_event(Region, CancelType, Target) ->
+    case whereis(yawl_xes) of
+        undefined ->
+            %% XES logger not available, skip logging
+            ok;
+        _Pid ->
+            RegionName = region_name(Region),
+            EventName = <<"Cancellation_", (atom_to_binary(CancelType))/binary>>,
+            try
+                yawl_xes:log_event(
+                    <<"yawl_default_log">>,
+                    EventName,
+                    <<"abort">>,
+                    #{
+                        <<"region_name">> => atom_to_binary(RegionName),
+                        <<"cancel_type">> => atom_to_binary(CancelType),
+                        <<"target">> => format_target(Target),
+                        <<"places_affected">> => length(region_places(Region))
+                    },
+                    undefined
+                )
+            catch
+                _:_ ->
+                    %% Silent fail if XES logging fails
+                    ok
+            end
+    end.
+
+%% @private
+format_target(undefined) -> <<"undefined">>;
+format_target(Target) when is_atom(Target) -> atom_to_binary(Target);
+format_target(Target) when is_binary(Target) -> Target;
+format_target(Target) -> list_to_binary(io_lib:format("~p", [Target])).
 
 %%====================================================================
 %% EUnit Tests

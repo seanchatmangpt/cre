@@ -48,7 +48,7 @@ agi_symposium_spec_minimal() ->
 -spec agi_symposium_spec_full() -> map().
 agi_symposium_spec_full() ->
     #{
-        places => [p_start, p_pc, p_rev, p_ops, p_venue, p_press, p_end],
+        places => [p_start, p_task, p_pc, p_rev, p_ops, p_venue, p_press, p_end],
         transitions => #{
             t_program_chair => #{
                 preset => [p_start],

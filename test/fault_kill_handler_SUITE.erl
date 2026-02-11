@@ -135,8 +135,8 @@ induce_timeout_test(_Config) ->
     %% Get effect handler
     {ok, EffectHandlerPid} = get_effect_handler_pid(Pid),
 
-    %% Spawn blocker to induce timeout
-    BlockerPid = spawn_link(fun() ->
+    %% Spawn blocker to induce timeout (use spawn, not spawn_link)
+    BlockerPid = spawn(fun() ->
         %% Block the effect handler
         f5_fault_injector:block_process(EffectHandlerPid, 200),
         timer:sleep(200)
@@ -373,35 +373,51 @@ evidence_collection_after_fault_test(_Config) ->
 %% @private Start a test workflow instance
 start_test_workflow() ->
     %% Create a simple gen_server as test workflow
-    {ok, Pid} = gen_server:start_link(?MODULE, [], []),
-    {ok, Pid}.
+    %% Use spawn instead of start_link to avoid linking to test process
+    case gen_server:start(?MODULE, [], []) of
+        {ok, Pid} -> {ok, Pid};
+        {error, {already_started, Pid}} -> {ok, Pid}
+    end.
 
 %% @private Start a test workflow with timeout
 start_test_workflow_with_timeout(Timeout) ->
-    {ok, Pid} = gen_server:start_link(?MODULE, [Timeout], []),
-    {ok, Pid}.
+    %% Use spawn instead of start_link to avoid linking to test process
+    case gen_server:start(?MODULE, [Timeout], []) of
+        {ok, Pid} -> {ok, Pid};
+        {error, {already_started, Pid}} -> {ok, Pid}
+    end.
 
 %% @private Start a multi-step workflow
 start_multi_step_workflow() ->
-    {ok, Pid} = gen_server:start_link(?MODULE, [multi_step], []),
-    {ok, Pid}.
+    %% Use spawn instead of start_link to avoid linking to test process
+    case gen_server:start(?MODULE, [multi_step], []) of
+        {ok, Pid} -> {ok, Pid};
+        {error, {already_started, Pid}} -> {ok, Pid}
+    end.
 
 %% @private Start workflow that executes effects
 start_workflow_with_effects() ->
-    {ok, Pid} = gen_server:start_link(?MODULE, [with_effects], []),
-    {ok, Pid}.
+    %% Use spawn instead of start_link to avoid linking to test process
+    case gen_server:start(?MODULE, [with_effects], []) of
+        {ok, Pid} -> {ok, Pid};
+        {error, {already_started, Pid}} -> {ok, Pid}
+    end.
 
 %% @private Start a slow workflow for timeout tests
 start_slow_workflow() ->
-    {ok, Pid} = gen_server:start_link(?MODULE, [slow], []),
-    {ok, Pid}.
+    %% Use spawn instead of start_link to avoid linking to test process
+    case gen_server:start(?MODULE, [slow], []) of
+        {ok, Pid} -> {ok, Pid};
+        {error, {already_started, Pid}} -> {ok, Pid}
+    end.
 
 %% @private Get effect handler pid from ln_ctrl state
 %% This is a simulation - in real implementation we'd introspect state
 get_effect_handler_pid(_CtrlPid) ->
     %% Simulate getting effect handler pid
     %% In practice, this would query the ln_ctrl state
-    Pid = spawn_link(fun() ->
+    %% Use spawn instead of spawn_link to avoid linking to test process
+    Pid = spawn(fun() ->
         receive
             stop -> ok
         end
