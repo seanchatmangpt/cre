@@ -86,8 +86,8 @@
 %% ```erlang
 %% 1> {ok, {_Flags, Children}} = cre_sup:init([]),
 %% 1> true = is_list(Children),
-%% 1> 7 = length(Children).
-%% 7
+%% 1> 8 = length(Children).
+%% 8
 %% ```
 %%
 %% @end
@@ -187,18 +187,22 @@ Defines supervisor flags and child specifications for the CRE supervision tree.
 
 ## Child Specifications
 
-Returns a list of 4 child specifications:
+Returns a list of 8 child specifications:
 - `cre_master` - temporary restart, 5000ms shutdown
 - `yawl_timeout` - permanent restart, 5000ms shutdown
 - `yawl_xes` - permanent restart, 5000ms shutdown
 - `yawl_approval` - permanent restart, 5000ms shutdown
+- `yawl_workflow_supervisor` - supervisor, infinity shutdown
+- `yawl_worklist` - permanent restart, 5000ms shutdown
+- `yawl_registry` - permanent restart, 5000ms shutdown
+- `license_sup` - supervisor (license enforcement), 5000ms shutdown
 
 ## Example
 
 ```erlang
 1> {ok, {#{strategy := one_for_one}, Children}} = cre_sup:init([]),
-1> 4 = length(Children).
-4
+1> 8 = length(Children).
+8
 ```
 """).
 -spec init(_) -> {ok, {#{
@@ -261,6 +265,15 @@ init(_Args) ->
                        modules => [yawl_workflow_supervisor]
                       },
 
+    CaseSupSpec = #{
+                    id => wf_case_sup,
+                    start => {wf_case_sup, start_link, []},
+                    restart => permanent,
+                    shutdown => infinity,
+                    type => supervisor,
+                    modules => [wf_case_sup]
+                   },
+
     WorklistSpec = #{
                     id => yawl_worklist,
                     start => {yawl_worklist, start_link, []},
@@ -279,7 +292,16 @@ init(_Args) ->
                     modules => [yawl_registry]
                    },
 
-    {ok, {SupFlags, [ChildSpec, TimeoutSpec, XesSpec, ApprovalSpec, WorkflowSupSpec, WorklistSpec, RegistrySpec]}}.
+    LicenseSupSpec = #{
+                      id => license_sup,
+                      start => {license_sup, start_link, []},
+                      restart => permanent,
+                      shutdown => 5000,
+                      type => supervisor,
+                      modules => [license_sup]
+                     },
+
+    {ok, {SupFlags, [ChildSpec, TimeoutSpec, XesSpec, ApprovalSpec, WorkflowSupSpec, CaseSupSpec, WorklistSpec, RegistrySpec, LicenseSupSpec]}}.
 
 %%====================================================================
 %% Doctests
@@ -329,7 +351,7 @@ doctest_test() ->
     %% Test 5: Verify child specs count
     {ok, {_, Children}} = init([]),
     true = is_list(Children),
-    7 = length(Children),
+    9 = length(Children),
 
     %% Test 6: Verify child specs have required fields
     [
@@ -353,8 +375,10 @@ doctest_test() ->
     true = lists:member(yawl_xes, ChildIds),
     true = lists:member(yawl_approval, ChildIds),
     true = lists:member(yawl_workflow_supervisor, ChildIds),
+    true = lists:member(wf_case_sup, ChildIds),
     true = lists:member(yawl_worklist, ChildIds),
     true = lists:member(yawl_registry, ChildIds),
+    true = lists:member(license_sup, ChildIds),
 
     %% Test 8: Verify cre_master spec details
     {ok, {_, Children2}} = init([]),
@@ -373,11 +397,11 @@ doctest_test() ->
     permanent = maps:get(restart, TimeoutSpec2),
     worker = maps:get(type, TimeoutSpec2),
 
-    %% Test 10: Verify child types (we have 6 workers and 1 supervisor)
+    %% Test 10: Verify child types (we have 6 workers and 3 supervisors)
     {ok, {_, Children4}} = init([]),
     WorkerCount = lists:filter(fun(C) -> worker =:= maps:get(type, C) end, Children4),
     SupCount = lists:filter(fun(C) -> supervisor =:= maps:get(type, C) end, Children4),
     6 = length(WorkerCount),
-    1 = length(SupCount),
+    3 = length(SupCount),
 
     ok.

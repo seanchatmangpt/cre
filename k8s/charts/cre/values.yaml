@@ -300,3 +300,19 @@ externalConfig:
   dbHost: ""
   dbPort: ""
   dbName: ""
+
+# -- License configuration for Google Cloud Marketplace BYOL model
+license:
+  # -- EULA acceptance (must be true for Marketplace deployment)
+  # Set to true in Marketplace UI to accept the Apache License 2.0
+  acceptEula: false
+
+  # -- Grace period in days (for deployments without EULA acceptance)
+  # CRE will run for this many days without EULA acceptance
+  gracePeriodDays: 30
+
+  # -- License file mount path (where EULA acceptance is stored)
+  licenseFile: /opt/cre/data/license/eula_acceptance.json
+
+  # -- Usage data directory (for v2 usage-based billing migration)
+  usageDataDir: /opt/cre/data/usage
