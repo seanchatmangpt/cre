@@ -1,0 +1,49 @@
+\chapter{Mathematical Foundations}
+\label{ch:math}
+
+\section{Ontologies as Riemannian Manifolds}
+
+\begin{definition}[Ontology Manifold]
+An ontology $\onto$ is a triple $(V, E, \Sigma)$ where:
+\begin{itemize}
+    \item $V$ is the set of concept nodes
+    \item $E \subseteq V \times V$ is the set of semantic relationships
+    \item $\Sigma: V \to \mathcal{L}$ maps concepts to logical specifications
+\end{itemize}
+We endow $\onto$ with a Riemannian metric $g_{ij}$ where $g_{ij} = \expect{\nabla \Sigma_i, \nabla \Sigma_j}$.
+\end{definition}
+
+\section{The Generation Fiber Bundle}
+
+Code generation can be formalized as a fiber bundle $\pi: E \to \onto$ where:
+\begin{itemize}
+    \item Base space: ontology manifold $\onto$
+    \item Total space: code manifold bundle $E$
+    \item Fiber: $\pi^{-1}(v)$ = all code implementations of concept $v$
+    \item Projection: $\pi$ maps code back to originating concept
+\end{itemize}
+
+\begin{theorem}[Geodesic Generation]
+The optimal code generation path is a geodesic in the total space $E$ with respect to the induced metric.
+\end{theorem}
+
+\section{Christoffel Symbols for SPARQL Queries}
+
+SPARQL graph pattern matching computes the Christoffel symbols $\Gamma^k_{ij}$ that define parallel transport in the ontology manifold:
+
+\begin{equation}
+\Gamma^k_{ij} = \frac{1}{2} g^{kl} \left( \frac{\partial g_{jl}}{\partial x^i} + \frac{\partial g_{il}}{\partial x^j} - \frac{\partial g_{ij}}{\partial x^l} \right)
+\end{equation}
+
+This explains why SPARQL is a natural language for ontology traversal: it computes the connection coefficients!
+
+\section{Information Density Tensor}
+
+\begin{definition}[Information Density Tensor]
+The information density at point $p \in \onto$ is the Ricci tensor:
+\begin{equation}
+\text{Ric}_{ij} = R^k_{ikj} = \frac{\partial \Gamma^k_{ij}}{\partial x^k} - \frac{\partial \Gamma^k_{ik}}{\partial x^j} + \Gamma^k_{ij}\Gamma^l_{kl} - \Gamma^k_{il}\Gamma^l_{kj}
+\end{equation}
+\end{definition}
+
+High curvature regions (many interconnected concepts) have high generative capacity.

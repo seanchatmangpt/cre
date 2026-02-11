@@ -1,0 +1,65 @@
+\chapter{Manufacturing Architecture}
+\label{ch:architecture}
+
+\section{Fortune-5 FIBO LineController Factory}
+
+The experimental apparatus consists of four layers:
+
+\subsection{Layer 1: FIBO-Aligned Control Ontology}
+
+The base ontology (\texttt{f5\_line\_control.ttl}) defines:
+\begin{itemize}
+    \item 30+ connector types (CRM, KYC/AML, Credit Bureau, Treasury, etc.)
+    \item 20 operations per connector = 600 operation modules
+    \item Generation patterns specifying LOC multipliers
+    \item FIBO references for semantic grounding
+\end{itemize}
+
+\begin{lstlisting}[language=]
+f5:CRMConnector a ln:Connector ;
+    ln:connectorId "crm" ;
+    ln:operations ( f5:CreateLeadOp f5:UpdateLeadOp ... ) ;
+    ln:authScheme "oauth2" ;
+    ln:rateLimit "1000/min" .
+\end{lstlisting}
+
+\subsection{Layer 2: SPARQL Extraction}
+
+SPARQL queries traverse the ontology graph, extracting connector metadata:
+
+\begin{lstlisting}[language=SQL]
+SELECT ?connectorId ?name ?authScheme ?rateLimit
+       (GROUP_CONCAT(?operation; separator=",") AS ?operations)
+WHERE {
+    ?connector a ln:Connector ;
+               ln:connectorId ?connectorId ;
+               ln:operations ?opList .
+    ?opList rdf:rest*/rdf:first ?operation .
+}
+\end{lstlisting}
+
+This computes the parallel transport along semantic edges.
+
+\subsection{Layer 3: Tera Template Engine}
+
+Templates define the fiber structure---how concepts map to code:
+
+\begin{lstlisting}
+-module(f5_connector_{{ connectorId }}).
+{% for op in operations %}
+{{ op | lower }}(Params) ->
+    gen_server:call(?MODULE, { {{op | lower }}, Params}).
+{% endfor %}
+\end{lstlisting}
+
+\subsection{Layer 4: OTP Evidence Harness}
+
+The \texttt{f5\_evidence} module collects runtime proofs using OTP-native calls:
+
+\begin{itemize}
+    \item \texttt{erlang:system\_info/*} for VM state
+    \item \texttt{erlang:process\_info/*} for scheduler statistics
+    \item \texttt{crypto:hash/2} for cryptographic chaining
+\end{itemize}
+
+This ensures evidence cannot be faked---it requires actual BEAM VM execution.
