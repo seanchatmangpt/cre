@@ -304,6 +304,7 @@ def generate_app_file(app_name, modules):
  [{{description, "Fortune-5 {app_name} application"}},
   {{vsn, "0.3.0"}},
   {{registered, []}},
+  {{mod, {{{app_name}_app, []}}}},
   {{applications, [kernel, stdlib]}},
   {{modules, [
         {mod_list}
