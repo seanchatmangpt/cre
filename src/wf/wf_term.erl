@@ -25,13 +25,7 @@
     %% Utility functions
     is_valid/1,
     term_size/1,
-    to_string/1,
-
-    %% Derived constructors (smart constructors)
-    simple_merge/1,
-    synchronizing_merge/1,
-    discriminator/1,
-    n_out_of_m/2
+    to_string/1
 ]).
 
 %% Type exports
@@ -228,34 +222,6 @@ mi(Policy, Body) when is_tuple(Policy) ->
     true = is_valid_mi_policy(Policy),
     {mi, Policy, validate_term(Body)}.
 
-%%% DERIVED/SMART CONSTRUCTORS =============================================
-
-%% @doc Simple merge: XOR-join that takes first available branch.
--spec simple_merge(Branches :: [wf_term()]) -> wf_term().
-simple_merge(Branches) when is_list(Branches), length(Branches) > 0 ->
-    join(xor_merge, Branches).
-
-%% @doc Synchronizing merge: coordinate branches before merging.
--spec synchronizing_merge(Branches :: [wf_term()]) -> wf_term().
-synchronizing_merge(Branches) when is_list(Branches), length(Branches) > 0 ->
-    join(sync_merge, Branches).
-
-%% @doc Discriminator: proceed on first branch, cancel others.
-%%
-%% Implemented as a first_n join with N=1, automatically cancelling remaining.
-%%
-%% @end
--spec discriminator(Branches :: [wf_term()]) -> wf_term().
-discriminator(Branches) when is_list(Branches), length(Branches) > 0 ->
-    join({first_n, 1}, Branches).
-
-%% @doc N-out-of-M join: wait for N out of M branches to complete.
--spec n_out_of_m(N :: non_neg_integer(), Branches :: [wf_term()]) -> wf_term().
-n_out_of_m(N, Branches) when is_integer(N), N >= 0, is_list(Branches) ->
-    M = length(Branches),
-    true = N =< M,
-    join({n_of_m, N, M}, Branches).
-
 %%% UTILITY FUNCTIONS =======================================================
 
 %% @doc Check if a term is a valid workflow pattern.
@@ -389,15 +355,6 @@ constructor_test_() ->
         ?_assert(is_valid(loop({max_iter, 5}, task(loop_task, fun(_) -> {ok, #{}} end)))),
         ?_assert(is_valid(cancel_scope({region, my_region}, task(t, fun(_) -> {ok, #{}} end)))),
         ?_assert(is_valid(mi({fixed, 3}, task(mi_task, fun(_) -> {ok, #{}} end))))
-    ].
-
-%% Test derived constructors
-derived_constructor_test_() ->
-    [
-        ?_assert(is_valid(simple_merge([task(a, fun(_) -> {ok, #{}} end), task(b, fun(_) -> {ok, #{}} end)]))),
-        ?_assert(is_valid(synchronizing_merge([task(a, fun(_) -> {ok, #{}} end), task(b, fun(_) -> {ok, #{}} end)]))),
-        ?_assert(is_valid(discriminator([task(a, fun(_) -> {ok, #{}} end), task(b, fun(_) -> {ok, #{}} end)]))),
-        ?_assert(is_valid(n_out_of_m(2, [task(a, fun(_) -> {ok, #{}} end), task(b, fun(_) -> {ok, #{}} end), task(c, fun(_) -> {ok, #{}} end)])))
     ].
 
 %% Test invalid patterns

@@ -256,8 +256,8 @@ mi_join_fixed_policy_test() ->
 %% @doc Test MI join with dynamic policy.
 %%--------------------------------------------------------------------
 mi_join_dynamic_policy_test() ->
-    CountFun = fun(_) -> 4 end,
-    Policy = {dynamic, CountFun},
+    IteratorFun = fun(_) -> done end,
+    Policy = {dynamic, IteratorFun},
     Opcode = wf_vm:op_mi_join(Policy),
     ?assertMatch({mi_join, {dynamic, _}}, Opcode).
 
@@ -329,10 +329,14 @@ context_indexing_test() ->
 %% @doc Test MI compilation with fixed policy.
 %%--------------------------------------------------------------------
 mi_compile_fixed_test() ->
-    Task = {task, work, fun(_) -> ok end},
+    Task = {task, work, fun(_) -> {ok, #{}} end},
     MITerm = wf_term:mi({fixed, 3}, Task),
 
-    Bytecode = wf_compile:compile(MITerm),
+    Result = wf_compile:compile(MITerm),
+
+    ?assertMatch({ok, {program, _, _, _, _, _}}, Result),
+
+    {ok, {program, Bytecode, _, _, _, _}} = Result,
 
     ?assert(is_list(Bytecode)),
     ?assert(length(Bytecode) > 0),
@@ -354,11 +358,15 @@ mi_compile_fixed_test() ->
 %% @doc Test MI compilation with dynamic policy.
 %%--------------------------------------------------------------------
 mi_compile_dynamic_test() ->
-    Task = {task, work, fun(_) -> ok end},
-    CountFun = fun(Ctx) -> maps:get(count, Ctx, 1) end,
-    MITerm = wf_term:mi({dynamic, CountFun}, Task),
+    Task = {task, work, fun(_) -> {ok, #{}} end},
+    IteratorFun = fun(_Ctx) -> done end,
+    MITerm = wf_term:mi({dynamic, IteratorFun}, Task),
 
-    Bytecode = wf_compile:compile(MITerm),
+    Result = wf_compile:compile(MITerm),
+
+    ?assertMatch({ok, {program, _, _, _, _, _}}, Result),
+
+    {ok, {program, Bytecode, _, _, _, _}} = Result,
 
     ?assert(is_list(Bytecode)),
 
@@ -373,14 +381,17 @@ mi_compile_dynamic_test() ->
 %% @doc Test MI with nested sequence.
 %%--------------------------------------------------------------------
 mi_nested_sequence_test() ->
-    Task1 = {task, a, fun(_) -> ok end},
-    Task2 = {task, b, fun(_) -> ok end},
+    Task1 = {task, a, fun(_) -> {ok, #{}} end},
+    Task2 = {task, b, fun(_) -> {ok, #{}} end},
     Seq = {seq, Task1, Task2},
     MITerm = wf_term:mi({fixed, 2}, Seq),
 
     ?assert(wf_term:is_valid(MITerm)),
 
-    Bytecode = wf_compile:compile(MITerm),
+    Result = wf_compile:compile(MITerm),
+    ?assertMatch({ok, {program, _, _, _, _, _}}, Result),
+
+    {ok, {program, Bytecode, _, _, _, _}} = Result,
     ?assert(is_list(Bytecode)),
     ?assert(length(Bytecode) > 0).
 
@@ -388,15 +399,15 @@ mi_nested_sequence_test() ->
 %% @doc Test MI with parallel body.
 %%--------------------------------------------------------------------
 mi_parallel_body_test() ->
-    Task1 = {task, x, fun(_) -> ok end},
-    Task2 = {task, y, fun(_) -> ok end},
+    Task1 = {task, x, fun(_) -> {ok, #{}} end},
+    Task2 = {task, y, fun(_) -> {ok, #{}} end},
     Par = {par, [Task1, Task2]},
     MITerm = wf_term:mi({fixed, 3}, Par),
 
     ?assert(wf_term:is_valid(MITerm)),
 
-    Bytecode = wf_compile:compile(MITerm),
-    ?assert(is_list(Bytecode)).
+    Result = wf_compile:compile(MITerm),
+    ?assertMatch({ok, {program, _, _, _, _, _}}, Result).
 
 %%====================================================================
 %% Helper Functions

@@ -320,6 +320,222 @@ should_cancel_scope(ScopeId, Stack, CancelFlags) ->
     end.
 
 %%====================================================================
+%% Scope Cleanup Functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Clean up cancelled scope frames from the execution stack.
+%%
+%% Removes stack frames for scopes that have been cancelled, ensuring
+%% the stack reflects only active scopes. This is typically called
+%% during cancellation processing.
+%%
+%% @param State The current execution state
+%% @return Updated execution state with cleaned stack
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec cleanup_cancelled_scopes(State :: wf_vm:exec_state()) ->
+    wf_vm:exec_state().
+
+cleanup_cancelled_scopes(State) ->
+    Stack = wf_vm:exec_stack(State),
+    CancelFlags = wf_vm:exec_cancel(State),
+
+    %% Filter out frames for cancelled scopes
+    NewStack = lists:filter(fun(Frame) ->
+        FrameId = wf_vm:frame_id(Frame),
+        ScopeId = extract_scope_id(FrameId),
+        not is_cancelled(ScopeId, CancelFlags)
+    end, Stack),
+
+    wf_vm:exec_set_stack(State, NewStack).
+
+%%--------------------------------------------------------------------
+%% @doc Remove a specific cancel flag from the exec_state.
+%%
+%% This is used when a scope completes successfully and its cancel
+%% flag should be removed from the flags map.
+%%
+%% @param State The current execution state
+%% @param ScopeId The scope ID whose flag should be removed
+%% @return Updated execution state with flag removed
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec remove_scope_flag(State :: wf_vm:exec_state(), ScopeId :: scope_id()) ->
+    wf_vm:exec_state().
+
+remove_scope_flag(State, ScopeId) ->
+    CancelFlags = wf_vm:exec_cancel(State),
+    NewCancelFlags = maps:remove(ScopeId, CancelFlags),
+    wf_vm:exec_set_cancel(State, NewCancelFlags).
+
+%%====================================================================
+%% Stack Introspection Functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Find a specific scope in the execution stack.
+%%
+%% Searches the stack for a frame with the given scope ID.
+%% Returns {ok, Frame} if found, or not_found otherwise.
+%%
+%% @param ScopeId The scope identifier to find
+%% @param Stack The execution stack
+%% @return {ok, Frame} | not_found
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec find_scope_in_stack(
+    ScopeId :: scope_id(),
+    Stack :: [wf_vm:stack_frame()]
+) -> {ok, wf_vm:stack_frame()} | not_found.
+
+find_scope_in_stack(_ScopeId, []) ->
+    not_found;
+find_scope_in_stack(ScopeId, [Frame | Rest]) ->
+    FrameId = wf_vm:frame_id(Frame),
+    case extract_scope_id(FrameId) of
+        ScopeId -> {ok, Frame};
+        _ -> find_scope_in_stack(ScopeId, Rest)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Get all nested scopes below a given scope in the stack.
+%%
+%% Returns a list of scope IDs for all frames nested within the
+%% specified scope. Used for cascading cancellation.
+%%
+%% @param ScopeId The parent scope ID
+%% @param Stack The execution stack
+%% @return List of nested scope IDs
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_nested_scopes(
+    ScopeId :: scope_id(),
+    Stack :: [wf_vm:stack_frame()]
+) -> [scope_id()].
+
+get_nested_scopes(ScopeId, Stack) ->
+    case find_scope_in_stack(ScopeId, Stack) of
+        not_found ->
+            [];
+        {ok, _Frame} ->
+            %% Collect all scope IDs before this frame (nested within)
+            collect_nested_scopes(ScopeId, Stack, [])
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Get all parent scopes above a given scope in the stack.
+%%
+%% Returns a list of scope IDs for all ancestor frames. Used to
+%% check for inherited cancellation from parent scopes.
+%%
+%% @param ScopeId The child scope ID
+%% @param Stack The execution stack
+%% @return List of parent scope IDs
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_parent_scopes(
+    ScopeId :: scope_id(),
+    Stack :: [wf_vm:stack_frame()]
+) -> [scope_id()].
+
+get_parent_scopes(ScopeId, Stack) ->
+    collect_parent_scopes(ScopeId, Stack, []).
+
+%%====================================================================
+%% Internal Helper Functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Extract scope ID from a frame ID.
+%%
+%% Frame IDs may be atoms or tuples {Type, UniqueInt}. This function
+%% extracts the meaningful scope identifier.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec extract_scope_id(FrameId :: atom() | {atom(), integer()}) -> scope_id().
+
+extract_scope_id(FrameId) when is_atom(FrameId) ->
+    FrameId;
+extract_scope_id({Type, _UniqueInt}) when is_atom(Type) ->
+    Type;
+extract_scope_id(_) ->
+    undefined.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Collect nested scope IDs from stack (before target scope).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_nested_scopes(
+    TargetScopeId :: scope_id(),
+    Stack :: [wf_vm:stack_frame()],
+    Acc :: [scope_id()]
+) -> [scope_id()].
+
+collect_nested_scopes(_TargetScopeId, [], Acc) ->
+    lists:reverse(Acc);
+collect_nested_scopes(TargetScopeId, [Frame | Rest], Acc) ->
+    FrameId = wf_vm:frame_id(Frame),
+    ScopeId = extract_scope_id(FrameId),
+    case ScopeId of
+        TargetScopeId ->
+            %% Found target, return accumulated nested scopes
+            lists:reverse(Acc);
+        _ ->
+            %% This is a nested scope, add it
+            collect_nested_scopes(TargetScopeId, Rest, [ScopeId | Acc])
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Collect parent scope IDs from stack (after target scope).
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_parent_scopes(
+    TargetScopeId :: scope_id(),
+    Stack :: [wf_vm:stack_frame()],
+    Acc :: [scope_id()]
+) -> [scope_id()].
+
+collect_parent_scopes(_TargetScopeId, [], Acc) ->
+    lists:reverse(Acc);
+collect_parent_scopes(TargetScopeId, [Frame | Rest], Acc) ->
+    FrameId = wf_vm:frame_id(Frame),
+    ScopeId = extract_scope_id(FrameId),
+    case ScopeId of
+        TargetScopeId ->
+            %% Found target, collect remaining frames as parents
+            collect_all_scope_ids(Rest);
+        _ ->
+            collect_parent_scopes(TargetScopeId, Rest, Acc)
+    end.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc Collect all scope IDs from remaining stack frames.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec collect_all_scope_ids(Stack :: [wf_vm:stack_frame()]) -> [scope_id()].
+
+collect_all_scope_ids([]) ->
+    [];
+collect_all_scope_ids([Frame | Rest]) ->
+    FrameId = wf_vm:frame_id(Frame),
+    ScopeId = extract_scope_id(FrameId),
+    [ScopeId | collect_all_scope_ids(Rest)].
+
+%%====================================================================
 %% EUnit Tests
 %%====================================================================
 
@@ -327,134 +543,125 @@ should_cancel_scope(ScopeId, Stack, CancelFlags) ->
 -include_lib("eunit/include/eunit.hrl").
 
 %%--------------------------------------------------------------------
-%% @doc EUnit test runner for the module.
-%% Tests the doctest examples from the moduledoc.
+%% @doc Test basic scope cancellation.
 %%--------------------------------------------------------------------
-doctest_test() ->
-    %% Test is_cancel_token/1
-    ?assertEqual(true, is_cancel_token({cancel, [p1, p2]})),
-    ?assertEqual(false, is_cancel_token({other, tuple})),
+cancel_scope_test() ->
+    Program = [],
+    State = wf_vm:exec_state(Program, 0, [], #{}, #{}, #{}, []),
 
-    %% Test create_cancel_token/1
-    Token = create_cancel_token([region_place1, region_place2]),
-    ?assertEqual({cancel, [region_place1, region_place2]}, Token),
+    %% Cancel a scope
+    State1 = cancel_scope(State, test_scope),
+    CancelFlags = wf_vm:exec_cancel(State1),
 
-    %% Test cancel_targets/1
-    ?assertEqual([region_place1, region_place2], cancel_targets(Token)),
-
-    %% Test apply_cancellation/2
-    Marking1 = #{p1 => [a], p2 => [b], p3 => [c]},
-    ?assertEqual(#{p1 => [], p2 => [], p3 => [c]}, apply_cancellation(Marking1, [p1, p2])),
-
-    %% Test cancel_region/2
-    Marking2 = #{p1 => [a], p2 => [b], p3 => [c], p4 => [d]},
-    Region = [p2, p3],
-    ?assertEqual(#{p1 => [a], p2 => [], p3 => [], p4 => [d]}, cancel_region(Marking2, Region)),
-
-    %% Test is_cancellation_set/1
-    ?assertEqual(true, is_cancellation_set([p1, p2, p3])),
-    ?assertEqual(false, is_cancellation_set(not_a_list)),
-
-    ok.
+    ?assertEqual(true, is_cancelled(test_scope, CancelFlags)),
+    ?assertEqual(false, is_cancelled(other_scope, CancelFlags)).
 
 %%--------------------------------------------------------------------
-%% @doc Test is_cancel_token/1 with various inputs.
-%%--------------------------------------------------------------------
-is_cancel_token_valid_test() ->
-    ?assertEqual(true, is_cancel_token({cancel, []})),
-    ?assertEqual(true, is_cancel_token({cancel, [p1]})),
-    ?assertEqual(true, is_cancel_token({cancel, [p1, p2, p3]})),
-    ?assertEqual(false, is_cancel_token({cancel, "not_a_list"})),
-    ?assertEqual(false, is_cancel_token({other, [p1]})),
-    ?assertEqual(false, is_cancel_token(not_a_tuple)),
-    ?assertEqual(false, is_cancel_token({cancel, [p1, "not_atom"]})).
-
-%%--------------------------------------------------------------------
-%% @doc Test create_cancel_token/1 with various inputs.
-%%--------------------------------------------------------------------
-create_cancel_token_test() ->
-    ?assertEqual({cancel, [p1]}, create_cancel_token(p1)),
-    ?assertEqual({cancel, [p1, p2]}, create_cancel_token([p1, p2])),
-    ?assertEqual({cancel, []}, create_cancel_token([])).
-
-%%--------------------------------------------------------------------
-%% @doc Test cancel_targets/1 with various inputs.
-%%--------------------------------------------------------------------
-cancel_targets_test() ->
-    ?assertEqual([p1, p2], cancel_targets({cancel, [p1, p2]})),
-    ?assertEqual([], cancel_targets({cancel, []})),
-    ?assertEqual([], cancel_targets(not_a_token)),
-    ?assertEqual([], cancel_targets({other, [p1]})).
-
-%%--------------------------------------------------------------------
-%% @doc Test apply_cancellation/2 with various inputs.
-%%--------------------------------------------------------------------
-apply_cancellation_test() ->
-    %% Empty cancellation set
-    Marking = #{p1 => [a], p2 => [b]},
-    ?assertEqual(Marking, apply_cancellation(Marking, [])),
-
-    %% Single place cancellation
-    ?assertEqual(#{p1 => [], p2 => [b]}, apply_cancellation(Marking, [p1])),
-
-    %% Multiple place cancellation
-    ?assertEqual(#{p1 => [], p2 => []}, apply_cancellation(Marking, [p1, p2])),
-
-    %% Non-existent places in set
-    ?assertEqual(#{p1 => [], p2 => [b], p3 => []}, apply_cancellation(Marking, [p1, p3])),
-
-    %% Empty marking - cancellation adds new places with empty tokens
-    ?assertEqual(#{p1 => []}, apply_cancellation(#{}, [p1])),
-
-    %% Cancellation with multiple new places
-    ?assertEqual(#{p1 => [], p2 => []}, apply_cancellation(#{}, [p1, p2])).
-
-%%--------------------------------------------------------------------
-%% @doc Test cancel_region/2 is an alias for apply_cancellation/2.
+%% @doc Test region cancellation cascades to all scopes.
 %%--------------------------------------------------------------------
 cancel_region_test() ->
-    Marking = #{a => [1], b => [2], c => [3]},
-    Region = [b, c],
-    ?assertEqual(#{a => [1], b => [], c => []}, cancel_region(Marking, Region)),
-    ?assertEqual(apply_cancellation(Marking, Region), cancel_region(Marking, Region)).
+    State = wf_vm:exec_state([], 0, [], #{}, #{}, #{}, []),
+
+    %% Cancel region with multiple scopes
+    State1 = cancel_region(State, region1, [scope1, scope2, scope3]),
+    CancelFlags = wf_vm:exec_cancel(State1),
+
+    ?assertEqual(true, is_cancelled(region1, CancelFlags)),
+    ?assertEqual(true, is_cancelled(scope1, CancelFlags)),
+    ?assertEqual(true, is_cancelled(scope2, CancelFlags)),
+    ?assertEqual(true, is_cancelled(scope3, CancelFlags)),
+    ?assertEqual(false, is_cancelled(other_scope, CancelFlags)).
 
 %%--------------------------------------------------------------------
-%% @doc Test is_cancellation_set/1 with various inputs.
+%% @doc Test case cancellation.
 %%--------------------------------------------------------------------
-is_cancellation_set_test() ->
-    %% Valid sets
-    ?assertEqual(true, is_cancellation_set([p1])),
-    ?assertEqual(true, is_cancellation_set([p1, p2, p3])),
-    ?assertEqual(true, is_cancellation_set([])),  % Empty list is valid
+cancel_case_test() ->
+    State = wf_vm:exec_state([], 0, [], #{}, #{}, #{}, []),
 
-    %% Invalid sets
-    ?assertEqual(false, is_cancellation_set(not_a_list)),
-    ?assertEqual(false, is_cancellation_set([p1, "not_atom"])),
-    ?assertEqual(false, is_cancellation_set([p1, 123])),
-    ?assertEqual(false, is_cancellation_set([p1, {tuple, here}])).
+    %% Cancel entire case
+    State1 = cancel_case(State),
+
+    ?assertEqual(true, is_case_cancelled(State1)),
+    ?assertEqual(false, is_case_cancelled(State)).
 
 %%--------------------------------------------------------------------
-%% @doc Test that cancellation preserves non-target places.
+%% @doc Test hierarchical cancellation check.
 %%--------------------------------------------------------------------
-cancellation_preservation_test() ->
-    Marking = #{
-        p1 => [a, b, c],
-        p2 => [d],
-        p3 => [],
-        p4 => [e, f]
-    },
-    ?assertEqual(
-        #{p1 => [], p2 => [d], p3 => [], p4 => [e, f]},
-        apply_cancellation(Marking, [p1, p3])
-    ).
+is_scope_cancelled_test() ->
+    CancelFlags = #{parent_scope => true},
+
+    %% Scope path: [child, parent]
+    ?assertEqual(true, is_scope_cancelled([child_scope, parent_scope], CancelFlags)),
+    ?assertEqual(false, is_scope_cancelled([child_scope, other_scope], CancelFlags)),
+    ?assertEqual(false, is_scope_cancelled([], CancelFlags)).
 
 %%--------------------------------------------------------------------
-%% @doc test cancel token with complex place names.
+%% @doc Test should_cancel_scope with parent hierarchy.
 %%--------------------------------------------------------------------
-complex_place_names_test() ->
-    %% Test with atoms that have different forms
-    Token = create_cancel_token(['place-1', 'place_2', 'place.3']),
-    ?assertEqual(true, is_cancel_token(Token)),
-    ?assertEqual(['place-1', 'place_2', 'place.3'], cancel_targets(Token)).
+should_cancel_scope_test() ->
+    %% Build a simple stack: [child, parent]
+    ParentFrame = wf_vm:frame(cancel_scope, {parent_scope}),
+    ChildFrame = wf_vm:frame(cancel_scope, {child_scope}),
+    Stack = [ChildFrame, ParentFrame],
+
+    %% Parent is cancelled
+    CancelFlags = #{parent_scope => true},
+
+    %% Child should be cancelled due to parent
+    ?assertEqual(true, should_cancel_scope(child_scope, Stack, CancelFlags)),
+    ?assertEqual(true, should_cancel_scope(parent_scope, Stack, CancelFlags)),
+    ?assertEqual(false, should_cancel_scope(unrelated_scope, Stack, #{})).
+
+%%--------------------------------------------------------------------
+%% @doc Test scope cleanup removes cancelled frames.
+%%--------------------------------------------------------------------
+cleanup_cancelled_scopes_test() ->
+    %% Build stack with mix of cancelled and active scopes
+    Frame1 = wf_vm:frame(seq, {active_scope}),
+    Frame2 = wf_vm:frame(cancel_scope, {cancelled_scope}),
+    Frame3 = wf_vm:frame(task, {another_active}),
+    Stack = [Frame1, Frame2, Frame3],
+
+    State = wf_vm:exec_state([], 0, Stack, #{}, #{}, #{cancelled_scope => true}, []),
+
+    %% Cleanup should remove Frame2
+    State1 = cleanup_cancelled_scopes(State),
+    NewStack = wf_vm:exec_stack(State1),
+
+    %% Stack should have 2 frames (Frame2 removed)
+    ?assertEqual(2, length(NewStack)).
+
+%%--------------------------------------------------------------------
+%% @doc Test remove_scope_flag.
+%%--------------------------------------------------------------------
+remove_scope_flag_test() ->
+    State = wf_vm:exec_state([], 0, [], #{}, #{}, #{scope1 => true, scope2 => true}, []),
+
+    State1 = remove_scope_flag(State, scope1),
+    CancelFlags = wf_vm:exec_cancel(State1),
+
+    ?assertEqual(false, is_cancelled(scope1, CancelFlags)),
+    ?assertEqual(true, is_cancelled(scope2, CancelFlags)).
+
+%%--------------------------------------------------------------------
+%% @doc Test find_scope_in_stack.
+%%--------------------------------------------------------------------
+find_scope_in_stack_test() ->
+    Frame1 = wf_vm:frame(seq, {scope1}),
+    Frame2 = wf_vm:frame(cancel_scope, {scope2}),
+    Stack = [Frame1, Frame2],
+
+    {ok, Found} = find_scope_in_stack(scope2, Stack),
+    ?assertEqual(cancel_scope, wf_vm:frame_type(Found)),
+
+    ?assertEqual(not_found, find_scope_in_stack(missing, Stack)).
+
+%%--------------------------------------------------------------------
+%% @doc Test extract_scope_id.
+%%--------------------------------------------------------------------
+extract_scope_id_test() ->
+    ?assertEqual(my_scope, extract_scope_id(my_scope)),
+    ?assertEqual(my_scope, extract_scope_id({my_scope, 123})),
+    ?assertEqual(undefined, extract_scope_id({complex, tuple, with, many, elements})).
 
 -endif.
