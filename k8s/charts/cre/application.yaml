@@ -1,0 +1,217 @@
+apiVersion: marketplace.cloud.google.com/v1alpha1
+kind: Application
+metadata:
+  name: cre
+  version: 0.3.0
+spec:
+  info:
+    title: "CRE - Common Runtime Environment"
+    description: "Production-grade workflow engine for YAWL with 36 workflow patterns, built on Erlang/OTP for high reliability and fault tolerance"
+    version: "0.3.0"
+    logoUrl: "https://raw.githubusercontent.com/joergen7/cre/main/docs/images/cre-logo.png"
+    documentationUrl: "https://github.com/joergen7/cre/blob/main/docs/DEPLOYMENT.md"
+    supportUrl: "https://github.com/joergen7/cre/issues"
+
+  runtime:
+    policy:
+      type: HELM
+      helm:
+        chartPath: ./
+        parameters:
+          # Cluster Configuration
+          - name: replicaCount
+            title: "Number of CRE Nodes"
+            description: "Number of CRE replicas in the Mnesia cluster (minimum 3 for HA). Each replica runs as a StatefulSet pod."
+            type: integer
+            default: 3
+            minimum: 1
+            maximum: 10
+
+          # Autoscaling
+          - name: autoscaling.enabled
+            title: "Enable Horizontal Pod Autoscaling"
+            description: "Automatically scale CRE pods based on CPU/memory usage"
+            type: boolean
+            default: false
+
+          - name: autoscaling.minReplicas
+            title: "Minimum Replicas"
+            description: "Minimum number of pods when autoscaling is enabled"
+            type: integer
+            default: 3
+            minimum: 1
+            maximum: 10
+            constraints:
+              - expression: "params.autoscaling.enabled == true"
+                errorMessage: "This parameter is only applicable when autoscaling is enabled"
+
+          - name: autoscaling.maxReplicas
+            title: "Maximum Replicas"
+            description: "Maximum number of pods when autoscaling is enabled"
+            type: integer
+            default: 10
+            minimum: 3
+            maximum: 50
+            constraints:
+              - expression: "params.autoscaling.enabled == true"
+                errorMessage: "This parameter is only applicable when autoscaling is enabled"
+
+          # Storage
+          - name: persistence.enabled
+            title: "Enable Persistent Storage"
+            description: "Use persistent volumes for Mnesia database. Recommended for production deployments."
+            type: boolean
+            default: true
+
+          - name: persistence.size
+            title: "Storage Size"
+            description: "Size of persistent volume for each CRE pod"
+            type: string
+            default: "10Gi"
+            enum: ["5Gi", "10Gi", "20Gi", "50Gi", "100Gi"]
+            constraints:
+              - expression: "params.persistence.enabled == true"
+                errorMessage: "This parameter is only applicable when persistence is enabled"
+
+          - name: persistence.storageClass
+            title: "Storage Class"
+            description: "GKE StorageClass for persistent volumes. premium-rwo uses SSD storage."
+            type: string
+            default: "standard-rwo"
+            enum: ["standard-rwo", "premium-rwo", "standard", "premium"]
+
+          # Resources
+          - name: resources.requests.cpu
+            title: "CPU Request"
+            description: "Minimum CPU guaranteed for each CRE pod"
+            type: string
+            default: "500m"
+            enum: ["250m", "500m", "1000m", "2000m"]
+
+          - name: resources.requests.memory
+            title: "Memory Request"
+            description: "Minimum memory guaranteed for each CRE pod"
+            type: string
+            default: "512Mi"
+            enum: ["256Mi", "512Mi", "1Gi", "2Gi", "4Gi"]
+
+          - name: resources.limits.cpu
+            title: "CPU Limit"
+            description: "Maximum CPU each CRE pod can use"
+            type: string
+            default: "2000m"
+            enum: ["500m", "1000m", "2000m", "4000m"]
+
+          - name: resources.limits.memory
+            title: "Memory Limit"
+            description: "Maximum memory each CRE pod can use"
+            type: string
+            default: "2Gi"
+            enum: ["1Gi", "2Gi", "4Gi", "8Gi", "16Gi"]
+
+          # Networking
+          - name: service.type
+            title: "Service Type"
+            description: "Kubernetes service type for CRE API"
+            type: string
+            default: "ClusterIP"
+            enum: ["ClusterIP", "LoadBalancer"]
+
+          - name: ingress.enabled
+            title: "Enable Ingress"
+            description: "Create an Ingress resource for external access via HTTP(S) load balancer"
+            type: boolean
+            default: false
+
+          # Licensing (BYOL)
+          - name: license.acceptEula
+            title: "Accept License Agreement"
+            description: "I accept the Apache License 2.0 for CRE software"
+            type: boolean
+            default: false
+            constraints:
+              - expression: "params.license.acceptEula == true"
+                errorMessage: "You must accept the license agreement to proceed"
+
+          # CRE Configuration
+          - name: config.logLevel
+            title: "Log Level"
+            description: "CRE logging verbosity level"
+            type: string
+            default: "info"
+            enum: ["debug", "info", "notice", "warning", "error"]
+
+          - name: config.maxExecutions
+            title: "Maximum Concurrent Executions"
+            description: "Maximum number of workflow executions running concurrently"
+            type: integer
+            default: 1000
+            minimum: 100
+            maximum: 10000
+
+          - name: config.sessionTimeout
+            title: "Session Timeout"
+            description: "Default session timeout in seconds"
+            type: integer
+            default: 3600
+            minimum: 300
+            maximum: 86400
+
+          # TLS Configuration
+          - name: tls.enabled
+            title: "Enable TLS"
+            description: "Enable TLS for CRE API (requires certificate management)"
+            type: boolean
+            default: false
+
+          - name: tls.type
+            title: "TLS Certificate Type"
+            description: "Certificate management strategy"
+            type: string
+            default: "managed"
+            enum: ["managed", "self-signed", "custom"]
+            constraints:
+              - expression: "params.tls.enabled == true"
+                errorMessage: "This parameter is only applicable when TLS is enabled"
+
+  output:
+    - name: serviceUrl
+      title: "CRE Service URL"
+      description: "URL to access the CRE API"
+      type: SERVICE_ENDPOINT
+      reference:
+        type: SERVICE
+        name: cre
+
+    - name: credentials
+      title: "Access Credentials"
+      description: "Instructions for accessing CRE"
+      type: MARKDOWN
+      content: |
+        ## Accessing CRE
+
+        CRE is now deployed in your GKE cluster.
+
+        **Service Endpoint:** `${serviceUrl}`
+
+        **Port:** 4142
+
+        **Health Check:** `${serviceUrl}/health`
+
+        **Status API:** `${serviceUrl}/status.json`
+
+        To connect from your local machine:
+
+        ```bash
+        kubectl port-forward -n cre svc/cre 4142:4142
+        curl http://localhost:4142/health
+        ```
+
+        To connect from within the cluster:
+
+        ```bash
+        kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+          curl http://cre.cre.svc.cluster.local:4142/health
+        ```
+
+        See the [CRE Documentation](https://github.com/joergen7/cre/blob/main/docs/DEPLOYMENT.md) for more details.

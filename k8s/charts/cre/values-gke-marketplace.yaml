@@ -1,0 +1,75 @@
+# GKE Marketplace deployment values
+# These override base values.yaml for Marketplace deployments
+
+# Marketplace requires explicit image references with digests
+image:
+  repository: us-central1-docker.pkg.dev/${PROJECT_ID}/cre/cre
+  tag: "${VERSION}"
+  pullPolicy: Always
+
+# GKE-specific node configuration
+nodeSelector:
+  cloud.google.com/gke-nodepool: cre-pool
+
+# GKE Pod Security Standards
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# GKE workload identity
+serviceAccount:
+  annotations:
+    iam.gke.io/gcp-service-account: cre-workload-sa@${PROJECT_ID}.iam.gserviceaccount.com
+
+# GKE StorageClass for persistent volumes
+persistence:
+  enabled: true
+  storageClass: premium-rwo
+  size: 10Gi
+
+# GKE health probe configuration (uses /health, /ready, /startup)
+probes:
+  liveness:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readiness:
+    httpGet:
+      path: /ready
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  startup:
+    httpGet:
+      path: /startup
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 30
+
+# Enable GKE integration
+monitoring:
+  enabled: true
+
+# Disable backup for Marketplace (user manages backups)
+backup:
+  enabled: false

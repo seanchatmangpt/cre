@@ -27,3 +27,6 @@ annotations:
   artifacthub.io/operator: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/containsSecurityUpdates: "false"
+  # Google Cloud Marketplace annotations
+  marketplace.cloud.google.com/deployer: "Helm"
+  marketplace.cloud.google.com/verified: "false"

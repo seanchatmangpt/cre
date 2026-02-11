@@ -1,2 +1,170 @@
-=== Build Steps ===
-=== Security Scanning ===
+# CRE Cloud Build Configuration for Google Cloud Marketplace
+# Multi-arch builds with security scanning and immutable version tags
+
+substitutions:
+  _IMAGE_NAME: 'cre'
+  _VERSION: '0.3.0'
+  _COMMIT_SHA: '${COMMIT_SHA}'
+  _BUILD_DATE: '${BUILD_DATE}'
+  _ARTIFACT_REGISTRY: 'us-central1-docker.pkg.dev'
+  _PROJECT_ID: '${PROJECT_ID}'
+
+steps:
+  # ============================================
+  # Step 1: Build multi-arch container images
+  # ============================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-amd64'
+    waitFor: ['-']
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker buildx build \
+          --platform linux/amd64 \
+          --build-arg TARGETPLATFORM=linux/amd64 \
+          --build-arg VERSION=${_VERSION} \
+          --build-arg GIT_REVISION=${_COMMIT_SHA} \
+          --build-arg BUILD_DATE=${_BUILD_DATE} \
+          --tag ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-amd64 \
+          --tag ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-amd64-${SHORT_SHA} \
+          --load \
+          .
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-arm64'
+    waitFor: ['-']
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker buildx build \
+          --platform linux/arm64 \
+          --build-arg TARGETPLATFORM=linux/arm64 \
+          --build-arg VERSION=${_VERSION} \
+          --build-arg GIT_REVISION=${_COMMIT_SHA} \
+          --build-arg BUILD_DATE=${_BUILD_DATE} \
+          --tag ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-arm64 \
+          --tag ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-arm64-${SHORT_SHA} \
+          --load \
+          .
+
+  # ============================================
+  # Step 2: Security scanning with Trivy
+  # ============================================
+  - name: 'aquasec/trivy:latest'
+    id: 'scan-amd64'
+    waitFor: ['build-amd64']
+    args:
+      - 'image'
+      - '--format'
+      - 'json'
+      - '--output'
+      - 'trivy-report-amd64.json'
+      - '--severity'
+      - 'CRITICAL,HIGH'
+      - '${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-amd64'
+
+  - name: 'aquasec/trivy:latest'
+    id: 'scan-arm64'
+    waitFor: ['build-arm64']
+    args:
+      - 'image'
+      - '--format'
+      - 'json'
+      - '--output'
+      - 'trivy-report-arm64.json'
+      - '--severity'
+      - 'CRITICAL,HIGH'
+      - '${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-arm64'
+
+  # ============================================
+  # Step 3: Generate SBOM
+  # ============================================
+  - name: 'anchore/syft:latest'
+    id: 'sbom-amd64'
+    waitFor: ['build-amd64']
+    args:
+      - 'docker'
+      - '${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-amd64'
+      - '-o'
+      - 'spdx-json'
+      - '--file'
+      - 'sbom-amd64.spdx.json'
+
+  - name: 'anchore/syft:latest'
+    id: 'sbom-arm64'
+    waitFor: ['build-arm64']
+    args:
+      - 'docker'
+      - '${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-arm64'
+      - '-o'
+      - 'spdx-json'
+      - '--file'
+      - 'sbom-arm64.spdx.json'
+
+  # ============================================
+  # Step 4: Push to Artifact Registry
+  # ============================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-images'
+    waitFor: ['scan-amd64', 'scan-arm64']
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Push architecture-specific images
+        docker push ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-amd64
+        docker push ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-amd64-${SHORT_SHA}
+        docker push ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-arm64
+        docker push ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-arm64-${SHORT_SHA}
+
+        # Create and push multi-arch manifest (immutable version tag)
+        docker manifest create ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION} \
+          ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-amd64 \
+          ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}-arm64
+
+        docker manifest push ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}
+
+        echo "Image digest:"
+        docker manifest inspect ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}
+
+  # ============================================
+  # Step 5: Sign images with cosign
+  # ============================================
+  - name: 'gcr.io/projectsigstore/cosign:v2.0.0'
+    id: 'sign-images'
+    waitFor: ['push-images']
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        cosign sign \
+          --yes \
+          ${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}
+
+  # ============================================
+  # Step 6: Upload scan reports and SBOMs
+  # ============================================
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'upload-reports'
+    waitFor: ['scan-amd64', 'scan-arm64', 'sbom-amd64', 'sbom-arm64']
+    args:
+      - '-m'
+      - 'cp'
+      - 'trivy-report-*.json'
+      - 'sbom-*.spdx.json'
+      - 'gs://${PROJECT_ID}-cre-reports/${_VERSION}/'
+
+# Log all artifacts for Marketplace submission
+logsBucket: '${PROJECT_ID}-cre-logs'
+
+options:
+  logging: GCS_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+timeout: '3600s'
+
+# Output image digest for Marketplace deployment spec
+images:
+  - '${_ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/${_IMAGE_NAME}:${_VERSION}'
