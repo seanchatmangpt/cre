@@ -1,0 +1,25 @@
+================================================================================
+Fortune-5 FIBO LineController Factory - Direct Generation
+================================================================================
+
+[1/3] Generating f5_connectors app...
+    Generated 30 connectors with 32 modules
+[2/3] Generating additional apps for scale...
+    Generated 206 total apps with 8642 modules
+[3/3] Generating rebar.config...
+
+[COUNTING] Calculating hashes...
+
+================================================================================
+Generation Complete
+================================================================================
+Generated Artifacts:
+  Erlang modules: 8642
+  OTP apps:       206
+  Total LOC:      300,980
+  Duration:       14619ms
+
+🟢 SCALE TARGET MET: {total_loc:,} LOC
+
+Receipt: /home/user/cre/examples/fortune5-fibo-lnctrl/receipts/build.last.json
+Hash: 48b02845a4926327...

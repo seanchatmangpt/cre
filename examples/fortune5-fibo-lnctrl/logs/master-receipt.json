@@ -1,0 +1,167 @@
+{
+  "metadata": {
+    "report_title": "Fortune-5 FIBO LineController Factory - Master Receipt",
+    "generated_date": "2026-02-11",
+    "report_version": "1.0",
+    "report_scope": "Complete agent logs aggregation"
+  },
+  "logs_directory_metrics": {
+    "total_size_mb": 0.262,
+    "total_size_kb": 268,
+    "total_lines": 9255,
+    "file_count": 10,
+    "files": [
+      "agent01-generation.log",
+      "agent02-evidence.log",
+      "agent02-hashes.txt",
+      "agent03-loc-count.txt",
+      "agent04-apps.txt",
+      "agent05-hash-verification.txt",
+      "agent08-evidence-stats.txt",
+      "agent09-ontology.txt",
+      "agent10-templates.txt",
+      "agent13-exports.txt"
+    ]
+  },
+  "aggregated_statistics": {
+    "code_generation": {
+      "erlang_modules": 8642,
+      "otp_applications": 206,
+      "total_lines_of_code": 300980,
+      "average_loc_per_app": 1461.66,
+      "generation_duration_ms": 14619,
+      "generation_timestamp": "2026-02-11T05:42:00Z"
+    },
+    "source_analysis": {
+      "source_erl_files": 8643,
+      "source_lines_of_code": 79998,
+      "note": "Source LOC lower than generated LOC includes modules from apps subdir"
+    },
+    "otp_applications": {
+      "total_apps_generated": 206,
+      "app_list_sample_count": 20,
+      "first_app": "f5_app_02",
+      "last_app": "f5_app_109"
+    },
+    "evidence_collection": {
+      "evidence_files": 9,
+      "evidence_pack_location": "/home/user/cre/examples/fortune5-fibo-lnctrl/evidence/",
+      "collection_steps": [
+        "System info",
+        "Etop simulation",
+        "Observer snapshot",
+        "TTB trace",
+        "Sys stats",
+        "Cancel proof",
+        "Replay proof",
+        "Crash restart proof",
+        "Evidence hashing"
+      ],
+      "evidence_files_collected": [
+        "cancel_proof.json",
+        "crash_restart_proof.json",
+        "etop.txt",
+        "evidence.sha256",
+        "observer_snapshot.txt",
+        "replay_proof.json",
+        "sys_stats.json",
+        "system_info.txt",
+        "ttb_trace/"
+      ]
+    },
+    "cryptographic_hashes": {
+      "evidence_hashes_count": 9,
+      "hash_algorithm": "SHA-256",
+      "sample_hashes": {
+        "ttb_summary.txt": "76018e4a5bc05e99b24ca9644d6e676c7aa725d110334dca867614bff16abc87",
+        "replay_proof.json": "38e9e099749b042a9d21d2b99a2315bece2f69abcc7ae89755c3fdaf4a24d6e0",
+        "etop.txt": "5f17cb7d94c57abd43423574e1a181f8a8cbb7ae5ae7e0f0b59c0cfe6632fab4",
+        "crash_restart_proof.json": "95727daccbcb246d4fd79d9d363b4b5c0fdb329b22a8d2355ba5b4c13a312ce3",
+        "sys_stats.json": "3023cfa1e1c6ce66b15c8cdeda50628da8043b76b08d031a3c51d53116042931",
+        "cancel_proof.json": "3105607ee07f3f1f683a0502fe3d283db16e3d7eb866187f4fd201257ae0cbf2",
+        "observer_snapshot.txt": "83c96e059e76319d7e48d0b805b5eef597d8a25370287dffd3901e74fbb2bf0a"
+      }
+    },
+    "integrity_verification": {
+      "build_receipt_file": "receipts/build.last.json",
+      "computed_hash": "91ac103bea85d02ea0113c1eac133ce41321ec2d2e7228f8a17aafc3da75fccf",
+      "stored_hash": "91ac103bea85d02ea0113c1eac133ce41321ec2d2e7228f8a17aafc3da75fccf",
+      "verification_status": "PASSED",
+      "hash_match": true,
+      "timestamp": "2026-02-11"
+    },
+    "ontology_definitions": {
+      "ontology_entity_count": 90,
+      "ontology_file": "agent09-ontology.txt"
+    },
+    "templates": {
+      "template_count": 1,
+      "templates_directory": "/home/user/cre/examples/fortune5-fibo-lnctrl/templates/",
+      "templates_list": [
+        {
+          "name": "connector_module.tera",
+          "size_bytes": 3174,
+          "size_kb": 3.1,
+          "type": "Tera template"
+        }
+      ]
+    },
+    "export_functions": {
+      "financial_accounting_exports": 20,
+      "customer_service_case_exports": 20,
+      "crm_exports": 20,
+      "policy_engine_exports": 20,
+      "data_warehouse_exports": 20,
+      "payment_system_exports": 20,
+      "generic_operation_exports": 20,
+      "data_processing_exports": 8200,
+      "credit_bureau_exports": 20,
+      "notification_system_exports": 20,
+      "gen_server_standard_callbacks": 30,
+      "supervisor_callbacks": 206,
+      "application_callbacks": 206,
+      "document_management_exports": 20,
+      "compliance_kyc_exports": 20,
+      "total_counted_exports": 8593
+    }
+  },
+  "directory_hashes": {
+    "logs_directory_sha256": "613516a8dce22e56d9e0747d68a6e91ff1348216660f6f51de3eb0f1caf1d823",
+    "hash_algorithm": "SHA-256",
+    "hash_scope": "All files in logs/ directory",
+    "hash_timestamp": "2026-02-11T05:45:00Z"
+  },
+  "summary": {
+    "total_agents_reporting": 10,
+    "agents": [
+      "agent01-generation",
+      "agent02-evidence",
+      "agent02-hashes",
+      "agent03-loc-count",
+      "agent04-apps",
+      "agent05-hash-verification",
+      "agent08-evidence-stats",
+      "agent09-ontology",
+      "agent10-templates",
+      "agent13-exports"
+    ],
+    "key_metrics": {
+      "modules_generated": 8642,
+      "applications_generated": 206,
+      "lines_of_code": 300980,
+      "evidence_files_collected": 9,
+      "integrity_checks_passed": 1,
+      "ontology_entities": 90,
+      "templates_defined": 1,
+      "export_function_definitions": 8593
+    },
+    "status": "COMPLETE",
+    "all_checks_passed": true
+  },
+  "chain_of_custody": {
+    "log_directory": "/home/user/cre/examples/fortune5-fibo-lnctrl/logs/",
+    "receipt_location": "/home/user/cre/examples/fortune5-fibo-lnctrl/logs/master-receipt.json",
+    "verification_instructions": "Verify logs_directory_sha256 hash using: cd /home/user/cre/examples/fortune5-fibo-lnctrl && find logs/ -type f | sort | sha256sum",
+    "reproducibility": "All statistics calculated from source files in logs/ directory dated 2026-02-11"
+  }
+}

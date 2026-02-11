@@ -1,0 +1,11 @@
+Hash Verification Report
+========================
+Generated: 2026-02-11
+Agent: agent05
+
+File: receipts/build.last.json
+Computed SHA256: 91ac103bea85d02ea0113c1eac133ce41321ec2d2e7228f8a17aafc3da75fccf
+Stored SHA256:   91ac103bea85d02ea0113c1eac133ce41321ec2d2e7228f8a17aafc3da75fccf
+
+Verification Status: PASSED
+Both hashes match - file integrity verified.

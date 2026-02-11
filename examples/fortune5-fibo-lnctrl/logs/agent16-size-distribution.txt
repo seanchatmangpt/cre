@@ -1,0 +1,82 @@
+================================================================================
+ERLANG FILE SIZE DISTRIBUTION ANALYSIS
+================================================================================
+
+Directory: /home/user/cre/examples/fortune5-fibo-lnctrl
+Analysis Date: 2026-02-11 05:43:23
+
+SUMMARY STATISTICS
+--------------------------------------------------------------------------------
+Total Erlang Files:    8,642
+Total Lines of Code:   276,682
+Mean LOC per file:     32.02
+Median LOC per file:   32.00
+Min LOC per file:      10
+Max LOC per file:      325
+Std Dev:               17.86
+
+QUARTILE ANALYSIS
+--------------------------------------------------------------------------------
+Q1 (25%):              32
+Q2 (50%, Median):      32
+Q3 (75%):              32
+
+SIZE DISTRIBUTION
+--------------------------------------------------------------------------------
+  0- 50 LOC:         8,612 files ( 99.7%)
+ 50-100 LOC:             0 files (  0.0%)
+100-150 LOC:             0 files (  0.0%)
+150-200 LOC:             0 files (  0.0%)
+200-250 LOC:             0 files (  0.0%)
+250-300 LOC:             0 files (  0.0%)
+300+ LOC:                30 files (  0.3%)
+
+================================================================================
+TOP 20 LARGEST FILES
+================================================================================
+
+ 1.   325 LOC  apps/f5_connectors/src/f5_connector_connector_08.erl
+ 2.   325 LOC  apps/f5_connectors/src/f5_connector_treasury.erl
+ 3.   325 LOC  apps/f5_connectors/src/f5_connector_connector_14.erl
+ 4.   325 LOC  apps/f5_connectors/src/f5_connector_connector_05.erl
+ 5.   325 LOC  apps/f5_connectors/src/f5_connector_connector_03.erl
+ 6.   325 LOC  apps/f5_connectors/src/f5_connector_connector_11.erl
+ 7.   325 LOC  apps/f5_connectors/src/f5_connector_connector_06.erl
+ 8.   325 LOC  apps/f5_connectors/src/f5_connector_connector_20.erl
+ 9.   325 LOC  apps/f5_connectors/src/f5_connector_connector_09.erl
+10.   325 LOC  apps/f5_connectors/src/f5_connector_connector_07.erl
+11.   325 LOC  apps/f5_connectors/src/f5_connector_data_warehouse.erl
+12.   325 LOC  apps/f5_connectors/src/f5_connector_kyc_aml.erl
+13.   325 LOC  apps/f5_connectors/src/f5_connector_document.erl
+14.   325 LOC  apps/f5_connectors/src/f5_connector_notification.erl
+15.   325 LOC  apps/f5_connectors/src/f5_connector_connector_04.erl
+16.   325 LOC  apps/f5_connectors/src/f5_connector_connector_12.erl
+17.   325 LOC  apps/f5_connectors/src/f5_connector_connector_01.erl
+18.   325 LOC  apps/f5_connectors/src/f5_connector_connector_18.erl
+19.   325 LOC  apps/f5_connectors/src/f5_connector_connector_15.erl
+20.   325 LOC  apps/f5_connectors/src/f5_connector_crm.erl
+
+================================================================================
+TOP 20 SMALLEST FILES
+================================================================================
+
+ 1.    10 LOC  apps/f5_app_79/src/f5_app_79_app.erl
+ 2.    10 LOC  apps/f5_app_44/src/f5_app_44_app.erl
+ 3.    10 LOC  apps/f5_app_70/src/f5_app_70_app.erl
+ 4.    10 LOC  apps/f5_app_71/src/f5_app_71_app.erl
+ 5.    10 LOC  apps/f5_app_16/src/f5_app_16_app.erl
+ 6.    10 LOC  apps/f5_app_66/src/f5_app_66_app.erl
+ 7.    10 LOC  apps/f5_app_203/src/f5_app_203_app.erl
+ 8.    10 LOC  apps/f5_app_155/src/f5_app_155_app.erl
+ 9.    10 LOC  apps/f5_app_100/src/f5_app_100_app.erl
+10.    10 LOC  apps/f5_app_125/src/f5_app_125_app.erl
+11.    10 LOC  apps/f5_app_197/src/f5_app_197_app.erl
+12.    10 LOC  apps/f5_app_168/src/f5_app_168_app.erl
+13.    10 LOC  apps/f5_app_187/src/f5_app_187_app.erl
+14.    10 LOC  apps/f5_app_200/src/f5_app_200_app.erl
+15.    10 LOC  apps/f5_app_38/src/f5_app_38_app.erl
+16.    10 LOC  apps/f5_app_81/src/f5_app_81_app.erl
+17.    10 LOC  apps/f5_app_92/src/f5_app_92_app.erl
+18.    10 LOC  apps/f5_app_95/src/f5_app_95_app.erl
+19.    10 LOC  apps/f5_app_122/src/f5_app_122_app.erl
+20.    10 LOC  apps/f5_app_154/src/f5_app_154_app.erl

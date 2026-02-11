@@ -1,0 +1,21 @@
+{
+  "ontology": "FIBO - Financial Industry Business Ontology",
+  "source": "https://github.com/edmcouncil/fibo.git",
+  "license": "MIT",
+  "license_file": "LICENSE",
+  "pinned_commit": "90770ba4797725d7784f6bcc824c3f106470a96b",
+  "pinned_date": "2026-02-11",
+  "commit_message": "Merge pull request #2194 from ElisaKendall/FBC-340",
+  "modules_used": [
+    "FND - Foundations",
+    "BE - Business Entities",
+    "LOAN - Loans"
+  ],
+  "namespace_prefixes": {
+    "fibo-fnd": "https://spec.edmcouncil.org/fibo/ontology/FND/",
+    "fibo-be": "https://spec.edmcouncil.org/fibo/ontology/BE/",
+    "fibo-loan": "https://spec.edmcouncil.org/fibo/ontology/LOAN/"
+  },
+  "verification_hash": null,
+  "notes": "Pinned for Fortune-5 LineController Factory reference implementation"
+}

@@ -1,0 +1,33 @@
+# Extract plan structure
+PREFIX ln: <http://linecontroller.factory/ontology/ln#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?planId ?planKind ?refTaskId ?refScopeId ?scopeBodyId ?childId
+WHERE {
+    ?plan rdf:type ln:Plan .
+    ?plan ln:planKind ?planKind .
+
+    BIND(STR(?plan) AS ?planId)
+
+    OPTIONAL {
+        ?plan ln:refTask ?refTask .
+        ?refTask ln:taskId ?refTaskId .
+    }
+
+    OPTIONAL {
+        ?plan ln:refScope ?refScope .
+        ?refScope ln:scopeId ?refScopeId .
+    }
+
+    OPTIONAL {
+        ?plan ln:scopeBody ?scopeBody .
+        BIND(STR(?scopeBody) AS ?scopeBodyId)
+    }
+
+    OPTIONAL {
+        ?plan ln:planChildren ?childList .
+        ?childList rdf:rest*/rdf:first ?child .
+        BIND(STR(?child) AS ?childId)
+    }
+}
+ORDER BY ?planId ?childId

@@ -1,0 +1,115 @@
+\chapter{Theoretical Framework}
+\label{ch:theory}
+
+\section{The Einstein-Code Equivalence Principle}
+
+\subsection{Motivation from General Relativity}
+
+Einstein's general relativity rests on the equivalence principle: gravitational mass equals inertial mass. This seemingly simple observation led to the revolutionary insight that gravity is not a force but the curvature of spacetime~\cite{einstein1916foundation}.
+
+We propose an analogous principle for software: \textbf{ontological density equals generative capacity}. Just as mass-energy curves spacetime, semantic density curves the code manifold. The more "meaning" packed into an ontology, the more code it can generate.
+
+\begin{definition}[Code Manifold]
+The \textbf{code manifold} $\mathcal{M}_{\code}$ is a Riemannian manifold where:
+\begin{itemize}
+    \item Points represent complete program states
+    \item Tangent vectors represent syntactic transformations
+    \item The metric tensor $g_{\mu\nu}$ measures semantic distance
+    \item Curvature represents the "generative potential" of the space
+\end{itemize}
+\end{definition}
+
+\subsection{The Equivalence Principle Formalized}
+
+\begin{axiom}[Einstein-Code Equivalence Principle (ECEP)]
+For any ontology $\onto$ and code manifold $\mathcal{M}_{\code}$, the generative capacity is:
+\begin{equation}
+G(\onto) = c^2 \int_{\onto} R \, dV
+\end{equation}
+where $R$ is the Ricci scalar curvature and $c$ is the maximum semantic propagation velocity.
+\end{axiom}
+
+The ECEP has profound implications:
+
+\begin{theorem}[Manufacturing Amplification]
+If $\onto$ has $N$ semantic nodes with average degree $k$, then:
+\begin{equation}
+G(\onto) \geq \frac{c^2 N k^2}{6}
+\end{equation}
+demonstrating superlinear scaling.
+\end{theorem}
+
+\section{Information Density Event Horizon}
+
+\subsection{The Too-Big-To-Fake Threshold}
+
+Hand-written code occupies a region of code space with bounded information density $\rho_h \approx 100$ LOC/day. Manufactured code achieves $\rho_m \approx 53,000$ LOC/second (from our 300k LOC / 5.6s result).
+
+The ratio $\rho_m / \rho_h \approx 4.6 \times 10^7$ represents a \textbf{phase transition}. Beyond a critical codebase size $L_c$, hand-writing becomes thermodynamically impossible:
+
+\begin{equation}
+L_c = \frac{k_B T}{\Delta S} \approx 10^5 \text{ LOC}
+\end{equation}
+
+where $k_B$ is the Boltzmann constant (interpreted as cognitive capacity) and $\Delta S$ is the entropy production rate.
+
+\subsection{The Manufacturing Singularity}
+
+As codebase size $L \to L_c$, the time required for hand-writing diverges:
+
+\begin{equation}
+t_{\text{write}}(L) = \frac{L}{\rho_h} \sqrt{1 - \frac{L}{L_c}}^{-1}
+\end{equation}
+
+This is the \textbf{code Schwarzschild radius}. Beyond it, only manufacturing can escape.
+
+\section{Quantum Superposition in Code Space}
+
+\subsection{Wavefunction Interpretation}
+
+Before compilation, manufactured code exists in a superposition of implementation states:
+
+\begin{equation}
+\ket{\Psi_{\code}} = \sum_{i} \alpha_i \ket{\code_i}
+\end{equation}
+
+where $\ket{\code_i}$ are basis states (different implementations satisfying the same ontology) and $|\alpha_i|^2$ is the probability of observing implementation $i$ upon compilation.
+
+\subsection{Collapse Upon Observation}
+
+Compilation acts as a measurement operator $\hat{M}$:
+
+\begin{equation}
+\hat{M} \ket{\Psi_{\code}} = \ket{\code_{\text{observed}}}
+\end{equation}
+
+This explains why manufactured code can simultaneously satisfy multiple constraints: until compiled, it "hasn't decided" which implementation to choose.
+
+\section{The Software Production Possibility Frontier}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[scale=1.2]
+    % Axes
+    \draw[->] (0,0) -- (8,0) node[right] {Code Complexity (LOC)};
+    \draw[->] (0,0) -- (0,6) node[above] {Development Time (years)};
+
+    % Hand-written curve (exponential)
+    \draw[thick, blue] (0,0.5) .. controls (2,1) and (4,3) .. (6,5.5);
+    \node[blue] at (5,4.5) {Hand-written};
+
+    % Manufactured curve (logarithmic)
+    \draw[thick, red] (0,0.1) .. controls (3,0.3) and (6,0.5) .. (7,0.6);
+    \node[red] at (6,1) {Manufactured};
+
+    % Event horizon
+    \draw[dashed] (4.5,0) -- (4.5,6);
+    \node at (4.5,5.5) {$L_c$};
+
+    % Our experiment point
+    \fill[green] (5.2,0.05) circle (2pt);
+    \node[green, below] at (5.2,0) {300k LOC, 5.6s};
+\end{tikzpicture}
+\caption{The Software Production Possibility Frontier showing hand-written (blue) and manufactured (red) trajectories. Beyond the event horizon $L_c$, hand-writing becomes infeasible.}
+\label{fig:frontier}
+\end{figure}

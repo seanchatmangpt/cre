@@ -1,0 +1,9 @@
+ M ../../.erlmcp/sessionstart.log
+ D apps/f5_evidence/src/f5_evidence.erl
+ M evidence/evidence.sha256
+ M receipts/build.last.json
+ M receipts/build.last.sha
+ M receipts/evidence.last.json
+ M receipts/evidence.last.sha
+?? logs/
+?? thesis/
