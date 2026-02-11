@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+  xmlns:owl="http://www.w3.org/2002/07/owl#"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:secops="http://cre.local/security-ops#">
+
+  <!-- Ontology Metadata -->
+  <rdf:Description rdf:about="http://cre.local/security-ops/incidents">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Ontology"/>
+    <dc:title>Incident Classification Ontology</dc:title>
+    <dc:description>Classification types, severity levels, and lifecycle states for security incidents</dc:description>
+    <dc:isPartOf rdf:resource="http://cre.local/security-ops"/>
+    <dc:created rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2026-02-11T00:00:00Z</dc:created>
+  </rdf:Description>
+
+  <!-- ==============================================
+       INCIDENT CLASSIFICATION TYPES
+       ============================================== -->
+
+  <!-- Base Classification class -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Classification">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+    <rdfs:label>Classification</rdfs:label>
+    <rdfs:comment>Base class for incident type classifications</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Malware -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Malware">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Classification"/>
+    <rdfs:label>Malware</rdfs:label>
+    <rdfs:comment>Incident involving malicious software (virus, trojan, ransomware, worm)</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Phishing -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Phishing">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Classification"/>
+    <rdfs:label>Phishing</rdfs:label>
+    <rdfs:comment>Incident involving phishing email or credential harvest attack</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Reconnaissance -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Recon">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Classification"/>
+    <rdfs:label>Reconnaissance</rdfs:label>
+    <rdfs:comment>Incident involving network reconnaissance, port scanning, or information gathering</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Unauthorized Access -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#UnauthorizedAccess">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Classification"/>
+    <rdfs:label>Unauthorized Access</rdfs:label>
+    <rdfs:comment>Incident involving unauthorized system or account access</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Data Exfiltration -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#DataExfiltration">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Classification"/>
+    <rdfs:label>Data Exfiltration</rdfs:label>
+    <rdfs:comment>Incident involving unauthorized data theft or transfer outside organization</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Denial of Service -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#DenialOfService">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Classification"/>
+    <rdfs:label>Denial of Service</rdfs:label>
+    <rdfs:comment>Incident involving DoS or DDoS attack disrupting service availability</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Privilege Escalation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#PrivilegeEscalation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Classification"/>
+    <rdfs:label>Privilege Escalation</rdfs:label>
+    <rdfs:comment>Incident involving privilege escalation from user to admin/root</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Lateral Movement -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#LateralMovement">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Classification"/>
+    <rdfs:label>Lateral Movement</rdfs:label>
+    <rdfs:comment>Incident involving attacker movement across network from compromised host</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Misconfiguration -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Misconfiguration">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Classification"/>
+    <rdfs:label>Misconfiguration</rdfs:label>
+    <rdfs:comment>Incident involving insecure system or application misconfiguration</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Suspicious Activity -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#SuspiciousActivity">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Classification"/>
+    <rdfs:label>Suspicious Activity</rdfs:label>
+    <rdfs:comment>Incident involving activity pattern matching suspicious behavior rules (not yet classified)</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       SEVERITY LEVELS
+       ============================================== -->
+
+  <!-- Base Severity class -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Severity">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+    <rdfs:label>Severity</rdfs:label>
+    <rdfs:comment>Base class for incident severity levels</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Critical -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Critical">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Severity"/>
+    <rdfs:label>Critical</rdfs:label>
+    <rdfs:comment>Critical severity: Active breach, data loss, or widespread compromise requiring immediate escalation</rdfs:comment>
+    <secops:priority_score rdf:datatype="http://www.w3.org/2001/XMLSchema#int">4</secops:priority_score>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- High -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#High">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Severity"/>
+    <rdfs:label>High</rdfs:label>
+    <rdfs:comment>High severity: Potential compromise or significant security weakness requiring urgent investigation</rdfs:comment>
+    <secops:priority_score rdf:datatype="http://www.w3.org/2001/XMLSchema#int">3</secops:priority_score>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Medium -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Medium">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Severity"/>
+    <rdfs:label>Medium</rdfs:label>
+    <rdfs:comment>Medium severity: Suspicious activity requiring investigation within business hours</rdfs:comment>
+    <secops:priority_score rdf:datatype="http://www.w3.org/2001/XMLSchema#int">2</secops:priority_score>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Low -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Low">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Severity"/>
+    <rdfs:label>Low</rdfs:label>
+    <rdfs:comment>Low severity: Informational event or false positive candidate requiring routine investigation</rdfs:comment>
+    <secops:priority_score rdf:datatype="http://www.w3.org/2001/XMLSchema#int">1</secops:priority_score>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       INCIDENT LIFECYCLE STATES
+       ============================================== -->
+
+  <!-- Base State class -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentState">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+    <rdfs:label>Incident State</rdfs:label>
+    <rdfs:comment>Base class for incident lifecycle states</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Detected -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Detected">
+    <rdf:type rdf:resource="http://cre.local/security-ops#IncidentState"/>
+    <rdfs:label>Detected</rdfs:label>
+    <rdfs:comment>Incident detected by SIEM or other monitoring system, awaiting analyst triage</rdfs:comment>
+    <secops:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">1</secops:sequence_order>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Classified -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Classified">
+    <rdf:type rdf:resource="http://cre.local/security-ops#IncidentState"/>
+    <rdfs:label>Classified</rdfs:label>
+    <rdfs:comment>Incident classified by type and severity; awaiting escalation decision</rdfs:comment>
+    <secops:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">2</secops:sequence_order>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Escalated -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Escalated">
+    <rdf:type rdf:resource="http://cre.local/security-ops#IncidentState"/>
+    <rdfs:label>Escalated</rdfs:label>
+    <rdfs:comment>Incident escalated to incident response team for investigation and containment</rdfs:comment>
+    <secops:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">3</secops:sequence_order>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Contained -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Contained">
+    <rdf:type rdf:resource="http://cre.local/security-ops#IncidentState"/>
+    <rdfs:label>Contained</rdfs:label>
+    <rdfs:comment>Incident contained; active threat neutralized through EDR or isolation actions</rdfs:comment>
+    <secops:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">4</secops:sequence_order>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Resolved -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Resolved">
+    <rdf:type rdf:resource="http://cre.local/security-ops#IncidentState"/>
+    <rdfs:label>Resolved</rdfs:label>
+    <rdfs:comment>Incident resolved; investigation complete and remediation actions applied</rdfs:comment>
+    <secops:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">5</secops:sequence_order>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- Closed -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Closed">
+    <rdf:type rdf:resource="http://cre.local/security-ops#IncidentState"/>
+    <rdfs:label>Closed</rdfs:label>
+    <rdfs:comment>Incident closed; all evidence archived and case file stored for future reference</rdfs:comment>
+    <secops:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">6</secops:sequence_order>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- False Positive -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#FalsePositive">
+    <rdf:type rdf:resource="http://cre.local/security-ops#IncidentState"/>
+    <rdfs:label>False Positive</rdfs:label>
+    <rdfs:comment>Incident dismissed as false positive; not a genuine security event</rdfs:comment>
+    <secops:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">7</secops:sequence_order>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       STATE TRANSITION PROPERTIES
+       ============================================== -->
+
+  <!-- current state -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#current_state">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>current_state</rdfs:label>
+    <rdfs:comment>Current lifecycle state of an incident</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Incident"/>
+    <rdfs:range rdf:resource="http://cre.local/security-ops#IncidentState"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+  <!-- state changed at -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#state_changed_at">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>state_changed_at</rdfs:label>
+    <rdfs:comment>ISO 8601 timestamp when incident state last changed</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Incident"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#dateTime"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/incidents"/>
+  </rdf:Description>
+
+</rdf:RDF>

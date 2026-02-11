@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+  xmlns:owl="http://www.w3.org/2002/07/owl#"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:secops="http://cre.local/security-ops#">
+
+  <!-- Ontology Metadata -->
+  <rdf:Description rdf:about="http://cre.local/security-ops/connectors">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Ontology"/>
+    <dc:title>Connector Capability Ontology</dc:title>
+    <dc:description>External system connectors with operations, effect types, and idempotency semantics</dc:description>
+    <dc:isPartOf rdf:resource="http://cre.local/security-ops"/>
+    <dc:created rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2026-02-11T00:00:00Z</dc:created>
+  </rdf:Description>
+
+  <!-- ==============================================
+       CONNECTOR BASE CLASS
+       ============================================== -->
+
+  <!-- Connector: Abstract base for all external system connectors -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#Connector">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+    <rdfs:label>Connector</rdfs:label>
+    <rdfs:comment>Abstract base class for connectors to external security systems</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       CONNECTOR IMPLEMENTATIONS
+       ============================================== -->
+
+  <!-- SIEM Connector: Splunk, ELK, Sumo Logic, etc -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#SIEMConnector">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Connector"/>
+    <rdfs:label>SIEM Connector</rdfs:label>
+    <rdfs:comment>Connector to Security Information and Event Management system (Splunk, ELK, Sumo Logic)</rdfs:comment>
+    <secops:endpoint_type>HTTP_REST_API</secops:endpoint_type>
+    <secops:authentication_type>API_KEY</secops:authentication_type>
+    <secops:retry_policy>exponential_backoff</secops:retry_policy>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- SIEM: ingest operation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#SIEMIngest">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:label>SIEM Ingest</rdfs:label>
+    <rdfs:comment>Ingest security events into SIEM from external feeds</rdfs:comment>
+    <secops:connector rdf:resource="http://cre.local/security-ops#SIEMConnector"/>
+    <secops:effect_type>async_webhook</secops:effect_type>
+    <secops:idempotency>event_id_deduplication</secops:idempotency>
+    <secops:required_fields>event_timestamp</secops:required_fields>
+    <secops:required_fields>source_ip</secops:required_fields>
+    <secops:required_fields>event_type</secops:required_fields>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- SIEM: query operation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#SIEMQuery">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:label>SIEM Query</rdfs:label>
+    <rdfs:comment>Query SIEM for related events or context</rdfs:comment>
+    <secops:connector rdf:resource="http://cre.local/security-ops#SIEMConnector"/>
+    <secops:effect_type>http</secops:effect_type>
+    <secops:idempotency>read_only</secops:idempotency>
+    <secops:timeout_seconds rdf:datatype="http://www.w3.org/2001/XMLSchema#int">30</secops:timeout_seconds>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- SIEM: enrich operation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#SIEMEnrich">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:label>SIEM Enrich</rdfs:label>
+    <rdfs:comment>Enrich incident with additional context from SIEM</rdfs:comment>
+    <secops:connector rdf:resource="http://cre.local/security-ops#SIEMConnector"/>
+    <secops:effect_type>http</secops:effect_type>
+    <secops:idempotency>enrichment_merge</secops:idempotency>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- EDR Connector: Crowdstrike, Carbon Black, Defender for Endpoint -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#EDRConnector">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Connector"/>
+    <rdfs:label>EDR Connector</rdfs:label>
+    <rdfs:comment>Connector to Endpoint Detection and Response system (Crowdstrike, Carbon Black, Defender)</rdfs:comment>
+    <secops:endpoint_type>HTTP_REST_API</secops:endpoint_type>
+    <secops:authentication_type>API_KEY</secops:authentication_type>
+    <secops:rate_limit_rps rdf:datatype="http://www.w3.org/2001/XMLSchema#int">100</secops:rate_limit_rps>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- EDR: isolate operation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#EDRIsolate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:label>EDR Isolate</rdfs:label>
+    <rdfs:comment>Isolate endpoint from network to contain compromise</rdfs:comment>
+    <secops:connector rdf:resource="http://cre.local/security-ops#EDRConnector"/>
+    <secops:effect_type>http</secops:effect_type>
+    <secops:idempotency>device_id_state_tracking</secops:idempotency>
+    <secops:required_fields>device_id</secops:required_fields>
+    <secops:required_fields>reason</secops:required_fields>
+    <secops:requires_approval rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</secops:requires_approval>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- EDR: kill process operation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#EDRKillProcess">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:label>EDR Kill Process</rdfs:label>
+    <rdfs:comment>Kill malicious process on compromised endpoint</rdfs:comment>
+    <secops:connector rdf:resource="http://cre.local/security-ops#EDRConnector"/>
+    <secops:effect_type>http</secops:effect_type>
+    <secops:idempotency>process_name_deduplication</secops:idempotency>
+    <secops:required_fields>device_id</secops:required_fields>
+    <secops:required_fields>process_name</secops:required_fields>
+    <secops:requires_approval rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</secops:requires_approval>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- EDR: get device info operation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#EDRGetDeviceInfo">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:label>EDR Get Device Info</rdfs:label>
+    <rdfs:comment>Get detailed device information and telemetry from EDR</rdfs:comment>
+    <secops:connector rdf:resource="http://cre.local/security-ops#EDRConnector"/>
+    <secops:effect_type>http</secops:effect_type>
+    <secops:idempotency>read_only</secops:idempotency>
+    <secops:required_fields>device_id</secops:required_fields>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- Ticket Connector: Jira, ServiceNow, etc -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#TicketConnector">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Connector"/>
+    <rdfs:label>Ticket Connector</rdfs:label>
+    <rdfs:comment>Connector to ticketing system (Jira, ServiceNow, etc)</rdfs:comment>
+    <secops:endpoint_type>HTTP_REST_API</secops:endpoint_type>
+    <secops:authentication_type>BASIC_AUTH</secops:authentication_type>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- Ticket: create operation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#TicketCreate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:label>Ticket Create</rdfs:label>
+    <rdfs:comment>Create new incident ticket in ticketing system</rdfs:comment>
+    <secops:connector rdf:resource="http://cre.local/security-ops#TicketConnector"/>
+    <secops:effect_type>http</secops:effect_type>
+    <secops:idempotency>incident_id_tracking</secops:idempotency>
+    <secops:required_fields>title</secops:required_fields>
+    <secops:required_fields>severity</secops:required_fields>
+    <secops:required_fields>description</secops:required_fields>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- Ticket: update operation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#TicketUpdate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:label>Ticket Update</rdfs:label>
+    <rdfs:comment>Update existing ticket with new evidence, status, or comments</rdfs:comment>
+    <secops:connector rdf:resource="http://cre.local/security-ops#TicketConnector"/>
+    <secops:effect_type>http</secops:effect_type>
+    <secops:idempotency>ticket_version_tracking</secops:idempotency>
+    <secops:required_fields>ticket_id</secops:required_fields>
+    <secops:required_fields>update_data</secops:required_fields>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- Notification Connector: Email, Slack, PagerDuty, etc -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#NotificationConnector">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Connector"/>
+    <rdfs:label>Notification Connector</rdfs:label>
+    <rdfs:comment>Connector for alert notifications (Email, Slack, PagerDuty, Teams)</rdfs:comment>
+    <secops:endpoint_type>HTTP_REST_API</secops:endpoint_type>
+    <secops:authentication_type>API_KEY</secops:authentication_type>
+    <secops:retry_policy>exponential_backoff</secops:retry_policy>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- Notification: send alert operation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#NotificationSend">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:label>Notification Send</rdfs:label>
+    <rdfs:comment>Send alert notification to personnel via email, Slack, etc</rdfs:comment>
+    <secops:connector rdf:resource="http://cre.local/security-ops#NotificationConnector"/>
+    <secops:effect_type>async_webhook</secops:effect_type>
+    <secops:idempotency>message_id_tracking</secops:idempotency>
+    <secops:required_fields>recipient</secops:required_fields>
+    <secops:required_fields>message_template</secops:required_fields>
+    <secops:required_fields>severity</secops:required_fields>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       OPERATION BASE CLASS
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/security-ops#Operation">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+    <rdfs:label>Operation</rdfs:label>
+    <rdfs:comment>An operation that can be performed via a connector</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       EFFECT TYPES (OUTPUT SEMANTICS)
+       ============================================== -->
+
+  <!-- HTTP: Synchronous REST API call with response -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#EffectHTTP">
+    <rdf:type rdf:resource="http://cre.local/security-ops#EffectType"/>
+    <rdfs:label>HTTP</rdfs:label>
+    <rdfs:comment>Synchronous HTTP request with immediate response expected</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- Async Webhook: Fire-and-forget async webhook call -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#EffectAsyncWebhook">
+    <rdf:type rdf:resource="http://cre.local/security-ops#EffectType"/>
+    <rdfs:label>Async Webhook</rdfs:label>
+    <rdfs:comment>Fire-and-forget asynchronous webhook invocation</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- Event Bus: Published to event bus for async processing -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#EffectEventBus">
+    <rdf:type rdf:resource="http://cre.local/security-ops#EffectType"/>
+    <rdfs:label>Event Bus</rdfs:label>
+    <rdfs:comment>Message published to event bus (Kafka, Kinesis, etc) for async processing</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       IDEMPOTENCY SEMANTICS
+       ============================================== -->
+
+  <!-- read_only: Operation is idempotent (read operations) -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IdempotencyReadOnly">
+    <rdf:type rdf:resource="http://cre.local/security-ops#IdempotencyType"/>
+    <rdfs:label>Read Only</rdfs:label>
+    <rdfs:comment>Operation is read-only and inherently idempotent</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- deduplication: Uses unique ID to avoid duplicates -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IdempotencyDeduplication">
+    <rdf:type rdf:resource="http://cre.local/security-ops#IdempotencyType"/>
+    <rdfs:label>Deduplication</rdfs:label>
+    <rdfs:comment>Uses unique ID (event_id, device_id) to deduplicate retries</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- state_tracking: Uses version or state to track applied operations -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IdempotencyStateTracking">
+    <rdf:type rdf:resource="http://cre.local/security-ops#IdempotencyType"/>
+    <rdfs:label>State Tracking</rdfs:label>
+    <rdfs:comment>Tracks operation state (version, applied flag) to ensure idempotency</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- merge: Merge enrichment data rather than overwrite -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IdempotencyMerge">
+    <rdf:type rdf:resource="http://cre.local/security-ops#IdempotencyType"/>
+    <rdfs:label>Merge</rdfs:label>
+    <rdfs:comment>Merge new data with existing data rather than overwrite (enrichment)</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       CONNECTOR PROPERTIES
+       ============================================== -->
+
+  <!-- effect_type: Output semantics (http, async_webhook, event_bus) -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#effect_type">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>effect_type</rdfs:label>
+    <rdfs:comment>Output semantics: http, async_webhook, event_bus</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- idempotency: Idempotency semantics -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#idempotency">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>idempotency</rdfs:label>
+    <rdfs:comment>Idempotency method (read_only, deduplication, state_tracking, merge)</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- required_fields: Fields required to execute operation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#required_fields">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>required_fields</rdfs:label>
+    <rdfs:comment>Required field names for operation execution</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- requires_approval: Whether operation requires human approval -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#requires_approval">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>requires_approval</rdfs:label>
+    <rdfs:comment>Whether operation requires human analyst approval before execution</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#boolean"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- timeout_seconds: Operation timeout in seconds -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#timeout_seconds">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>timeout_seconds</rdfs:label>
+    <rdfs:comment>Maximum duration in seconds for operation to complete</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#int"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+  <!-- connector: Links operation to its connector -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#connector">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>connector</rdfs:label>
+    <rdfs:comment>The connector that executes this operation</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Operation"/>
+    <rdfs:range rdf:resource="http://cre.local/security-ops#Connector"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/connectors"/>
+  </rdf:Description>
+
+</rdf:RDF>
