@@ -1,0 +1,98 @@
+# ggen.toml - LineController Factory Generation Configuration
+# Order Fulfillment Line Example
+#
+# This configuration drives deterministic generation of Erlang/OTP modules
+# from the RDF ontology specification.
+#
+# Usage: ggen sync (or via wrapper: ./bin/. sync)
+
+[project]
+name = "order_fulfillment_line"
+version = "0.1.0"
+description = "Order fulfillment workflow generated from ln ontology"
+
+[ontology]
+# Source RDF files (Turtle format)
+sources = ["ontology/order_line.ttl"]
+
+# RDF namespace prefixes
+[ontology.prefixes]
+ln = "http://linecontroller.factory/ontology/ln#"
+order = "http://linecontroller.factory/examples/order#"
+rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+rdfs = "http://www.w3.org/2000/01/rdf-schema#"
+
+[output]
+# Generated artifacts go here
+directory = "."
+manifest = "receipts/manifest.json"
+
+# Generation rules: query → template → output
+[[rules]]
+name = "generate-plan-module"
+description = "Generate ln_ctrl plan module from plan structure"
+query = "sparql/plan_nodes.sparql"
+template = "templates/plan_module.tera"
+output = "src/generated/{{project.name}}_plan.erl"
+mode = "overwrite"
+
+[[rules]]
+name = "generate-callback-module"
+description = "Generate ln_ctrl callback module from tasks"
+query = "sparql/tasks.sparql"
+template = "templates/callback_module.tera"
+output = "src/{{project.name}}_cb.erl"
+mode = "overwrite"
+
+[[rules]]
+name = "generate-rebar-config"
+description = "Generate rebar3 configuration"
+query = "sparql/line_meta.sparql"
+template = "templates/rebar_config.tera"
+output = "rebar.config"
+mode = "overwrite"
+
+[[rules]]
+name = "generate-app-src"
+description = "Generate OTP application resource file"
+query = "sparql/line_meta.sparql"
+template = "templates/app_src.tera"
+output = "src/{{project.name}}.app.src"
+mode = "overwrite"
+
+[[rules]]
+name = "generate-app-module"
+description = "Generate OTP application module"
+query = "sparql/line_meta.sparql"
+template = "templates/app_module.tera"
+output = "src/{{project.name}}_app.erl"
+mode = "overwrite"
+
+[[rules]]
+name = "generate-supervisor"
+description = "Generate OTP supervisor module"
+query = "sparql/line_meta.sparql"
+template = "templates/supervisor.tera"
+output = "src/{{project.name}}_sup.erl"
+mode = "overwrite"
+
+[[rules]]
+name = "generate-tests"
+description = "Generate EUnit test suite"
+query = "sparql/tasks.sparql"
+template = "templates/tests.tera"
+output = "test/{{project.name}}_tests.erl"
+mode = "overwrite"
+
+[validation]
+# Preflight checks before generation
+check_rdf_parse = true
+check_sparql_syntax = true
+check_template_syntax = true
+
+[receipts]
+# Build receipt configuration
+format = "json"
+hash_algorithm = "sha256"
+output_file = "receipts/last.json"
+hash_file = "receipts/last.sha"

@@ -1,0 +1,11 @@
+# Extract all scopes
+PREFIX ln: <http://linecontroller.factory/ontology/ln#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?scopeId ?scopeDescription
+WHERE {
+    ?scope rdf:type ln:Scope .
+    ?scope ln:scopeId ?scopeId .
+    ?scope ln:scopeDescription ?scopeDescription .
+}
+ORDER BY ?scopeId
