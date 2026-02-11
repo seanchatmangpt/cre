@@ -348,7 +348,7 @@ property_identical_traces_test_() ->
 
 %% @doc Test a single pattern for determinism.
 test_pattern_determinism(Pattern) ->
-    {Description, _} = wf_term:to_string(Pattern),
+    Description = lists:flatten(wf_term:to_string(Pattern)),
     {Description, fun() ->
         {ok, Compiled} = wf_compile:compile(Pattern),
 

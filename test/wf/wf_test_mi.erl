@@ -135,7 +135,7 @@ dynamic_mi_policy_data_driven_test() ->
 %% @doc Test MI term with fixed policy.
 %%--------------------------------------------------------------------
 mi_term_fixed_test() ->
-    Task = {task, process_item, fun(_) -> ok end},
+    Task = {task, process_item, fun(_) -> {ok, #{}} end},
     MITerm = wf_term:mi({fixed, 3}, Task),
     ?assertMatch({mi, {fixed, 3}, _}, MITerm).
 
@@ -152,7 +152,7 @@ mi_term_dynamic_test() ->
 %% @doc Test MI term validation with nested tasks.
 %%--------------------------------------------------------------------
 mi_term_nested_valid_test() ->
-    Task = {task, inner, fun(_) -> ok end},
+    Task = {task, inner, fun(_) -> {ok, #{}} end},
     Seq = {seq, Task, Task},
     MITerm = wf_term:mi({fixed, 2}, Seq),
     ?assert(wf_term:is_valid(MITerm)).
@@ -161,7 +161,7 @@ mi_term_nested_valid_test() ->
 %% @doc Test MI term validation rejects invalid policy.
 %%--------------------------------------------------------------------
 mi_term_invalid_policy_test() ->
-    Task = {task, process, fun(_) -> ok end},
+    Task = {task, process, fun(_) -> {ok, #{}} end},
     ?assertException(error, _, wf_term:mi(invalid_policy, Task)).
 
 %%====================================================================
