@@ -93,11 +93,10 @@ append({log, Tid, FilePath, _MaxSeq}, Data) ->
             {LastSeq + 1, H}
     end,
 
-    % Compute receipt hash
+    % Compute receipt hash (does not include timestamp for reproducibility)
     ReceiptHash = compute_hash(#{
         seq => NewSeq,
         prev_hash => PrevHash,
-        timestamp => Timestamp,
         data => Data
     }),
 
@@ -198,12 +197,11 @@ compute_hash(Data) ->
 -spec validate_chain_impl([term()], binary()) -> ok | error.
 validate_chain_impl([], _PrevHash) ->
     ok;
-validate_chain_impl([{Seq, Hash, PrevHash, Timestamp, Data} | Rest], ExpectedPrevHash) ->
-    % Recompute expected hash
+validate_chain_impl([{Seq, Hash, PrevHash, _Timestamp, Data} | Rest], ExpectedPrevHash) ->
+    % Recompute expected hash (timestamp NOT included in hash)
     ExpectedHash = compute_hash(#{
         seq => Seq,
         prev_hash => PrevHash,
-        timestamp => Timestamp,
         data => Data
     }),
 

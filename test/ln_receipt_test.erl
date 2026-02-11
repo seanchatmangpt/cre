@@ -73,15 +73,16 @@ hash_chain_validation_test() ->
         {ok, _ID2} = ln_receipt_log:append(Handle, <<"data2">>),
         {ok, _ID3} = ln_receipt_log:append(Handle, <<"data3">>),
 
-        % Validate chain before tampering
-        {ok, _Receipts1} = ln_receipt_log:validate_chain(Handle),
+        % Validate chain before tampering - should succeed
+        ValidResult1 = ln_receipt_log:validate_chain(Handle),
+        ?assertMatch({ok, _}, ValidResult1),
 
         % Manually tamper with middle receipt in ETS
         EtsTableID = element(2, Handle),
         ets:delete(EtsTableID, 2),
         ets:insert(EtsTableID, {2, <<"fakehash">>, <<"someprevhash">>, erlang:system_time(millisecond), <<"data2">>}),
 
-        % Validate chain after tampering
+        % Validate chain after tampering - should fail
         Result = ln_receipt_log:validate_chain(Handle),
         ?assertEqual({error, chain_broken}, Result)
     after
