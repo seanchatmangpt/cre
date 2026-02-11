@@ -25,7 +25,10 @@
 %% @doc Validate all requirements for this regulation
 -spec validate_all(map()) -> {ok, [{atom(), ok}]} | {error, [{atom(), term()}]}.
 validate_all(Context) ->
-    Checks = [{validate_data_deletion_rights, 'data_deletion_rights'}, {validate_opt_out_sale, 'opt_out_sale'}, {validate_disclosure_collection, 'disclosure_collection'}],
+    %% Use function references, not atoms
+    Checks = [
+        {fun ?MODULE:validate_data_deletion_rights/1, 'data_deletion_rights'}, {fun ?MODULE:validate_opt_out_sale/1, 'opt_out_sale'}, {fun ?MODULE:validate_disclosure_collection/1, 'disclosure_collection'}
+    ],
 
     Results = lists:map(fun({CheckFun, CheckName}) ->
         case CheckFun(Context) of

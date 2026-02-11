@@ -25,7 +25,10 @@
 %% @doc Validate all requirements for this regulation
 -spec validate_all(map()) -> {ok, [{atom(), ok}]} | {error, [{atom(), term()}]}.
 validate_all(Context) ->
-    Checks = [{validate_kyc_verification, 'kyc_verification'}, {validate_sar_filing, 'sar_filing'}, {validate_ctr_reporting, 'ctr_reporting'}, {validate_suspicious_activity_monitoring, 'suspicious_activity_monitoring'}],
+    %% Use function references, not atoms
+    Checks = [
+        {fun ?MODULE:validate_kyc_verification/1, 'kyc_verification'}, {fun ?MODULE:validate_sar_filing/1, 'sar_filing'}, {fun ?MODULE:validate_ctr_reporting/1, 'ctr_reporting'}, {fun ?MODULE:validate_suspicious_activity_monitoring/1, 'suspicious_activity_monitoring'}
+    ],
 
     Results = lists:map(fun({CheckFun, CheckName}) ->
         case CheckFun(Context) of

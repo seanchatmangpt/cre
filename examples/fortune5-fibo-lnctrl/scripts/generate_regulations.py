@@ -184,7 +184,10 @@ validate_{check_snake}_test() ->
 %% @doc Validate all requirements for this regulation
 -spec validate_all(map()) -> {{ok, [{{atom(), ok}}]}} | {{error, [{{atom(), term()}}]}}.
 validate_all(Context) ->
-    Checks = [{", ".join([f"{{validate_{c.replace('-', '_')}, '{c}'}}" for c in checks])}],
+    %% Use function references, not atoms
+    Checks = [
+        {", ".join([f"{{fun ?MODULE:validate_{c.replace('-', '_')}/1, '{c}'}}" for c in checks])}
+    ],
 
     Results = lists:map(fun({{CheckFun, CheckName}}) ->
         case CheckFun(Context) of

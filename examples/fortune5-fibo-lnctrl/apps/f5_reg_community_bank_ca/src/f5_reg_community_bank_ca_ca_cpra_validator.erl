@@ -25,7 +25,10 @@
 %% @doc Validate all requirements for this regulation
 -spec validate_all(map()) -> {ok, [{atom(), ok}]} | {error, [{atom(), term()}]}.
 validate_all(Context) ->
-    Checks = [{validate_sensitive_data_limits, 'sensitive_data_limits'}, {validate_automated_decision_rights, 'automated_decision_rights'}, {validate_correction_rights, 'correction_rights'}],
+    %% Use function references, not atoms
+    Checks = [
+        {fun ?MODULE:validate_sensitive_data_limits/1, 'sensitive_data_limits'}, {fun ?MODULE:validate_automated_decision_rights/1, 'automated_decision_rights'}, {fun ?MODULE:validate_correction_rights/1, 'correction_rights'}
+    ],
 
     Results = lists:map(fun({CheckFun, CheckName}) ->
         case CheckFun(Context) of

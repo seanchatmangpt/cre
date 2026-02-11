@@ -25,7 +25,10 @@
 %% @doc Validate all requirements for this regulation
 -spec validate_all(map()) -> {ok, [{atom(), ok}]} | {error, [{atom(), term()}]}.
 validate_all(Context) ->
-    Checks = [{validate_licensing_requirements, 'licensing_requirements'}, {validate_fee_disclosures, 'fee_disclosures'}, {validate_complaint_handling, 'complaint_handling'}],
+    %% Use function references, not atoms
+    Checks = [
+        {fun ?MODULE:validate_licensing_requirements/1, 'licensing_requirements'}, {fun ?MODULE:validate_fee_disclosures/1, 'fee_disclosures'}, {fun ?MODULE:validate_complaint_handling/1, 'complaint_handling'}
+    ],
 
     Results = lists:map(fun({CheckFun, CheckName}) ->
         case CheckFun(Context) of
