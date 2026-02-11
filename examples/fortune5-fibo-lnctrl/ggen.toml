@@ -38,45 +38,8 @@ mode = "OverwriteAll"
 [[generation.rules]]
 name = "generate-connector-supervisor"
 description = "Generate supervisor for all connectors"
-query = { inline = """
-PREFIX ln: <http://lnctrl.io/ontology#>
-SELECT (COUNT(?connector) AS ?connectorCount)
-WHERE {
-    ?connector a ln:Connector .
-}
-""" }
-template = { inline = """
-%% Generated supervisor for f5_connectors
--module(f5_connectors_sup).
--behaviour(supervisor).
--export([start_link/0, init/1]).
-
-start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
-
-init([]) ->
-    SupFlags = #{strategy => one_for_one, intensity => 10, period => 60},
-
-    %% Start all connector gen_servers as children
-    ChildSpecs = [
-        #{
-            id => worker_1,
-            start => {f5_connectors_worker, start_link, [#{worker_id => 1}]},
-            restart => permanent,
-            shutdown => 5000,
-            type => worker
-        },
-        #{
-            id => worker_2,
-            start => {f5_connectors_worker, start_link, [#{worker_id => 2}]},
-            restart => permanent,
-            shutdown => 5000,
-            type => worker
-        }
-    ],
-
-    {ok, {SupFlags, ChildSpecs}}.
-""" }
+query = { inline = "SELECT * WHERE { }" }
+template = { file = "templates/supervisor_module.tera" }
 output_file = "apps/f5_connectors/src/f5_connectors_sup.erl"
 mode = "Overwrite"
 
@@ -85,22 +48,29 @@ mode = "Overwrite"
 name = "generate-connector-app"
 description = "Generate OTP application module for connectors"
 query = { inline = "SELECT * WHERE { }" }
-template = { inline = """
-%% Generated application module for f5_connectors
--module(f5_connectors_app).
--behaviour(application).
--export([start/2, stop/1]).
-
-start(_StartType, _StartArgs) ->
-    f5_connectors_sup:start_link().
-
-stop(_State) ->
-    ok.
-""" }
+template = { file = "templates/app_module.tera" }
 output_file = "apps/f5_connectors/src/f5_connectors_app.erl"
 mode = "Overwrite"
 
-# Rule 4: Generate service apps (internal implementations)
+# Rule 4: Generate connector worker
+[[generation.rules]]
+name = "generate-connector-worker"
+description = "Generate worker module for connectors"
+query = { inline = "SELECT * WHERE { }" }
+template = { file = "templates/worker_module.tera" }
+output_file = "apps/f5_connectors/src/f5_connectors_worker.erl"
+mode = "Overwrite"
+
+# Rule 5: Generate connector .app.src
+[[generation.rules]]
+name = "generate-connector-app-src"
+description = "Generate .app.src for connectors"
+query = { inline = "SELECT * WHERE { }" }
+template = { file = "templates/app_src.tera" }
+output_file = "apps/f5_connectors/src/f5_connectors.app.src"
+mode = "Overwrite"
+
+# Rule 6: Generate service apps (internal implementations)
 [[generation.rules]]
 name = "generate-service-apps"
 description = "Generate internal service apps for each connector type"
@@ -109,26 +79,128 @@ template = { file = "templates/service_app.tera" }
 output_pattern = "apps/f5_service_{connectorId}/src/f5_service_{connectorId}_app.erl"
 mode = "OverwriteAll"
 
-# Rule 5: Generate regulation validators per customer
+# Rule 7: Generate service workers
 [[generation.rules]]
-name = "generate-regulation-validators"
-description = "Generate customer-specific regulation validators"
-query = { inline = """
-PREFIX ln: <http://lnctrl.io/ontology#>
-PREFIX f5: <http://fortune5.lnctrl.io/ontology#>
-SELECT ?customerId ?jurisdiction ?regulationType
-WHERE {
-    ?customer a ln:Customer ;
-              ln:customerId ?customerId ;
-              ln:jurisdiction ?jurisdiction ;
-              ln:regulationType ?regulationType .
-}
-""" }
-template = { file = "templates/regulation_validator.tera" }
-output_pattern = "apps/f5_regulations_{customerId}/src/f5_reg_{regulationType}_validator.erl"
+name = "generate-service-workers"
+description = "Generate service worker modules for each connector"
+query = { file = "sparql/extract_connectors.sparql" }
+template = { file = "templates/service_worker.tera" }
+output_pattern = "apps/f5_service_{connectorId}/src/f5_service_{connectorId}_worker.erl"
 mode = "OverwriteAll"
 
-# Rule 6: Generate adversarial validators
+# Rule 8: Generate service supervisors
+[[generation.rules]]
+name = "generate-service-supervisors"
+description = "Generate supervisors for service apps"
+query = { file = "sparql/extract_connectors.sparql" }
+template = { file = "templates/supervisor_module.tera" }
+output_pattern = "apps/f5_service_{connectorId}/src/f5_service_{connectorId}_sup.erl"
+mode = "OverwriteAll"
+
+# Rule 9: Generate service .app.src files
+[[generation.rules]]
+name = "generate-service-app-src"
+description = "Generate .app.src files for service apps"
+query = { file = "sparql/extract_connectors.sparql" }
+template = { file = "templates/app_src.tera" }
+output_pattern = "apps/f5_service_{connectorId}/src/f5_service_{connectorId}.app.src"
+mode = "OverwriteAll"
+
+# Rule 10: Generate regulation validators per customer (ontology-driven)
+[[generation.rules]]
+name = "generate-regulation-validators"
+description = "Generate customer-specific regulation validators from regulations ontology"
+ontology_files = ["ontology/regulations.ttl", "ontology/customers.ttl"]
+query = { file = "sparql/extract_customer_regulations.sparql" }
+template = { file = "templates/regulation_validator.tera" }
+output_pattern = "apps/f5_reg_{customerId}/src/f5_reg_{customerId}_{regulationId}_validator.erl"
+mode = "OverwriteAll"
+
+# Rule 10a: Generate regulation suite supervisors per customer
+[[generation.rules]]
+name = "generate-regulation-supervisors"
+description = "Generate supervisor modules for customer regulation suites"
+ontology_files = ["ontology/customers.ttl", "ontology/regulations.ttl"]
+query = { file = "sparql/extract_customer_suite.sparql" }
+template = { file = "templates/regulation_supervisor.tera" }
+output_pattern = "apps/f5_reg_{customerId}/src/f5_reg_{customerId}_sup.erl"
+mode = "OverwriteAll"
+
+# Rule 10b: Generate regulation suite app modules per customer
+[[generation.rules]]
+name = "generate-regulation-apps"
+description = "Generate app modules for customer regulation suites"
+ontology_files = ["ontology/customers.ttl", "ontology/regulations.ttl"]
+query = { file = "sparql/extract_customer_suite.sparql" }
+template = { file = "templates/regulation_app.tera" }
+output_pattern = "apps/f5_reg_{customerId}/src/f5_reg_{customerId}_app.erl"
+mode = "OverwriteAll"
+
+# Rule 10c: Generate regulation suite .app.src per customer
+[[generation.rules]]
+name = "generate-regulation-app-src"
+description = "Generate .app.src files for customer regulation suites"
+ontology_files = ["ontology/customers.ttl", "ontology/regulations.ttl"]
+query = { file = "sparql/extract_customer_suite.sparql" }
+template = { file = "templates/regulation_app_src.tera" }
+output_pattern = "apps/f5_reg_{customerId}/src/f5_reg_{customerId}.app.src"
+mode = "OverwriteAll"
+
+# Rule 11: Generate generic OTP apps
+[[generation.rules]]
+name = "generate-apps"
+description = "Generate OTP application modules"
+query = { file = "sparql/extract_apps.sparql" }
+template = { file = "templates/app_module.tera" }
+output_pattern = "apps/{appId}/src/{appId}_app.erl"
+mode = "OverwriteAll"
+
+# Rule 12: Generate app supervisors
+[[generation.rules]]
+name = "generate-supervisors"
+description = "Generate supervisor modules"
+query = { file = "sparql/extract_supervisors.sparql" }
+template = { file = "templates/supervisor_module.tera" }
+output_pattern = "apps/{appId}/src/{appId}_sup.erl"
+mode = "OverwriteAll"
+
+# Rule 13: Generate app workers
+[[generation.rules]]
+name = "generate-workers"
+description = "Generate worker modules"
+query = { file = "sparql/extract_workers.sparql" }
+template = { file = "templates/worker_module.tera" }
+output_pattern = "apps/{appId}/src/{appId}_worker.erl"
+mode = "OverwriteAll"
+
+# Rule 14: Generate app .app.src files
+[[generation.rules]]
+name = "generate-app-src-files"
+description = "Generate .app.src files"
+query = { file = "sparql/extract_apps.sparql" }
+template = { file = "templates/app_src.tera" }
+output_pattern = "apps/{appId}/src/{appId}.app.src"
+mode = "OverwriteAll"
+
+# Rule 15: Generate generic modules
+[[generation.rules]]
+name = "generate-modules"
+description = "Generate generic Erlang modules"
+query = { file = "sparql/extract_modules.sparql" }
+template = { file = "templates/generic_module.tera" }
+output_pattern = "apps/{appId}/src/{appId}_{moduleId}.erl"
+mode = "OverwriteAll"
+
+# Rule 16: Generate test suites
+[[generation.rules]]
+name = "generate-test-suites"
+description = "Generate Common Test suites"
+query = { file = "sparql/extract_apps.sparql" }
+template = { file = "templates/test_module.tera" }
+output_pattern = "test/{appId}_SUITE.erl"
+mode = "OverwriteAll"
+
+# Rule 17: Generate adversarial validators
 [[generation.rules]]
 name = "generate-adversarial-validators"
 description = "Generate adversarial zero-downtime validators"
@@ -158,3 +230,56 @@ include_loc_count = true
 directory = "evidence"
 collect_otp_metrics = true
 generate_proofs = true
+# =============================================================================
+# SOC 2 COMPLIANCE ARTIFACTS
+# =============================================================================
+
+# Rule 18: Generate SOC 2 control matrix (all suites)
+[[generation.rules]]
+name = "soc2-control-matrix"
+description = "Generate SOC 2 control matrix with full closure"
+ontology_files = ["ontology/reg/soc2.ttl"]
+query = { file = "sparql/soc2/extract_control_closure.sparql" }
+template = { file = "templates/soc2/soc2_auditor_pack.tera" }
+output_file = "lib/soc2/soc2.control_matrix.yaml"
+mode = "Overwrite"
+
+# Rule 19: Generate SOC 2 auditor pack (JSON manifest)
+[[generation.rules]]
+name = "soc2-auditor-pack"
+description = "Generate SOC 2 auditor pack with evidence manifest"
+ontology_files = ["ontology/reg/soc2.ttl"]
+query = { file = "sparql/soc2/extract_control_closure.sparql" }
+template = { file = "templates/soc2/soc2_auditor_pack.tera" }
+output_file = "lib/soc2/soc2.auditor_pack.json"
+mode = "Overwrite"
+
+# Rule 20: Generate customer-specific SOC 2 control matrices
+[[generation.rules]]
+name = "soc2-customer-control-matrix"
+description = "Generate customer-specific SOC 2 control matrices"
+ontology_files = ["ontology/reg/soc2.ttl", "ontology/customers.ttl"]
+query = { file = "sparql/soc2/extract_customer_control_closure.sparql" }
+template = { file = "templates/soc2/soc2_auditor_pack.tera" }
+output_pattern = "lib/soc2/customers/{customerId}.soc2.control_matrix.yaml"
+mode = "OverwriteAll"
+
+# Rule 21: Generate customer-specific SOC 2 auditor packs
+[[generation.rules]]
+name = "soc2-customer-auditor-pack"
+description = "Generate customer-specific SOC 2 auditor packs"
+ontology_files = ["ontology/reg/soc2.ttl", "ontology/customers.ttl"]
+query = { file = "sparql/soc2/extract_customer_control_closure.sparql" }
+template = { file = "templates/soc2/soc2_auditor_pack.tera" }
+output_pattern = "lib/soc2/customers/{customerId}.soc2.auditor_pack.json"
+mode = "OverwriteAll"
+
+[soc2]
+enabled = true
+generate_receipts = true
+integrate_with_cert_runner = true
+
+[soc2.type_ii]
+enabled = true
+period_evidence_index = "evidence/period/index.json"
+accumulate_snapshots = true

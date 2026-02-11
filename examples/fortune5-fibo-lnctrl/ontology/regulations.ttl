@@ -1,0 +1,322 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix reg: <http://fortune5.lnctrl.io/regulations#> .
+@prefix ln: <http://lnctrl.io/ontology#> .
+
+# ============================================================================
+# Regulation Ontology - Fortune-5 Financial Services Compliance
+# ============================================================================
+
+reg:Regulation a owl:Class ;
+    rdfs:label "Regulation" ;
+    rdfs:comment "A financial regulation that must be enforced" .
+
+reg:Check a owl:Class ;
+    rdfs:label "Regulatory Check" ;
+    rdfs:comment "A specific compliance check required by a regulation" .
+
+reg:regulationId a owl:DatatypeProperty ;
+    rdfs:domain reg:Regulation ;
+    rdfs:range xsd:string .
+
+reg:regulationName a owl:DatatypeProperty ;
+    rdfs:domain reg:Regulation ;
+    rdfs:range xsd:string .
+
+reg:severity a owl:DatatypeProperty ;
+    rdfs:domain reg:Regulation ;
+    rdfs:range xsd:string .
+
+reg:requiresCheck a owl:ObjectProperty ;
+    rdfs:domain reg:Regulation ;
+    rdfs:range reg:Check .
+
+reg:checkId a owl:DatatypeProperty ;
+    rdfs:domain reg:Check ;
+    rdfs:range xsd:string .
+
+# ============================================================================
+# Federal Regulations
+# ============================================================================
+
+# Bank Secrecy Act / Anti-Money Laundering
+reg:fed_bsa_aml a reg:Regulation ;
+    reg:regulationId "fed_bsa_aml" ;
+    reg:regulationName "Bank Secrecy Act / Anti-Money Laundering" ;
+    reg:severity "critical" ;
+    reg:requiresCheck reg:check_kyc_verification ;
+    reg:requiresCheck reg:check_sar_filing ;
+    reg:requiresCheck reg:check_ctr_reporting ;
+    reg:requiresCheck reg:check_suspicious_activity_monitoring .
+
+reg:check_kyc_verification a reg:Check ;
+    reg:checkId "kyc_verification" ;
+    rdfs:label "KYC Verification" ;
+    rdfs:comment "Know Your Customer identity verification" .
+
+reg:check_sar_filing a reg:Check ;
+    reg:checkId "sar_filing" ;
+    rdfs:label "SAR Filing" ;
+    rdfs:comment "Suspicious Activity Report filing requirements" .
+
+reg:check_ctr_reporting a reg:Check ;
+    reg:checkId "ctr_reporting" ;
+    rdfs:label "CTR Reporting" ;
+    rdfs:comment "Currency Transaction Report for transactions over $10,000" .
+
+reg:check_suspicious_activity_monitoring a reg:Check ;
+    reg:checkId "suspicious_activity_monitoring" ;
+    rdfs:label "Suspicious Activity Monitoring" ;
+    rdfs:comment "Continuous monitoring for suspicious patterns" .
+
+# Federal Regulation E (Electronic Fund Transfers)
+reg:fed_cfpb_reg_e a reg:Regulation ;
+    reg:regulationId "fed_cfpb_reg_e" ;
+    reg:regulationName "Federal Regulation E (Electronic Fund Transfers)" ;
+    reg:severity "critical" ;
+    reg:requiresCheck reg:check_error_resolution ;
+    reg:requiresCheck reg:check_unauthorized_transfer_liability ;
+    reg:requiresCheck reg:check_disclosure_requirements .
+
+reg:check_error_resolution a reg:Check ;
+    reg:checkId "error_resolution" ;
+    rdfs:label "Error Resolution" ;
+    rdfs:comment "Process for resolving electronic transfer errors" .
+
+reg:check_unauthorized_transfer_liability a reg:Check ;
+    reg:checkId "unauthorized_transfer_liability" ;
+    rdfs:label "Unauthorized Transfer Liability" ;
+    rdfs:comment "Liability limits for unauthorized electronic transfers" .
+
+reg:check_disclosure_requirements a reg:Check ;
+    reg:checkId "disclosure_requirements" ;
+    rdfs:label "Disclosure Requirements" ;
+    rdfs:comment "Required disclosures for electronic fund transfer services" .
+
+# Federal Regulation Z (Truth in Lending)
+reg:fed_cfpb_reg_z a reg:Regulation ;
+    reg:regulationId "fed_cfpb_reg_z" ;
+    reg:regulationName "Federal Regulation Z (Truth in Lending)" ;
+    reg:severity "critical" ;
+    reg:requiresCheck reg:check_apr_disclosure ;
+    reg:requiresCheck reg:check_rescission_rights ;
+    reg:requiresCheck reg:check_billing_error_resolution .
+
+reg:check_apr_disclosure a reg:Check ;
+    reg:checkId "apr_disclosure" ;
+    rdfs:label "APR Disclosure" ;
+    rdfs:comment "Annual Percentage Rate disclosure requirements" .
+
+reg:check_rescission_rights a reg:Check ;
+    reg:checkId "rescission_rights" ;
+    rdfs:label "Rescission Rights" ;
+    rdfs:comment "Three-day right to cancel certain credit transactions" .
+
+reg:check_billing_error_resolution a reg:Check ;
+    reg:checkId "billing_error_resolution" ;
+    rdfs:label "Billing Error Resolution" ;
+    rdfs:comment "Process for resolving billing disputes" .
+
+# TRID (TILA-RESPA Integrated Disclosures)
+reg:fed_cfpb_trid a reg:Regulation ;
+    reg:regulationId "fed_cfpb_trid" ;
+    reg:regulationName "TRID (TILA-RESPA Integrated Disclosures)" ;
+    reg:severity "critical" ;
+    reg:requiresCheck reg:check_loan_estimate_accuracy ;
+    reg:requiresCheck reg:check_closing_disclosure_timing ;
+    reg:requiresCheck reg:check_fee_tolerance_limits .
+
+reg:check_loan_estimate_accuracy a reg:Check ;
+    reg:checkId "loan_estimate_accuracy" ;
+    rdfs:label "Loan Estimate Accuracy" ;
+    rdfs:comment "Accuracy requirements for initial loan estimates" .
+
+reg:check_closing_disclosure_timing a reg:Check ;
+    reg:checkId "closing_disclosure_timing" ;
+    rdfs:label "Closing Disclosure Timing" ;
+    rdfs:comment "Timing requirements for final closing disclosures" .
+
+reg:check_fee_tolerance_limits a reg:Check ;
+    reg:checkId "fee_tolerance_limits" ;
+    rdfs:label "Fee Tolerance Limits" ;
+    rdfs:comment "Allowed variance between estimated and actual fees" .
+
+# ============================================================================
+# State Regulations
+# ============================================================================
+
+# New York DFS Cybersecurity Regulation (23 NYCRR 500)
+reg:ny_dfs_23_nycrr_500 a reg:Regulation ;
+    reg:regulationId "ny_dfs_23_nycrr_500" ;
+    reg:regulationName "NY DFS Cybersecurity Regulation (23 NYCRR 500)" ;
+    reg:severity "critical" ;
+    reg:requiresCheck reg:check_audit_trail ;
+    reg:requiresCheck reg:check_access_controls ;
+    reg:requiresCheck reg:check_penetration_testing ;
+    reg:requiresCheck reg:check_incident_response .
+
+reg:check_audit_trail a reg:Check ;
+    reg:checkId "audit_trail" ;
+    rdfs:label "Audit Trail" ;
+    rdfs:comment "Comprehensive logging of system access and changes" .
+
+reg:check_access_controls a reg:Check ;
+    reg:checkId "access_controls" ;
+    rdfs:label "Access Controls" ;
+    rdfs:comment "Multi-factor authentication and role-based access" .
+
+reg:check_penetration_testing a reg:Check ;
+    reg:checkId "penetration_testing" ;
+    rdfs:label "Penetration Testing" ;
+    rdfs:comment "Regular security testing and vulnerability assessments" .
+
+reg:check_incident_response a reg:Check ;
+    reg:checkId "incident_response" ;
+    rdfs:label "Incident Response" ;
+    rdfs:comment "Documented incident response procedures" .
+
+# California Consumer Privacy Act (CCPA)
+reg:ca_ccpa a reg:Regulation ;
+    reg:regulationId "ca_ccpa" ;
+    reg:regulationName "California Consumer Privacy Act" ;
+    reg:severity "high" ;
+    reg:requiresCheck reg:check_data_deletion_rights ;
+    reg:requiresCheck reg:check_opt_out_sale ;
+    reg:requiresCheck reg:check_disclosure_collection .
+
+reg:check_data_deletion_rights a reg:Check ;
+    reg:checkId "data_deletion_rights" ;
+    rdfs:label "Data Deletion Rights" ;
+    rdfs:comment "Right to request deletion of personal information" .
+
+reg:check_opt_out_sale a reg:Check ;
+    reg:checkId "opt_out_sale" ;
+    rdfs:label "Opt-Out of Sale" ;
+    rdfs:comment "Right to opt out of sale of personal information" .
+
+reg:check_disclosure_collection a reg:Check ;
+    reg:checkId "disclosure_collection" ;
+    rdfs:label "Disclosure of Collection" ;
+    rdfs:comment "Disclosure of personal information collection practices" .
+
+# California Privacy Rights Act (CPRA)
+reg:ca_cpra a reg:Regulation ;
+    reg:regulationId "ca_cpra" ;
+    reg:regulationName "California Privacy Rights Act" ;
+    reg:severity "high" ;
+    reg:requiresCheck reg:check_sensitive_data_limits ;
+    reg:requiresCheck reg:check_automated_decision_rights ;
+    reg:requiresCheck reg:check_correction_rights .
+
+reg:check_sensitive_data_limits a reg:Check ;
+    reg:checkId "sensitive_data_limits" ;
+    rdfs:label "Sensitive Data Limits" ;
+    rdfs:comment "Restrictions on use of sensitive personal information" .
+
+reg:check_automated_decision_rights a reg:Check ;
+    reg:checkId "automated_decision_rights" ;
+    rdfs:label "Automated Decision Rights" ;
+    rdfs:comment "Right to opt out of automated decision-making" .
+
+reg:check_correction_rights a reg:Check ;
+    reg:checkId "correction_rights" ;
+    rdfs:label "Correction Rights" ;
+    rdfs:comment "Right to correct inaccurate personal information" .
+
+# Delaware Money Transmitter License
+reg:de_money_transmitter a reg:Regulation ;
+    reg:regulationId "de_money_transmitter" ;
+    reg:regulationName "Delaware Money Transmitter License" ;
+    reg:severity "critical" ;
+    reg:requiresCheck reg:check_capital_requirements ;
+    reg:requiresCheck reg:check_bond_requirements ;
+    reg:requiresCheck reg:check_transaction_limits .
+
+reg:check_capital_requirements a reg:Check ;
+    reg:checkId "capital_requirements" ;
+    rdfs:label "Capital Requirements" ;
+    rdfs:comment "Minimum capital reserves for money transmission" .
+
+reg:check_bond_requirements a reg:Check ;
+    reg:checkId "bond_requirements" ;
+    rdfs:label "Bond Requirements" ;
+    rdfs:comment "Surety bond requirements for licensure" .
+
+reg:check_transaction_limits a reg:Check ;
+    reg:checkId "transaction_limits" ;
+    rdfs:label "Transaction Limits" ;
+    rdfs:comment "Maximum transaction amounts and velocity limits" .
+
+# Texas Finance Code
+reg:tx_finance_code a reg:Regulation ;
+    reg:regulationId "tx_finance_code" ;
+    reg:regulationName "Texas Finance Code" ;
+    reg:severity "high" ;
+    reg:requiresCheck reg:check_licensing_requirements ;
+    reg:requiresCheck reg:check_fee_disclosures ;
+    reg:requiresCheck reg:check_complaint_handling .
+
+reg:check_licensing_requirements a reg:Check ;
+    reg:checkId "licensing_requirements" ;
+    rdfs:label "Licensing Requirements" ;
+    rdfs:comment "Texas state licensing for financial services" .
+
+reg:check_fee_disclosures a reg:Check ;
+    reg:checkId "fee_disclosures" ;
+    rdfs:label "Fee Disclosures" ;
+    rdfs:comment "Required disclosure of all fees and charges" .
+
+reg:check_complaint_handling a reg:Check ;
+    reg:checkId "complaint_handling" ;
+    rdfs:label "Complaint Handling" ;
+    rdfs:comment "Process for handling customer complaints" .
+
+# NCUA Part 701 (Credit Union Regulations)
+reg:ncua_part_701 a reg:Regulation ;
+    reg:regulationId "ncua_part_701" ;
+    reg:regulationName "NCUA Part 701 (Credit Union Regulations)" ;
+    reg:severity "high" ;
+    reg:requiresCheck reg:check_member_rights ;
+    reg:requiresCheck reg:check_loan_limits ;
+    reg:requiresCheck reg:check_investment_restrictions .
+
+reg:check_member_rights a reg:Check ;
+    reg:checkId "member_rights" ;
+    rdfs:label "Member Rights" ;
+    rdfs:comment "Credit union member rights and protections" .
+
+reg:check_loan_limits a reg:Check ;
+    reg:checkId "loan_limits" ;
+    rdfs:label "Loan Limits" ;
+    rdfs:comment "Maximum loan amounts and terms for credit unions" .
+
+reg:check_investment_restrictions a reg:Check ;
+    reg:checkId "investment_restrictions" ;
+    rdfs:label "Investment Restrictions" ;
+    rdfs:comment "Permitted investments for credit union funds" .
+
+# Florida Mortgage Lending Regulations
+reg:fl_mortgage_lending a reg:Regulation ;
+    reg:regulationId "fl_mortgage_lending" ;
+    reg:regulationName "Florida Mortgage Lending Regulations" ;
+    reg:severity "high" ;
+    reg:requiresCheck reg:check_originator_licensing ;
+    reg:requiresCheck reg:check_escrow_requirements ;
+    reg:requiresCheck reg:check_foreclosure_procedures .
+
+reg:check_originator_licensing a reg:Check ;
+    reg:checkId "originator_licensing" ;
+    rdfs:label "Originator Licensing" ;
+    rdfs:comment "Licensing requirements for mortgage originators" .
+
+reg:check_escrow_requirements a reg:Check ;
+    reg:checkId "escrow_requirements" ;
+    rdfs:label "Escrow Requirements" ;
+    rdfs:comment "Escrow account management requirements" .
+
+reg:check_foreclosure_procedures a reg:Check ;
+    reg:checkId "foreclosure_procedures" ;
+    rdfs:label "Foreclosure Procedures" ;
+    rdfs:comment "Required procedures for mortgage foreclosures" .

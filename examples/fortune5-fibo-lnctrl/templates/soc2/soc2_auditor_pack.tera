@@ -1,0 +1,54 @@
+{
+  "soc2_auditor_pack": {
+    "version": "1.0.0",
+    "generated_by": "ggen_sync",
+    "suites_evaluated": [
+      {% for row in rows | unique(attribute="suiteId") | sort(attribute="suiteId") -%}
+      {
+        "suite_id": "{{ row.suiteId }}",
+        "suite_name": "{{ row.suiteName }}"
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ],
+    "evidence_manifest": {
+      "manifest_file": "evidence/evidence.sha256",
+      "integrity_mechanism": "sha256_manifest",
+      "required_evidence": [
+        {% for row in rows | unique(attribute="evidenceId") | sort(attribute="evidencePath") -%}
+        {
+          "evidence_id": "{{ row.evidenceId }}",
+          "path": "{{ row.evidencePath }}",
+          "format": "{{ row.evidenceFormat }}",
+          "integrity": "{{ row.evidenceIntegrity }}"{% if row.retentionDays %},
+          "retention_days": {{ row.retentionDays }}{% endif %}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ]
+    },
+    "validator_registry": [
+      {% for row in rows | unique(attribute="validatorId") | sort(attribute="validatorId") -%}
+      "{{ row.validatorId }}"{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ],
+    "control_evidence_mapping": [
+      {% for row in rows | sort(attribute="controlId") -%}
+      {
+        "control_id": "{{ row.controlId }}",
+        "validator": "{{ row.validatorId }}",
+        "evidence": "{{ row.evidenceId }}"
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ],
+    "receipt_fields": {
+      "build_receipt": "receipts/build.last.json",
+      "evidence_manifest": "receipts/evidence.last.json",
+      "verdict": "receipts/verdict.last.json"
+    },
+    "notes": [
+      "This pack contains all evidence paths and validators for SOC 2 audit",
+      "All evidence files are indexed in evidence/evidence.sha256",
+      "Receipt files contain cryptographic proof hashes",
+      "Generated deterministically - same ontology produces identical pack"
+    ]
+  }
+}

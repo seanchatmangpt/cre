@@ -14523,3 +14523,117 @@ Failed to fetch and copy dep: {git,"https://github.com/yakaz/yamerl.git",
 [INFO] OTP Path: /home/user/cre/.erlmcp/otp-28.3.1/bin/erl
 [INFO] Environment: native linux
 [SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-11T12:47:33+00:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: linux
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /home/user/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /home/user/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /home/user/cre/.erlmcp/cache/rebar3
+[INFO] Fetching dependencies...
+Verifying dependencies...
+Failed to update package pc from repo hexpm
+Errors loading plugin {pc,"~> 1.0"}. Run rebar3 with DEBUG=1 set to see errors.
+Fetching yamerl (from {git,"https://github.com/yakaz/yamerl.git",{tag,"0.10.0"}})
+Failed to fetch and copy dep: {git,"https://github.com/yakaz/yamerl.git",
+                                   {tag,"0.10.0"}}
+[ERROR] Failed to fetch dependencies
+[INFO] Project build skipped or failed (non-fatal)
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /home/user/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: native linux
+[SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-11T13:23:22+00:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: linux
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /home/user/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /home/user/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /home/user/cre/.erlmcp/cache/rebar3
+[INFO] Fetching dependencies...
+Verifying dependencies...
+Failed to update package pc from repo hexpm
+Errors loading plugin {pc,"~> 1.0"}. Run rebar3 with DEBUG=1 set to see errors.
+Fetching yamerl (from {git,"https://github.com/yakaz/yamerl.git",{tag,"0.10.0"}})
+Failed to fetch and copy dep: {git,"https://github.com/yakaz/yamerl.git",
+                                   {tag,"0.10.0"}}
+[ERROR] Failed to fetch dependencies
+[INFO] Project build skipped or failed (non-fatal)
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /home/user/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: native linux
+[SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-11T13:58:26+00:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: linux
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /home/user/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /home/user/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /home/user/cre/.erlmcp/cache/rebar3
+[INFO] Fetching dependencies...
+Verifying dependencies...
+Failed to update package pc from repo hexpm
+Errors loading plugin {pc,"~> 1.0"}. Run rebar3 with DEBUG=1 set to see errors.
+Fetching yamerl (from {git,"https://github.com/yakaz/yamerl.git",{tag,"0.10.0"}})
+Failed to fetch and copy dep: {git,"https://github.com/yakaz/yamerl.git",
+                                   {tag,"0.10.0"}}
+[ERROR] Failed to fetch dependencies
+[INFO] Project build skipped or failed (non-fatal)
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /home/user/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: native linux
+[SUCCESS] SessionStart complete - ready to develop

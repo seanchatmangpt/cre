@@ -1,0 +1,34 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX cust: <http://fortune5.lnctrl.io/customers#>
+PREFIX reg: <http://fortune5.lnctrl.io/regulations#>
+
+# Extract customer-regulation pairs with all checks
+# This query generates one row per customer-regulation combination
+# Used to generate regulation validator modules
+
+SELECT ?customerId ?customerName ?jurisdiction ?riskTier
+       ?regulationId ?regulationName ?severity
+       (GROUP_CONCAT(?checkId; separator=",") AS ?checks)
+WHERE {
+    # Match customer to their required regulations
+    ?customer a cust:Customer ;
+              cust:customerId ?customerId ;
+              cust:customerName ?customerName ;
+              cust:jurisdiction ?jurisdiction ;
+              cust:riskTier ?riskTier ;
+              cust:requiresRegulation ?regulation .
+
+    # Get regulation details
+    ?regulation a reg:Regulation ;
+                reg:regulationId ?regulationId ;
+                reg:regulationName ?regulationName ;
+                reg:severity ?severity ;
+                reg:requiresCheck ?check .
+
+    # Get check IDs
+    ?check reg:checkId ?checkId .
+}
+GROUP BY ?customerId ?customerName ?jurisdiction ?riskTier
+         ?regulationId ?regulationName ?severity
+ORDER BY ?customerId ?regulationId

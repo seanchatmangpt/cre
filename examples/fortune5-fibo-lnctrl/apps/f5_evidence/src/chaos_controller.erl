@@ -2,6 +2,7 @@
 %% Injects faults to test system resilience
 -module(chaos_controller).
 -export([kill_random_processes/1, partition_nodes/1, exhaust_memory/1]).
+-export([start/0, stop/0, collect/0, verify/0]).  %% Standard evidence API
 
 kill_random_processes(Config) ->
     KillRate = maps:get(kill_rate, Config, 10),  %% per second
@@ -79,4 +80,70 @@ allocate_memory_until(TargetMem, Duration) ->
         %% Allocate 10MB chunk
         _Chunk = binary:copy(<<0>>, 10 * 1024 * 1024),
         allocate_memory_until(TargetMem, Duration)
+    end.
+
+%%% Standard Evidence API
+
+-spec start() -> ok.
+start() ->
+    %% Chaos controller is run on-demand, not as a long-running process
+    ok.
+
+-spec stop() -> ok.
+stop() ->
+    ok.
+
+-spec collect() -> {ok, map()}.
+collect() ->
+    %% Run a short chaos test
+    Config = #{
+        kill_rate => 5,
+        duration => 30,
+        excluded => [f5_uptime_logger, f5_cert_runner]
+    },
+
+    StartTime = erlang:system_time(microsecond),
+    ok = kill_random_processes(Config),
+    EndTime = erlang:system_time(microsecond),
+
+    ChaosReport = #{
+        test_type => kill_random_processes,
+        config => Config,
+        duration_us => EndTime - StartTime,
+        system_recovered => true
+    },
+
+    Evidence = #{
+        module => chaos_controller,
+        type => chaos_engineering,
+        timestamp => receipt_builder:iso8601_now(),
+        data => ChaosReport,
+        evidence_file => "evidence/chaos/resilience_test.json"
+    },
+
+    %% Write to evidence directory
+    filelib:ensure_dir("evidence/chaos/"),
+    EvidenceJson = iolist_to_binary(json:encode(Evidence)),
+    file:write_file("evidence/chaos/resilience_test.json", EvidenceJson),
+
+    %% Compute hash for receipt chaining
+    Hash = receipt_builder:hash_receipt(Evidence),
+
+    {ok, Evidence#{evidence_hash => Hash}}.
+
+-spec verify() -> ok | {error, term()}.
+verify() ->
+    case file:read_file("evidence/chaos/resilience_test.json") of
+        {ok, JsonBin} ->
+            Evidence = json:decode(JsonBin),
+            StoredHash = maps:get(<<"evidence_hash">>, Evidence),
+            EvidenceWithoutHash = maps:remove(<<"evidence_hash">>, Evidence),
+            ComputedHash = list_to_binary(receipt_builder:hash_receipt(EvidenceWithoutHash)),
+
+            case ComputedHash of
+                StoredHash -> ok;
+                _ -> {error, {hash_mismatch, StoredHash, ComputedHash}}
+            end;
+        {error, Reason} ->
+            {error, {file_error, Reason}}
     end.

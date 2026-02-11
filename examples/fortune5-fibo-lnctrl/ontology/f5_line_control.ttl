@@ -7,10 +7,15 @@
 @prefix fibo-fnd: <https://spec.edmcouncil.org/fibo/ontology/FND/> .
 @prefix fibo-be: <https://spec.edmcouncil.org/fibo/ontology/BE/> .
 @prefix fibo-loan: <https://spec.edmcouncil.org/fibo/ontology/LOAN/> .
+@prefix fibo-fbc: <https://spec.edmcouncil.org/fibo/ontology/FBC/> .
+
+# Import FIBO alignment ontology
+@prefix : <http://fortune5.lnctrl.io/ontology/fibo_alignment#> .
 
 # =============================================================================
 # Fortune-5 FIBO LineController Factory - Control Ontology
 # Generates 300k+ LOC Erlang/OTP from FIBO patterns
+# FIBO-Aligned: Uses Financial Industry Business Ontology vocabulary
 # =============================================================================
 
 # -----------------------------------------------------------------------------

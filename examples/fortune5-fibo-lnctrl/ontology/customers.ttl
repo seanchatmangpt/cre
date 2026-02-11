@@ -1,0 +1,141 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix cust: <http://fortune5.lnctrl.io/customers#> .
+@prefix reg: <http://fortune5.lnctrl.io/regulations#> .
+@prefix ln: <http://lnctrl.io/ontology#> .
+
+# ============================================================================
+# Customer Ontology - Fortune-5 Financial Institutions
+# ============================================================================
+
+cust:Customer a owl:Class ;
+    rdfs:label "Customer" ;
+    rdfs:comment "A financial institution customer with regulatory requirements" .
+
+cust:customerId a owl:DatatypeProperty ;
+    rdfs:domain cust:Customer ;
+    rdfs:range xsd:string .
+
+cust:customerName a owl:DatatypeProperty ;
+    rdfs:domain cust:Customer ;
+    rdfs:range xsd:string .
+
+cust:jurisdiction a owl:DatatypeProperty ;
+    rdfs:domain cust:Customer ;
+    rdfs:range xsd:string .
+
+cust:riskTier a owl:DatatypeProperty ;
+    rdfs:domain cust:Customer ;
+    rdfs:range xsd:string .
+
+cust:requiresRegulation a owl:ObjectProperty ;
+    rdfs:domain cust:Customer ;
+    rdfs:range reg:Regulation .
+
+# ============================================================================
+# Customer Instances
+# ============================================================================
+
+# Customer 1: MegaBank (New York)
+cust:megabank_ny a cust:Customer ;
+    cust:customerId "megabank_ny" ;
+    cust:customerName "MegaBank (New York)" ;
+    cust:jurisdiction "new_york" ;
+    cust:riskTier "tier_1_systemically_important" ;
+    cust:requiresRegulation reg:ny_dfs_23_nycrr_500 ;
+    cust:requiresRegulation reg:fed_cfpb_reg_e ;
+    cust:requiresRegulation reg:fed_cfpb_reg_z ;
+    cust:requiresRegulation reg:fed_bsa_aml .
+
+# Customer 2: Community Bank (California)
+cust:community_bank_ca a cust:Customer ;
+    cust:customerId "community_bank_ca" ;
+    cust:customerName "Community Bank (California)" ;
+    cust:jurisdiction "california" ;
+    cust:riskTier "tier_3_community" ;
+    cust:requiresRegulation reg:ca_ccpa ;
+    cust:requiresRegulation reg:ca_cpra ;
+    cust:requiresRegulation reg:fed_cfpb_reg_e ;
+    cust:requiresRegulation reg:fed_bsa_aml .
+
+# Customer 3: FinTech Startup (Delaware)
+cust:fintech_startup_de a cust:Customer ;
+    cust:customerId "fintech_startup_de" ;
+    cust:customerName "FinTech Startup (Delaware)" ;
+    cust:jurisdiction "delaware" ;
+    cust:riskTier "tier_2_regional" ;
+    cust:requiresRegulation reg:de_money_transmitter ;
+    cust:requiresRegulation reg:fed_cfpb_reg_e ;
+    cust:requiresRegulation reg:fed_bsa_aml .
+
+# Customer 4: Credit Union (Texas)
+cust:credit_union_tx a cust:Customer ;
+    cust:customerId "credit_union_tx" ;
+    cust:customerName "Credit Union (Texas)" ;
+    cust:jurisdiction "texas" ;
+    cust:riskTier "tier_3_community" ;
+    cust:requiresRegulation reg:tx_finance_code ;
+    cust:requiresRegulation reg:ncua_part_701 ;
+    cust:requiresRegulation reg:fed_bsa_aml .
+
+# Customer 5: Mortgage Lender (Florida)
+cust:mortgage_lender_fl a cust:Customer ;
+    cust:customerId "mortgage_lender_fl" ;
+    cust:customerName "Mortgage Lender (Florida)" ;
+    cust:jurisdiction "florida" ;
+    cust:riskTier "tier_2_regional" ;
+    cust:requiresRegulation reg:fl_mortgage_lending ;
+    cust:requiresRegulation reg:fed_cfpb_trid ;
+    cust:requiresRegulation reg:fed_cfpb_reg_z ;
+    cust:requiresRegulation reg:fed_bsa_aml .
+# ============================================================================
+# SOC 2 Extensions
+# ============================================================================
+
+cust:requiresSuite a owl:ObjectProperty ;
+    rdfs:domain cust:Customer ;
+    rdfs:range reg:Suite ;
+    rdfs:label "Requires SOC 2 Suite" ;
+    rdfs:comment "Direct suite selection for customer" .
+
+cust:auditFramework a owl:ObjectProperty ;
+    rdfs:domain cust:Customer ;
+    rdfs:label "Audit Framework" ;
+    rdfs:comment "Audit framework (e.g., reg:SOC2, reg:ISO27001)" .
+
+cust:tscScope a owl:ObjectProperty ;
+    rdfs:domain cust:Customer ;
+    rdfs:label "TSC Scope" ;
+    rdfs:comment "Trust Services Categories in scope for audit" .
+
+# ============================================================================
+# Customer SOC 2 Scope (Direct Suite Selection)
+# ============================================================================
+
+# MegaBank: Security + Availability (high availability requirements)
+cust:megabank_ny cust:requiresSuite reg:soc2_security_availability .
+
+# Community Bank: Security only (basic compliance)
+cust:community_bank_ca cust:requiresSuite reg:soc2_security .
+
+# FinTech Startup: Security + Processing Integrity (data accuracy critical)
+cust:fintech_startup_de cust:requiresSuite reg:soc2_security_processing_integrity .
+
+# Credit Union: Security + Privacy (member data protection)
+cust:credit_union_tx cust:requiresSuite reg:soc2_security_privacy .
+
+# Mortgage Lender: Security + Confidentiality (PII protection)
+cust:mortgage_lender_fl cust:requiresSuite reg:soc2_security_confidentiality .
+
+# ============================================================================
+# Example: Profile-Derived Scope (Alternative Pattern)
+# ============================================================================
+# Uncomment to use profile-derived instead of direct suite selection:
+#
+# cust:megabank_ny 
+#     cust:auditFramework reg:SOC2 ;
+#     cust:tscScope reg:TSC_Security, reg:TSC_Availability .
+#
+# This would allow SPARQL to compute the suite: reg:soc2_security_availability

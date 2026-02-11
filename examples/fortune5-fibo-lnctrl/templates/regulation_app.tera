@@ -1,0 +1,11 @@
+%% Generated regulation suite app for {{ customerName }}
+-module(f5_reg_{{ customerId }}_app).
+-behaviour(application).
+
+-export([start/2, stop/1]).
+
+start(_StartType, _StartArgs) ->
+    f5_reg_{{ customerId }}_sup:start_link().
+
+stop(_State) ->
+    ok.

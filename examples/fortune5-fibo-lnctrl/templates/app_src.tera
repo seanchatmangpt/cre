@@ -1,0 +1,18 @@
+{application, {{ appId }},
+ [{description, "{{ appDescription | default(value="Fortune-5 FIBO OTP Application") }}"},
+  {vsn, "0.3.0"},
+  {registered, []},
+  {mod, { {{ appId }}_app, []}},
+  {applications, [
+        kernel,
+        stdlib
+    ]},
+  {modules, [
+        {{ appId }}_app,
+        {{ appId }}_sup,
+        {{ appId }}_worker
+    ]},
+  {env, []},
+  {licenses, ["Apache-2.0"]},
+  {links, [{"GitHub", "https://github.com/joergen7/cre"}]}
+ ]}.

@@ -1,0 +1,24 @@
+PREFIX ln: <http://lnctrl.io/ontology#>
+PREFIX f5: <http://fortune5.lnctrl.io/ontology#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?appId ?supervisorId ?strategy ?intensity ?period
+       (GROUP_CONCAT(?childId; separator=",") AS ?children)
+WHERE {
+    ?app a ln:Application ;
+         ln:appId ?appId ;
+         ln:supervisor ?supervisor .
+
+    ?supervisor ln:supervisorId ?supervisorId ;
+                ln:strategy ?strategy ;
+                ln:intensity ?intensity ;
+                ln:period ?period .
+
+    OPTIONAL {
+        ?supervisor ln:children ?childList .
+        ?childList rdf:rest*/rdf:first ?child .
+        ?child ln:childId ?childId .
+    }
+}
+GROUP BY ?appId ?supervisorId ?strategy ?intensity ?period
+ORDER BY ?appId

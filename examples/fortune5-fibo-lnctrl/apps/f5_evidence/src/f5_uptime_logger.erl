@@ -4,6 +4,7 @@
 -behaviour(gen_server).
 
 -export([start_link/0, log_event/1, get_uptime_stats/0, stop/0]).
+-export([start/0, collect/0, verify/0]).  %% Standard evidence API
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {
@@ -93,7 +94,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 
 write_event(Fd, Event) ->
-    Json = jsx:encode(Event),
+    Json = iolist_to_binary(json:encode(Event)),
     file:write(Fd, [Json, "\n"]).
 
 calculate_uptime_percentage(0, _Uptime) ->
@@ -103,3 +104,51 @@ calculate_uptime_percentage(Restarts, Uptime) ->
     DowntimeUs = Restarts * 100000,
     UptimeUs = Uptime * 1000000,
     ((UptimeUs - DowntimeUs) / UptimeUs) * 100.
+
+%%% Standard Evidence API
+
+-spec start() -> ok | {error, term()}.
+start() ->
+    case start_link() of
+        {ok, _Pid} -> ok;
+        {error, {already_started, _Pid}} -> ok;
+        Error -> Error
+    end.
+
+-spec collect() -> {ok, map()}.
+collect() ->
+    Stats = get_uptime_stats(),
+    Evidence = #{
+        module => f5_uptime_logger,
+        type => uptime_monitoring,
+        timestamp => receipt_builder:iso8601_now(),
+        data => Stats,
+        evidence_file => "evidence/uptime/continuous_operation.json"
+    },
+
+    %% Write to evidence directory
+    filelib:ensure_dir("evidence/uptime/"),
+    EvidenceJson = iolist_to_binary(json:encode(Evidence)),
+    file:write_file("evidence/uptime/continuous_operation.json", EvidenceJson),
+
+    %% Compute hash for receipt chaining
+    Hash = receipt_builder:hash_receipt(Evidence),
+
+    {ok, Evidence#{evidence_hash => Hash}}.
+
+-spec verify() -> ok | {error, term()}.
+verify() ->
+    case file:read_file("evidence/uptime/continuous_operation.json") of
+        {ok, JsonBin} ->
+            Evidence = json:decode(JsonBin),
+            StoredHash = maps:get(<<"evidence_hash">>, Evidence),
+            EvidenceWithoutHash = maps:remove(<<"evidence_hash">>, Evidence),
+            ComputedHash = list_to_binary(receipt_builder:hash_receipt(EvidenceWithoutHash)),
+
+            case ComputedHash of
+                StoredHash -> ok;
+                _ -> {error, {hash_mismatch, StoredHash, ComputedHash}}
+            end;
+        {error, Reason} ->
+            {error, {file_error, Reason}}
+    end.

@@ -1,0 +1,17 @@
+{application, f5_reg_{{ customerId }},
+ [{description, "Regulation validators for {{ customerName }}"},
+  {vsn, "0.3.0"},
+  {registered, [f5_reg_{{ customerId }}_sup]},
+  {mod, {f5_reg_{{ customerId }}_app, []}},
+  {applications, [kernel, stdlib, logger]},
+  {modules, [
+        f5_reg_{{ customerId }}_app,
+        f5_reg_{{ customerId }}_sup{% for reg in regulations | split(pat=",") %},
+        f5_reg_{{ customerId }}_{{ reg }}_validator{% endfor %}
+    ]},
+  {env, [
+        {customer_id, "{{ customerId }}"},
+        {jurisdiction, {{ jurisdiction }}},
+        {risk_tier, {{ riskTier }}}
+    ]}
+ ]}.

@@ -1,0 +1,12 @@
+{application, f5_receipts,
+ [{description, "Hash-chained receipts and evidence for nine-nines certification"},
+  {vsn, "0.3.0"},
+  {registered, []},
+  {applications, [kernel, stdlib, crypto]},
+  {modules, [
+        receipt_builder,
+        evidence_collector,
+        verdict_builder
+    ]},
+  {env, []}
+ ]}.

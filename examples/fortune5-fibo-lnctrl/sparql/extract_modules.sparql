@@ -1,0 +1,25 @@
+PREFIX ln: <http://lnctrl.io/ontology#>
+PREFIX f5: <http://fortune5.lnctrl.io/ontology#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?appId ?moduleId ?moduleName ?moduleType
+       (GROUP_CONCAT(?function; separator=",") AS ?functions)
+WHERE {
+    ?app a ln:Application ;
+         ln:appId ?appId ;
+         ln:modules ?moduleList .
+
+    ?moduleList rdf:rest*/rdf:first ?module .
+
+    ?module ln:moduleId ?moduleId ;
+            ln:name ?moduleName ;
+            ln:moduleType ?moduleType .
+
+    OPTIONAL {
+        ?module ln:functions ?funcList .
+        ?funcList rdf:rest*/rdf:first ?function .
+    }
+}
+GROUP BY ?appId ?moduleId ?moduleName ?moduleType
+ORDER BY ?appId ?moduleId

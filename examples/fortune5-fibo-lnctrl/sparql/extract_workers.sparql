@@ -1,0 +1,18 @@
+PREFIX ln: <http://lnctrl.io/ontology#>
+PREFIX f5: <http://fortune5.lnctrl.io/ontology#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?appId ?workerId ?workerModule ?restartType ?shutdownTime
+WHERE {
+    ?app a ln:Application ;
+         ln:appId ?appId ;
+         ln:workers ?workerList .
+
+    ?workerList rdf:rest*/rdf:first ?worker .
+
+    ?worker ln:workerId ?workerId ;
+            ln:module ?workerModule ;
+            ln:restart ?restartType ;
+            ln:shutdown ?shutdownTime .
+}
+ORDER BY ?appId ?workerId

@@ -1,0 +1,14 @@
+{application, f5_ontology_tools,
+ [{description, "FIBO ontology validation and linting tools"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, {f5_ontology_tools_app, []}},
+  {applications,
+   [kernel,
+    stdlib
+   ]},
+  {env,[]},
+  {modules, []},
+  {licenses, ["Apache-2.0"]},
+  {links, []}
+ ]}.

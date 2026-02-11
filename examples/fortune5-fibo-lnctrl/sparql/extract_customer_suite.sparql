@@ -1,0 +1,24 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX cust: <http://fortune5.lnctrl.io/customers#>
+PREFIX reg: <http://fortune5.lnctrl.io/regulations#>
+
+# Extract customer suite information
+# Used to generate supervisor, app, and app.src files for each customer
+
+SELECT ?customerId ?customerName ?jurisdiction ?riskTier
+       (GROUP_CONCAT(?regulationId; separator=",") AS ?regulations)
+WHERE {
+    # Match customer to their required regulations
+    ?customer a cust:Customer ;
+              cust:customerId ?customerId ;
+              cust:customerName ?customerName ;
+              cust:jurisdiction ?jurisdiction ;
+              cust:riskTier ?riskTier ;
+              cust:requiresRegulation ?regulation .
+
+    # Get regulation IDs
+    ?regulation reg:regulationId ?regulationId .
+}
+GROUP BY ?customerId ?customerName ?jurisdiction ?riskTier
+ORDER BY ?customerId

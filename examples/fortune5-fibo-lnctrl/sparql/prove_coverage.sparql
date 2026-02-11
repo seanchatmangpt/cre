@@ -1,0 +1,38 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX cust: <http://fortune5.lnctrl.io/customers#>
+PREFIX reg: <http://fortune5.lnctrl.io/regulations#>
+
+# Coverage Proof Query
+# This query proves:
+# 1. All required regulations are covered (no missing validators)
+# 2. No redundant checks (each check appears exactly once per customer-regulation)
+# 3. Complete check coverage for each regulation
+
+SELECT ?customerId ?regulationId
+       (COUNT(DISTINCT ?check) AS ?checkCount)
+       (COUNT(?check) AS ?totalChecks)
+       ?expectedChecks
+       (?checkCount = ?totalChecks AS ?noRedundancy)
+       (?checkCount = ?expectedChecks AS ?completeCoverage)
+WHERE {
+    # Get customer-regulation pairs
+    ?customer a cust:Customer ;
+              cust:customerId ?customerId ;
+              cust:requiresRegulation ?regulation .
+
+    ?regulation a reg:Regulation ;
+                reg:regulationId ?regulationId ;
+                reg:requiresCheck ?check .
+
+    # Count expected checks for this regulation
+    {
+        SELECT ?regulation (COUNT(?c) AS ?expectedChecks)
+        WHERE {
+            ?regulation reg:requiresCheck ?c .
+        }
+        GROUP BY ?regulation
+    }
+}
+GROUP BY ?customerId ?regulationId ?expectedChecks
+ORDER BY ?customerId ?regulationId

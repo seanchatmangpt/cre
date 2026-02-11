@@ -1,0 +1,67 @@
+# Extract Customer-Specific SOC 2 Control Closure
+# Returns: customer → suite → categories → controls → validators → evidence
+# Ordered deterministically for stable generation
+
+PREFIX reg: <http://fortune5.lnctrl.io/regulation#>
+PREFIX cust: <http://fortune5.lnctrl.io/customers#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT DISTINCT
+    ?customerId
+    ?customerName
+    ?suiteName
+    ?suiteId
+    ?tscLabel
+    ?tscId
+    ?controlId
+    ?controlTitle
+    ?controlDescription
+    ?validatorId
+    ?evidenceId
+    ?evidencePath
+    ?evidenceFormat
+    ?evidenceIntegrity
+    ?retentionDays
+WHERE {
+    # Customer
+    ?customer a cust:Customer ;
+              cust:customerId ?customerId ;
+              cust:customerName ?customerName .
+
+    # Suite required by customer
+    ?customer cust:requiresSuite ?suite .
+    ?suite a reg:Suite ;
+           rdfs:label ?suiteName .
+
+    # Extract suite ID from IRI
+    BIND(STRAFTER(STR(?suite), "#") AS ?suiteId)
+
+    # Categories in suite
+    ?suite reg:includesCategory ?tsc .
+    ?tsc rdfs:label ?tscLabel .
+    BIND(STRAFTER(STR(?tsc), "#") AS ?tscId)
+
+    # Controls in category
+    ?control a reg:Control ;
+             reg:tscCategory ?tsc ;
+             reg:controlId ?controlId ;
+             reg:title ?controlTitle ;
+             reg:description ?controlDescription .
+
+    # Validators required by control
+    ?control reg:requiresValidator ?validatorId .
+
+    # Evidence required by control
+    ?control reg:requiresEvidence ?evidence .
+    ?evidence reg:evidenceId ?evidenceId ;
+              reg:path ?evidencePath ;
+              reg:format ?evidenceFormat ;
+              reg:integrity ?evidenceIntegrity .
+
+    # Optional retention period
+    OPTIONAL {
+        ?evidence reg:retentionDays ?retentionDays .
+    }
+}
+ORDER BY ?customerId ?suiteId ?tscId ?controlId ?validatorId ?evidencePath

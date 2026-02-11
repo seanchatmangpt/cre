@@ -1,0 +1,18 @@
+{application, f5_cert_runner,
+ [{description, "Certification pipeline orchestrator for nine-nines certification"},
+  {vsn, "0.3.0"},
+  {registered, [f5_cert_runner, f5_cert_scheduler]},
+  {mod, {f5_cert_runner_app, []}},
+  {applications, [kernel, stdlib, logger, f5_evidence, f5_receipts]},
+  {modules, [
+        f5_cert_runner_app,
+        f5_cert_runner_sup,
+        f5_cert_runner,
+        f5_cert_scheduler,
+        generate_certification_report
+    ]},
+  {env, [
+      {collection_interval, 3600000},  %% 1 hour in milliseconds
+      {continuous_operation_days, 90}
+  ]}
+ ]}.

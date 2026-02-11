@@ -1,0 +1,15 @@
+PREFIX ln: <http://lnctrl.io/ontology#>
+PREFIX f5: <http://fortune5.lnctrl.io/ontology#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?connectorId ?serviceId ?operation
+WHERE {
+    ?connector a ln:Connector ;
+               ln:connectorId ?connectorId ;
+               ln:operations ?opList .
+
+    ?opList rdf:rest*/rdf:first ?operation .
+
+    BIND(CONCAT("f5_service_", ?connectorId) AS ?serviceId)
+}
+ORDER BY ?connectorId ?operation

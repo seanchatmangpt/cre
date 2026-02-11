@@ -1,0 +1,31 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX cust: <http://fortune5.lnctrl.io/customers#>
+PREFIX reg: <http://fortune5.lnctrl.io/regulations#>
+
+# Generate Coverage Report
+# Returns statistics proving suite minimality
+
+SELECT
+    (COUNT(DISTINCT ?customer) AS ?totalCustomers)
+    (COUNT(DISTINCT ?regulation) AS ?totalRegulations)
+    (COUNT(DISTINCT ?check) AS ?totalUniqueChecks)
+    (COUNT(*) AS ?totalCustomerRegulationPairs)
+    (SUM(?checkCount) AS ?totalValidatorModules)
+WHERE {
+    # Customer-regulation relationships
+    ?customer a cust:Customer ;
+              cust:requiresRegulation ?regulation .
+
+    ?regulation a reg:Regulation ;
+                reg:requiresCheck ?check .
+
+    # Count checks per regulation
+    {
+        SELECT ?regulation (COUNT(?c) AS ?checkCount)
+        WHERE {
+            ?regulation reg:requiresCheck ?c .
+        }
+        GROUP BY ?regulation
+    }
+}

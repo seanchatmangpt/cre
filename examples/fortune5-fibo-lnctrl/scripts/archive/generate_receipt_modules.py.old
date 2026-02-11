@@ -1,0 +1,443 @@
+#!/usr/bin/env python3
+"""
+Generate receipt and evidence infrastructure modules
+Uses native OTP 28 json:encode/1 with stable key ordering
+"""
+
+from pathlib import Path
+
+def generate_receipt_builder():
+    """Generate receipt builder module with hash chaining"""
+
+    return '''%% Receipt Builder - Hash-Chained Proofs
+%% Uses OTP 28 json:encode/1 with stable alphabetical key ordering
+-module(receipt_builder).
+
+-export([
+    build_receipt/1,
+    verify_receipt/1,
+    verify_chain/2,
+    canonical_json/1,
+    hash_receipt/1
+]).
+
+-type receipt() :: #{
+    chain := #{prev_hash := binary() | null, this_hash := binary()},
+    counts := #{apps := integer(), modules := integer(), loc := integer(), tests := integer()},
+    environment_fingerprint := #{arch := binary(), emulator := binary(), os := binary(), otp_version := binary()},
+    generator_version := binary(),
+    ontology_hash := binary(),
+    timestamp := binary(),
+    timings := #{generation_us := integer(), validation_us := integer()}
+}.
+
+%%% API
+
+-spec build_receipt(map()) -> receipt().
+build_receipt(Params) ->
+    %% Get previous receipt hash
+    PrevHash = case file:read_file("receipts/build.last.json") of
+        {ok, PrevJson} ->
+            PrevReceipt = json:decode(PrevJson),
+            case maps:get(<<"chain">>, PrevReceipt, undefined) of
+                undefined -> null;  %% Old format without chain
+                Chain -> maps:get(<<"this_hash">>, Chain, null)
+            end;
+        _ ->
+            null
+    end,
+
+    %% Build receipt without this_hash
+    Receipt0 = #{
+        chain => #{prev_hash => PrevHash},
+        counts => maps:get(counts, Params),
+        environment_fingerprint => get_environment_fingerprint(),
+        generator_version => get_generator_version(),
+        ontology_hash => maps:get(ontology_hash, Params),
+        timestamp => iso8601_now(),
+        timings => maps:get(timings, Params)
+    },
+
+    %% Compute this_hash over canonical JSON
+    ThisHash = hash_receipt(Receipt0),
+
+    %% Add this_hash to chain
+    Receipt = Receipt0#{
+        chain := (maps:get(chain, Receipt0))#{this_hash => ThisHash}
+    },
+
+    %% Write receipt
+    filelib:ensure_dir("receipts/"),
+    CanonicalJson = canonical_json(Receipt),
+    file:write_file("receipts/build.last.json", CanonicalJson),
+    file:write_file("receipts/build.last.sha", ThisHash),
+
+    Receipt.
+
+-spec verify_receipt(receipt()) -> ok | {error, term()}.
+verify_receipt(Receipt) ->
+    %% Extract this_hash
+    Chain = maps:get(chain, Receipt),
+    ThisHash = maps:get(this_hash, Chain),
+
+    %% Remove this_hash and recompute
+    Receipt0 = Receipt#{chain := maps:remove(this_hash, Chain)},
+    ComputedHash = hash_receipt(Receipt0),
+
+    case ComputedHash of
+        ThisHash -> ok;
+        _ -> {error, {hash_mismatch, ThisHash, ComputedHash}}
+    end.
+
+-spec verify_chain(receipt(), receipt()) -> ok | {error, term()}.
+verify_chain(PrevReceipt, CurrReceipt) ->
+    PrevThisHash = maps:get(this_hash, maps:get(chain, PrevReceipt)),
+    CurrPrevHash = maps:get(prev_hash, maps:get(chain, CurrReceipt)),
+
+    case PrevThisHash of
+        CurrPrevHash -> ok;
+        _ -> {error, {chain_broken, PrevThisHash, CurrPrevHash}}
+    end.
+
+-spec canonical_json(map()) -> binary().
+canonical_json(Map) ->
+    %% Use OTP 28 json:encode with stable ordering
+    %% Maps are encoded with alphabetically sorted keys
+    iolist_to_binary(json:encode(sort_map_keys(Map))).
+
+-spec hash_receipt(map()) -> binary().
+hash_receipt(Receipt) ->
+    CanonicalJson = canonical_json(Receipt),
+    Hash = crypto:hash(sha256, CanonicalJson),
+    binary:encode_hex(Hash, lowercase).
+
+%%% Internal Functions
+
+get_environment_fingerprint() ->
+    #{
+        arch => list_to_binary(erlang:system_info(system_architecture)),
+        emulator => list_to_binary(erlang:system_info(version)),
+        os => list_to_binary(os_type()),
+        otp_version => list_to_binary(erlang:system_info(otp_release))
+    }.
+
+os_type() ->
+    case os:type() of
+        {unix, darwin} -> "darwin";
+        {unix, linux} -> "linux";
+        {win32, nt} -> "windows";
+        {Type, Subtype} -> io_lib:format("~p/~p", [Type, Subtype])
+    end.
+
+get_generator_version() ->
+    %% Try to get git commit hash
+    case os:cmd("git rev-parse HEAD 2>/dev/null") of
+        [] -> <<"unknown">>;
+        Hash -> list_to_binary(string:trim(Hash))
+    end.
+
+iso8601_now() ->
+    list_to_binary(calendar:system_time_to_rfc3339(erlang:system_time(second), [{unit, second}])).
+
+sort_map_keys(Map) when is_map(Map) ->
+    %% Recursively sort all nested maps
+    Keys = lists:sort(maps:keys(Map)),
+    maps:from_list([{K, sort_map_keys(maps:get(K, Map))} || K <- Keys]);
+sort_map_keys(List) when is_list(List) ->
+    [sort_map_keys(Item) || Item <- List];
+sort_map_keys(Other) ->
+    Other.
+
+%%% Tests
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+canonical_json_test() ->
+    %% Keys should be alphabetically sorted
+    Map = #{z => 1, a => 2, m => 3},
+    Json = canonical_json(Map),
+    io:format("Generated JSON: ~s~n", [Json]),
+    %% Should be {"a":2,"m":3,"z":1}
+    {match, [{APos, _}]} = re:run(Json, <<"a">>),
+    {match, [{MPos, _}]} = re:run(Json, <<"m">>),
+    {match, [{ZPos, _}]} = re:run(Json, <<"z">>),
+    io:format("Positions - a:~p m:~p z:~p~n", [APos, MPos, ZPos]),
+    ?assert(APos < MPos),
+    ?assert(MPos < ZPos).
+
+hash_determinism_test() ->
+    Map = #{test => true, value => 42},
+    Hash1 = hash_receipt(Map),
+    Hash2 = hash_receipt(Map),
+    ?assertEqual(Hash1, Hash2).
+
+receipt_verification_test() ->
+    Receipt = build_receipt(#{
+        counts => #{apps => 1, modules => 10, loc => 1000, tests => 5},
+        ontology_hash => <<"test123">>,
+        timings => #{generation_us => 1000, validation_us => 500}
+    }),
+    ?assertEqual(ok, verify_receipt(Receipt)).
+
+-endif.
+'''
+
+
+def generate_evidence_collector():
+    """Generate evidence manifest builder"""
+
+    return '''%% Evidence Manifest Builder
+-module(evidence_collector).
+
+-export([
+    collect_evidence/0,
+    build_manifest/1,
+    verify_manifest/0
+]).
+
+-type evidence_file() :: #{
+    path := binary(),
+    sha256 := binary(),
+    size_bytes := integer()
+}.
+
+-type evidence_manifest() :: #{
+    chain := #{prev_hash := binary() | null, this_hash := binary()},
+    environment_fingerprint := map(),
+    evidence_files := [evidence_file()],
+    generator_version := binary(),
+    manifest_hash := binary(),
+    ontology_hash := binary(),
+    timestamp := binary()
+}.
+
+%%% API
+
+-spec collect_evidence() -> evidence_manifest().
+collect_evidence() ->
+    %% Find all evidence files
+    EvidenceFiles = find_evidence_files("evidence/"),
+
+    %% Build manifest
+    build_manifest(#{evidence_files => EvidenceFiles}).
+
+-spec build_manifest(map()) -> evidence_manifest().
+build_manifest(Params) ->
+    EvidenceFiles = maps:get(evidence_files, Params),
+
+    %% Generate evidence.sha256 file
+    ManifestLines = [io_lib:format("~s  ~s~n", [Sha256, Path])
+                     || #{path := Path, sha256 := Sha256} <- EvidenceFiles],
+    ManifestContent = iolist_to_binary(ManifestLines),
+    filelib:ensure_dir("evidence/"),
+    file:write_file("evidence/evidence.sha256", ManifestContent),
+
+    %% Hash the manifest
+    ManifestHash = binary:encode_hex(crypto:hash(sha256, ManifestContent), lowercase),
+
+    %% Get previous evidence receipt
+    PrevHash = case file:read_file("receipts/evidence.last.json") of
+        {ok, PrevJson} ->
+            PrevReceipt = json:decode(PrevJson),
+            case maps:get(<<"chain">>, PrevReceipt, undefined) of
+                undefined -> null;  %% Old format without chain
+                Chain -> maps:get(<<"this_hash">>, Chain, null)
+            end;
+        _ ->
+            null
+    end,
+
+    %% Build receipt
+    Receipt0 = #{
+        chain => #{prev_hash => PrevHash},
+        environment_fingerprint => receipt_builder:get_environment_fingerprint(),
+        evidence_files => EvidenceFiles,
+        generator_version => receipt_builder:get_generator_version(),
+        manifest_hash => ManifestHash,
+        ontology_hash => get_ontology_hash(),
+        timestamp => receipt_builder:iso8601_now()
+    },
+
+    ThisHash = receipt_builder:hash_receipt(Receipt0),
+    Receipt = Receipt0#{chain := (maps:get(chain, Receipt0))#{this_hash => ThisHash}},
+
+    %% Write receipt
+    CanonicalJson = receipt_builder:canonical_json(Receipt),
+    file:write_file("receipts/evidence.last.json", CanonicalJson),
+
+    Receipt.
+
+-spec verify_manifest() -> ok | {error, term()}.
+verify_manifest() ->
+    %% Read manifest
+    {ok, ManifestContent} = file:read_file("evidence/evidence.sha256"),
+
+    %% Parse and verify each file
+    Lines = binary:split(ManifestContent, <<"\\n">>, [global]),
+    Results = [verify_evidence_file(Line) || Line <- Lines, Line =/= <<>>],
+
+    case lists:all(fun(R) -> R =:= ok end, Results) of
+        true -> ok;
+        false -> {error, {manifest_verification_failed, Results}}
+    end.
+
+%%% Internal Functions
+
+find_evidence_files(Dir) ->
+    case filelib:wildcard(Dir ++ "**/*") of
+        [] -> [];
+        Files ->
+            [evidence_file_info(F) || F <- Files, filelib:is_regular(F)]
+    end.
+
+evidence_file_info(Path) ->
+    {ok, Content} = file:read_file(Path),
+    Hash = binary:encode_hex(crypto:hash(sha256, Content), lowercase),
+    Size = byte_size(Content),
+
+    #{
+        path => list_to_binary(Path),
+        sha256 => Hash,
+        size_bytes => Size
+    }.
+
+verify_evidence_file(Line) ->
+    case binary:split(Line, <<"  ">>) of
+        [ExpectedHash, Path] ->
+            case file:read_file(binary_to_list(Path)) of
+                {ok, Content} ->
+                    ActualHash = binary:encode_hex(crypto:hash(sha256, Content), lowercase),
+                    case ActualHash of
+                        ExpectedHash -> ok;
+                        _ -> {error, {hash_mismatch, Path}}
+                    end;
+                {error, Reason} ->
+                    {error, {file_not_found, Path, Reason}}
+            end;
+        _ ->
+            {error, {invalid_manifest_line, Line}}
+    end.
+
+get_ontology_hash() ->
+    %% Hash all ontology files
+    OntologyFiles = filelib:wildcard("ontology/*.ttl"),
+    case OntologyFiles of
+        [] -> <<"no-ontology">>;
+        Files ->
+            Content = iolist_to_binary([file:read_file(F) || {ok, F} <- [file:read_file(F) || F <- Files]]),
+            binary:encode_hex(crypto:hash(sha256, Content), lowercase)
+    end.
+'''
+
+
+def generate_verdict_builder():
+    """Generate verdict builder for test results"""
+
+    return '''%% Verdict Builder - Test Results with Proofs
+-module(verdict_builder).
+
+-export([
+    build_verdict/1,
+    verify_verdict/1
+]).
+
+-type verdict() :: #{
+    apps_generated := [binary()],
+    chain := #{prev_hash := binary() | null, this_hash := binary()},
+    environment_fingerprint := map(),
+    failing_tests := [#{test_id := binary(), reason := binary()}],
+    generator_version := binary(),
+    ontology_hash := binary(),
+    proofs_summary := map(),
+    suite := binary(),
+    tests_passed := boolean(),
+    timestamp := binary()
+}.
+
+%%% API
+
+-spec build_verdict(map()) -> verdict().
+build_verdict(Params) ->
+    PrevHash = case file:read_file("receipts/verdict.last.json") of
+        {ok, PrevJson} ->
+            PrevReceipt = json:decode(PrevJson),
+            case maps:get(<<"chain">>, PrevReceipt, undefined) of
+                undefined -> null;  %% Old format without chain
+                Chain -> maps:get(<<"this_hash">>, Chain, null)
+            end;
+        _ ->
+            null
+    end,
+
+    Verdict0 = #{
+        apps_generated => maps:get(apps_generated, Params, []),
+        chain => #{prev_hash => PrevHash},
+        environment_fingerprint => receipt_builder:get_environment_fingerprint(),
+        failing_tests => maps:get(failing_tests, Params, []),
+        generator_version => receipt_builder:get_generator_version(),
+        ontology_hash => maps:get(ontology_hash, Params, <<"unknown">>),
+        proofs_summary => maps:get(proofs_summary, Params, #{}),
+        suite => maps:get(suite, Params, <<"nine_nines">>),
+        tests_passed => length(maps:get(failing_tests, Params, [])) =:= 0,
+        timestamp => receipt_builder:iso8601_now()
+    },
+
+    ThisHash = receipt_builder:hash_receipt(Verdict0),
+    Verdict = Verdict0#{chain := (maps:get(chain, Verdict0))#{this_hash => ThisHash}},
+
+    filelib:ensure_dir("receipts/"),
+    CanonicalJson = receipt_builder:canonical_json(Verdict),
+    file:write_file("receipts/verdict.last.json", CanonicalJson),
+
+    Verdict.
+
+-spec verify_verdict(verdict()) -> ok | {error, term()}.
+verify_verdict(Verdict) ->
+    receipt_builder:verify_receipt(Verdict).
+'''
+
+
+def create_receipt_infrastructure(apps_dir):
+    """Create receipt infrastructure app"""
+
+    receipt_app = apps_dir / "f5_receipts"
+    (receipt_app / "src").mkdir(parents=True, exist_ok=True)
+    (receipt_app / "ebin").mkdir(parents=True, exist_ok=True)
+
+    # Generate modules
+    (receipt_app / "src" / "receipt_builder.erl").write_text(generate_receipt_builder())
+    (receipt_app / "src" / "evidence_collector.erl").write_text(generate_evidence_collector())
+    (receipt_app / "src" / "verdict_builder.erl").write_text(generate_verdict_builder())
+
+    # Generate app files
+    app_src = '''{application, f5_receipts,
+ [{description, "Hash-chained receipts and evidence for nine-nines certification"},
+  {vsn, "0.3.0"},
+  {registered, []},
+  {applications, [kernel, stdlib, crypto]},
+  {modules, [
+        receipt_builder,
+        evidence_collector,
+        verdict_builder
+    ]},
+  {env, []}
+ ]}.
+'''
+
+    (receipt_app / "src" / "f5_receipts.app.src").write_text(app_src)
+    (receipt_app / "ebin" / "f5_receipts.app").write_text(app_src)
+
+    return "f5_receipts"
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+    apps_dir = Path(__file__).parent.parent / "apps"
+    app_name = create_receipt_infrastructure(apps_dir)
+    print(f"Generated receipt infrastructure: {app_name}")
+    print("\nModules:")
+    print("  - receipt_builder: Hash-chained build receipts")
+    print("  - evidence_collector: Evidence manifest with sha256")
+    print("  - verdict_builder: Test verdict with proofs")
+    print("\nUses OTP 28 json:encode/1 with stable key ordering")

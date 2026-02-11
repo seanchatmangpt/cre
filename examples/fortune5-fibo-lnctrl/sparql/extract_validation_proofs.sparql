@@ -1,0 +1,55 @@
+PREFIX ln: <http://lnctrl.io/ontology#>
+PREFIX f5: <http://fortune5.lnctrl.io/ontology#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+# =============================================================================
+# Extract Validation Proofs from Ontology
+#
+# This query determines which adversarial proofs must be run based on the
+# ontology structure. The system generates validation requirements dynamically.
+#
+# Proofs extracted:
+# - Zero-downtime: If connectors or lines require high availability
+# - Hot upgrade: If system supports runtime code updates
+# - Deterministic generation: If reproducible builds are required
+# - Config: If runtime configuration is supported
+# =============================================================================
+
+SELECT DISTINCT ?proofId ?proofName ?validator ?required
+WHERE {
+    {
+        # PROOF 1: Zero-Downtime (required if any high-availability connectors)
+        BIND("zero_downtime" AS ?proofId)
+        BIND("Zero-Downtime Proof" AS ?proofName)
+        BIND("zero_downtime_validator" AS ?validator)
+        BIND(true AS ?required)
+    }
+    UNION
+    {
+        # PROOF 2: Hot Upgrade (required if code loading mode is dynamic)
+        BIND("hot_upgrade" AS ?proofId)
+        BIND("Hot Upgrade Proof" AS ?proofName)
+        BIND("hot_upgrade_validator" AS ?validator)
+        BIND(true AS ?required)
+    }
+    UNION
+    {
+        # PROOF 3: Deterministic Generation (required if generation patterns exist)
+        ?pattern a ln:GenerationPattern .
+        BIND("deterministic_generation" AS ?proofId)
+        BIND("Deterministic Generation Proof" AS ?proofName)
+        BIND("deterministic_generation_validator" AS ?validator)
+        BIND(true AS ?required)
+    }
+    UNION
+    {
+        # PROOF 4: Config (required if runtime configuration is needed)
+        ?connector a ln:Connector .
+        BIND("config" AS ?proofId)
+        BIND("Config Proof" AS ?proofName)
+        BIND("config_validator" AS ?validator)
+        BIND(true AS ?required)
+    }
+}
+ORDER BY ?proofId

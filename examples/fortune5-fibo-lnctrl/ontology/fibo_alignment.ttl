@@ -1,0 +1,238 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix f5: <http://fortune5.lnctrl.io/ontology#> .
+@prefix ln: <http://lnctrl.io/ontology#> .
+
+# FIBO Imports
+@prefix fibo-fnd-aap-agt: <https://spec.edmcouncil.org/fibo/ontology/FND/AgentsAndPeople/Agents/> .
+@prefix fibo-fnd-aap-ppl: <https://spec.edmcouncil.org/fibo/ontology/FND/AgentsAndPeople/People/> .
+@prefix fibo-fnd-agr-ctr: <https://spec.edmcouncil.org/fibo/ontology/FND/Agreements/Contracts/> .
+@prefix fibo-fnd-acc-cur: <https://spec.edmcouncil.org/fibo/ontology/FND/Accounting/CurrencyAmount/> .
+@prefix fibo-be-le-lp: <https://spec.edmcouncil.org/fibo/ontology/BE/LegalEntities/LegalPersons/> .
+@prefix fibo-be-le-fbo: <https://spec.edmcouncil.org/fibo/ontology/BE/LegalEntities/FormalBusinessOrganizations/> .
+@prefix fibo-fbc-pas-fpas: <https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/FinancialProductsAndServices/> .
+@prefix fibo-fbc-dae-dbt: <https://spec.edmcouncil.org/fibo/ontology/FBC/DebtAndEquities/Debt/> .
+@prefix fibo-loan-ln-ln: <https://spec.edmcouncil.org/fibo/ontology/LOAN/LoansGeneral/Loans/> .
+@prefix fibo-loan-spc-cns: <https://spec.edmcouncil.org/fibo/ontology/LOAN/LoansSpecific/ConsumerLoans/> .
+@prefix fibo-loan-spc-com: <https://spec.edmcouncil.org/fibo/ontology/LOAN/LoansSpecific/CommercialLoans/> .
+
+# =============================================================================
+# FIBO Alignment Ontology for Fortune-5 LineController
+# =============================================================================
+# This ontology provides explicit mappings between custom Fortune-5 terms
+# and FIBO (Financial Industry Business Ontology) standard vocabulary.
+#
+# Purpose:
+# - Ensure FIBO-first terminology across all generated code
+# - Provide semantic interoperability with FIBO-compliant systems
+# - Enable automated validation and linting of ontology terms
+#
+# Generated: 2026-02-11
+# FIBO Version: 2025/Q4 Production
+# =============================================================================
+
+<http://fortune5.lnctrl.io/ontology/fibo_alignment>
+    a owl:Ontology ;
+    owl:versionInfo "0.1.0" ;
+    rdfs:label "Fortune-5 FIBO Alignment Ontology" ;
+    rdfs:comment "Mappings between Fortune-5 custom terms and FIBO standard vocabulary" ;
+    owl:imports <https://spec.edmcouncil.org/fibo/ontology/FND/MetadataFND/> ,
+                <https://spec.edmcouncil.org/fibo/ontology/BE/MetadataBE/> ,
+                <https://spec.edmcouncil.org/fibo/ontology/FBC/MetadataFBC/> ,
+                <https://spec.edmcouncil.org/fibo/ontology/LOAN/MetadataLOAN/> .
+
+# -----------------------------------------------------------------------------
+# LOAN DOMAIN ALIGNMENTS
+# -----------------------------------------------------------------------------
+
+# Loan Application → FIBO Loan Contract
+f5:LoanApplication
+    a owl:Class ;
+    owl:equivalentClass fibo-loan-ln-ln:LoanContract ;
+    skos:definition "A loan application is equivalent to a FIBO loan contract in the application stage" ;
+    rdfs:comment "FIBO Alignment: Use fibo-loan-ln-ln:LoanContract for loan contracts" .
+
+# Borrower → FIBO Borrower
+f5:Borrower
+    a owl:Class ;
+    owl:equivalentClass fibo-loan-ln-ln:Borrower ;
+    skos:definition "Party that receives a loan and is obligated to repay it" ;
+    rdfs:comment "FIBO Alignment: Already aligned with fibo-loan-ln-ln:Borrower" .
+
+# Loan → FIBO Loan
+f5:Loan
+    a owl:Class ;
+    owl:equivalentClass fibo-loan-ln-ln:Loan ;
+    skos:definition "A debt instrument where one party lends money to another" ;
+    rdfs:comment "FIBO Alignment: Already aligned with fibo-loan-ln-ln:Loan" .
+
+# Mortgage Loan → FIBO Mortgage
+f5:MortgageLoan
+    a owl:Class ;
+    owl:equivalentClass fibo-loan-spc-cns:Mortgage ;
+    skos:definition "A loan secured by real property" ;
+    rdfs:comment "FIBO Alignment: Use fibo-loan-spc-cns:Mortgage for mortgage loans" .
+
+# Consumer Loan → FIBO Consumer Loan
+f5:ConsumerLoan
+    a owl:Class ;
+    owl:equivalentClass fibo-loan-spc-cns:ConsumerLoan ;
+    skos:definition "A loan made to an individual for personal or household use" ;
+    rdfs:comment "FIBO Alignment: Already aligned with fibo-loan-spc-cns:ConsumerLoan" .
+
+# Commercial Loan → FIBO Commercial Loan
+f5:CommercialLoan
+    a owl:Class ;
+    owl:equivalentClass fibo-loan-spc-com:CommercialLoan ;
+    skos:definition "A loan made to a business entity for commercial purposes" ;
+    rdfs:comment "FIBO Alignment: Already aligned with fibo-loan-spc-com:CommercialLoan" .
+
+# -----------------------------------------------------------------------------
+# FOUNDATIONS DOMAIN ALIGNMENTS
+# -----------------------------------------------------------------------------
+
+# Party → FIBO Agent (or Person/Organization)
+f5:Party
+    a owl:Class ;
+    owl:equivalentClass fibo-fnd-aap-agt:AutonomousAgent ;
+    skos:definition "An entity that can enter into agreements and bear responsibilities" ;
+    rdfs:comment "FIBO Alignment: Use fibo-fnd-aap-agt:AutonomousAgent for parties" .
+
+# Person → FIBO Person
+f5:Person
+    a owl:Class ;
+    owl:equivalentClass fibo-fnd-aap-ppl:Person ;
+    skos:definition "A human being" ;
+    rdfs:comment "FIBO Alignment: Already aligned with fibo-fnd-aap-ppl:Person" .
+
+# Agreement → FIBO Written Contract
+f5:Agreement
+    a owl:Class ;
+    owl:equivalentClass fibo-fnd-agr-ctr:WrittenContract ;
+    skos:definition "A legally binding agreement between parties" ;
+    rdfs:comment "FIBO Alignment: Use fibo-fnd-agr-ctr:WrittenContract for agreements" .
+
+# Contract → FIBO Contract
+f5:Contract
+    a owl:Class ;
+    owl:equivalentClass fibo-fnd-agr-ctr:Contract ;
+    skos:definition "A voluntary agreement between parties" ;
+    rdfs:comment "FIBO Alignment: Already aligned with fibo-fnd-agr-ctr:Contract" .
+
+# Account → FIBO Financial Account
+f5:Account
+    a owl:Class ;
+    owl:equivalentClass fibo-fbc-pas-fpas:Account ;
+    skos:definition "A financial account held at a financial institution" ;
+    rdfs:comment "FIBO Alignment: Use fibo-fbc-pas-fpas:Account for financial accounts" .
+
+# -----------------------------------------------------------------------------
+# BUSINESS ENTITIES DOMAIN ALIGNMENTS
+# -----------------------------------------------------------------------------
+
+# Legal Entity → FIBO Legal Person
+f5:LegalEntity
+    a owl:Class ;
+    owl:equivalentClass fibo-be-le-lp:LegalPerson ;
+    skos:definition "An entity with legal rights and obligations" ;
+    rdfs:comment "FIBO Alignment: Use fibo-be-le-lp:LegalPerson for legal entities" .
+
+# Organization → FIBO Formal Organization
+f5:Organization
+    a owl:Class ;
+    owl:equivalentClass fibo-be-le-fbo:FormalOrganization ;
+    skos:definition "A structured group of people with a common purpose" ;
+    rdfs:comment "FIBO Alignment: Use fibo-be-le-fbo:FormalOrganization for organizations" .
+
+# Corporation → FIBO Corporation
+f5:Corporation
+    a owl:Class ;
+    owl:equivalentClass fibo-be-le-fbo:Corporation ;
+    skos:definition "A legal entity that is separate from its owners" ;
+    rdfs:comment "FIBO Alignment: Already aligned with fibo-be-le-fbo:Corporation" .
+
+# -----------------------------------------------------------------------------
+# FINANCIAL BUSINESS & COMMERCE ALIGNMENTS
+# -----------------------------------------------------------------------------
+
+# Lender → FIBO Lender
+f5:Lender
+    a owl:Class ;
+    owl:equivalentClass fibo-fbc-dae-dbt:Lender ;
+    skos:definition "A party that provides loans" ;
+    rdfs:comment "FIBO Alignment: Already aligned with fibo-fbc-dae-dbt:Lender" .
+
+# Financial Institution → FIBO Financial Service Provider
+f5:FinancialInstitution
+    a owl:Class ;
+    owl:equivalentClass fibo-fbc-pas-fpas:FinancialServiceProvider ;
+    skos:definition "An institution that provides financial services" ;
+    rdfs:comment "FIBO Alignment: Use fibo-fbc-pas-fpas:FinancialServiceProvider" .
+
+# -----------------------------------------------------------------------------
+# CUSTOM PROPERTIES ALIGNMENT
+# -----------------------------------------------------------------------------
+
+# Custom properties that need FIBO alignment
+f5:hasInterestRate
+    a owl:ObjectProperty ;
+    rdfs:domain fibo-loan-ln-ln:Loan ;
+    rdfs:range fibo-fnd-acc-cur:InterestRate ;
+    rdfs:comment "FIBO Alignment: Interest rate property for loans" .
+
+f5:hasMaturityDate
+    a owl:ObjectProperty ;
+    rdfs:domain fibo-loan-ln-ln:Loan ;
+    rdfs:range xsd:date ;
+    rdfs:comment "FIBO Alignment: Maturity date for loan contracts" .
+
+f5:hasPrincipalAmount
+    a owl:ObjectProperty ;
+    rdfs:domain fibo-loan-ln-ln:Loan ;
+    rdfs:range fibo-fnd-acc-cur:MonetaryAmount ;
+    rdfs:comment "FIBO Alignment: Principal amount of the loan" .
+
+# -----------------------------------------------------------------------------
+# UNMAPPED TERMS (Need FIBO Alignment)
+# -----------------------------------------------------------------------------
+
+# Terms that don't have direct FIBO equivalents yet
+# These should be reviewed and mapped to appropriate FIBO classes
+
+# LineController workflow concepts (application-specific)
+ln:Connector
+    a owl:Class ;
+    rdfs:comment "⚠️  Application-specific: No direct FIBO mapping. Consider using fibo-fbc-pas-fpas:FinancialServiceProvider with additional properties" .
+
+ln:Line
+    a owl:Class ;
+    rdfs:comment "⚠️  Application-specific: Workflow line concept. No direct FIBO mapping" .
+
+ln:Task
+    a owl:Class ;
+    rdfs:comment "⚠️  Application-specific: Workflow task concept. No direct FIBO mapping" .
+
+ln:Scope
+    a owl:Class ;
+    rdfs:comment "⚠️  Application-specific: Workflow scope concept. No direct FIBO mapping" .
+
+# -----------------------------------------------------------------------------
+# VALIDATION RULES
+# -----------------------------------------------------------------------------
+
+# All financial domain classes SHOULD use FIBO vocabulary
+# All loan-related terms MUST use fibo-loan namespace
+# All party/entity terms MUST use fibo-fnd or fibo-be namespaces
+# Custom business logic (workflow, connectors) MAY use custom namespaces
+
+# -----------------------------------------------------------------------------
+# REFERENCES
+# -----------------------------------------------------------------------------
+
+# FIBO Specification: https://spec.edmcouncil.org/fibo/
+# FIBO on GitHub: https://github.com/edmcouncil/fibo
+# EDM Council: https://edmcouncil.org/frameworks/industry-models/fibo/
+# FIBO Documentation: https://fib-dm.com/

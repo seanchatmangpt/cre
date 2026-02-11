@@ -1,0 +1,405 @@
+@prefix reg: <http://fortune5.lnctrl.io/regulation#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<http://fortune5.lnctrl.io/regulation/soc2> a owl:Ontology ;
+    rdfs:label "SOC 2 Trust Services Criteria Ontology"@en ;
+    rdfs:comment "Machine-addressable SOC 2 controls, evidence requirements, and suites"@en ;
+    owl:versionInfo "1.0.0" .
+
+##############################################################################
+# Trust Services Categories (TSC)
+##############################################################################
+
+reg:TSC_Security a owl:Class ;
+    rdfs:label "Security (TSC)"@en ;
+    skos:definition "Information and systems are protected against unauthorized access"@en .
+
+reg:TSC_Availability a owl:Class ;
+    rdfs:label "Availability (TSC)"@en ;
+    skos:definition "Information and systems are available for operation and use"@en .
+
+reg:TSC_Confidentiality a owl:Class ;
+    rdfs:label "Confidentiality (TSC)"@en ;
+    skos:definition "Information designated as confidential is protected"@en .
+
+reg:TSC_ProcessingIntegrity a owl:Class ;
+    rdfs:label "Processing Integrity (TSC)"@en ;
+    skos:definition "System processing is complete, valid, accurate, timely, and authorized"@en .
+
+reg:TSC_Privacy a owl:Class ;
+    rdfs:label "Privacy (TSC)"@en ;
+    skos:definition "Personal information is collected, used, retained, disclosed and disposed of in conformity with the entity's privacy notice"@en .
+
+##############################################################################
+# Control Families (Common Criteria)
+##############################################################################
+
+reg:CC1 a owl:Class ;
+    rdfs:label "CC1: Control Environment"@en ;
+    skos:definition "Organization demonstrates commitment to integrity and ethical values"@en .
+
+reg:CC2 a owl:Class ;
+    rdfs:label "CC2: Communication and Information"@en ;
+    skos:definition "Organization communicates information internally and externally"@en .
+
+reg:CC3 a owl:Class ;
+    rdfs:label "CC3: Risk Assessment"@en ;
+    skos:definition "Organization identifies, analyzes, and manages risks"@en .
+
+reg:CC4 a owl:Class ;
+    rdfs:label "CC4: Monitoring Activities"@en ;
+    skos:definition "Organization monitors system and evaluates deficiencies"@en .
+
+reg:CC5 a owl:Class ;
+    rdfs:label "CC5: Control Activities"@en ;
+    skos:definition "Organization selects and develops control activities"@en .
+
+reg:CC6 a owl:Class ;
+    rdfs:label "CC6: Logical and Physical Access"@en ;
+    skos:definition "Organization restricts logical and physical access"@en .
+
+reg:CC7 a owl:Class ;
+    rdfs:label "CC7: System Operations"@en ;
+    skos:definition "Organization manages system operations"@en .
+
+reg:CC8 a owl:Class ;
+    rdfs:label "CC8: Change Management"@en ;
+    skos:definition "Organization manages system changes"@en .
+
+reg:CC9 a owl:Class ;
+    rdfs:label "CC9: Risk Mitigation"@en ;
+    skos:definition "Organization mitigates identified risks"@en .
+
+##############################################################################
+# Control Class
+##############################################################################
+
+reg:Control a owl:Class ;
+    rdfs:label "SOC 2 Control"@en ;
+    skos:definition "Individual SOC 2 control with validators and evidence"@en .
+
+reg:controlId a owl:DatatypeProperty ;
+    rdfs:domain reg:Control ;
+    rdfs:range xsd:string ;
+    rdfs:label "Control ID"@en .
+
+reg:title a owl:DatatypeProperty ;
+    rdfs:domain reg:Control ;
+    rdfs:range xsd:string ;
+    rdfs:label "Control Title"@en .
+
+reg:description a owl:DatatypeProperty ;
+    rdfs:domain reg:Control ;
+    rdfs:range xsd:string ;
+    rdfs:label "Control Description"@en .
+
+reg:tscCategory a owl:ObjectProperty ;
+    rdfs:domain reg:Control ;
+    rdfs:label "TSC Category"@en .
+
+reg:controlFamily a owl:ObjectProperty ;
+    rdfs:domain reg:Control ;
+    rdfs:label "Control Family"@en .
+
+reg:requiresValidator a owl:DatatypeProperty ;
+    rdfs:domain reg:Control ;
+    rdfs:range xsd:string ;
+    rdfs:label "Requires Validator"@en .
+
+reg:requiresEvidence a owl:ObjectProperty ;
+    rdfs:domain reg:Control ;
+    rdfs:range reg:EvidenceRequirement ;
+    rdfs:label "Requires Evidence"@en .
+
+##############################################################################
+# Evidence Requirements
+##############################################################################
+
+reg:EvidenceRequirement a owl:Class ;
+    rdfs:label "Evidence Requirement"@en ;
+    skos:definition "Required evidence artifact for control compliance"@en .
+
+reg:evidenceId a owl:DatatypeProperty ;
+    rdfs:domain reg:EvidenceRequirement ;
+    rdfs:range xsd:string ;
+    rdfs:label "Evidence ID"@en .
+
+reg:path a owl:DatatypeProperty ;
+    rdfs:domain reg:EvidenceRequirement ;
+    rdfs:range xsd:string ;
+    rdfs:label "Evidence Path"@en .
+
+reg:format a owl:DatatypeProperty ;
+    rdfs:domain reg:EvidenceRequirement ;
+    rdfs:range xsd:string ;
+    rdfs:label "Evidence Format"@en .
+
+reg:integrity a owl:DatatypeProperty ;
+    rdfs:domain reg:EvidenceRequirement ;
+    rdfs:range xsd:string ;
+    rdfs:label "Integrity Mechanism"@en .
+
+reg:retentionDays a owl:DatatypeProperty ;
+    rdfs:domain reg:EvidenceRequirement ;
+    rdfs:range xsd:integer ;
+    rdfs:label "Retention Days"@en .
+
+##############################################################################
+# SOC 2 Suites (Composable)
+##############################################################################
+
+reg:Suite a owl:Class ;
+    rdfs:label "SOC 2 Suite"@en ;
+    skos:definition "Composable set of SOC 2 controls"@en .
+
+reg:includesCategory a owl:ObjectProperty ;
+    rdfs:domain reg:Suite ;
+    rdfs:label "Includes TSC Category"@en .
+
+reg:includesControl a owl:ObjectProperty ;
+    rdfs:domain reg:Suite ;
+    rdfs:range reg:Control ;
+    rdfs:label "Includes Control"@en .
+
+## Security Suite (baseline)
+reg:soc2_security a reg:Suite ;
+    rdfs:label "SOC 2 Security"@en ;
+    reg:includesCategory reg:TSC_Security .
+
+## Security + Availability
+reg:soc2_security_availability a reg:Suite ;
+    rdfs:label "SOC 2 Security + Availability"@en ;
+    reg:includesCategory reg:TSC_Security, reg:TSC_Availability .
+
+## Security + Confidentiality
+reg:soc2_security_confidentiality a reg:Suite ;
+    rdfs:label "SOC 2 Security + Confidentiality"@en ;
+    reg:includesCategory reg:TSC_Security, reg:TSC_Confidentiality .
+
+## Security + Processing Integrity
+reg:soc2_security_processing_integrity a reg:Suite ;
+    rdfs:label "SOC 2 Security + Processing Integrity"@en ;
+    reg:includesCategory reg:TSC_Security, reg:TSC_ProcessingIntegrity .
+
+## Security + Privacy
+reg:soc2_security_privacy a reg:Suite ;
+    rdfs:label "SOC 2 Security + Privacy"@en ;
+    reg:includesCategory reg:TSC_Security, reg:TSC_Privacy .
+
+##############################################################################
+# Evidence Requirements (Link to Existing System Artifacts)
+##############################################################################
+
+reg:Evidence_BuildReceipt a reg:EvidenceRequirement ;
+    reg:evidenceId "build_receipt" ;
+    reg:path "receipts/build.last.json" ;
+    reg:format "json" ;
+    reg:integrity "sha256_manifest" ;
+    reg:retentionDays 2555 .
+
+reg:Evidence_EvidenceManifest a reg:EvidenceRequirement ;
+    reg:evidenceId "evidence_manifest" ;
+    reg:path "receipts/evidence.last.json" ;
+    reg:format "json" ;
+    reg:integrity "sha256_manifest" ;
+    reg:retentionDays 2555 .
+
+reg:Evidence_VerdictReceipt a reg:EvidenceRequirement ;
+    reg:evidenceId "verdict_receipt" ;
+    reg:path "receipts/verdict.last.json" ;
+    reg:format "json" ;
+    reg:integrity "sha256_manifest" ;
+    reg:retentionDays 2555 .
+
+reg:Evidence_Sha256Manifest a reg:EvidenceRequirement ;
+    reg:evidenceId "sha256_manifest" ;
+    reg:path "evidence/evidence.sha256" ;
+    reg:format "text" ;
+    reg:integrity "sha256_of_sha256s" ;
+    reg:retentionDays 2555 .
+
+reg:Evidence_UptimeLogs a reg:EvidenceRequirement ;
+    reg:evidenceId "uptime_logs" ;
+    reg:path "evidence/uptime/**/*.json" ;
+    reg:format "jsonl" ;
+    reg:integrity "sha256_manifest" ;
+    reg:retentionDays 2555 .
+
+reg:Evidence_LoadTests a reg:EvidenceRequirement ;
+    reg:evidenceId "load_tests" ;
+    reg:path "evidence/load_tests/**/*.json" ;
+    reg:format "json" ;
+    reg:integrity "sha256_manifest" ;
+    reg:retentionDays 2555 .
+
+reg:Evidence_ChaosTests a reg:EvidenceRequirement ;
+    reg:evidenceId "chaos_tests" ;
+    reg:path "evidence/chaos/**/*.json" ;
+    reg:format "json" ;
+    reg:integrity "sha256_manifest" ;
+    reg:retentionDays 2555 .
+
+##############################################################################
+# CC6 Controls (Logical and Physical Access)
+##############################################################################
+
+reg:CC6_1 a reg:Control ;
+    reg:controlId "CC6.1" ;
+    reg:title "Authorization Controls" ;
+    reg:description "Entity implements logical access controls to prevent unauthorized access" ;
+    reg:tscCategory reg:TSC_Security ;
+    reg:controlFamily reg:CC6 ;
+    reg:requiresValidator "zero_downtime_validator" ;
+    reg:requiresValidator "config_validator" ;
+    reg:requiresEvidence reg:Evidence_BuildReceipt ;
+    reg:requiresEvidence reg:Evidence_VerdictReceipt .
+
+reg:CC6_2 a reg:Control ;
+    reg:controlId "CC6.2" ;
+    reg:title "Authentication" ;
+    reg:description "Entity uses multi-factor authentication" ;
+    reg:tscCategory reg:TSC_Security ;
+    reg:controlFamily reg:CC6 ;
+    reg:requiresValidator "config_validator" ;
+    reg:requiresEvidence reg:Evidence_BuildReceipt ;
+    reg:requiresEvidence reg:Evidence_VerdictReceipt .
+
+reg:CC6_3 a reg:Control ;
+    reg:controlId "CC6.3" ;
+    reg:title "Access Removal" ;
+    reg:description "Entity removes access when no longer required" ;
+    reg:tscCategory reg:TSC_Security ;
+    reg:controlFamily reg:CC6 ;
+    reg:requiresValidator "config_validator" ;
+    reg:requiresEvidence reg:Evidence_BuildReceipt ;
+    reg:requiresEvidence reg:Evidence_VerdictReceipt .
+
+##############################################################################
+# CC7 Controls (System Operations)
+##############################################################################
+
+reg:CC7_1 a reg:Control ;
+    reg:controlId "CC7.1" ;
+    reg:title "Backup and Recovery" ;
+    reg:description "Entity maintains current processing capacity and monitors system components" ;
+    reg:tscCategory reg:TSC_Availability ;
+    reg:controlFamily reg:CC7 ;
+    reg:requiresValidator "zero_downtime_validator" ;
+    reg:requiresValidator "hot_upgrade_validator" ;
+    reg:requiresEvidence reg:Evidence_UptimeLogs ;
+    reg:requiresEvidence reg:Evidence_VerdictReceipt .
+
+reg:CC7_2 a reg:Control ;
+    reg:controlId "CC7.2" ;
+    reg:title "Incident Response" ;
+    reg:description "Entity responds to incidents that could affect system security" ;
+    reg:tscCategory reg:TSC_Security ;
+    reg:controlFamily reg:CC7 ;
+    reg:requiresValidator "zero_downtime_validator" ;
+    reg:requiresEvidence reg:Evidence_ChaosTests ;
+    reg:requiresEvidence reg:Evidence_VerdictReceipt .
+
+reg:CC7_3 a reg:Control ;
+    reg:controlId "CC7.3" ;
+    reg:title "Capacity Monitoring" ;
+    reg:description "Entity monitors system capacity to meet processing requirements" ;
+    reg:tscCategory reg:TSC_Availability ;
+    reg:controlFamily reg:CC7 ;
+    reg:requiresValidator "zero_downtime_validator" ;
+    reg:requiresEvidence reg:Evidence_LoadTests ;
+    reg:requiresEvidence reg:Evidence_UptimeLogs .
+
+##############################################################################
+# CC8 Controls (Change Management)
+##############################################################################
+
+reg:CC8_1 a reg:Control ;
+    reg:controlId "CC8.1" ;
+    reg:title "Change Authorization" ;
+    reg:description "Entity authorizes, designs, develops, configures, documents, tests, approves and implements changes" ;
+    reg:tscCategory reg:TSC_Security ;
+    reg:controlFamily reg:CC8 ;
+    reg:requiresValidator "deterministic_generation_validator" ;
+    reg:requiresValidator "hot_upgrade_validator" ;
+    reg:requiresEvidence reg:Evidence_BuildReceipt ;
+    reg:requiresEvidence reg:Evidence_VerdictReceipt .
+
+reg:CC8_2 a reg:Control ;
+    reg:controlId "CC8.2" ;
+    reg:title "Change Testing" ;
+    reg:description "Entity tests system changes before deployment" ;
+    reg:tscCategory reg:TSC_Security ;
+    reg:controlFamily reg:CC8 ;
+    reg:requiresValidator "deterministic_generation_validator" ;
+    reg:requiresEvidence reg:Evidence_VerdictReceipt ;
+    reg:requiresEvidence reg:Evidence_LoadTests .
+
+##############################################################################
+# CC9 Controls (Risk Mitigation)
+##############################################################################
+
+reg:CC9_1 a reg:Control ;
+    reg:controlId "CC9.1" ;
+    reg:title "Risk Identification" ;
+    reg:description "Entity identifies and assesses risks" ;
+    reg:tscCategory reg:TSC_Security ;
+    reg:controlFamily reg:CC9 ;
+    reg:requiresValidator "zero_downtime_validator" ;
+    reg:requiresEvidence reg:Evidence_ChaosTests ;
+    reg:requiresEvidence reg:Evidence_VerdictReceipt .
+
+reg:CC9_2 a reg:Control ;
+    reg:controlId "CC9.2" ;
+    reg:title "Risk Mitigation" ;
+    reg:description "Entity designs and implements control activities to mitigate risks" ;
+    reg:tscCategory reg:TSC_Security ;
+    reg:controlFamily reg:CC9 ;
+    reg:requiresValidator "zero_downtime_validator" ;
+    reg:requiresValidator "hot_upgrade_validator" ;
+    reg:requiresEvidence reg:Evidence_ChaosTests ;
+    reg:requiresEvidence reg:Evidence_VerdictReceipt .
+
+##############################################################################
+# Processing Integrity Controls
+##############################################################################
+
+reg:PI1_1 a reg:Control ;
+    reg:controlId "PI1.1" ;
+    reg:title "Data Input Accuracy" ;
+    reg:description "Processing is complete, valid, accurate, timely, and authorized" ;
+    reg:tscCategory reg:TSC_ProcessingIntegrity ;
+    reg:controlFamily reg:CC7 ;
+    reg:requiresValidator "deterministic_generation_validator" ;
+    reg:requiresEvidence reg:Evidence_BuildReceipt ;
+    reg:requiresEvidence reg:Evidence_VerdictReceipt .
+
+##############################################################################
+# Confidentiality Controls
+##############################################################################
+
+reg:C1_1 a reg:Control ;
+    reg:controlId "C1.1" ;
+    reg:title "Confidentiality Protection" ;
+    reg:description "Information designated as confidential is protected during storage and transmission" ;
+    reg:tscCategory reg:TSC_Confidentiality ;
+    reg:controlFamily reg:CC6 ;
+    reg:requiresValidator "config_validator" ;
+    reg:requiresEvidence reg:Evidence_BuildReceipt ;
+    reg:requiresEvidence reg:Evidence_VerdictReceipt .
+
+##############################################################################
+# Privacy Controls
+##############################################################################
+
+reg:P1_1 a reg:Control ;
+    reg:controlId "P1.1" ;
+    reg:title "Privacy Notice" ;
+    reg:description "Entity provides notice about its privacy practices" ;
+    reg:tscCategory reg:TSC_Privacy ;
+    reg:controlFamily reg:CC1 ;
+    reg:requiresValidator "config_validator" ;
+    reg:requiresEvidence reg:Evidence_BuildReceipt .
