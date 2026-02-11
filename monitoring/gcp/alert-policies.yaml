@@ -23,7 +23,7 @@ policies:
             alignmentPeriod: 300s
             perSeriesAligner: ALIGN_PERCENTILE99
             crossSeriesReducer: REDUCE_NONE
-           groupByFields:
+            groupByFields:
               - metric.label.pattern_name
           comparison: COMPARISON_GT
           thresholdValue: 5.0

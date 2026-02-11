@@ -1,0 +1,1329 @@
+openapi: 3.0.3
+info:
+  title: CRE Common Runtime Environment API
+  description: |
+    # CRE API Documentation
+
+    The Common Runtime Environment (CRE) provides a comprehensive REST API for workflow management and execution.
+    This API enables creation, execution, monitoring, and control of YAWL (Yet Another Workflow Language) workflows
+    using Petri Net patterns and distributed task execution.
+
+    ## Key Features
+    - Workflow lifecycle management (create, validate, execute, monitor)
+    - YAWL pattern composition and execution
+    - Task-based distributed execution
+    - Real-time health monitoring and status reporting
+    - Workflow history and audit trails
+
+    ## Authentication
+
+    The API currently supports two authentication mechanisms:
+
+    1. **Basic Authentication**: Include `Authorization: Basic base64(username:password)` header
+    2. **Bearer Token**: Include `Authorization: Bearer <token>` header (future support)
+
+    All endpoints (except health checks) require proper authentication credentials.
+
+    ## Error Handling
+
+    All API errors follow a consistent JSON structure:
+
+    ```json
+    {
+      "error": "error_code",
+      "message": "Human-readable error description",
+      "details": {}
+    }
+    ```
+
+    Common HTTP status codes:
+    - `200 OK` - Request succeeded
+    - `201 Created` - Resource created successfully
+    - `202 Accepted` - Request accepted for processing
+    - `400 Bad Request` - Invalid request parameters
+    - `401 Unauthorized` - Authentication required or failed
+    - `403 Forbidden` - Insufficient permissions
+    - `404 Not Found` - Resource not found
+    - `409 Conflict` - Resource state conflict
+    - `500 Internal Server Error` - Server error
+    - `503 Service Unavailable` - Service temporarily unavailable
+
+  version: 0.3.0
+  contact:
+    name: CRE Project
+    url: https://github.com/joergen7/cre
+    email: support@cre-project.org
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  x-logo:
+    url: https://raw.githubusercontent.com/joergen7/cre/master/docs/diagrams/cre-logo.svg
+    altText: CRE Logo
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.cre.example.com
+    description: Production server
+  - url: http://cre-master:8080
+    description: Docker/Kubernetes internal service
+
+tags:
+  - name: Health
+    description: Service health and readiness checks
+  - name: Workflows
+    description: Workflow lifecycle management
+  - name: Cases
+    description: Workflow case execution and monitoring
+  - name: Tasks
+    description: Task and work item management
+  - name: Status
+    description: System status and statistics
+  - name: Patterns
+    description: YAWL workflow pattern management
+  - name: Admin
+    description: Administrative operations
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Liveness probe
+      description: |
+        Check if the service is running. This endpoint is used by load balancers
+        and uptime monitoring systems to determine service availability.
+
+        Returns 200 if the BEAM VM is responsive, 503 otherwise.
+      operationId: getLiveness
+      security: []
+      responses:
+        '200':
+          description: Service is healthy and running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                healthy:
+                  $ref: '#/components/examples/HealthResponseHealthy'
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /ready:
+    get:
+      tags:
+        - Health
+      summary: Readiness probe
+      description: |
+        Check if the service is ready to accept requests. This endpoint verifies
+        that all critical subsystems (Mnesia, worker pool, CRE master) are operational.
+
+        Returns 200 only if the service can handle requests, 503 otherwise.
+      operationId: getReadiness
+      security: []
+      responses:
+        '200':
+          description: Service is ready to serve traffic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /startup:
+    get:
+      tags:
+        - Health
+      summary: Startup probe
+      description: |
+        Check if the service has completed initialization.
+
+        Used by Kubernetes to determine when a container is ready for traffic.
+      operationId: getStartup
+      security: []
+      responses:
+        '200':
+          description: Service has started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '202':
+          description: Service is still starting up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service startup failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /status.json:
+    get:
+      tags:
+        - Status
+      summary: Get master process status
+      description: |
+        Retrieve the current status of the CRE master process, including:
+        - Worker pool statistics
+        - Active task counts
+        - System load information
+
+        This endpoint provides real-time metrics for monitoring and diagnostics.
+      operationId: getMasterStatus
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current master status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MasterStatus'
+              examples:
+                statusExample:
+                  $ref: '#/components/examples/MasterStatusExample'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '503':
+          description: Master process unavailable
+
+  /history.json:
+    get:
+      tags:
+        - Status
+      summary: Get workflow execution history
+      description: |
+        Retrieve cached results from previous workflow executions, organized by application name.
+
+        The history contains completed workflows and their final results, useful for auditing
+        and result retrieval.
+      operationId: getHistory
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Workflow execution history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        app:
+                          type: string
+                          description: Application/workflow name
+                        delta:
+                          type: object
+                          description: Cached result from execution
+              examples:
+                historyExample:
+                  $ref: '#/components/examples/HistoryExample'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/yawl/specifications:
+    get:
+      tags:
+        - Workflows
+      summary: List all workflow specifications
+      description: |
+        Retrieve a list of all available YAWL workflow specifications that have been loaded
+        into the system.
+      operationId: listSpecifications
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of specifications to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          description: Offset for pagination
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of workflow specifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  specifications:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkflowSpecification'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      tags:
+        - Workflows
+      summary: Upload a new workflow specification
+      description: |
+        Upload and register a new YAWL workflow specification. The workflow will be
+        validated and stored in the system for later execution.
+
+        Currently returns 501 Not Implemented. Full implementation planned for future release.
+      operationId: uploadSpecification
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowUpload'
+          application/xml:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: Specification uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowSpecification'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '501':
+          description: Feature not yet implemented
+
+  /api/yawl/specifications/{specification_id}:
+    get:
+      tags:
+        - Workflows
+      summary: Get workflow specification details
+      description: |
+        Retrieve detailed information about a specific workflow specification,
+        including its structure, tasks, and connections.
+      operationId: getSpecification
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: specification_id
+          in: path
+          required: true
+          description: Unique identifier of the workflow specification
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workflow specification details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowSpecification'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/yawl/specifications/{specification_id}/validate:
+    post:
+      tags:
+        - Workflows
+      summary: Validate a workflow specification
+      description: |
+        Validate a workflow specification for correctness and Petri Net soundness.
+        Returns detailed validation results including any errors or warnings.
+      operationId: validateSpecification
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: specification_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Validation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+              examples:
+                validWorkflow:
+                  $ref: '#/components/examples/ValidationResultValid'
+                invalidWorkflow:
+                  $ref: '#/components/examples/ValidationResultInvalid'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/yawl/specifications/{specification_id}/launch:
+    post:
+      tags:
+        - Cases
+      summary: Launch a new workflow case
+      description: |
+        Create and start a new instance of a workflow specification.
+        Returns the case ID for monitoring and control.
+
+        Currently returns 501 Not Implemented. Use /api/yawl/cases endpoint instead.
+      operationId: launchCase
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: specification_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Initial data for the workflow case
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      responses:
+        '201':
+          description: Case launched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseInstance'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '501':
+          description: Feature not yet implemented
+
+  /api/yawl/cases:
+    get:
+      tags:
+        - Cases
+      summary: List all workflow cases
+      description: |
+        Retrieve a list of all workflow case instances, showing their status,
+        start time, and current progress.
+      operationId: listCases
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Filter by case status
+          schema:
+            type: string
+            enum:
+              - running
+              - completed
+              - failed
+              - suspended
+              - cancelled
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of workflow cases
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cases:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CaseInstance'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+              examples:
+                casesExample:
+                  $ref: '#/components/examples/CasesListExample'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/yawl/cases/{case_id}:
+    get:
+      tags:
+        - Cases
+      summary: Get case details
+      description: |
+        Retrieve detailed information about a specific workflow case, including:
+        - Current status and progress
+        - Task execution history
+        - Work item queue
+        - Case-level variables and data
+      operationId: getCase
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          description: Unique identifier of the workflow case
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Case details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseDetail'
+              examples:
+                caseExample:
+                  $ref: '#/components/examples/CaseDetailExample'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/yawl/cases/{case_id}/cancel:
+    post:
+      tags:
+        - Cases
+      summary: Cancel a workflow case
+      description: |
+        Terminate a running workflow case immediately, cancelling all pending work
+        and transitions. The case moves to CANCELLED state.
+      operationId: cancelCase
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Cancellation reason (optional)
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Case cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseInstance'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Case cannot be cancelled in current state
+
+  /api/yawl/cases/{case_id}/suspend:
+    post:
+      tags:
+        - Cases
+      summary: Suspend a workflow case
+      description: |
+        Pause a running workflow case. Work items remain pending and can be resumed later.
+
+        Currently returns 501 Not Implemented.
+      operationId: suspendCase
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Case suspended successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseInstance'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '501':
+          description: Feature not yet implemented
+
+  /api/yawl/cases/{case_id}/resume:
+    post:
+      tags:
+        - Cases
+      summary: Resume a suspended workflow case
+      description: |
+        Resume execution of a suspended workflow case, reactivating pending work items.
+
+        Currently returns 501 Not Implemented.
+      operationId: resumeCase
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Case resumed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseInstance'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '501':
+          description: Feature not yet implemented
+
+  /api/yawl/worklist/{user_id}:
+    get:
+      tags:
+        - Tasks
+      summary: Get user's work items
+      description: |
+        Retrieve the work item queue for a specific user, showing tasks ready
+        for execution from running workflow cases.
+      operationId: getUserWorklist
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: User identifier
+          schema:
+            type: string
+        - name: filter
+          in: query
+          description: Filter work items by state
+          schema:
+            type: string
+            enum:
+              - enabled
+              - fired
+              - started
+              - executing
+              - completed
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 50
+      responses:
+        '200':
+          description: User's work items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  work_items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkItem'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /patterns:
+    get:
+      tags:
+        - Patterns
+      summary: List all YAWL patterns
+      description: |
+        Retrieve available YAWL control-flow patterns supported by CRE.
+        Includes the 43 core workflow patterns plus resource patterns.
+      operationId: listPatterns
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          description: Filter patterns by category
+          schema:
+            type: string
+            enum:
+              - control-flow
+              - data
+              - resource
+              - exception
+              - all
+            default: all
+      responses:
+        '200':
+          description: List of available patterns
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  patterns:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PatternDefinition'
+                  total:
+                    type: integer
+              examples:
+                patternsExample:
+                  $ref: '#/components/examples/PatternsListExample'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /patterns/{pattern_name}:
+    get:
+      tags:
+        - Patterns
+      summary: Get pattern definition
+      description: |
+        Retrieve detailed information about a specific YAWL pattern, including
+        Petri Net definition, usage examples, and requirements.
+      operationId: getPattern
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: pattern_name
+          in: path
+          required: true
+          description: Name of the pattern (e.g., sequence, parallel_split)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pattern definition and documentation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatternDetail'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - unhealthy
+            - starting
+          description: Overall health status
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix millisecond timestamp of health check
+        subsystems:
+          type: array
+          description: Health status of individual subsystems
+          items:
+            type: object
+            required:
+              - name
+              - status
+            properties:
+              name:
+                type: string
+                description: Subsystem name (beam, mnesia, epmd, cre_master, worker_pool, etc.)
+              status:
+                type: string
+                enum:
+                  - healthy
+                  - unhealthy
+                  - disabled
+              message:
+                type: string
+              details:
+                type: object
+                additionalProperties: {}
+
+    MasterStatus:
+      type: object
+      description: Current status of the CRE master process
+      properties:
+        status:
+          type: string
+          enum:
+            - running
+            - stopping
+            - error
+        cre_info:
+          type: object
+          properties:
+            n_wrk:
+              type: integer
+              description: Number of active workers
+            load:
+              type: number
+              description: Current system load
+            uptime_seconds:
+              type: integer
+        timestamp:
+          type: integer
+          format: int64
+
+    WorkflowSpecification:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the workflow
+        name:
+          type: string
+          description: Human-readable workflow name
+        description:
+          type: string
+        version:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+            - draft
+            - loaded
+            - validated
+            - archived
+        tasks_count:
+          type: integer
+        patterns:
+          type: array
+          items:
+            type: string
+            description: Pattern names used in this workflow
+
+    WorkflowUpload:
+      type: object
+      required:
+        - content
+      properties:
+        name:
+          type: string
+          description: Workflow name
+        content:
+          type: string
+          description: Workflow definition (YAWL XML or JSON)
+        format:
+          type: string
+          enum:
+            - yawl
+            - json
+          default: yawl
+
+    CaseInstance:
+      type: object
+      required:
+        - id
+        - specification_id
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          description: Unique case identifier
+        specification_id:
+          type: string
+          description: ID of the workflow specification
+        status:
+          type: string
+          enum:
+            - created
+            - running
+            - suspended
+            - completed
+            - cancelled
+            - failed
+        created_at:
+          type: string
+          format: date-time
+          description: Case creation timestamp
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        active_work_items:
+          type: integer
+          description: Count of pending work items
+        completed_tasks:
+          type: integer
+          description: Count of executed tasks
+
+    CaseDetail:
+      allOf:
+        - $ref: '#/components/schemas/CaseInstance'
+        - type: object
+          properties:
+            work_items:
+              type: array
+              items:
+                $ref: '#/components/schemas/WorkItem'
+            task_history:
+              type: array
+              items:
+                $ref: '#/components/schemas/TaskExecution'
+            case_data:
+              type: object
+              additionalProperties: {}
+              description: Case-level variables and state
+
+    WorkItem:
+      type: object
+      required:
+        - id
+        - case_id
+        - task_name
+        - status
+      properties:
+        id:
+          type: string
+        case_id:
+          type: string
+        task_name:
+          type: string
+        task_id:
+          type: string
+        status:
+          type: string
+          enum:
+            - enabled
+            - fired
+            - started
+            - executing
+            - completed
+            - cancelled
+        assigned_to:
+          type: string
+          description: User ID if assigned
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        input_data:
+          type: object
+          additionalProperties: {}
+        output_data:
+          type: object
+          additionalProperties: {}
+
+    TaskExecution:
+      type: object
+      required:
+        - task_id
+        - task_name
+        - status
+        - timestamp
+      properties:
+        task_id:
+          type: string
+        task_name:
+          type: string
+        status:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        duration_ms:
+          type: integer
+        result:
+          type: object
+          additionalProperties: {}
+
+    ValidationResult:
+      type: object
+      required:
+        - is_valid
+        - timestamp
+      properties:
+        is_valid:
+          type: boolean
+          description: Whether the workflow is valid
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              message:
+                type: string
+              element:
+                type: string
+                description: Workflow element with error
+        warnings:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              message:
+                type: string
+        timestamp:
+          type: string
+          format: date-time
+        checks_performed:
+          type: array
+          items:
+            type: string
+            description: 'Validation checks: syntax, soundness, liveness, boundedness, etc.'
+
+    PatternDefinition:
+      type: object
+      required:
+        - name
+        - category
+      properties:
+        name:
+          type: string
+          description: Pattern identifier (e.g., "sequence", "parallel_split")
+        category:
+          type: string
+          enum:
+            - control-flow
+            - data
+            - resource
+            - exception
+        display_name:
+          type: string
+          description: Human-readable pattern name
+        description:
+          type: string
+        supported:
+          type: boolean
+          description: Whether pattern is supported by CRE
+
+    PatternDetail:
+      allOf:
+        - $ref: '#/components/schemas/PatternDefinition'
+        - type: object
+          properties:
+            petri_net:
+              type: object
+              description: Petri Net definition of the pattern
+              properties:
+                places:
+                  type: array
+                  items:
+                    type: object
+                transitions:
+                  type: array
+                  items:
+                    type: object
+                arcs:
+                  type: array
+                  items:
+                    type: object
+            input_places:
+              type: array
+              items:
+                type: string
+              description: Entry points for pattern input
+            output_places:
+              type: array
+              items:
+                type: string
+              description: Exit points for pattern output
+            usage_example:
+              type: string
+              description: YAWL/JSON example usage
+            requirements:
+              type: array
+              items:
+                type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error description
+        details:
+          type: object
+          additionalProperties: {}
+          description: Additional error details
+
+  responses:
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            badRequest:
+              value:
+                error: bad_request
+                message: Invalid workflow specification format
+
+    UnauthorizedError:
+      description: Authentication required or failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          description: Authentication challenge
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notFound:
+              value:
+                error: not_found
+                message: Workflow case not found
+
+  examples:
+    HealthResponseHealthy:
+      value:
+        status: healthy
+        timestamp: 1707641400000
+        subsystems:
+          - name: beam
+            status: healthy
+            message: BEAM VM is responsive
+            details:
+              uptime_seconds: 3600
+              process_count: 245
+              memory_total: 104857600
+          - name: mnesia
+            status: healthy
+            message: Mnesia cluster is operational
+            details:
+              running_nodes: 1
+              tables: 5
+              local_tables: 5
+          - name: cre_master
+            status: healthy
+            message: CRE master is running
+
+    MasterStatusExample:
+      value:
+        status: running
+        cre_info:
+          n_wrk: 8
+          load: 0.45
+          uptime_seconds: 3600
+        timestamp: 1707641400000
+
+    HistoryExample:
+      value:
+        history:
+          - app: payment_workflow
+            delta:
+              status: completed
+              result: success
+              amount: 1000
+          - app: approval_workflow
+            delta:
+              status: completed
+              approved: true
+
+    CasesListExample:
+      value:
+        cases:
+          - id: case_001
+            specification_id: spec_payment
+            status: running
+            created_at: '2025-02-11T10:00:00Z'
+            active_work_items: 3
+            completed_tasks: 5
+          - id: case_002
+            specification_id: spec_approval
+            status: completed
+            created_at: '2025-02-11T09:00:00Z'
+            completed_at: '2025-02-11T10:30:00Z'
+            completed_tasks: 8
+        total: 2
+        limit: 50
+        offset: 0
+
+    CaseDetailExample:
+      value:
+        id: case_001
+        specification_id: spec_payment
+        status: running
+        created_at: '2025-02-11T10:00:00Z'
+        started_at: '2025-02-11T10:00:15Z'
+        active_work_items: 3
+        completed_tasks: 5
+        work_items:
+          - id: wi_001
+            case_id: case_001
+            task_name: payment_validation
+            status: executing
+            assigned_to: user_123
+            created_at: '2025-02-11T10:05:00Z'
+            started_at: '2025-02-11T10:10:00Z'
+        case_data:
+          amount: 1000
+          currency: USD
+          account: ACC123456
+
+    ValidationResultValid:
+      value:
+        is_valid: true
+        errors: []
+        warnings: []
+        timestamp: '2025-02-11T10:00:00Z'
+        checks_performed:
+          - syntax
+          - soundness
+          - liveness
+          - boundedness
+
+    ValidationResultInvalid:
+      value:
+        is_valid: false
+        errors:
+          - code: syntax_error
+            message: Invalid task definition
+            element: Task_PaymentProcessing
+          - code: soundness_error
+            message: Unreachable place detected
+            element: Place_CompletionGate
+        warnings:
+          - code: unused_element
+            message: Task never referenced
+            element: Task_Legacy
+        timestamp: '2025-02-11T10:00:00Z'
+        checks_performed:
+          - syntax
+          - soundness
+
+    PatternsListExample:
+      value:
+        patterns:
+          - name: sequence
+            category: control-flow
+            display_name: Sequence
+            description: Sequential execution of tasks
+            supported: true
+          - name: parallel_split
+            category: control-flow
+            display_name: Parallel Split
+            description: Split execution into parallel branches
+            supported: true
+          - name: synchronization
+            category: control-flow
+            display_name: Synchronization
+            description: Join parallel branches
+            supported: true
+        total: 43
+
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: HTTP Basic Authentication (username:password)
+
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token authentication (future support)
+
+security:
+  - basicAuth: []
+  - bearerAuth: []
+
+x-google-endpoints:
+  - name: cre-api.example.com
+    allowUnregisteredCalls: false
+
+x-google-audiences: cre-api.example.com
