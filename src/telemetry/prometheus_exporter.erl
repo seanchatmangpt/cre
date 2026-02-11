@@ -160,7 +160,7 @@ to_json_metrics(Req, State) ->
     Metrics = otel_metrics:export_metrics(),
     %% Convert Prometheus text to JSON format
     Json = prometheus_to_json(Metrics),
-    Body = jiffy:encode(Json),
+    Body = jsone:encode(Json),
     Headers = #{<<"content-type">> => <<"application/json">>},
     {Body, Req, State, Headers}.
 
