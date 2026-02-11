@@ -81,17 +81,16 @@ new_log(FilePath) ->
 
 -spec append(log_handle(), term()) -> {ok, receipt_id()} | {error, term()}.
 %% @doc Append a receipt to the log. Returns the receipt sequence number.
-append({log, _Tid, _FilePath, _MaxSeq} = Handle, Data) ->
-    {log, Tid, FilePath, MaxSeq} = Handle,
-    NewSeq = MaxSeq + 1,
+append({log, Tid, FilePath, _MaxSeq}, Data) ->
     Timestamp = erlang:system_time(millisecond),
 
-    % Get previous receipt hash
-    PrevHash = case ets:last(Tid) of
-        '$end_of_table' -> ?EMPTY_HASH;
-        PrevSeq ->
-            [{_K, _, H, _, _}] = ets:lookup(Tid, PrevSeq),
-            H
+    % Get the next sequence number from the table
+    {NewSeq, PrevHash} = case ets:last(Tid) of
+        '$end_of_table' ->
+            {1, ?EMPTY_HASH};
+        LastSeq ->
+            [{_K, _, H, _, _}] = ets:lookup(Tid, LastSeq),
+            {LastSeq + 1, H}
     end,
 
     % Compute receipt hash
