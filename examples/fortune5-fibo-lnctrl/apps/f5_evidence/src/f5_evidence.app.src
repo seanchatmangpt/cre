@@ -1,0 +1,15 @@
+{application, f5_evidence,
+ [{description, "Evidence collection for nine-nines certification"},
+  {vsn, "0.3.0"},
+  {registered, [f5_uptime_logger]},
+  {mod, {f5_evidence_app, []}},
+  {applications, [kernel, stdlib, logger]},
+  {modules, [
+        f5_evidence_app,
+        f5_evidence_sup,
+        f5_uptime_logger,
+        f5_load_tester,
+        chaos_controller
+    ]},
+  {env, []}
+ ]}.
