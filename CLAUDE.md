@@ -26,6 +26,10 @@ docker run --rm -v $(pwd):/work -w /work cre:0.3.0 rebar3 eunit
 docker run --rm -v $(pwd):/work -w /work cre:0.3.0 sh -c "rebar3 compile && rebar3 ct"
 ```
 
+## gVisor Cloud Environments
+
+**Claude Code on Web runs in gVisor sandbox**, which meets our containerization requirements. The SessionStart.sh hook automatically bootstraps OTP 28 in these environments using pre-built static binaries. gVisor provides syscall-level isolation similar to containers, making it suitable for CRE development. When Docker isn't available (cloud IDEs, web-based Claude), SessionStart.sh falls back to native tooling. BEAM VM startup time in gVisor: ~420-440ms (measured with scripts/measure_beam_startup.sh).
+
 ## GCP Marketplace Deployment
 
 **Target:** GCP Marketplace submission with first-time approval
