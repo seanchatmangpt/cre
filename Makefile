@@ -44,6 +44,11 @@ docker:
 	@echo "Building Docker image..."
 	docker buildx bake --load
 
+# Run platform-agnostic CI/CD pipeline (Build → SBOM → Scan → optional Push)
+cicd:
+	@echo "Running CI/CD pipeline..."
+	./scripts/cicd-pipeline.sh
+
 # Run F5 validation in Docker
 f5_validate_docker: docker
 	@echo "Running F5 validation in Docker..."
@@ -61,6 +66,7 @@ help:
 	@echo "  dot / escript    - Build the dot escript CLI"
 	@echo "  f5_validate      - Run F5 validation suite"
 	@echo "  docker           - Build Docker image"
+	@echo "  cicd             - Run CI/CD pipeline (Build → SBOM → Scan)"
 	@echo "  f5_validate_docker - Run F5 validation in Docker"
 	@echo ""
 	@echo "Dot command usage (after running 'make dot'):"

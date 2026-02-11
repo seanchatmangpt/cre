@@ -871,6 +871,55 @@ mnesia:create_table(Tab, [{ram_copies, [node()]}, {type, set}]).
 
 ---
 
+## Docker and Colima
+
+### exec format error / input/output error
+
+**Symptoms:**
+```
+exec /usr/local/bin/docker-entrypoint.sh: input/output error
+exec /bin/sh: exec format error
+```
+
+**Causes:**
+- **Wrong build target:** Use `--target runtime` if the Dockerfile has multiple stages.
+- **Architecture mismatch:** Running amd64 image on Apple Silicon (arm64) without emulation.
+- **Colima virtiofs:** Mount or I/O issues with default virtiofs on some macOS setups.
+
+**Solutions:**
+
+1. **Ensure correct build target (fixed in docker-bake.hcl):**
+   ```bash
+   # docker-bake.hcl now has target = "runtime" for cre target
+   docker buildx bake --load arm64   # Apple Silicon
+   docker buildx bake --load amd64   # Intel/AMD
+   ```
+
+2. **Plain docker build (explicit target):**
+   ```bash
+   docker build --platform linux/arm64 --target runtime -t cre:0.3.0 -f Dockerfile .
+   ```
+
+3. **Colima: switch to 9p mounts** (if virtiofs causes I/O errors):
+   ```bash
+   colima stop
+   colima delete
+   colima start --mount-type 9p
+   ```
+
+4. **Verify image architecture:**
+   ```bash
+   docker image inspect cre:0.3.0 --format '{{.Architecture}}'
+   # Should show arm64 on Apple Silicon
+   ```
+
+5. **Test without volume mount** (isolate mount issues):
+   ```bash
+   docker run --rm cre:0.3.0 echo hello
+   ```
+
+---
+
 ## Getting Help
 
 ### Before Asking

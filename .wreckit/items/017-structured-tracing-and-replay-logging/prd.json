@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "id": "017-structured-tracing-and-replay-logging",
+  "branch_name": "wreckit/017-structured-tracing-and-replay-logging",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Add trace persistence to ln_trace (save/load to file)",
+      "acceptance_criteria": [
+        "ln_trace:save/2 successfully writes trace buffer to JSON file",
+        "ln_trace:load/1 successfully reads trace from JSON file and reconstructs state",
+        "Loaded trace maintains event ordering and sequence numbers",
+        "File format is human-readable JSON for manual inspection",
+        "Error handling returns {error, Reason} on file I/O failures",
+        "Unit tests cover save/load cycle with various event types"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Uses jsx:encode/1 and jsx:decode/1 which is already in dependencies (cre.app.src:11). File format is JSON list of event maps."
+    },
+    {
+      "id": "US-002",
+      "title": "Integrate ln_trace with OTP logger",
+      "acceptance_criteria": [
+        "Each ln_trace emit/2 call also logs to OTP logger via logger:info/2",
+        "Logger messages include sequence number and event data",
+        "Logger level is configurable via ln_trace:set_logger_level/1",
+        "Logging does not fail if OTP logger is not available",
+        "No duplicate events when trace level is 'none'",
+        "Unit tests verify OTP logger receives correct events"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "OTP logger is already used in 50+ modules. Integration is additive - does not replace existing in-memory buffer."
+    },
+    {
+      "id": "US-003",
+      "title": "Create ln_trace_replay module for trace verification",
+      "acceptance_criteria": [
+        "ln_trace_replay:verify/2 compares two traces and returns ok or {error, diff}",
+        "ln_trace_replay:diff/2 computes missing, extra, and different events",
+        "Diff result is a map with missing, extra, and different keys",
+        "Verification is exact (all fields must match)",
+        "Unit tests cover exact match, missing events, extra events, different data"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Replay execution (replay/4) is deferred - focus on verification first. Diff algorithm uses set operations on sequence numbers."
+    },
+    {
+      "id": "US-004",
+      "title": "Create ln_trace_adapter module for telemetry integration",
+      "acceptance_criteria": [
+        "ln_trace_adapter:to_telemetry_span/1 converts event to yawl_telemetry span format",
+        "ln_trace_adapter:to_yawl_log/1 converts event to yawl_logging format",
+        "ln_trace_adapter:export_to_telemetry/2 sends trace to yawl_telemetry gen_server",
+        "ln_trace_adapter:export_to_yawl_logging/2 sends trace to yawl_logging gen_server",
+        "Data preservation through conversion (all fields survive)",
+        "Unit tests for all conversion functions"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Adapters avoid breaking existing telemetry systems. Conversion is bidirectional where possible."
+    },
+    {
+      "id": "US-005",
+      "title": "Instrument gen_pnet:step/1 with trace logging",
+      "acceptance_criteria": [
+        "gen_pnet:step/1 logs reduction step start via OTP logger",
+        "Successful steps log before_hash, after_hash, and transition name",
+        "Aborted steps log abort event",
+        "Hash values are base64-encoded for readability",
+        "Logging uses ?LOG_INFO macro from logger.hrl",
+        "No performance regression in gen_pnet benchmarks"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Uses OTP logger directly to avoid architectural changes. Full ln_trace integration would require passing trace state through gen_pnet - larger refactoring deferred."
+    },
+    {
+      "id": "US-006",
+      "title": "Instrument wf_engine lifecycle with trace events",
+      "acceptance_criteria": [
+        "wf_engine:start_case/3 logs case_started event with case_id",
+        "wf_engine:complete/5 logs workitem_completed event with wi_id and user",
+        "wf_engine failure paths log case_failed events",
+        "wf_engine cancellation paths log case_cancelled events",
+        "All lifecycle events include relevant metadata (case_id, timestamp, etc.)",
+        "Unit tests verify events are emitted for all lifecycle transitions"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Instrumentation points: start_case, complete, suspend_case, resume_case, cancel_case. Uses ?LOG_INFO macro."
+    },
+    {
+      "id": "US-007",
+      "title": "Add application configuration for trace level",
+      "acceptance_criteria": [
+        "cre.app.src includes trace_level and trace_max_events in env",
+        "ln_trace:from_config/0 reads config and creates trace buffer",
+        "Default trace_level is 'none' (zero overhead)",
+        "trace_max_events limits buffer size and triggers automatic trimming",
+        "Config changes require application restart (documented)",
+        "Manual tests verify each trace level (none/min/full) works correctly"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Config values: trace_level = none | min | full, trace_max_events = non_neg_integer() | infinity. Defaults: none, infinity."
+    },
+    {
+      "id": "US-008",
+      "title": "Add comprehensive tests for tracing system",
+      "acceptance_criteria": [
+        "Unit tests for ln_trace (save/load, OTP integration, levels)",
+        "Unit tests for ln_trace_replay (verify, diff)",
+        "Unit tests for ln_trace_adapter (conversions)",
+        "Integration tests for trace export to telemetry systems",
+        "Performance benchmarks for each trace level",
+        "All tests pass with rebar3 eunit and rebar3 ct"
+      ],
+      "priority": 4,
+      "status": "done",
+      "notes": "Tests should use existing test patterns from test/ directory. Performance tests use bench_SUITE pattern."
+    },
+    {
+      "id": "US-009",
+      "title": "Add documentation and examples",
+      "acceptance_criteria": [
+        "EDoc documentation for all new modules",
+        "Example code showing trace save/load workflow",
+        "Example code showing replay verification",
+        "Example code showing telemetry adapter usage",
+        "Configuration guide for trace levels",
+        "Migration guide for existing code"
+      ],
+      "priority": 4,
+      "status": "done",
+      "notes": "Documentation should follow existing patterns in src/ directory. Include moduledoc with examples."
+    }
+  ]
+}

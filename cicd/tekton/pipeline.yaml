@@ -1,0 +1,48 @@
+# CRE Tekton Pipeline - Platform-agnostic (GKE, EKS, AKS)
+#
+# Single task runs the full pipeline: Build → SBOM → Scan → Push
+#
+# Install Tekton: kubectl apply -f https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
+# Apply:         kubectl apply -f cicd/tekton/
+# Run:           tkn pipeline start cre-pipeline -p registry=us-central1-docker.pkg.dev/myproject/cre -p push=true
+#
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: cre-pipeline
+spec:
+  description: Build → SBOM → Scan → Push (no GitHub Actions)
+  params:
+    - name: registry
+      type: string
+      description: Container registry URL
+    - name: image
+      type: string
+      default: cre
+    - name: tag
+      type: string
+      default: latest
+    - name: push
+      type: string
+      default: "false"
+  workspaces:
+    - name: source
+    - name: artifacts
+  tasks:
+    - name: cicd
+      taskRef:
+        name: cre-cicd
+      params:
+        - name: registry
+          value: $(params.registry)
+        - name: image
+          value: $(params.image)
+        - name: tag
+          value: $(params.tag)
+        - name: push
+          value: $(params.push)
+      workspaces:
+        - name: source
+          workspace: source
+        - name: artifacts
+          workspace: artifacts

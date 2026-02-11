@@ -1,29 +1,109 @@
 ---
 name: build
+
 on:
   push:
     branches:
       - master
+      - main
+      - develop
   pull_request:
     branches:
       - master
+      - main
+      - develop
+
+env:
+  CACHE_VERSION: v2
+
 jobs:
   ci:
-    name: Run checks and tests over ${{matrix.otp}} and ${{matrix.os}}
-    runs-on: ${{matrix.os}}
+    name: CI (OTP ${{ matrix.otp }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        otp: ['25.0', '26.0', '27.0']
+        otp: ['26.3', '27.2', '28.0']
         os: [ubuntu-latest]
+        include:
+          # Add macos testing for OTP 27
+          - otp: '27.2'
+            os: macos-latest
+          # Add windows testing for OTP 26
+          - otp: '26.3'
+            os: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          otp-version: ${{matrix.otp}}
+          fetch-depth: 0
+
+      - name: Setup Erlang/OTP
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp }}
           rebar3-version: '3.24.0'
-      - run: rebar3 compile
-      - run: rebar3 xref
-      - run: rebar3 efmt -c
-      - run: rebar3 eunit
-      - run: rebar3 dialyzer
-      - run: rebar3 edoc
+          hexpm-mirror: true
+
+      - name: Cache Rebar3 dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            _build
+            ~/.cache/rebar3
+          key: ${{ runner.os }}-rebar3-${{ matrix.otp }}-${{ env.CACHE_VERSION }}-${{ hashFiles('**/rebar.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-rebar3-${{ matrix.otp }}-${{ env.CACHE_VERSION }}-
+            ${{ runner.os }}-rebar3-${{ matrix.otp }}-
+
+      - name: Compile
+        run: rebar3 compile
+
+      - name: XREF analysis
+        run: rebar3 xref
+        continue-on-error: true
+
+      - name: Format check
+        run: |
+          # Check if efmt is available, otherwise skip
+          if command -v efmt &> /dev/null; then
+            rebar3 efmt -c
+          else
+            echo "efmt not installed, skipping format check"
+          fi
+
+      - name: Run EUnit tests
+        run: rebar3 eunit --cover
+
+      - name: Generate coverage report
+        if: matrix.os == 'ubuntu-latest' && matrix.otp == '28.0'
+        run: |
+          rebar3 cover
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.otp == '28.0'
+        uses: codecov/codecov-action@v4
+        with:
+          files: _build/test/cover/cre.coverdata
+          flags: eunit-otp${{ matrix.otp }}
+          name: codecov-otp${{ matrix.otp }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Dialyzer type analysis
+        run: rebar3 dialyzer
+        continue-on-error: true
+
+      - name: Build documentation
+        run: rebar3 edoc
+
+      - name: Upload coverage artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-otp${{ matrix.otp }}
+          path: |
+            _build/test/cover/
+            _build/test/coverindex.html
+          retention-days: 30

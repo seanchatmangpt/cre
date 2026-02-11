@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "017-structured-tracing-and-replay-logging",
+  "title": "Structured tracing and replay logging",
+  "section": "infra",
+  "state": "implementing",
+  "overview": "Debugging complex workflows requires detailed execution traces. Need structured logging that supports replay analysis, performance debugging, and operational monitoring without excessive overhead.\n\n**Motivation:** Enables post-mortem debugging, supports verification of deterministic replay, provides operational observability, facilitates performance analysis and optimization.\n\n**Success criteria:**\n- Trace event per reduction step\n- Replay reproduces exact trace\n- Configurable trace levels\n- Integration with OTP logging\n\n**Technical constraints:**\n- Structured event format\n- Configurable verbosity\n- Minimal performance impact at 'min' level\n- Supports trace queries (range retrieval)\n\n**Signals:** priority: high, urgency: Essential for debugging and observability",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Failed to checkout base branch main",
+  "created_at": "2026-02-11T01:57:00.428Z",
+  "updated_at": "2026-02-11T04:37:16.789Z",
+  "problem_statement": "Debugging complex workflows requires detailed execution traces. Need structured logging that supports replay analysis, performance debugging, and operational monitoring without excessive overhead.",
+  "motivation": "Enables post-mortem debugging, supports verification of deterministic replay, provides operational observability, facilitates performance analysis and optimization.",
+  "success_criteria": [
+    "Trace event per reduction step",
+    "Replay reproduces exact trace",
+    "Configurable trace levels",
+    "Integration with OTP logging"
+  ],
+  "technical_constraints": [
+    "Structured event format",
+    "Configurable verbosity",
+    "Minimal performance impact at 'min' level",
+    "Supports trace queries (range retrieval)"
+  ],
+  "priority_hint": "high",
+  "urgency_hint": "Essential for debugging and observability"
+}

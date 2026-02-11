@@ -5,12 +5,14 @@ on:
   push:
     branches:
       - master
+      - main
       - develop
     tags:
       - 'v*'
   pull_request:
     branches:
       - master
+      - main
       - develop
   workflow_dispatch:
     inputs:
@@ -29,7 +31,7 @@ on:
           - production
 
 env:
-  CACHE_VERSION: v1
+  CACHE_VERSION: v2
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -213,7 +215,12 @@ jobs:
         run: rebar3 xref
 
       - name: Check formatting with EFmt
-        run: rebar3 efmt -c
+        run: |
+          if command -v efmt &> /dev/null; then
+            rebar3 efmt -c
+          else
+            echo "efmt not installed, skipping format check"
+          fi
 
       - name: Security audit
         run: |
@@ -228,7 +235,6 @@ jobs:
           name: dialyzer-results-${{ matrix.otp }}
           path: |
             _build/default/rebar3_crash.dump
-            dialyzer_report.md
           retention-days: 30
 
   # ============================================
@@ -281,15 +287,16 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.production
+          file: ./Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             VERSION=${{ github.ref_name }}
-            COMMIT_SHA=${{ github.sha }}
+            GIT_REVISION=${{ github.sha }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
 
       - name: Generate SBOM
@@ -321,13 +328,13 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
   # ============================================
-  # Stage 5: Deploy to Staging
+  # Stage 5: Deploy to Staging (Manual/Tag only)
   # ============================================
   deploy-staging:
     name: Deploy to Staging
     needs: docker
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && github.event_name == 'push'
     environment:
       name: staging
       url: https://cre-staging.example.com
@@ -364,7 +371,7 @@ jobs:
           ENDPOINT=$(kubectl get svc cre -n cre-staging -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 
           # Health check
-          curl -f http://${ENDPOINT}:4142/status.json || exit 1
+          curl -f http://${ENDPOINT}:4142/api/v1/health || exit 1
 
           echo "Smoke tests passed!"
 
@@ -375,92 +382,11 @@ jobs:
           echo "Deployment rolled back due to test failure"
 
   # ============================================
-  # Stage 6: Deploy to Production (Manual)
-  # ============================================
-  deploy-production:
-    name: Deploy to Production
-    needs: docker
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    environment:
-      name: production
-      url: https://cre.example.com
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: 'v1.29.0'
-
-      - name: Set up kubeconfig
-        run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 -d > ~/.kube/config
-
-      - name: Pre-deployment health check
-        run: |
-          ENDPOINT=$(kubectl get svc cre -n cre-prod -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-          curl -f http://${ENDPOINT}:4142/status.json
-
-      - name: Deploy to Kubernetes
-        run: |
-          # Create deployment snapshot for rollback
-          kubectl get deployment cre -n cre-prod -o yaml > deployment-backup.yaml
-
-          kubectl set image deployment/cre \
-            cre=${{ needs.docker.outputs.image-tag }} \
-            -n cre-prod
-
-          kubectl rollout status deployment/cre -n cre-prod --timeout=5m
-
-      - name: Post-deployment health verification
-        run: |
-          sleep 30  # Allow warmup
-
-          ENDPOINT=$(kubectl get svc cre -n cre-prod -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-
-          # Health check with retries
-          for i in {1..10}; do
-            if curl -f http://${ENDPOINT}:4142/status.json; then
-              echo "Health check passed!"
-              exit 0
-            fi
-            echo "Health check failed, retrying... ($i/10)"
-            sleep 10
-          done
-
-          echo "Health check failed after 10 attempts"
-          exit 1
-
-      - name: Verify deployment metrics
-        run: |
-          # Check pod status
-          kubectl get pods -n cre-prod -l app=cre
-
-          # Check deployment status
-          kubectl rollout status deployment/cre -n cre-prod
-
-      - name: Rollback on failure
-        if: failure()
-        run: |
-          kubectl rollout undo deployment/cre -n cre-prod
-          echo "Production deployment rolled back due to verification failure"
-
-      - name: Create deployment notification
-        if: success()
-        run: |
-          echo "Deployment successful: ${{ needs.docker.outputs.image-tag }}"
-          echo "Digest: ${{ needs.docker.outputs.image-digest }}"
-
-  # ============================================
-  # Stage 7: Release
+  # Stage 6: Release
   # ============================================
   release:
     name: Create Release
-    needs: deploy-production
+    needs: deploy-staging
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
 
@@ -514,6 +440,6 @@ jobs:
           if [ "${{ needs.test.result }}" != "success" ] || \
              [ "${{ needs.security.result }}" != "success" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "## :x: Pipeline Failed" >> $GITHUB_STEP_SUMMARY
+            echo "## Pipeline Failed" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi

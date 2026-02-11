@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "016-effect-system-with-receipts",
+  "title": "Effect system with receipts",
+  "section": "backend",
+  "state": "researched",
+  "overview": "Pure workflow reduction needs controlled interaction with external world. Must ensure effects are mediated, tracked, replayable, and support compensation without side-effects during pure execution.\n\n**Motivation:** Separates pure workflow logic from external effects, enables deterministic replay (effects can be mocked), provides audit trail via receipts, supports cancellation and compensation of external actions.\n\n**Success criteria:**\n- All effects mediated through wf_effect manager\n- Each effect has unique causal ID\n- Receipts enable idempotency\n- Effects can be canceled when supported\n- Trace events record all effect invocations\n\n**Technical constraints:**\n- task/2 yields {effect, Spec, ContCtx}\n- wf_effect executes Spec and returns Result\n- Reducer resumes with Result and produces receipt\n- No direct side effects in reducer loop\n\n**Signals:** priority: high, urgency: Critical for real-world workflows",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Story quality validation failed:\nToo many stories: 22, maximum 15 allowed\nStory \"US-009\" (Create wf_effect_handler gen_server for async execution): Priority 5 outside valid range [1, 4]\nStory \"US-010\" (Update ln_effect:request/4 to use async handler): Priority 5 outside valid range [1, 4]\nStory \"US-011\" (Add effect opcodes to ln_compile): Priority 6 outside valid range [1, 4]\nStory \"US-012\" (Add effect constructor to ln_plan): Priority 6 outside valid range [1, 4]\nStory \"US-013\" (Implement effect compilation in ln_compile): Priority 6 outside valid range [1, 4]\nStory \"US-014\" (Add effect state to ln_vm:vm_state record): Priority 6 outside valid range [1, 4]\nStory \"US-015\" (Implement op_effect_yield execution in ln_vm): Priority 6 outside valid range [1, 4]\nStory \"US-016\" (Implement op_effect_resume execution in ln_vm): Priority 6 outside valid range [1, 4]\nStory \"US-017\" (Implement effect completion handling in ln_vm): Priority 6 outside valid range [1, 4]\nStory \"US-018\" (Add trace field to ln_effect:effect_state): Priority 7 outside valid range [1, 4]\nStory \"US-019\" (Emit effect_requested trace event in ln_effect:request/4): Priority 7 outside valid range [1, 4]\nStory \"US-020\" (Emit effect_cached trace event for idempotent requests): Priority 7 outside valid range [1, 4]\nStory \"US-021\" (Emit effect_completed trace event in ln_effect:complete/3): Priority 7 outside valid range [1, 4]\nStory \"US-022\" (Emit effect_cancelled trace event in ln_effect:cancel_effects/2): Priority 7 outside valid range [1, 4]",
+  "created_at": "2026-02-11T01:57:00.428Z",
+  "updated_at": "2026-02-11T04:24:08.317Z",
+  "problem_statement": "Pure workflow reduction needs controlled interaction with external world. Must ensure effects are mediated, tracked, replayable, and support compensation without side-effects during pure execution.",
+  "motivation": "Separates pure workflow logic from external effects, enables deterministic replay (effects can be mocked), provides audit trail via receipts, supports cancellation and compensation of external actions.",
+  "success_criteria": [
+    "All effects mediated through wf_effect manager",
+    "Each effect has unique causal ID",
+    "Receipts enable idempotency",
+    "Effects can be canceled when supported",
+    "Trace events record all effect invocations"
+  ],
+  "technical_constraints": [
+    "task/2 yields {effect, Spec, ContCtx}",
+    "wf_effect executes Spec and returns Result",
+    "Reducer resumes with Result and produces receipt",
+    "No direct side effects in reducer loop"
+  ],
+  "priority_hint": "high",
+  "urgency_hint": "Critical for real-world workflows"
+}

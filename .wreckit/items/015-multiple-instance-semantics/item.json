@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "015-multiple-instance-semantics",
+  "title": "Multiple instance semantics",
+  "section": "backend",
+  "state": "researched",
+  "overview": "Many real-world workflows require parallel execution of same task with data variations. Need well-defined semantics for creating, tracking, and joining multiple instances.\n\n**Motivation:** Enables parallel processing patterns, supports fan-out/fan-in workflows, provides data parallelism capabilities, covers important workflow patterns from the 43 patterns canon.\n\n**Success criteria:**\n- Fixed instances spawn exact count\n- Dynamic instances spawn based on runtime data\n- Join policies: all, first_n, n_of_m, discriminator\n- Instance state tracked independently\n\n**Technical constraints:**\n- Support both fixed and dynamic instance counts\n- Multiple join policies\n- Integration with cancellation scope per instance\n\n**Signals:** priority: high, urgency: Required for pattern coverage completeness",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Plan quality validation failed:\nMissing required sections: Phases\nInsufficient implementation phases: found 0, required at least 1",
+  "created_at": "2026-02-11T01:57:00.428Z",
+  "updated_at": "2026-02-11T04:19:24.740Z",
+  "problem_statement": "Many real-world workflows require parallel execution of same task with data variations. Need well-defined semantics for creating, tracking, and joining multiple instances.",
+  "motivation": "Enables parallel processing patterns, supports fan-out/fan-in workflows, provides data parallelism capabilities, covers important workflow patterns from the 43 patterns canon.",
+  "success_criteria": [
+    "Fixed instances spawn exact count",
+    "Dynamic instances spawn based on runtime data",
+    "Join policies: all, first_n, n_of_m, discriminator",
+    "Instance state tracked independently"
+  ],
+  "technical_constraints": [
+    "Support both fixed and dynamic instance counts",
+    "Multiple join policies",
+    "Integration with cancellation scope per instance"
+  ],
+  "priority_hint": "high",
+  "urgency_hint": "Required for pattern coverage completeness"
+}

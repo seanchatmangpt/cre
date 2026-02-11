@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "id": "021-core-control-flow-pattern-implementations",
+  "branch_name": "wreckit/021-core-control-flow-pattern-implementations",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Create comprehensive PATTERNS.md documentation",
+      "acceptance_criteria": [
+        "docs/PATTERNS.md file created with all 43 YAWL patterns documented",
+        "Each pattern has classification (KERNEL or DERIVED) per IDEAS.md specification",
+        "Each pattern has term form mapping (e.g., seq(TaskA, TaskB) for Sequence)",
+        "Each pattern lists semantic properties (e.g., 'XOR choice selects exactly one branch')",
+        "Each pattern has test coverage status (EUnit, property tests, validation)",
+        "All 43 patterns from WCP-01 through WCP-43 are included",
+        "Pattern module source files updated with -moduledoc annotations indicating classification",
+        "Documentation builds successfully without errors",
+        "Pattern registry (yawl_pattern_registry.erl) mappings remain consistent"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "This is the primary deliverable - the item.json explicitly requires 'Document mapping in docs/PATTERNS.md'. This documentation satisfies the 'kernel or derived patterns' constraint by classifying existing implementations, not rewriting them."
+    },
+    {
+      "id": "US-002",
+      "title": "Implement property-based tests for core control-flow patterns",
+      "acceptance_criteria": [
+        "PropEr added to rebar.config test profile dependencies",
+        "test/yawl_patterns_properties_test.erl module created and compiles",
+        "At least 15 core patterns have property tests defined (minimum: all kernel patterns)",
+        "Property tests verify semantic invariants (e.g., 'exactly one branch selected' for XOR)",
+        "Property tests use PropEr generators for branches, tasks, conditions",
+        "Property tests run with minimum 100 iterations per property",
+        "All property tests pass: rebar3 proper succeeds",
+        "EUnit test wrappers created for running PropEr tests",
+        "Coverage report shows property tests supplement existing EUnit tests"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Property-based testing is explicitly required by item.json: 'Include property-based tests where applicable'. Focus on kernel patterns first (Sequence, Parallel Split, Synchronization, Exclusive Choice, Join, Loop, Defer, Cancel, MI). Derive patterns can be deferred if time-constrained."
+    },
+    {
+      "id": "US-003",
+      "title": "Add property-based tests to individual pattern modules",
+      "acceptance_criteria": [
+        "Each kernel pattern module includes PropEr tests under -ifdef(TEST) sections",
+        "Pattern-specific properties tested (e.g., sequence ordering, parallel branch count)",
+        "Properties use pattern state record definitions from module",
+        "Properties compile without warnings",
+        "Properties can be run standalone per module",
+        "At minimum: sequence, parallel_split, synchronization, exclusive_choice, discriminator, multiple_instances_sync",
+        "Pattern modules still compile without PropEr in production build"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Adds module-level property tests for better organization. Must use -ifdef(TEST) to avoid PropEr dependency in production. Follow existing pattern module structure from PATTERN_IMPLEMENTATION_GUIDE.md."
+    },
+    {
+      "id": "US-004",
+      "title": "Implement validation tests using bounded model checking",
+      "acceptance_criteria": [
+        "test/yawl_patterns_validation_test.erl module created",
+        "Integration with existing yawl_model_checker.erl module",
+        "Tests verify soundness properties: option to complete, proper completion, no dead transitions",
+        "Bounded liveness test for deadlock detection (exploration depth up to 100)",
+        "All kernel patterns pass validation tests",
+        "Validation tests complete in reasonable time (< 5 minutes total)",
+        "Validation failures produce useful counterexamples"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Validation provides formal verification of pattern correctness. Integrates with item 018 (validation backend). Focus on kernel patterns first - derived patterns inherit properties from kernel basis."
+    },
+    {
+      "id": "US-005",
+      "title": "Create performance benchmarks for pattern execution",
+      "acceptance_criteria": [
+        "bench/yawl_patterns_microbench.erl module created",
+        "Benchmark 1: Sequence of 10k task steps (target: ≤ 10 μs/step)",
+        "Benchmark 2: Parallel split with 100 branches (target: ≤ 500 μs/branch)",
+        "Benchmark 3: Repeated discriminator pattern (target: ≤ 10ms/iteration)",
+        "Benchmarks measure and report timing (total time, per-operation time)",
+        "Performance targets documented in PATTERNS.md",
+        "All benchmarks meet targets within 20% tolerance",
+        "Benchmarks run successfully on reference hardware"
+      ],
+      "priority": 5,
+      "status": "pending",
+      "notes": "Performance baseline for future optimization. Microbench approach matches IDEAS.md requirements. Use erlang:monotonic_time(microsecond) for accurate measurements. If targets missed, document findings and create follow-up item."
+    },
+    {
+      "id": "US-006",
+      "title": "Document performance characteristics in PATTERNS.md",
+      "acceptance_criteria": [
+        "Performance characteristics section added to docs/PATTERNS.md",
+        "Benchmark results documented for all core patterns",
+        "Per-step overhead analysis included (Petri net, XES, OTel overhead)",
+        "Cancellation latency documented (activity, case, region)",
+        "Memory footprint estimates provided",
+        "Overhead scaling analysis (O(n), O(log n), etc.)",
+        "Performance data includes hardware configuration for reproducibility"
+      ],
+      "priority": 6,
+      "status": "pending",
+      "notes": "Depends on US-005. Performance documentation helps users understand pattern costs and enables future optimization work. Include both absolute timings and relative scaling."
+    },
+    {
+      "id": "US-007",
+      "title": "Add TODO stubs for any remaining patterns",
+      "acceptance_criteria": [
+        "Audit all 43 patterns against YAWL canon",
+        "If any patterns are missing or incomplete, add TODO stub implementations",
+        "TODO stubs include module skeleton with -behaviour(gen_yawl)",
+        "TODO stubs have placeholder callbacks returning abort or {}",
+        "TODO stubs document what's missing in -moduledoc",
+        "PATTERNS.md marks incomplete patterns with TODO status",
+        "No existing patterns are removed or broken",
+        "Test suite still compiles and runs"
+      ],
+      "priority": 7,
+      "status": "pending",
+      "notes": "Per item.json technical constraint: 'Scaffolding for remaining patterns with TODO stubs'. Current research shows all 43 patterns implemented, but audit may reveal gaps in data/resource/cancellation patterns (WDP, WRP, WHP)."
+    }
+  ]
+}

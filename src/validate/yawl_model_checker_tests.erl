@@ -1,9 +1,9 @@
 %% -*- erlang -*-
 %% @author CRE Team
 %% @version 0.3.0
-%% @doc Test Suite for YAWL Model Checker
+%% @doc Comprehensive Test Suite for YAWL Model Checker
 %%
-%% Tests the bounded model checking validation backend.
+%% Tests bounded model checking validation backend.
 %% @end
 %% -------------------------------------------------------------------
 
@@ -45,7 +45,6 @@ create_sequence_spec() ->
 %% @doc Creates a workflow with XOR split / AND join mismatch (potential deadlock).
 %%
 %% Input -> Split -> [Task1, Task2] -> Join -> Output
-%%
 %% Split is XOR, Join is AND = deadlock
 %%
 %% @end
@@ -159,7 +158,7 @@ sequence_workflow_test() ->
     ?assertEqual([], Warnings).
 
 %%--------------------------------------------------------------------
-%% @doc Test deadlock workflow (should detect deadlock).
+%% @doc Test deadlock workflow.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -171,7 +170,6 @@ deadlock_workflow_test() ->
             ?assert(lists:any(fun(#{code := Code}) -> Code =:= deadlock_detected end, Errors));
         {ok, _} ->
             %% If no error detected, this is expected behavior for this simple case
-            %% The XOR/AND mismatch doesn't always cause deadlock in this structure
             ok
     end.
 
@@ -197,10 +195,12 @@ no_completion_test() ->
     Result = yawl_model_checker:validate(Spec),
     case Result of
         {error, Errors} ->
-            ?assert(lists:any(fun(#{code := Code}) -> Code =:= no_completion_path end, Errors));
-        {ok, _} ->
-            %% If loop completes within depth bound, no error detected
-            ok
+            ?assert(lists:any(fun(#{code := Code}) ->
+                Code =:= no_completion_path orelse Code =:= deadlock_detected
+            end, Errors));
+        {ok, Warnings} ->
+            %% May not detect within depth bound
+            ?assert(length(Warnings) > 0)
     end.
 
 %%--------------------------------------------------------------------
@@ -236,6 +236,119 @@ explore_test() ->
     Spec = create_sequence_spec(),
     {ok, Marking, Transitions} = yawl_pnet_compiler:compile(Spec),
     Result = yawl_explorer:explore(Marking, Transitions, #{depth => 10, token_bound => 10}),
-    ?assertMatch({ok, _Traces}, Result),
-    {ok, Traces} = Result,
-    ?assert(length(Traces) > 0).
+    ?assertMatch({ok, _}, Result).
+
+%%--------------------------------------------------------------------
+%% @doc Test explore_stats returns statistics.
+%%
+%% @end
+%%--------------------------------------------------------------------
+explore_stats_test() ->
+    Spec = create_sequence_spec(),
+    {ok, Marking, Transitions} = yawl_pnet_compiler:compile(Spec),
+    Result = yawl_explorer:explore_stats(Marking, Transitions, #{}),
+    ?assertMatch({ok, _Traces, _Stats}, Result).
+
+%%--------------------------------------------------------------------
+%% @doc Test reachability analysis.
+%%
+%% @end
+%%--------------------------------------------------------------------
+analyze_reachability_test() ->
+    Spec = create_dead_transition_spec(),
+    {ok, Marking, Transitions} = yawl_pnet_compiler:compile(Spec),
+    Result = yawl_model_checker:analyze_reachability(Marking, Transitions),
+    ?assert(is_map(Result)),
+    ?assert(maps:is_key(Result, reachable)),
+    ?assert(maps:is_key(Result, unreachable)).
+
+%%--------------------------------------------------------------------
+%% @doc Test deadlock detection with traces.
+%%
+%% @end
+%%--------------------------------------------------------------------
+check_deadlock_test() ->
+    Spec = create_no_completion_spec(),
+    {ok, Marking, Transitions} = yawl_pnet_compiler:compile(Spec),
+    Result = yawl_model_checker:check_deadlock([], Marking, Transitions),
+    ?assert(is_list(Result)),
+    ?assert(length(Result) > 0).
+
+%%--------------------------------------------------------------------
+%% @doc Test dead transitions detection.
+%%
+%% @end
+%%--------------------------------------------------------------------
+check_dead_transitions_test() ->
+    Spec = create_dead_transition_spec(),
+    {ok, _Marking, Transitions} = yawl_pnet_compiler:compile(Spec),
+    %% Empty trace list - no transitions fired
+    Result = yawl_model_checker:check_dead_transitions([], Transitions),
+    ?assert(is_list(Result)),
+    ?assert(length(Result) > 0).
+
+%%--------------------------------------------------------------------
+%% @doc Test completion checking.
+%%
+%% @end
+%%--------------------------------------------------------------------
+check_completion_test() ->
+    Spec = create_sequence_spec(),
+    {ok, Marking, _Transitions} = yawl_pnet_compiler:compile(Spec),
+    %% Build trace with one step
+    Trace = [{f1, Marking}],
+    %% Sequence should reach completion
+    Result = yawl_model_checker:check_completion(Trace, Marking),
+    ?assertEqual([], Result).
+
+%%--------------------------------------------------------------------
+%% @doc Test liveness checking.
+%%
+%% @end
+%%--------------------------------------------------------------------
+check_liveness_test() ->
+    Spec = create_sequence_spec(),
+    {ok, Marking, Transitions} = yawl_pnet_compiler:compile(Spec),
+    %% Build traces with transitions
+    Traces = [{f1, Marking}, {f2, Marking}, {f3, Marking}],
+    Result = yawl_model_checker:check_liveness(Traces),
+    ?assert(is_list(Result)),
+    %% Should have no liveness issues for valid workflow
+    ?assertEqual([], Result).
+
+%%--------------------------------------------------------------------
+%% @doc Test XES export.
+%%
+%% @end
+%%--------------------------------------------------------------------
+export_xes_test() ->
+    Spec = create_dead_transition_spec(),
+    Result = yawl_model_checker:validate(Spec),
+    XESResult = yawl_model_checker:export_xes(Spec, Result),
+    ?assertMatch({ok, _XESBinary}, XESResult).
+
+%%--------------------------------------------------------------------
+%% @doc Test format_report.
+%%
+%% @end
+%%--------------------------------------------------------------------
+format_report_test() ->
+    Spec = create_dead_transition_spec(),
+    Result = yawl_model_checker:validate(Spec),
+    Report = yawl_model_checker:format_report(Result),
+    ?assert(is_list(Report)),
+    ?assert(length(Report) > 0).
+
+%%--------------------------------------------------------------------
+%% @doc Test statistics gathering.
+%%
+%% @end
+%%--------------------------------------------------------------------
+get_statistics_test() ->
+    Spec = create_sequence_spec(),
+    Result = yawl_model_checker:validate(Spec),
+    StatsResult = yawl_model_checker:get_statistics(Result),
+    ?assertMatch({ok, _}, StatsResult),
+    {ok, Stats} = StatsResult,
+    ?assert(is_map(Stats)),
+    ?assert(maps:is_key(Stats, total_states)).

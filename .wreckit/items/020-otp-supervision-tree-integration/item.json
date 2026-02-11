@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "020-otp-supervision-tree-integration",
+  "title": "OTP supervision tree integration",
+  "section": "infra",
+  "state": "implementing",
+  "overview": "Production Erlang systems require proper OTP supervision for resilience. Need supervision strategy appropriate for dynamic case creation/termination and effect worker management.\n\n**Motivation:** Provides OTP-compliant fault tolerance, enables clean shutdown/restart, supports dynamic case lifecycle, integrates with Erlang/OTP ecosystem conventions.\n\n**Technical constraints:**\n- Use OTP behaviors (gen_server/gen_statem/supervisor)\n- wf_case_sup uses simple_one_for_one or dynamic supervisor\n- Per-case runners as gen_server or gen_statem\n- Effect worker supervision optional\n\n**Signals:** priority: medium, urgency: Required for production readiness",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Failed to checkout base branch main",
+  "created_at": "2026-02-11T01:57:00.430Z",
+  "updated_at": "2026-02-11T05:04:55.524Z",
+  "problem_statement": "Production Erlang systems require proper OTP supervision for resilience. Need supervision strategy appropriate for dynamic case creation/termination and effect worker management.",
+  "motivation": "Provides OTP-compliant fault tolerance, enables clean shutdown/restart, supports dynamic case lifecycle, integrates with Erlang/OTP ecosystem conventions.",
+  "technical_constraints": [
+    "Use OTP behaviors (gen_server/gen_statem/supervisor)",
+    "wf_case_sup uses simple_one_for_one or dynamic supervisor",
+    "Per-case runners as gen_server or gen_statem",
+    "Effect worker supervision optional"
+  ],
+  "priority_hint": "medium",
+  "urgency_hint": "Required for production readiness"
+}

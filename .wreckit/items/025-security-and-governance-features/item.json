@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "025-security-and-governance-features",
+  "title": "Security and governance features",
+  "section": "backend",
+  "state": "idea",
+  "overview": "Marketplace-bound product needs governance controls to prevent abuse, ensure resource limits, and provide approval workflows for sensitive operations.\n\n**Motivation:** Enables safe multi-tenancy, provides resource isolation, supports compliance requirements, essential for production deployment in shared environments.\n\n**Success criteria:**\n- Effect allowlist enforced per scope\n- Effect budgets enforced\n- Timeout policies terminate cases\n- Approval points block until signal\n- Guard failures produce structured errors\n\n**Technical constraints:**\n- Allowlist configuration per scope\n- Budget tracking with receipts\n- Approval point as special task pattern\n- Structured error format\n\n**Signals:** priority: medium, urgency: Required for marketplace readiness",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Research phase detected unauthorized file modifications:\n\n  Modified M src/wfnet/patterns/wfnet_milestone.erl\n\nThe research phase must be read-only. Only research.md may be created.\nAny code changes should be made during the implementation phase.",
+  "created_at": "2026-02-11T01:57:00.432Z",
+  "updated_at": "2026-02-11T05:20:38.688Z",
+  "problem_statement": "Marketplace-bound product needs governance controls to prevent abuse, ensure resource limits, and provide approval workflows for sensitive operations.",
+  "motivation": "Enables safe multi-tenancy, provides resource isolation, supports compliance requirements, essential for production deployment in shared environments.",
+  "success_criteria": [
+    "Effect allowlist enforced per scope",
+    "Effect budgets enforced",
+    "Timeout policies terminate cases",
+    "Approval points block until signal",
+    "Guard failures produce structured errors"
+  ],
+  "technical_constraints": [
+    "Allowlist configuration per scope",
+    "Budget tracking with receipts",
+    "Approval point as special task pattern",
+    "Structured error format"
+  ],
+  "priority_hint": "medium",
+  "urgency_hint": "Required for marketplace readiness"
+}

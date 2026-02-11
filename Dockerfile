@@ -8,13 +8,14 @@
 #   - erlang:28-alpine for minimal base (no Rust if NIFs optional)
 #   - Cache-optimized layer ordering
 #   - Minimal runtime dependencies
-#   - SBOM generation in optional stage
+#   - SBOM: generated in CI/CD (Syft against built image), not in Docker
 #
 # Build Stages:
 #   1. rust-builder - Compile Rust NIFs (cached)
 #   2. erlang-builder - Compile Erlang/OTP release
 #   3. runtime - Minimal runtime with only BEAM files
-#   4. sbom - Optional SBOM generation
+#
+# SBOM generation is done in CI/CD (Syft against built image), not in Docker.
 
 # Build arguments for multi-platform support
 ARG TARGETPLATFORM
@@ -86,20 +87,26 @@ ARG VERSION
 ARG GIT_REVISION
 ARG BUILD_DATE
 
+# Install as root first, then create user
 USER root
 
-# Install minimal build dependencies
+# Install build dependencies and git for rebar3 bootstrap
 RUN apk add --no-cache \
     build-base \
+    git \
     openssl-dev \
+    ca-certificates \
+    curl \
     && rm -rf /var/cache/apk/*
 
-# Install rebar3 from pre-built binary
-COPY --from=rust-builder /usr/local/bin/rebar3 /tmp/rebar3_src || true
-RUN which rebar3 || \
-    (curl -sL -o /usr/local/bin/rebar3 https://s3.amazonaws.com/rebar3/rebar3 && \
-    chmod +x /usr/local/bin/rebar3) && \
-    rebar3 --version || echo "Rebar3 installed"
+# Install rebar3 from official source with bootstrap
+RUN git clone --depth 1 --branch 3.24.0 https://github.com/erlang/rebar3 /tmp/rebar3 && \
+    cd /tmp/rebar3 && \
+    ./bootstrap --bootstrapper sh && \
+    mv rebar3 /usr/local/bin/rebar3 && \
+    chmod +x /usr/local/bin/rebar3 && \
+    rm -rf /tmp/rebar3 && \
+    rebar3 version || echo "Rebar3 installed"
 
 # Set working directory
 WORKDIR /build
@@ -181,14 +188,16 @@ RUN apk add --no-cache \
     libstdc++ \
     tzdata \
     curl \
-    ca-certificates && \
+    ca-certificates \
+    bash \
+    && \
     # Update CA certificates for HTTPS
     update-ca-certificates && \
     # Create non-root user and group
-    addgroup -g 1000 cre && \
-    adduser -D -u 1000 -G cre -s /sbin/nologin cre && \
+    addgroup -g 1000 -S cre && \
+    adduser -S -u 1000 -G cre -s /bin/bash -h /opt/cre cre && \
     # Cleanup
-    rm -rf /var/cache/apk/*
+    rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
 
 # Optional: Install Python + GCP Cloud Logging (comment out if not needed for minimal image)
 # RUN apk add --no-cache python3 py3-pip && \
@@ -210,7 +219,7 @@ RUN mkdir -p /opt/cre/data /opt/cre/log /opt/cre/checkpoints /opt/cre/mnesia && 
     chown -R cre:cre /opt/cre
 
 # Switch to non-root user
-USER cre
+USER 1000:1000
 
 # Expose ports
 # 4142 - CRE HTTP API
@@ -243,25 +252,3 @@ STOPSIGNAL SIGTERM
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["foreground"]
 
-# =============================================================================
-# Stage 4: SBOM Generation (Optional, for GCP Artifact Registry)
-# =============================================================================
-FROM alpine:latest AS sbom-generator
-
-USER root
-
-# Install minimal dependencies for SBOM generation
-RUN apk add --no-cache wget tar gzip && \
-    ARCH=$(uname -m) && \
-    case "$ARCH" in \
-        x86_64) SYFT_ARCH="amd64" ;; \
-        aarch64) SYFT_ARCH="arm64" ;; \
-        *) SYFT_ARCH="$ARCH" ;; \
-    esac && \
-    wget -qO /tmp/syft.tar.gz "https://github.com/anchore/syft/releases/download/v1.18.1/syft_1.18.1_linux_${SYFT_ARCH}.tar.gz" && \
-    tar -xzf /tmp/syft.tar.gz -C /tmp && \
-    mv /tmp/syft /usr/local/bin/syft && \
-    chmod +x /usr/local/bin/syft && \
-    rm -f /tmp/syft.tar.gz
-
-# SBOM is generated as a separate build target output (see docker-bake.hcl)

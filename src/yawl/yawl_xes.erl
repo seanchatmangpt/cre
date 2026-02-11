@@ -1,7 +1,7 @@
 %% -*- erlang -*-
 -module(yawl_xes).
 
--export([new_log/1, close_log/1, log_case_start/2, log_case_end/1, log_event/3, log_event/4, get_log/1, export_to_xml/1, export_to_file/2, replay_trace/2, replay_with_opts/3, query_traces/2, get_statistics/1]).
+-export([new_log/1, close_log/1, log_case_start/2, log_case_end/1, log_event/4, log_event/5, get_log/1, export_to_xml/1, export_to_file/2, replay_trace/2, replay_with_opts/2, replay_with_opts/5, query_traces/2, get_statistics/1]).
 
 -on_load(init_ets/0).
 
@@ -152,7 +152,7 @@ log_case_end(LogId) ->
 
 -spec log_event(log_id(), event_concept(), event_lifecycle(), event_data()) -> ok | {error, term()}.
 log_event(LogId, Concept, Lifecycle, Data) ->
-    log_event(LogId, Concept, Lifecycle, Timestamp, Data) when is_map(Data) ->
+    log_event(LogId, Concept, Lifecycle, erlang:system_time(millisecond), Data).
 
 -spec log_event(log_id(), event_concept(), event_lifecycle(), timestamp_ms(), event_data()) -> ok | {error, term()}.
 log_event(LogId, Concept, Lifecycle, Timestamp, Data) when is_map(Data) ->
@@ -474,7 +474,7 @@ generate_log_id_test() ->
 %% Test timestamp formatting
 format_timestamp_ms_test() ->
     ?assertEqual(<<"1970-01-01T00:00:00.000">>, format_timestamp_ms(0)),
-    ?assertMatch(<<"20", _/binary>>, format_timestamp_ms(1000000000000)).
+    ?assertMatch(<<"20", _/binary>>, format_timestamp_ms(1000000000)).
 
 %% Test XML attribute escaping
 escape_xml_attr_test() ->
@@ -581,7 +581,7 @@ export_to_xml_not_found_test() ->
 %% Test build_xes_xml/1
 build_xes_xml_test() ->
     Trace = {<<"case1">>, 1000000000, 1000100, [
-        {1000000000, <<"Activity">>, <<"start">>, #{<<"task">> => <<"A">>},
+        {1000000000, <<"Activity">>, <<"start">>, #{<<"task">> => <<"A">>}},
         {1000000050, <<"Activity">>, <<"complete">>, #{<<"result">> => <<"done">>>}
     ]},
     XML = build_xes_xml([Trace]),
@@ -645,17 +645,17 @@ build_attr_list_test() ->
 
 %% Test trace_matches/2
 trace_matches_concept_test() ->
-    Events = [{1000, <<"ConceptA">>, <<"start">>, #{}},
+    Events = [{1000, <<"ConceptA">>, <<"start">>, #{}}],
     Trace = {<<"case1">>, 1000, 2000, Events},
     ?assert(trace_matches(Trace, [{concept, <<"ConceptA">>}])).
 
 trace_matches_lifecycle_test() ->
-    Events = [{1000, <<"C">>, <<"start">>, #{}},
+    Events = [{1000, <<"C">>, <<"start">>, #{}}],
     Trace = {<<"case1">>, 1000, 2000, Events},
     ?assert(trace_matches(Trace, [{lifecycle, <<"start">>}])).
 
 trace_matches_time_range_test() ->
-    Events = [{1000, <<"C">>, <<"start">>, #{}},
+    Events = [{1000, <<"C">>, <<"start">>, #{}}],
     Trace = {<<"case1">>, 1000, 2000, Events},
     ?assert(trace_matches(Trace, [{time_range, {500, 1500}}])).
 
@@ -718,17 +718,17 @@ replay_trace_error_test() ->
     CallbackError = fun(_, _) -> {error, test_error} end,
     ?assertEqual({error, {replay_failed, 0, test_error}}, replay_trace(Trace, CallbackError)).
 
-%% Test replay_trace_with_opts/3
-replay_trace_with_opts_test() ->
+%% Test replay_with_opts/3
+replay_with_opts_test() ->
     Events = [{1000, <<"E">>, <<"start">>, #{}}],
     Trace = {Events, <<"case1">>, 1000, 2000},
-    ?assertEqual({ok, processed}, replay_trace_with_opts(Trace, [{timeout, 5000}, callback, fun(_, A) -> {ok, processed} end])).
+    ?assertEqual({ok, processed}, replay_with_opts(Trace, [{timeout, 5000}, callback, fun(_, A) -> {ok, processed} end])).
 
 replay_with_strict_test() ->
     Events = [{1000, <<"E">>, <<"start">>, #{}}],
     Trace = {Events, <<"case1">>, 1000, 2000},
     CallbackError = fun(_, _) -> {error, strict_error} end,
-    ?assertEqual({error, {replay_failed, 0, strict_error}}, replay_trace_with_opts(Trace, [{strict, true}, callback, CallbackError])).
+    ?assertEqual({error, {replay_failed, 0, strict_error}}, replay_with_opts(Trace, [{strict, true}, callback, CallbackError])).
 
 %% Test calc_stats/1
 calc_stats_empty_test() ->
@@ -740,8 +740,8 @@ calc_stats_empty_test() ->
 
 calc_stats_test() ->
     Traces = [
-        {<<"case1">>, 1000, 3000, [{1000, <<"E">>, <<"start">>, #{}}, {2000, <<"E">>, <<"end">>, #{}]},
-        {<<"case2">>, 4000, 6000, [{4000, <<"E">>, <<"start">>, #{}]}
+        {<<"case1">>, 1000, 3000, [{1000, <<"E">>, <<"start">>, #{}}, {2000, <<"E">>, <<"end">>, #{}}]},
+        {<<"case2">>, 4000, 6000, [{4000, <<"E">>, <<"start">>, #{}}]}
     ],
     Stats = calc_stats(Traces),
     ?assertEqual(2, maps:get(total_traces, Stats)),
@@ -751,8 +751,8 @@ calc_stats_test() ->
 
 calc_stats_partial_duration_test() ->
     Traces = [
-        {<<"case1">>, 1000, undefined, [{1000, <<"E">>, <<"start">>, #{}]},
-        {<<"case2">>, 2000, 4000, [{2000, <<"E">>, <<"start">>, #{}]}
+        {<<"case1">>, 1000, undefined, [{1000, <<"E">>, <<"start">>, #{}}]},
+        {<<"case2">>, 2000, 4000, [{2000, <<"E">>, <<"start">>, #{}}]}
     ],
     Stats = calc_stats(Traces),
     ?assertEqual(2000, maps:get(total_duration_ms, Stats)).

@@ -1,0 +1,47 @@
+# CRE Tekton Tasks - Single-task pipeline using platform-agnostic script
+#
+# The cre-cicd task runs scripts/cicd-pipeline.sh which handles:
+# Build → SBOM → Scan → Push
+#
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: cre-cicd
+spec:
+  description: Full CI/CD pipeline (Build → SBOM → Scan → Push)
+  params:
+    - name: registry
+      type: string
+      description: Container registry (e.g. us-central1-docker.pkg.dev/project/cre)
+    - name: image
+      type: string
+      default: cre
+    - name: tag
+      type: string
+      default: latest
+    - name: push
+      type: string
+      default: "false"
+  workspaces:
+    - name: source
+    - name: artifacts
+  steps:
+    - name: pipeline
+      image: gcr.io/cloud-builders/docker
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: CICD_REGISTRY
+          value: $(params.registry)
+        - name: CICD_IMAGE
+          value: $(params.image)
+        - name: CICD_TAG
+          value: $(params.tag)
+        - name: CICD_PUSH
+          value: $(params.push)
+        - name: CICD_OUTPUT_DIR
+          value: $(workspaces.artifacts.path)
+      script: |
+        #!/bin/bash
+        set -e
+        chmod +x scripts/cicd-pipeline.sh
+        ./scripts/cicd-pipeline.sh

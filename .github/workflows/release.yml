@@ -1,0 +1,205 @@
+name: CRE Image Build and Sign
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository }}
+  COSIGN_EXPERIMENTAL: true
+
+jobs:
+  build-and-sign:
+    name: Build and Sign Multi-Arch Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write  # Required for OIDC token
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build multi-arch image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            GIT_REVISION=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.4.0'
+
+      - name: Sign image with Cosign (OIDC)
+        run: |
+          # Sign all tags from the build
+          for tag in ${{ steps.meta.outputs.tags }}; do
+            cosign sign \
+              --yes \
+              "${tag}"
+          done
+
+      - name: Verify signature
+        run: |
+          cosign verify \
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name }}
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM with Syft
+        run: |
+          syft ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name }} \
+            -o spdx-json \
+            > sbom.spdx.json
+
+      - name: Attach SBOM to image with Cosign
+        run: |
+          cosign attach sbom \
+            --sbom sbom.spdx.json \
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name }}
+
+      - name: Install Trivy
+        run: |
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Run vulnerability scan
+        run: |
+          trivy image \
+            --severity CRITICAL,HIGH \
+            --format json \
+            --output scan-results.json \
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name }}
+
+          # Count CRITICAL vulnerabilities
+          CRITICAL_COUNT=$(jq '[.Results[].Vulnerabilities[] | select(.Severity == "CRITICAL")] | length' scan-results.json)
+
+          # Fail if any CRITICAL vulnerabilities found
+          if [ "$CRITICAL_COUNT" -gt "0" ]; then
+            echo "Found $CRITICAL_COUNT CRITICAL vulnerabilities. Build failed."
+            jq '.Results[].Vulnerabilities[] | select(.Severity == "CRITICAL")' scan-results.json
+            exit 1
+          fi
+
+          echo "Vulnerability scan passed. 0 CRITICAL vulnerabilities found."
+
+      - name: Upload scan results as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerability-scan-results
+          path: scan-results.json
+          retention-days: 90
+
+      - name: Upload SBOM as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-spdx
+          path: sbom.spdx.json
+          retention-days: 90
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: CRE ${{ github.ref_name }}
+          body: |
+            ## Signed Images
+
+            This release includes signed container images verified with Cosign using OIDC (no private key storage).
+
+            ### Image Tags
+            - `${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name }}`
+            - `${{ env.REGISTRY }}/${{ env.IMAGE }}:latest`
+
+            ### Platforms
+            - linux/amd64
+            - linux/arm64
+
+            ### Verification
+            Verify the image signature before deploying:
+            ```bash
+            cosign verify ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name }}
+            ```
+
+            ## SBOM
+            The Software Bill of Materials (SBOM) is attached to this release in SPDX format and as an image annotation.
+
+            View SBOM:
+            ```bash
+            cosign download sbom ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name }}
+            ```
+
+            ## Vulnerability Scan
+            Vulnerability scan results are attached as GitHub Actions artifacts.
+
+            ## Security
+            - ✅ Image signed with Cosign (OIDC-based, no private key storage)
+            - ✅ SBOM generated with Syft and attached to image
+            - ✅ Vulnerability scan passed (0 CRITICAL)
+            - ✅ Multi-architecture support (amd64, arm64)
+
+            ## Deployment
+            Deploy to GKE or any Kubernetes cluster:
+            ```bash
+            kubectl set image deployment/cre cre=${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name }} -n cre-prod
+            ```
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        files: |
+          sbom.spdx.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release summary
+        if: always()
+        run: |
+          echo "# Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Platforms:** linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "**Signed:** Yes (Cosign OIDC)" >> $GITHUB_STEP_SUMMARY
+          echo "**SBOM:** Attached" >> $GITHUB_STEP_SUMMARY
