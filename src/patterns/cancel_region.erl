@@ -28,8 +28,6 @@
 -module(cancel_region).
 -author("CRE Team").
 
--include_lib("kernel/include/logger.hrl").
-
 -behaviour(gen_pnet).
 
 %%====================================================================
@@ -168,8 +166,7 @@ is_enabled(_Trsn, _Marking, _UsrInfo) -> false.
 %% @private
 -spec fire(atom(), map(), _) -> {produce, map()} | abort.
 
-fire(?T_START, #{?P_START := [start]}, UsrInfo) ->
-    log_xes_event(<<"CancelRegion">>, <<"start">>, UsrInfo#{region_id => undefined}),
+fire(?T_START, #{?P_START := [start]}, _UsrInfo) ->
     {produce, #{
         ?P_START => [],
         ?P_ACTIVE => [{active, erlang:unique_integer()}],
@@ -179,8 +176,6 @@ fire(?T_START, #{?P_START := [start]}, UsrInfo) ->
 fire(?T_CANCEL, _Marking, UsrInfo) ->
     %% Get the case ID from user info
     CaseId = get_case_id(UsrInfo),
-    %% Log cancellation event
-    log_xes_event(<<"CancelRegion">>, <<"cancel_all">>, UsrInfo#{case_id => CaseId}),
     %% Cancel all regions in the case
     cancel_all_regions(CaseId),
     {produce, #{
@@ -188,8 +183,7 @@ fire(?T_CANCEL, _Marking, UsrInfo) ->
         ?P_CANCELLED => [cancelled]
     }};
 
-fire(?T_COMPLETE, #{?P_ACTIVE := [{active, _Id}]}, UsrInfo) ->
-    log_xes_event(<<"CancelRegion">>, <<"complete">>, UsrInfo),
+fire(?T_COMPLETE, #{?P_ACTIVE := [{active, _Id}]}, _UsrInfo) ->
     {produce, #{
         ?P_ACTIVE => [],
         ?P_DONE => [complete]
@@ -198,8 +192,6 @@ fire(?T_COMPLETE, #{?P_ACTIVE := [{active, _Id}]}, UsrInfo) ->
 fire(?T_REGION_CANCEL, _Marking, UsrInfo) ->
     %% Get the region ID from user info
     RegionId = get_region_id(UsrInfo),
-    %% Log region cancellation event
-    log_xes_event(<<"CancelRegion">>, <<"cancel_region">>, UsrInfo#{region_id => RegionId}),
     %% Cancel the region and all child regions
     cancel_region_recursive(RegionId),
     {produce, #{
@@ -293,54 +285,3 @@ cancel_region_recursive(RegionId) ->
     %% Cancel the region and all its children
     ?LOG_INFO("Cancelling region ~p and children", [RegionId]),
     ok.
-
-%%====================================================================
-%% XES Logging Functions
-%%====================================================================
-
-%% @private
-log_xes_event(PatternType, Transition, UsrInfo) ->
-    case whereis(yawl_xes) of
-        undefined ->
-            %% XES logger not available, skip logging
-            ok;
-        _Pid ->
-            RegionId = maps_get_safe(region_id, UsrInfo, undefined),
-            CaseId = maps_get_safe(case_id, UsrInfo, undefined),
-            EventName = <<(atom_to_binary(PatternType))/binary, "_",
-                        (atom_to_binary(Transition))/binary>>,
-            try
-                yawl_xes:log_event(
-                    default_log_id(),
-                    EventName,
-                    atom_to_binary(Transition),
-                    #{
-                        <<"pattern">> => PatternType,
-                        <<"region_id">> => format_id(RegionId),
-                        <<"case_id">> => format_id(CaseId)
-                    },
-                    CaseId
-                )
-            catch
-                _:_ ->
-                    %% Silent fail if XES logging fails
-                    ok
-            end
-    end.
-
-%% @private
-default_log_id() ->
-    <<"yawl_default_log">>.
-
-%% @private
-format_id(undefined) -> <<"undefined">>;
-format_id(Id) when is_atom(Id) -> atom_to_binary(Id);
-format_id(Id) when is_binary(Id) -> Id;
-format_id(Id) -> list_to_binary(io_lib:format("~p", [Id])).
-
-%% @private
-maps_get_safe(Key, Map, Default) ->
-    case maps:find(Key, Map) of
-        {ok, Value} -> Value;
-        error -> Default
-    end.
