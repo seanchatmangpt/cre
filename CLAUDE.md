@@ -66,6 +66,7 @@ Single OTP runner (`gen_yawl`) wrapping `gen_pnet`. Everything else is pure stat
 ## Critical Rules
 
 - **DOCKER-ONLY WORKFLOW** - ALL operations must run inside Docker containers
+  - **EXCEPTION**: When running in gVisor sandbox (Claude Code on Web), Docker is unavailable. Use rebar3 and native tooling directly. SessionStart.sh hook detects gVisor automatically.
 - Source in `src/`, tests in `test/`, docs in `docs/`. NEVER put files in project root.
 - MUST run `rebar3 compile` after modifying `.erl` or `.hrl` files to verify correctness.
 - See @.claude/rules/erlang.md for Erlang code conventions.

@@ -105,9 +105,16 @@ detect_platform() {
 
 # Check if running in gVisor sandbox
 is_gvisor() {
+    # Most direct indicator - Claude Code on web sets this
+    [[ "${IS_SANDBOX:-}" == "yes" ]] && return 0
+    # Check dmesg for gVisor startup messages
+    dmesg 2>/dev/null | grep -qi "Starting gVisor" && return 0
+    # Check /proc/version for gVisor marker
     [[ -f /proc/version ]] && grep -qi "gvisor" /proc/version 2>/dev/null && return 0
     # Check for limited /proc (gVisor limits /proc access)
     [[ ! -d /proc/sys/vm ]] && return 0
+    # Check for process API (gVisor's init)
+    ps -p 1 -o comm= 2>/dev/null | grep -q "process_api" && return 0
     return 1
 }
 
@@ -585,6 +592,11 @@ main() {
     init_log
     info "Starting SessionStart.sh (v4.1.0-timing)"
     info "Platform: $(detect_platform)"
+
+    # Detect gVisor environment early
+    if is_gvisor; then
+        info "Environment: gVisor sandbox detected - Docker rules exemption applies"
+    fi
 
     # Phase 1: Cache check
     if ! check_cache; then
