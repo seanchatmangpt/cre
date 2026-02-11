@@ -44,8 +44,6 @@
 %% Constants and Configuration
 %%====================================================================
 
--define(LOG(Level, Msg), logger:log(Level, Msg)).
--define(LOG(Level, Msg, Data), logger:log(Level, Msg, Data)).
 -define(METRICS_ENABLED, true).
 -define(MAX_COMPENSATION_STACK_SIZE, 100).
 -define(DEFAULT_TIMEOUT, 30000).  % 30 seconds
@@ -501,7 +499,7 @@ compensate_with_retry(#compensator{retry_policy = Policy} = C, Input, Attempt) -
             compensate(C, Input);
         true ->
             Delay = calculate_backoff(Policy, Attempt),
-            ?LOG(info, "Retrying compensation after ~p ms, attempt ~p", [Delay, Attempt]),
+            logger:info("Retrying compensation after ~p ms, attempt ~p", [Delay, Attempt]),
             timer:sleep(Delay),
             compensate(C, Input)
     end.
@@ -1218,7 +1216,7 @@ is_enabled(cancel_compensation, _Marking, _UsrInfo) -> true.
 
 %% Transition firing - Enhanced for WHP-01 to WHP-05 patterns
 fire(raise_exception, #{'Active' := [Exception]}, _UsrInfo) when is_record(Exception, yawl_exception) ->
-    ?LOG(warning, "Exception raised: ~p", [Exception#yawl_exception.type]),
+    logger:warning("Exception raised: ~p", [Exception#yawl_exception.type]),
     {produce, #{
       'ExceptionRaised' => [Exception],
       'Active' => []
@@ -1229,13 +1227,13 @@ fire(handle_exception, #{'ExceptionRaised' := [Exception]}, #exception_state{han
     ExceptionType = Exception#yawl_exception.type,
     case find_handler(Handlers, ExceptionType) of
         [] ->
-            ?LOG(error, "No handler found for exception type: ~p", [ExceptionType]),
+            logger:error("No handler found for exception type: ~p", [ExceptionType]),
             {produce, #{
               'Failed' => [Exception],
               'ExceptionRaised' => []
              }};
         [Handler | _] ->
-            ?LOG(info, "Handler found for exception type: ~p", [ExceptionType]),
+            logger:info("Handler found for exception type: ~p", [ExceptionType]),
             {produce, #{
               'Handling' => [{Exception, Handler}],
               'ExceptionRaised' => []
@@ -1246,21 +1244,21 @@ fire(error_handler_execute, #{'Handling' := [{Exception, Handler}]}, _UsrInfo) -
     Now = erlang:system_time(millisecond),
     case execute_handler_with_circuit_breaker(Handler, Exception, Now) of
         {ok, _Result} ->
-            ?LOG(info, "Handler executed successfully", []),
+            logger:info("Handler executed successfully", []),
             {produce, #{
               'Resolved' => [Exception],
               'Handling' => [],
               'Metrics' => [#{event => handler_success, timestamp => Now, exception_type => Exception#yawl_exception.type}]
              }};
         {error, Reason} ->
-            ?LOG(error, "Handler execution failed: ~p", [Reason]),
+            logger:error("Handler execution failed: ~p", [Reason]),
             {produce, #{
               'Retry' => [Exception],
               'Handling' => [],
               'AuditLog' => [#{event => handler_failure, exception => Exception, reason => Reason, timestamp => Now}]
              }};
         {circuit_open, Reason} ->
-            ?LOG(warning, "Circuit breaker open: ~p", [Reason]),
+            logger:warning("Circuit breaker open: ~p", [Reason]),
             {produce, #{
               'Failed' => [Exception],
               'Handling' => [],
@@ -1273,7 +1271,7 @@ fire(error_handler_execute, #{'Handling' := [{Exception, Handler}]}, _UsrInfo) -
 fire(retry_after_backoff, #{'Retry' := [Exception]}, _UsrInfo) ->
     Now = erlang:system_time(millisecond),
     Exception1 = Exception#yawl_exception{retry_attempts = Exception#yawl_exception.retry_attempts + 1},
-    ?LOG(info, "Retrying after backoff, attempt ~p", [Exception1#yawl_exception.retry_attempts]),
+    logger:info("Retrying after backoff, attempt ~p", [Exception1#yawl_exception.retry_attempts]),
     {produce, #{
       'ExceptionRaised' => [Exception1],
       'Retry' => [],
@@ -1292,13 +1290,13 @@ fire(retry_with_policy, #{'Retry' := [Exception]}, #exception_state{handlers = H
                     case should_retry(Policy, Attempt) of
                         true ->
                             Delay = calculate_backoff(Policy, Attempt),
-                            ?LOG(info, "Scheduling retry with policy: ~pms, attempt ~p", [Delay, Attempt]),
+                            logger:info("Scheduling retry with policy: ~pms, attempt ~p", [Delay, Attempt]),
                             {produce, #{
                               'Retry' => [Exception#yawl_exception{retry_attempts = Attempt}],
                               'Metrics' => [#{event => retry_scheduled, timestamp => erlang:system_time(millisecond), delay => Delay, attempt => Attempt}]
                              }};
                         false ->
-                            ?LOG(error, "Retry attempts exhausted for exception: ~p", [ExceptionType]),
+                            logger:error("Retry attempts exhausted for exception: ~p", [ExceptionType]),
                             {produce, #{
                               'Failed' => [Exception],
                               'Retry' => []
@@ -1311,7 +1309,7 @@ fire(retry_with_policy, #{'Retry' := [Exception]}, #exception_state{handlers = H
 fire(compensate_activity, #{'Compensating' := [Compensator]}, #exception_state{compensation_stack = Stack}) ->
     case length(Stack) >= ?MAX_COMPENSATION_STACK_SIZE of
         true ->
-            ?LOG(error, "Compensation stack limit reached", []),
+            logger:error("Compensation stack limit reached", []),
             {produce, #{
               'Failed' => [Compensator],
               'Compensating' => []
@@ -1319,13 +1317,13 @@ fire(compensate_activity, #{'Compensating' := [Compensator]}, #exception_state{c
         false ->
             case compensate_with_retry(Compensator, undefined, 1) of
                 {ok, NewCompensator} ->
-                    ?LOG(info, "Compensation executed successfully for activity: ~p", [NewCompensator#compensator.activity_id]),
+                    logger:info("Compensation executed successfully for activity: ~p", [NewCompensator#compensator.activity_id]),
                     {produce, #{
                       'CompensationStack' => [NewCompensator],
                       'Compensating' => []
                      }};
                 {error, Reason} ->
-                    ?LOG(error, "Compensation failed: ~p", [Reason]),
+                    logger:error("Compensation failed: ~p", [Reason]),
                     {produce, #{
                       'Failed' => [Compensator],
                       'Compensating' => []
@@ -1334,14 +1332,14 @@ fire(compensate_activity, #{'Compensating' := [Compensator]}, #exception_state{c
     end;
 
 fire(compensation_success, #{'Compensating' := [Compensator]}, _UsrInfo) ->
-    ?LOG(info, "Compensation succeeded for activity: ~p", [Compensator#compensator.activity_id]),
+    logger:info("Compensation succeeded for activity: ~p", [Compensator#compensator.activity_id]),
     {produce, #{
       'CompensationStack' => [Compensator#compensator{state = completed}],
       'Compensating' => []
      }};
 
 fire(compensation_failure, #{'Compensating' := [Compensator]}, _UsrInfo) ->
-    ?LOG(error, "Compensation failed for activity: ~p", [Compensator#compensator.activity_id]),
+    logger:error("Compensation failed for activity: ~p", [Compensator#compensator.activity_id]),
     {produce, #{
       'Failed' => [Compensator],
       'Compensating' => []
@@ -1350,7 +1348,7 @@ fire(compensation_failure, #{'Compensating' := [Compensator]}, _UsrInfo) ->
 fire(push_compensator, #{'Active' := [ActivityId]}, #exception_state{workflow_id = _WorkflowId}) ->
     HandlerFun = fun(_Input) -> {compensated, ActivityId} end,
     Compensator = new_compensator(ActivityId, HandlerFun, immediate),
-    ?LOG(info, "Pushed compensator for activity: ~p", [ActivityId]),
+    logger:info("Pushed compensator for activity: ~p", [ActivityId]),
     {produce, #{
       'CompensationStack' => [Compensator],
       'Active' => [ActivityId]
@@ -1359,7 +1357,7 @@ fire(push_compensator, #{'Active' := [ActivityId]}, #exception_state{workflow_id
 % WHP-04: Triggered Compensation
 fire(trigger_compensation, #{'ExceptionRaised' := [Exception]}, _UsrInfo) ->
     Exception1 = Exception#yawl_exception{compensation_attempts = Exception#yawl_exception.compensation_attempts + 1},
-    ?LOG(info, "Triggered compensation for exception: ~p", [Exception1#yawl_exception.type]),
+    logger:info("Triggered compensation for exception: ~p", [Exception1#yawl_exception.type]),
     {produce, #{
       'TriggeredCompensation' => [Exception1],
       'ExceptionRaised' => []
@@ -1376,7 +1374,7 @@ fire(compensation_triggered, #{'TriggeredCompensation' := [Exception]}, _UsrInfo
 % WHP-05: Consecutive Compensation
 fire(start_consecutive_compensation, #{'ExceptionRaised' := [Exception]}, _UsrInfo) ->
     Exception1 = Exception#yawl_exception{compensation_attempts = Exception#yawl_exception.compensation_attempts + 1},
-    ?LOG(info, "Starting consecutive compensation for exception: ~p", [Exception1#yawl_exception.type]),
+    logger:info("Starting consecutive compensation for exception: ~p", [Exception1#yawl_exception.type]),
     {produce, #{
       'ConsecutiveCompensations' => [Exception1],
       'ExceptionRaised' => []
@@ -1392,7 +1390,7 @@ fire(execute_consecutive_compensation, #{'ConsecutiveCompensations' := [Exceptio
 
 % Enhanced transitions
 fire(retry_exhausted, #{'Retry' := [Exception]}, _UsrInfo) ->
-    ?LOG(error, "Retry attempts exhausted for exception: ~p", [Exception#yawl_exception.type]),
+    logger:error("Retry attempts exhausted for exception: ~p", [Exception#yawl_exception.type]),
     {produce, #{
       'Failed' => [Exception],
       'Retry' => []
@@ -1400,7 +1398,7 @@ fire(retry_exhausted, #{'Retry' := [Exception]}, _UsrInfo) ->
 
 fire(mark_resolved, #{'Handling' := [{_Exception, _Handler}]}, _UsrInfo) ->
     Now = erlang:system_time(millisecond),
-    ?LOG(info, "Exception resolved", []),
+    logger:info("Exception resolved", []),
     {produce, #{
       'Active' => [resolved],
       'Handling' => [],
@@ -1409,7 +1407,7 @@ fire(mark_resolved, #{'Handling' := [{_Exception, _Handler}]}, _UsrInfo) ->
 
 fire(mark_failed, #{'ExceptionRaised' := [Exception]}, _UsrInfo) ->
     Now = erlang:system_time(millisecond),
-    ?LOG(error, "Exception marked as failed: ~p", [Exception#yawl_exception.type]),
+    logger:error("Exception marked as failed: ~p", [Exception#yawl_exception.type]),
     {produce, #{
       'Failed' => [Exception],
       'ExceptionRaised' => [],

@@ -1,0 +1,80 @@
+{# SOC 2 Customer-Specific Auditor Pack Template
+   Generates deterministic JSON from customer-scoped SOC 2 control results.
+   Features:
+   - Stable key ordering (alphabetical)
+   - Customer-scoped filtering
+   - Unique filtering by control ID per customer
+   - No timestamps or runtime values
+   - Structure: customer → suite → category → control → validator + evidence
+#}
+{
+{%- set customers = rows | unique(attribute="customerId") | sort(attribute="customerId") %}
+  "auditor_pack": {
+    "version": "1.0.0",
+    "format": "soc2-customer-control-matrix",
+    "customers": [
+{%- for customer in customers %}
+      {
+        "customerId": "{{ customer.customerId }}",
+        "customerName": "{{ customer.customerName }}",
+        "suites": [
+{%- set suites = rows | where(attribute="customerId", value=customer.customerId) | unique(attribute="suiteId") | sort(attribute="suiteId") %}
+{%- for suite in suites %}
+          {
+            "suiteId": "{{ suite.suiteId }}",
+            "suiteName": "{{ suite.suiteName }}",
+            "categories": [
+{%- set categories = rows | where(attribute="customerId", value=customer.customerId) | where(attribute="suiteId", value=suite.suiteId) | unique(attribute="tscId") | sort(attribute="tscId") %}
+{%- for category in categories %}
+              {
+                "categoryId": "{{ category.tscId }}",
+                "categoryLabel": "{{ category.tscLabel }}",
+                "controls": [
+{%- set controls = rows | where(attribute="customerId", value=customer.customerId) | where(attribute="suiteId", value=suite.suiteId) | where(attribute="tscId", value=category.tscId) | unique(attribute="controlId") | sort(attribute="controlId") %}
+{%- for control in controls %}
+                  {
+                    "controlId": "{{ control.controlId }}",
+                    "controlTitle": "{{ control.controlTitle }}",
+                    "controlDescription": "{{ control.controlDescription }}",
+                    "evidence": [
+{%- set evidence_items = rows | where(attribute="controlId", value=control.controlId) | unique(attribute="evidencePath") | sort(attribute="evidencePath") %}
+{%- for evidence in evidence_items %}
+                      {
+                        "evidenceFormat": "{{ evidence.evidenceFormat }}",
+                        "evidenceId": "{{ evidence.evidenceId }}",
+                        "evidencePath": "{{ evidence.evidencePath }}",
+                        "evidenceIntegrity": "{{ evidence.evidenceIntegrity }}"
+{%- if evidence.retentionDays %},
+                        "retentionDays": {{ evidence.retentionDays }}
+{%- endif %}
+                      }
+{%- if not loop.last %},{% endif %}
+{%- endfor %}
+                    ],
+                    "validators": [
+{%- set validators = rows | where(attribute="controlId", value=control.controlId) | map(attribute="validatorId") | unique | sort %}
+{%- for validator in validators %}
+                      {
+                        "validatorId": "{{ validator }}"
+                      }
+{%- if not loop.last %},{% endif %}
+{%- endfor %}
+                    ]
+                  }
+{%- if not loop.last %},{% endif %}
+{%- endfor %}
+                ]
+              }
+{%- if not loop.last %},{% endif %}
+{%- endfor %}
+            ]
+          }
+{%- if not loop.last %},{% endif %}
+{%- endfor %}
+        ]
+      }
+{%- if not loop.last %},{% endif %}
+{%- endfor %}
+    ]
+  }
+}

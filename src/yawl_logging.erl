@@ -458,15 +458,17 @@ log_engine_event(Level, Message) ->
 log_event(Level, Type, CaseId, WorkItemId, Message, Data) ->
     case whereis(?MODULE) of
         undefined ->
-            %% Fallback to error_logger if logger not started
-            error_logger:info_report([
-                {level, Level},
-                {type, Type},
-                {case_id, CaseId},
-                {workitem_id, WorkItemId},
-                {message, Message},
-                {data, Data}
-            ]);
+            %% Fallback to logger if logger not started
+            LogFun = case Level of
+                debug -> fun logger:debug/2;
+                info -> fun logger:info/2;
+                warning -> fun logger:warning/2;
+                error -> fun logger:error/2;
+                critical -> fun logger:critical/2;
+                _ -> fun logger:info/2
+            end,
+            LogFun("Event: type=~p, case_id=~p, workitem_id=~p, message=~p, data=~p",
+                   [Type, CaseId, WorkItemId, Message, Data]);
         Pid ->
             Entry = #log_entry{
                 id = generate_event_id(),

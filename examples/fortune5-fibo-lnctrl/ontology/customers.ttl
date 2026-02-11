@@ -3,7 +3,7 @@
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix cust: <http://fortune5.lnctrl.io/customers#> .
-@prefix reg: <http://fortune5.lnctrl.io/regulations#> .
+@prefix reg: <http://fortune5.lnctrl.io/regulation#> .
 @prefix ln: <http://lnctrl.io/ontology#> .
 
 # ============================================================================

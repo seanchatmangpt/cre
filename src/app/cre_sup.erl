@@ -24,25 +24,29 @@
 %%
 %% This module implements the top-level supervisor for the CRE application.
 %% It manages the core worker processes including cre_master, yawl_timeout,
-%% yawl_xes, and yawl_approval using the one_for_one restart strategy.
+%% yawl_xes, yawl_approval, and soc2_validation_sup using the one_for_one restart strategy.
 %%
 %% <h3>Key Features</h3>
 %% <ul>
 %%   <li><b>Top-Level Supervisor:</b> Root supervisor for all CRE processes</li>
-%%   <li><b>Child Specs:</b> Manages cre_master, yawl_timeout, yawl_xes, yawl_approval</li>
+%%   <li><b>Child Specs:</b> Manages cre_master, yawl_timeout, yawl_xes, yawl_approval, workflow supervisor, worklist, registry, and SOC2 validation</li>
 %%   <li><b>One-For-One Strategy:</b> Each child is restarted independently</li>
 %%   <li><b>Zero Intensity:</b> No automatic restarts (manual recovery only)</li>
 %% </ul>
 %%
 %% <h3>Child Specifications</h3>
 %%
-%% The supervisor manages four child processes:
+%% The supervisor manages eight child processes:
 %%
 %% <ul>
 %%   <li><b>cre_master:</b> Central coordinator for worker pools and task scheduling</li>
 %%   <li><b>yawl_timeout:</b> Timeout and cancellation infrastructure for workflows</li>
 %%   <li><b>yawl_xes:</b> XES logging for process mining compliance</li>
 %%   <li><b>yawl_approval:</b> Human-in-the-loop approval workflow support</li>
+%%   <li><b>yawl_workflow_supervisor:</b> Supervisor for active workflow instances</li>
+%%   <li><b>yawl_worklist:</b> Worklist and task management for human participants</li>
+%%   <li><b>yawl_registry:</b> Workflow definition registry and validation</li>
+%%   <li><b>soc2_validation_sup:</b> SOC 2 compliance validation supervisor (runs independently, does not crash main app)</li>
 %% </ul>
 %%
 %% <h3>Supervisor Flags</h3>
@@ -86,8 +90,8 @@
 %% ```erlang
 %% 1> {ok, {_Flags, Children}} = cre_sup:init([]),
 %% 1> true = is_list(Children),
-%% 1> 7 = length(Children).
-%% 7
+%% 1> 8 = length(Children).
+%% 8
 %% ```
 %%
 %% @end
@@ -167,6 +171,10 @@ start_link() ->
 %%        <li><b>yawl_timeout:</b> permanent restart, 5s shutdown timeout</li>
 %%        <li><b>yawl_xes:</b> permanent restart, 5s shutdown timeout</li>
 %%        <li><b>yawl_approval:</b> permanent restart, 5s shutdown timeout</li>
+%%        <li><b>yawl_workflow_supervisor:</b> supervisor restart, infinite shutdown timeout</li>
+%%        <li><b>yawl_worklist:</b> permanent restart, 5s shutdown timeout</li>
+%%        <li><b>yawl_registry:</b> permanent restart, 5s shutdown timeout</li>
+%%        <li><b>soc2_validation_sup:</b> supervisor restart, infinite shutdown timeout (isolated from main app)</li>
 %%      </ul>
 %%
 %% @param _Args Unused (empty list)
@@ -187,18 +195,22 @@ Defines supervisor flags and child specifications for the CRE supervision tree.
 
 ## Child Specifications
 
-Returns a list of 4 child specifications:
+Returns a list of 8 child specifications:
 - `cre_master` - temporary restart, 5000ms shutdown
 - `yawl_timeout` - permanent restart, 5000ms shutdown
 - `yawl_xes` - permanent restart, 5000ms shutdown
 - `yawl_approval` - permanent restart, 5000ms shutdown
+- `yawl_workflow_supervisor` - permanent restart, infinite shutdown
+- `yawl_worklist` - permanent restart, 5000ms shutdown
+- `yawl_registry` - permanent restart, 5000ms shutdown
+- `soc2_validation_sup` - permanent restart, infinite shutdown (isolated from main app)
 
 ## Example
 
 ```erlang
 1> {ok, {#{strategy := one_for_one}, Children}} = cre_sup:init([]),
-1> 4 = length(Children).
-4
+1> 8 = length(Children).
+8
 ```
 """).
 -spec init(_) -> {ok, {#{
@@ -279,7 +291,16 @@ init(_Args) ->
                     modules => [yawl_registry]
                    },
 
-    {ok, {SupFlags, [ChildSpec, TimeoutSpec, XesSpec, ApprovalSpec, WorkflowSupSpec, WorklistSpec, RegistrySpec]}}.
+    Soc2ValidationSupSpec = #{
+                             id => soc2_validation_sup,
+                             start => {soc2_validation_sup, start_link, []},
+                             restart => permanent,
+                             shutdown => infinity,
+                             type => supervisor,
+                             modules => [soc2_validation_sup]
+                            },
+
+    {ok, {SupFlags, [ChildSpec, TimeoutSpec, XesSpec, ApprovalSpec, WorkflowSupSpec, WorklistSpec, RegistrySpec, Soc2ValidationSupSpec]}}.
 
 %%====================================================================
 %% Doctests
@@ -329,7 +350,7 @@ doctest_test() ->
     %% Test 5: Verify child specs count
     {ok, {_, Children}} = init([]),
     true = is_list(Children),
-    7 = length(Children),
+    8 = length(Children),
 
     %% Test 6: Verify child specs have required fields
     [
@@ -355,6 +376,7 @@ doctest_test() ->
     true = lists:member(yawl_workflow_supervisor, ChildIds),
     true = lists:member(yawl_worklist, ChildIds),
     true = lists:member(yawl_registry, ChildIds),
+    true = lists:member(soc2_validation_sup, ChildIds),
 
     %% Test 8: Verify cre_master spec details
     {ok, {_, Children2}} = init([]),
@@ -373,11 +395,11 @@ doctest_test() ->
     permanent = maps:get(restart, TimeoutSpec2),
     worker = maps:get(type, TimeoutSpec2),
 
-    %% Test 10: Verify child types (we have 6 workers and 1 supervisor)
+    %% Test 10: Verify child types (we have 6 workers and 2 supervisors)
     {ok, {_, Children4}} = init([]),
     WorkerCount = lists:filter(fun(C) -> worker =:= maps:get(type, C) end, Children4),
     SupCount = lists:filter(fun(C) -> supervisor =:= maps:get(type, C) end, Children4),
     6 = length(WorkerCount),
-    1 = length(SupCount),
+    2 = length(SupCount),
 
     ok.

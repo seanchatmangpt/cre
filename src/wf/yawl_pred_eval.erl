@@ -80,7 +80,7 @@ modes(t1, Marking, _UsrInfo) ->
     case yawl_pred_eval:evaluate(Pred, Marking, #{}) of
         {ok, true} -> [#{enabled => []}];
         {ok, false} -> [#{disabled => []}];
-        {error, Reason} -> error_logger:warning_msg("Predicate error: ~p", [Reason]), []
+        {error, Reason} -> logger:warning("Predicate error: ~p", [Reason]), []
     end.
 ```
 
@@ -329,11 +329,11 @@ extract_token_facts(Place, Token) when is_map(Token) ->
     maps:fold(fun
         (Key, Value, Acc) when is_atom(Key) ->
             %% Convert to lowercase to match rule predicate names
-            KeyLower = list_to_existing_atom(string:lowercase(atom_to_list(Key))),
+            KeyLower = list_to_atom(string:lowercase(atom_to_list(Key))),
             [{KeyLower, [Value]} | Acc];
         (Key, Value, Acc) when is_binary(Key) ->
             %% Convert binary key to lowercase atom
-            KeyLower = list_to_existing_atom(string:lowercase(binary_to_list(Key))),
+            KeyLower = list_to_atom(string:lowercase(binary_to_list(Key))),
             [{KeyLower, [Value]} | Acc];
         (_Key, _Value, Acc) ->
             Acc

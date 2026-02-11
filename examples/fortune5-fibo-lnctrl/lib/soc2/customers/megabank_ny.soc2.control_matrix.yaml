@@ -1,0 +1,186 @@
+control_matrix:
+  metadata:
+    customer_id: megabank_ny
+    customer_name: MegaBank (New York)
+    suite_id: soc2_security_availability
+    suite_name: SOC 2 Security + Availability
+    generated_by: generate_customer_soc2_artifacts.py
+    version: 1.0.0
+  suites:
+  - suite_id: soc2_security_availability
+    suite_name: SOC 2 Security + Availability
+    categories:
+    - category_id: TSC_Availability
+      category_name: Availability (TSC)
+      controls:
+      - control_id: CC7.1
+        title: Backup and Recovery
+        description: Entity maintains current processing capacity and monitors system
+          components
+        validators:
+        - hot_upgrade_validator
+        - zero_downtime_validator
+        evidence:
+        - evidence_id: uptime_logs
+          path: evidence/uptime/**/*.json
+          format: jsonl
+          integrity: sha256_manifest
+          retention_days: 2555
+        - evidence_id: verdict_receipt
+          path: receipts/verdict.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+      - control_id: CC7.3
+        title: Capacity Monitoring
+        description: Entity monitors system capacity to meet processing requirements
+        validators:
+        - zero_downtime_validator
+        evidence:
+        - evidence_id: load_tests
+          path: evidence/load_tests/**/*.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+        - evidence_id: uptime_logs
+          path: evidence/uptime/**/*.json
+          format: jsonl
+          integrity: sha256_manifest
+          retention_days: 2555
+    - category_id: TSC_Security
+      category_name: Security (TSC)
+      controls:
+      - control_id: CC6.1
+        title: Authorization Controls
+        description: Entity implements logical access controls to prevent unauthorized
+          access
+        validators:
+        - config_validator
+        - zero_downtime_validator
+        evidence:
+        - evidence_id: build_receipt
+          path: receipts/build.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+        - evidence_id: verdict_receipt
+          path: receipts/verdict.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+      - control_id: CC6.2
+        title: Authentication
+        description: Entity uses multi-factor authentication
+        validators:
+        - config_validator
+        evidence:
+        - evidence_id: build_receipt
+          path: receipts/build.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+        - evidence_id: verdict_receipt
+          path: receipts/verdict.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+      - control_id: CC6.3
+        title: Access Removal
+        description: Entity removes access when no longer required
+        validators:
+        - config_validator
+        evidence:
+        - evidence_id: build_receipt
+          path: receipts/build.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+        - evidence_id: verdict_receipt
+          path: receipts/verdict.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+      - control_id: CC7.2
+        title: Incident Response
+        description: Entity responds to incidents that could affect system security
+        validators:
+        - zero_downtime_validator
+        evidence:
+        - evidence_id: chaos_tests
+          path: evidence/chaos/**/*.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+        - evidence_id: verdict_receipt
+          path: receipts/verdict.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+      - control_id: CC8.1
+        title: Change Authorization
+        description: Entity authorizes, designs, develops, configures, documents,
+          tests, approves and implements changes
+        validators:
+        - deterministic_generation_validator
+        - hot_upgrade_validator
+        evidence:
+        - evidence_id: build_receipt
+          path: receipts/build.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+        - evidence_id: verdict_receipt
+          path: receipts/verdict.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+      - control_id: CC8.2
+        title: Change Testing
+        description: Entity tests system changes before deployment
+        validators:
+        - deterministic_generation_validator
+        evidence:
+        - evidence_id: load_tests
+          path: evidence/load_tests/**/*.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+        - evidence_id: verdict_receipt
+          path: receipts/verdict.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+      - control_id: CC9.1
+        title: Risk Identification
+        description: Entity identifies and assesses risks
+        validators:
+        - zero_downtime_validator
+        evidence:
+        - evidence_id: chaos_tests
+          path: evidence/chaos/**/*.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+        - evidence_id: verdict_receipt
+          path: receipts/verdict.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+      - control_id: CC9.2
+        title: Risk Mitigation
+        description: Entity designs and implements control activities to mitigate
+          risks
+        validators:
+        - hot_upgrade_validator
+        - zero_downtime_validator
+        evidence:
+        - evidence_id: chaos_tests
+          path: evidence/chaos/**/*.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555
+        - evidence_id: verdict_receipt
+          path: receipts/verdict.last.json
+          format: json
+          integrity: sha256_manifest
+          retention_days: 2555

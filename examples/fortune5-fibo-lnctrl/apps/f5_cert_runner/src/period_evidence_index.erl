@@ -1,6 +1,8 @@
 %%%-------------------------------------------------------------------
 %%% @doc Period Evidence Index for SOC 2 Type II
-%%% Maintains deterministic index of evidence snapshots over time
+%%% Maintains deterministic index of evidence snapshots over time.
+%%% Creates snapshots by copying evidence/ to evidence/period/snapshot_YYYYMMDD/
+%%% with manifest and verdict files. Implements 365-day rotation.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(period_evidence_index).
@@ -9,11 +11,18 @@
     create_snapshot/1,
     update_index/1,
     get_index/0,
-    verify_index/0
+    verify_index/0,
+    rotate_snapshots/0,
+    get_snapshot_path/1,
+    list_snapshots/0
 ]).
 
 -define(INDEX_FILE, "evidence/period/index.json").
--define(SNAPSHOT_DIR, "evidence/period/snapshots").
+-define(SNAPSHOT_BASE_DIR, "evidence/period").
+-define(EVIDENCE_DIR, "evidence").
+-define(RETENTION_DAYS, 365).
+-define(MANIFEST_FILE, "evidence.last.json").
+-define(VERDICT_FILE, "verdict.last.json").
 
 -type snapshot() :: #{
     snapshot_id => binary(),
@@ -33,38 +42,78 @@ create_snapshot(Opts) ->
     %% Generate snapshot ID (deterministic based on date, not timestamp)
     Date = maps:get(date, Opts, current_date()),
     SnapshotId = generate_snapshot_id(Date),
+    SnapshotPath = get_snapshot_path(SnapshotId),
 
-    %% Collect evidence files
-    EvidenceFiles = collect_evidence_files(),
+    try
+        %% Create snapshot directory
+        ok = filelib:ensure_dir(filename:join([SnapshotPath, "dummy"])),
 
-    %% Get manifest and verdict hashes
-    ManifestHash = get_file_hash("receipts/evidence.last.json"),
-    VerdictHash = get_file_hash("receipts/verdict.last.json"),
+        %% Copy evidence files to snapshot directory
+        EvidenceFiles = collect_evidence_files(),
+        CopyResults = lists:map(fun(EvidenceFile) ->
+            copy_evidence_file(EvidenceFile, SnapshotPath)
+        end, EvidenceFiles),
 
-    %% Get suites from verdict or opts
-    Suites = maps:get(suites, Opts, get_suites_from_verdict()),
+        %% Check for copy errors
+        case lists:filter(fun({ok, _}) -> false; (_) -> true end, CopyResults) of
+            [] ->
+                ok;  %% All copies successful
+            Errors ->
+                logger:warning("Some evidence files failed to copy: ~p", [Errors])
+        end,
 
-    %% Create snapshot
-    Snapshot = #{
-        snapshot_id => SnapshotId,
-        timestamp => iso8601_now(),
-        manifest_hash => ManifestHash,
-        verdict_hash => VerdictHash,
-        suites => Suites,
-        evidence_count => length(EvidenceFiles)
-    },
+        %% Copy manifest and verdict files to snapshot
+        copy_snapshot_metadata(SnapshotPath),
 
-    %% Write snapshot to file
-    SnapshotFile = filename:join([?SNAPSHOT_DIR, <<SnapshotId/binary, ".json">>]),
-    filelib:ensure_dir(SnapshotFile),
+        %% Collect evidence files that were actually copied
+        CopiedFiles = lists:filtermap(fun
+            ({ok, File}) -> {true, File};
+            (_) -> false
+        end, CopyResults),
 
-    SnapshotJson = canonical_json(Snapshot),
-    ok = file:write_file(SnapshotFile, SnapshotJson),
+        %% Get manifest and verdict hashes
+        ManifestFile = filename:join([SnapshotPath, ?MANIFEST_FILE]),
+        VerdictFile = filename:join([SnapshotPath, ?VERDICT_FILE]),
+        ManifestHash = get_file_hash(ManifestFile),
+        VerdictHash = get_file_hash(VerdictFile),
 
-    %% Update index
-    case update_index(Snapshot) of
-        ok -> {ok, SnapshotId};
-        {error, Reason} -> {error, Reason}
+        %% Get suites from verdict or opts
+        Suites = maps:get(suites, Opts, get_suites_from_verdict()),
+
+        %% Create snapshot metadata
+        Snapshot = #{
+            snapshot_id => SnapshotId,
+            timestamp => iso8601_now(),
+            path => list_to_binary(SnapshotPath),
+            manifest_hash => ManifestHash,
+            verdict_hash => VerdictHash,
+            suites => Suites,
+            evidence_count => length(CopiedFiles),
+            created_at => iso8601_now()
+        },
+
+        %% Write snapshot metadata file
+        SnapshotMetadataFile = filename:join([SnapshotPath, "snapshot_metadata.json"]),
+        SnapshotJson = canonical_json(Snapshot),
+        ok = file:write_file(SnapshotMetadataFile, SnapshotJson),
+
+        logger:info("Created snapshot ~s at ~s with ~p evidence files",
+                   [SnapshotId, SnapshotPath, length(CopiedFiles)]),
+
+        %% Update index
+        case update_index(Snapshot) of
+            ok ->
+                %% Attempt rotation after successful snapshot
+                ok = rotate_snapshots(),
+                {ok, SnapshotId};
+            {error, Reason} ->
+                {error, {index_update_failed, Reason}}
+        end
+    catch
+        Class:Reason:Stacktrace ->
+            logger:error("Failed to create snapshot ~s: ~p:~p~n~p",
+                        [SnapshotId, Class, Reason, Stacktrace]),
+            {error, {snapshot_creation_failed, Class, Reason}}
     end.
 
 -spec update_index(snapshot()) -> ok | {error, term()}.
@@ -112,14 +161,21 @@ verify_index() ->
         {ok, Index} ->
             Snapshots = maps:get(snapshots, Index, []),
 
-            %% Verify each snapshot file exists and hashes match
+            %% Verify each snapshot directory exists and contains required files
             Results = lists:map(fun(Snapshot) ->
                 SnapshotId = maps:get(snapshot_id, Snapshot),
-                SnapshotFile = filename:join([?SNAPSHOT_DIR, <<SnapshotId/binary, ".json">>]),
+                SnapshotPath = get_snapshot_path(SnapshotId),
 
-                case filelib:is_regular(SnapshotFile) of
-                    true -> ok;
-                    false -> {error, {missing_snapshot, SnapshotId}}
+                case filelib:is_dir(SnapshotPath) of
+                    true ->
+                        %% Check for snapshot_metadata.json
+                        MetadataFile = filename:join([SnapshotPath, "snapshot_metadata.json"]),
+                        case filelib:is_regular(MetadataFile) of
+                            true -> ok;
+                            false -> {error, {missing_metadata, SnapshotId}}
+                        end;
+                    false ->
+                        {error, {missing_snapshot_dir, SnapshotId}}
                 end
             end, Snapshots),
 
@@ -130,6 +186,68 @@ verify_index() ->
         {error, Reason} ->
             {error, {index_not_found, Reason}}
     end.
+
+-spec rotate_snapshots() -> ok | {error, term()}.
+rotate_snapshots() ->
+    try
+        SnapshotDirs = list_snapshot_directories(),
+        Now = erlang:system_time(second),
+        RotationThreshold = Now - (?RETENTION_DAYS * 86400),
+
+        DeletedDirs = lists:filtermap(fun(SnapshotDir) ->
+            SnapshotId = filename:basename(SnapshotDir),
+            case extract_date_from_snapshot_id(SnapshotId) of
+                invalid_format ->
+                    false;
+                DateBin ->
+                    case date_to_seconds(DateBin) of
+                        invalid_date -> false;
+                        SnapshotTime ->
+                            case SnapshotTime < RotationThreshold of
+                                true ->
+                                    case delete_snapshot_directory(SnapshotDir) of
+                                        ok ->
+                                            logger:info("Deleted expired snapshot: ~s", [SnapshotId]),
+                                            {true, SnapshotId};
+                                        {error, Reason} ->
+                                            logger:error("Failed to delete snapshot ~s: ~p", [SnapshotId, Reason]),
+                                            false
+                                    end;
+                                false ->
+                                    false
+                            end
+                    end
+            end
+        end, SnapshotDirs),
+
+        case DeletedDirs of
+            [] ->
+                logger:debug("No snapshots expired for rotation");
+            _ ->
+                logger:info("Rotated ~p expired snapshots", [length(DeletedDirs)])
+        end,
+
+        ok
+    catch
+        Class:Reason:Stacktrace ->
+            logger:error("Snapshot rotation failed: ~p:~p~n~p", [Class, Reason, Stacktrace]),
+            {error, {rotation_failed, Class, Reason}}
+    end.
+
+-spec list_snapshots() -> [binary()] | {error, term()}.
+list_snapshots() ->
+    case file:list_dir(?SNAPSHOT_BASE_DIR) of
+        {ok, Files} ->
+            lists:filter(fun(F) ->
+                filelib:is_dir(filename:join([?SNAPSHOT_BASE_DIR, F]))
+            end, Files);
+        {error, _Reason} ->
+            []
+    end.
+
+-spec get_snapshot_path(binary()) -> string().
+get_snapshot_path(SnapshotId) ->
+    filename:join([?SNAPSHOT_BASE_DIR, binary_to_list(SnapshotId)]).
 
 %%====================================================================
 %% Internal Functions
@@ -147,9 +265,19 @@ iso8601_now() ->
     list_to_binary(calendar:system_time_to_rfc3339(erlang:system_time(second), [{unit, second}])).
 
 collect_evidence_files() ->
-    %% Find all evidence files
-    filelib:wildcard("evidence/**/*.json") ++
-    filelib:wildcard("evidence/**/*.jsonl").
+    %% Find all evidence files in evidence/ directory (excluding period/ subdirectory)
+    EvidenceJsonFiles = filelib:wildcard(filename:join([?EVIDENCE_DIR, "**/*.json"])),
+    EvidenceJsonlFiles = filelib:wildcard(filename:join([?EVIDENCE_DIR, "**/*.jsonl"])),
+
+    %% Filter out files from evidence/period/ subdirectory
+    FilteredJson = lists:filter(fun(F) ->
+        not string:prefix(F, filename:join([?EVIDENCE_DIR, "period"]))
+    end, EvidenceJsonFiles),
+    FilteredJsonl = lists:filter(fun(F) ->
+        not string:prefix(F, filename:join([?EVIDENCE_DIR, "period"]))
+    end, EvidenceJsonlFiles),
+
+    FilteredJson ++ FilteredJsonl.
 
 get_file_hash(File) ->
     case file:read_file(File) of
@@ -159,6 +287,55 @@ get_file_hash(File) ->
         {error, _} ->
             <<"not_found">>
     end.
+
+copy_evidence_file(SourceFile, SnapshotPath) ->
+    try
+        %% Build relative path preserving directory structure
+        RelativePath = filename:relative_path(SourceFile, ?EVIDENCE_DIR),
+        DestFile = filename:join([SnapshotPath, RelativePath]),
+
+        %% Ensure destination directory exists
+        ok = filelib:ensure_dir(DestFile),
+
+        %% Copy file
+        case file:copy(SourceFile, DestFile) of
+            {ok, _BytesCopied} ->
+                {ok, DestFile};
+            {error, Reason} ->
+                logger:warning("Failed to copy evidence file ~s: ~p", [SourceFile, Reason]),
+                {error, {copy_failed, SourceFile, Reason}}
+        end
+    catch
+        Class:Reason:Stacktrace ->
+            logger:error("Exception copying file ~s: ~p:~p~n~p",
+                        [SourceFile, Class, Reason, Stacktrace]),
+            {error, {exception, SourceFile, Class, Reason}}
+    end.
+
+copy_snapshot_metadata(SnapshotPath) ->
+    %% Copy manifest file if it exists
+    case file:copy(filename:join(["receipts", ?MANIFEST_FILE]),
+                   filename:join([SnapshotPath, ?MANIFEST_FILE])) of
+        {ok, _} ->
+            logger:debug("Copied manifest file to snapshot");
+        {error, enoent} ->
+            logger:debug("Manifest file not found, skipping copy");
+        {error, Reason} ->
+            logger:warning("Failed to copy manifest file: ~p", [Reason])
+    end,
+
+    %% Copy verdict file if it exists
+    case file:copy(filename:join(["receipts", ?VERDICT_FILE]),
+                   filename:join([SnapshotPath, ?VERDICT_FILE])) of
+        {ok, _} ->
+            logger:debug("Copied verdict file to snapshot");
+        {error, enoent} ->
+            logger:debug("Verdict file not found, skipping copy");
+        {error, Reason} ->
+            logger:warning("Failed to copy verdict file: ~p", [Reason])
+    end,
+
+    ok.
 
 get_suites_from_verdict() ->
     case file:read_file("receipts/verdict.last.json") of
@@ -223,9 +400,16 @@ compute_days_covered(Snapshots) ->
             days_between(FirstDate, LastDate)
     end.
 
-extract_date_from_snapshot_id(SnapshotId) ->
+extract_date_from_snapshot_id(SnapshotId) when is_binary(SnapshotId) ->
     %% snapshot_YYYYMMDD -> YYYYMMDD
-    binary:part(SnapshotId, {9, 8}).
+    case byte_size(SnapshotId) >= 17 of
+        true ->
+            binary:part(SnapshotId, {9, 8});
+        false ->
+            invalid_format
+    end;
+extract_date_from_snapshot_id(_) ->
+    invalid_format.
 
 days_between(Date1, Date2) ->
     %% Parse dates and compute difference
@@ -252,3 +436,56 @@ sort_map_keys(List) when is_list(List) ->
     [sort_map_keys(Item) || Item <- List];
 sort_map_keys(Other) ->
     Other.
+
+list_snapshot_directories() ->
+    BasePath = ?SNAPSHOT_BASE_DIR,
+    case file:list_dir(BasePath) of
+        {ok, Files} ->
+            lists:filtermap(fun(FileName) ->
+                FullPath = filename:join([BasePath, FileName]),
+                case filelib:is_dir(FullPath) of
+                    true -> {true, FullPath};
+                    false -> false
+                end
+            end, Files);
+        {error, _Reason} ->
+            []
+    end.
+
+delete_snapshot_directory(DirPath) ->
+    try
+        ok = delete_directory_recursive(DirPath),
+        logger:info("Deleted snapshot directory: ~s", [DirPath]),
+        ok
+    catch
+        Class:Reason:Stacktrace ->
+            logger:error("Failed to delete directory ~s: ~p:~p~n~p",
+                        [DirPath, Class, Reason, Stacktrace]),
+            {error, {deletion_failed, Class, Reason}}
+    end.
+
+delete_directory_recursive(Dir) ->
+    case file:list_dir(Dir) of
+        {ok, Files} ->
+            lists:foreach(fun(File) ->
+                Path = filename:join([Dir, File]),
+                case filelib:is_dir(Path) of
+                    true -> delete_directory_recursive(Path);
+                    false -> ok = file:delete(Path)
+                end
+            end, Files),
+            ok = file:del_dir(Dir);
+        {error, enoent} ->
+            ok
+    end.
+
+date_to_seconds(DateBin) when is_binary(DateBin), byte_size(DateBin) =:= 8 ->
+    try
+        {Date, _} = {parse_date(DateBin), undefined},
+        Seconds = calendar:datetime_to_gregorian_seconds({Date, {0, 0, 0}}),
+        Seconds
+    catch
+        _:_ -> invalid_date
+    end;
+date_to_seconds(_) ->
+    invalid_date.

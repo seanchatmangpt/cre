@@ -1,0 +1,53 @@
+{# SOC 2 Customer Control Matrix Template
+   Generates deterministic YAML from customer-scoped SOC 2 control results.
+   Features:
+   - Stable key ordering (alphabetical)
+   - Customer-scoped filtering
+   - Unique filtering by control ID
+   - No timestamps or runtime values
+   - Matrix format for customer-specific compliance reporting
+#}
+{%- set customers = rows | unique(attribute="customerId") | sort(attribute="customerId") %}
+soc2_customer_control_matrix:
+  format_version: "2.0.0"
+  compliance_framework: "SOC 2"
+  customers:
+{%- for customer in customers %}
+    "{{ customer.customerId }}":
+      customer_name: "{{ customer.customerName }}"
+      suites:
+{%- set suites = rows | where(attribute="customerId", value=customer.customerId) | unique(attribute="suiteId") | sort(attribute="suiteId") %}
+{%- for suite in suites %}
+        "{{ suite.suiteId }}":
+          suite_name: "{{ suite.suiteName }}"
+          categories:
+{%- set categories = rows | where(attribute="customerId", value=customer.customerId) | where(attribute="suiteId", value=suite.suiteId) | unique(attribute="tscId") | sort(attribute="tscId") %}
+{%- for category in categories %}
+            "{{ category.tscId }}":
+              category_label: "{{ category.tscLabel }}"
+              controls:
+{%- set controls = rows | where(attribute="customerId", value=customer.customerId) | where(attribute="suiteId", value=suite.suiteId) | where(attribute="tscId", value=category.tscId) | unique(attribute="controlId") | sort(attribute="controlId") %}
+{%- for control in controls %}
+                "{{ control.controlId }}":
+                  title: "{{ control.controlTitle }}"
+                  description: "{{ control.controlDescription }}"
+                  evidence:
+{%- set evidence_items = rows | where(attribute="controlId", value=control.controlId) | unique(attribute="evidencePath") | sort(attribute="evidencePath") %}
+{%- for evidence in evidence_items %}
+                    - evidence_id: "{{ evidence.evidenceId }}"
+                      format: "{{ evidence.evidenceFormat }}"
+                      integrity: "{{ evidence.evidenceIntegrity }}"
+                      path: "{{ evidence.evidencePath }}"
+{%- if evidence.retentionDays %}
+                      retention_days: {{ evidence.retentionDays }}
+{%- endif %}
+{%- endfor %}
+                  validators:
+{%- set validators = rows | where(attribute="controlId", value=control.controlId) | map(attribute="validatorId") | unique | sort %}
+{%- for validator in validators %}
+                    - "{{ validator }}"
+{%- endfor %}
+{%- endfor %}
+{%- endfor %}
+{%- endfor %}
+{%- endfor %}

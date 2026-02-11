@@ -1,0 +1,188 @@
+{
+  "soc2_auditor_pack": {
+    "version": "1.0.0",
+    "generated_by": "generate_customer_soc2_artifacts.py",
+    "customer_id": "fintech_startup_de",
+    "customer_name": "FinTech Startup (Delaware)",
+    "suites_evaluated": [
+      {
+        "suite_id": "soc2_security_processing_integrity",
+        "suite_name": "SOC 2 Security + Processing Integrity"
+      }
+    ],
+    "evidence_manifest": {
+      "manifest_file": "evidence/evidence.sha256",
+      "integrity_mechanism": "sha256_manifest",
+      "required_evidence": [
+        {
+          "evidence_id": "chaos_tests",
+          "path": "evidence/chaos/**/*.json",
+          "format": "json",
+          "integrity": "sha256_manifest",
+          "retention_days": 2555
+        },
+        {
+          "evidence_id": "load_tests",
+          "path": "evidence/load_tests/**/*.json",
+          "format": "json",
+          "integrity": "sha256_manifest",
+          "retention_days": 2555
+        },
+        {
+          "evidence_id": "build_receipt",
+          "path": "receipts/build.last.json",
+          "format": "json",
+          "integrity": "sha256_manifest",
+          "retention_days": 2555
+        },
+        {
+          "evidence_id": "verdict_receipt",
+          "path": "receipts/verdict.last.json",
+          "format": "json",
+          "integrity": "sha256_manifest",
+          "retention_days": 2555
+        }
+      ]
+    },
+    "validator_registry": [
+      "config_validator",
+      "deterministic_generation_validator",
+      "hot_upgrade_validator",
+      "zero_downtime_validator"
+    ],
+    "control_evidence_mapping": [
+      {
+        "control_id": "CC6.1",
+        "validator": "config_validator",
+        "evidence": "build_receipt"
+      },
+      {
+        "control_id": "CC6.1",
+        "validator": "config_validator",
+        "evidence": "verdict_receipt"
+      },
+      {
+        "control_id": "CC6.1",
+        "validator": "zero_downtime_validator",
+        "evidence": "build_receipt"
+      },
+      {
+        "control_id": "CC6.1",
+        "validator": "zero_downtime_validator",
+        "evidence": "verdict_receipt"
+      },
+      {
+        "control_id": "CC6.2",
+        "validator": "config_validator",
+        "evidence": "build_receipt"
+      },
+      {
+        "control_id": "CC6.2",
+        "validator": "config_validator",
+        "evidence": "verdict_receipt"
+      },
+      {
+        "control_id": "CC6.3",
+        "validator": "config_validator",
+        "evidence": "build_receipt"
+      },
+      {
+        "control_id": "CC6.3",
+        "validator": "config_validator",
+        "evidence": "verdict_receipt"
+      },
+      {
+        "control_id": "CC7.2",
+        "validator": "zero_downtime_validator",
+        "evidence": "chaos_tests"
+      },
+      {
+        "control_id": "CC7.2",
+        "validator": "zero_downtime_validator",
+        "evidence": "verdict_receipt"
+      },
+      {
+        "control_id": "CC8.1",
+        "validator": "deterministic_generation_validator",
+        "evidence": "build_receipt"
+      },
+      {
+        "control_id": "CC8.1",
+        "validator": "deterministic_generation_validator",
+        "evidence": "verdict_receipt"
+      },
+      {
+        "control_id": "CC8.1",
+        "validator": "hot_upgrade_validator",
+        "evidence": "build_receipt"
+      },
+      {
+        "control_id": "CC8.1",
+        "validator": "hot_upgrade_validator",
+        "evidence": "verdict_receipt"
+      },
+      {
+        "control_id": "CC8.2",
+        "validator": "deterministic_generation_validator",
+        "evidence": "load_tests"
+      },
+      {
+        "control_id": "CC8.2",
+        "validator": "deterministic_generation_validator",
+        "evidence": "verdict_receipt"
+      },
+      {
+        "control_id": "CC9.1",
+        "validator": "zero_downtime_validator",
+        "evidence": "chaos_tests"
+      },
+      {
+        "control_id": "CC9.1",
+        "validator": "zero_downtime_validator",
+        "evidence": "verdict_receipt"
+      },
+      {
+        "control_id": "CC9.2",
+        "validator": "hot_upgrade_validator",
+        "evidence": "chaos_tests"
+      },
+      {
+        "control_id": "CC9.2",
+        "validator": "hot_upgrade_validator",
+        "evidence": "verdict_receipt"
+      },
+      {
+        "control_id": "CC9.2",
+        "validator": "zero_downtime_validator",
+        "evidence": "chaos_tests"
+      },
+      {
+        "control_id": "CC9.2",
+        "validator": "zero_downtime_validator",
+        "evidence": "verdict_receipt"
+      },
+      {
+        "control_id": "PI1.1",
+        "validator": "deterministic_generation_validator",
+        "evidence": "build_receipt"
+      },
+      {
+        "control_id": "PI1.1",
+        "validator": "deterministic_generation_validator",
+        "evidence": "verdict_receipt"
+      }
+    ],
+    "receipt_fields": {
+      "build_receipt": "receipts/build.last.json",
+      "evidence_manifest": "receipts/evidence.last.json",
+      "verdict": "receipts/verdict.last.json"
+    },
+    "notes": [
+      "Customer-specific SOC 2 auditor pack for FinTech Startup (Delaware)",
+      "Audit suite: SOC 2 Security + Processing Integrity",
+      "All evidence files are indexed in evidence/evidence.sha256",
+      "Receipt files contain cryptographic proof hashes",
+      "Generated deterministically - same ontology produces identical pack"
+    ]
+  }
+}

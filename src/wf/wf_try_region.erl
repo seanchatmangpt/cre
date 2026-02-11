@@ -158,12 +158,12 @@ execute_compensation(Action, Data, Exception) when is_function(Action) ->
         Action(Data, Exception)
     catch
         E:R:S ->
-            error_logger:error_msg("Compensation failed: ~p:~p~nStack: ~p~n", [E, R, S])
+            logger:error("Compensation failed: ~p:~p, Stack: ~p", [E, R, S])
     end,
     ok;
 execute_compensation(Action, Data, Exception) when is_atom(Action) ->
-    error_logger:info_msg("Executing compensation: ~p with data: ~p for exception: ~p~n",
-                          [Action, Data, maps:get(reason, Exception)]),
+    logger:info("Executing compensation: ~p with data: ~p for exception: ~p",
+                [Action, Data, maps:get(reason, Exception)]),
     ok.
 
 %%====================================================================

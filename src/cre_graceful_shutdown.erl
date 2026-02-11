@@ -838,7 +838,7 @@ check_preemption_notice() ->
 %% @end
 -spec handle_preemption_notice() -> ok.
 handle_preemption_notice() ->
-    logger:critical("GCP Spot VM preemption detected! Initiating fast shutdown"),
+    logger:critical("GCP Spot VM preemption detected! Initiating fast shutdown", []),
     %% Initiate shutdown with Spot VM timeout
     initiate_shutdown(?GKE_SPOT_TIMEOUT_MS, gke_preemption),
     ok.

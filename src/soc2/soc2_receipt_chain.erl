@@ -37,9 +37,21 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec append_receipt(map()) -> ok.
+-spec append_receipt(map()) -> ok | {error, term()}.
 append_receipt(Receipt) ->
-    gen_server:cast(?MODULE, {append_receipt, Receipt}).
+    %% Validate receipt against schema before appending
+    case soc2_receipt_schema:validate_receipt(Receipt) of
+        {ok, ValidReceipt} ->
+            gen_server:cast(?MODULE, {append_receipt, ValidReceipt}),
+            ok;
+        {error, Errors} ->
+            logger:warning(#{
+                what => receipt_validation_failed,
+                receipt => Receipt,
+                errors => Errors
+            }),
+            {error, {invalid_receipt, Errors}}
+    end.
 
 -spec get_chain() -> #{root_hash := binary(), receipts := [map()]}.
 get_chain() ->
@@ -89,6 +101,7 @@ handle_call(_Request, _From, State) ->
     {reply, {error, unknown_request}, State}.
 
 handle_cast({append_receipt, Receipt}, State) ->
+    %% Receipt has already been validated by append_receipt/1
     %% Compute receipt hash
     ReceiptHash = hash_receipt(Receipt),
     ReceiptWithHash = Receipt#{receipt_hash => ReceiptHash},
