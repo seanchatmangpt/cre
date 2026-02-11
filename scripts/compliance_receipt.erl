@@ -55,7 +55,7 @@ main_impl(OutputDir) ->
         {error, E1} -> io:format("Error writing receipt: ~p~n", [E1]), erlang:error(E1)
     end,
     Report = generate_report(Results, PassCount, TotalTests, CompliancePercent, ReceiptHash),
-    ReportBinary = iolist_to_binary(Report),
+    ReportBinary = unicode:characters_to_binary(Report),
     case file:write_file(ReportFile, ReportBinary) of
         ok -> ok;
         {error, E2} -> io:format("Error writing report: ~p~n", [E2]), erlang:error(E2)
@@ -118,10 +118,33 @@ test_supervision() ->
 test_hot_swapping() ->
     io:format("[ 3/7] Hot Code Swapping (Zero Downtime)... "),
     try
-        %% Simple test: verify code loading works
-        TestCode = "-module(test_hot). -export([v/0]). v() -> 1.",
-        {ok, Tokens, _} = erl_scan:string(TestCode),
-        {ok, _Form} = erl_parse:parse_form(Tokens),
+        %% Create test module v1 using abstract format
+        Forms1 = [
+            {attribute, 1, module, hotswap_compliance_test},
+            {attribute, 2, export, [{version, 0}]},
+            {function, 3, version, 0, [
+                {clause, 3, [], [], [{integer, 3, 1}]}
+            ]}
+        ],
+        {ok, hotswap_compliance_test, Bin1, _} = compile:forms(Forms1, [binary, return]),
+        {module, hotswap_compliance_test} = code:load_binary(hotswap_compliance_test, "hotswap_compliance_test.erl", Bin1),
+        1 = hotswap_compliance_test:version(),
+
+        %% Create test module v2 with updated version
+        Forms2 = [
+            {attribute, 1, module, hotswap_compliance_test},
+            {attribute, 2, export, [{version, 0}]},
+            {function, 3, version, 0, [
+                {clause, 3, [], [], [{integer, 3, 2}]}
+            ]}
+        ],
+        {ok, hotswap_compliance_test, Bin2, _} = compile:forms(Forms2, [binary, return]),
+        {module, hotswap_compliance_test} = code:load_binary(hotswap_compliance_test, "hotswap_compliance_test.erl", Bin2),
+        2 = hotswap_compliance_test:version(),
+
+        %% Purge old code
+        true = code:soft_purge(hotswap_compliance_test),
+
         io:format("✓ PASS~n"),
         pass
     catch
@@ -226,13 +249,8 @@ generate_receipt(Results, PassCount, TotalTests, CompliancePercent) ->
 
     %% Calculate hash
     ReceiptHash = crypto:hash(sha256, JsonBinary),
-    ReceiptHashHex = try
-        binary:encode_hex(ReceiptHash, lowercase)
-    catch
-        _:_ ->
-            %% Fallback for older OTP versions
-            list_to_binary([io_lib:format("~2.16.0b", [X]) || <<X>> <= ReceiptHash])
-    end,
+    %% Convert to hex string
+    ReceiptHashHex = list_to_binary([io_lib:format("~2.16.0b", [X]) || <<X>> <= ReceiptHash]),
 
     %% Add hash to receipt
     FinalReceipt = Receipt#{<<"receipt_hash">> => ReceiptHashHex},
@@ -240,21 +258,12 @@ generate_receipt(Results, PassCount, TotalTests, CompliancePercent) ->
 
     {FinalJson, binary_to_list(ReceiptHashHex)}.
 
-%% Try to use native JSON, fallback to readable format
+%% Use native Erlang JSON (OTP 27+)
 try_encode_json(Map) ->
-    case erlang:function_exported(json, encode, 1) of
-        true ->
-            try
-                json:encode(Map)
-            catch
-                _:_ ->
-                    %% Fallback: pretty-print as Erlang term
-                    list_to_binary(io_lib:format("~p~n", [Map]))
-            end;
-        false ->
-            %% JSON module not available - use readable format
-            list_to_binary(io_lib:format("~p~n", [Map]))
-    end.
+    %% Ensure json module is loaded
+    code:ensure_loaded(json),
+    %% Use native json:encode/1
+    json:encode(Map).
 
 %% Helper functions
 count_passes(Results) ->
