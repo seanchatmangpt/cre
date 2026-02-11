@@ -63,3 +63,4 @@ terraform/gcp/.terraform/
 terraform/gcp/**/.terraform/
 *.tfstate
 *.tfstate.*
+.erlmcp/sessionstart.log
