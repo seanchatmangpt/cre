@@ -10170,3 +10170,172 @@ src/core/gen_wfnet.erl:{101,14}: can't find include lib "wfnet/wfnet_types.hrl"
 [INFO] Environment: gVisor sandbox detected
 [INFO] Note: Some syscalls are limited in gVisor
 [SUCCESS] SessionStart complete - ready to develop
+--- SessionStart 2026-02-10T16:28:01-08:00 OTP=28.3.1 ---
+[INFO] Starting SessionStart.sh (v4.0.0-gvisor)
+[INFO] Platform: macos
+================================================================================
+[PHASE] 1/6 Cache check
+================================================================================
+[SUCCESS] OTP major version 28 found in cache
+================================================================================
+[PHASE] 3/6 Environment setup
+================================================================================
+[INFO] Environment variables persisted to CLAUDE_ENV_FILE
+[SUCCESS] Environment variables set
+[INFO]   PATH includes /Users/sac/cre/.erlmcp/otp-28.3.1/bin
+[INFO]   ERLMCP_PROFILE=cloud
+================================================================================
+[PHASE] 4/6 Lock file creation
+================================================================================
+[SUCCESS] Lock file created: /Users/sac/cre/.erlmcp/cache/sessionstart.lock
+================================================================================
+[PHASE] 5/6 Project build (rebar3)
+================================================================================
+[INFO] rebar3 already cached at /Users/sac/cre/.erlmcp/cache/rebar3
+[INFO] Already compiled (     327 beam files), verifying...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
+
+Compiling src/wfnet/wfnet_pattern_registry.erl failed
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 343 │      Patterns = ets:select(?MODULE, [{{{'$1', pattern}, '$2'}, [], [['$$]]}]),
+     │                                                                      ╰── illegal atom
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 393 │  %% the provided arguments. Delegates to the pattern module's `new/1` or
+     │                                                               ╰── syntax error before: '`'
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 430 │                          PatternOptions = maps:get.without([validate, timeout], Options),
+     │                                                   ╰── syntax error before: '.'
+
+
+    ┌─ src/wfnet/wfnet_pattern_registry.erl:
+    │
+ 91 │  -export([
+    │   ╰── function list_categories/0 undefined, did you mean clear_registry/0?
+
+    ┌─ src/wfnet/wfnet_pattern_registry.erl:
+    │
+ 91 │  -export([
+    │   ╰── function list_patterns/0 undefined, did you mean register_builtins/0?
+
+    ┌─ src/wfnet/wfnet_pattern_registry.erl:
+    │
+ 91 │  -export([
+    │   ╰── function list_patterns/1 undefined, did you mean list_patterns_by_category/1?
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 102 │  -export([
+     │   ╰── function create_pattern/3 undefined, did you mean create_pattern/2?
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 340 │  -spec list_patterns() -> [{atom(), pattern_definition()}].
+     │   ╰── spec for undefined function list_patterns/0
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 405 │      create_pattern(PatternName, Args, #{}).
+     │      ╰── function create_pattern/3 undefined, did you mean create_pattern/2?
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 416 │  -spec create_pattern(atom(), term(), create_options()) ->
+     │   ╰── spec for undefined function create_pattern/3
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 659 │      list_patterns({category, Category}).
+     │      ╰── function list_patterns/1 undefined, did you mean list_patterns_by_category/1?
+
+
+[INFO] Re-compilation needed...
+[INFO] Fetching dependencies...
+Verifying dependencies...
+[INFO] Compiling project...
+Verifying dependencies...
+Analyzing applications...
+Compiling cre
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:684: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:686: Warning: OPTIMIZED: match context reused
+src/yawl_sms.erl:702: Warning: OPTIMIZED: match context reused
+
+Compiling src/wfnet/wfnet_pattern_registry.erl failed
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 343 │      Patterns = ets:select(?MODULE, [{{{'$1', pattern}, '$2'}, [], [['$$]]}]),
+     │                                                                      ╰── illegal atom
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 393 │  %% the provided arguments. Delegates to the pattern module's `new/1` or
+     │                                                               ╰── syntax error before: '`'
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 430 │                          PatternOptions = maps:get.without([validate, timeout], Options),
+     │                                                   ╰── syntax error before: '.'
+
+
+    ┌─ src/wfnet/wfnet_pattern_registry.erl:
+    │
+ 91 │  -export([
+    │   ╰── function list_categories/0 undefined, did you mean clear_registry/0?
+
+    ┌─ src/wfnet/wfnet_pattern_registry.erl:
+    │
+ 91 │  -export([
+    │   ╰── function list_patterns/0 undefined, did you mean register_builtins/0?
+
+    ┌─ src/wfnet/wfnet_pattern_registry.erl:
+    │
+ 91 │  -export([
+    │   ╰── function list_patterns/1 undefined, did you mean list_patterns_by_category/1?
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 102 │  -export([
+     │   ╰── function create_pattern/3 undefined, did you mean create_pattern/2?
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 340 │  -spec list_patterns() -> [{atom(), pattern_definition()}].
+     │   ╰── spec for undefined function list_patterns/0
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 405 │      create_pattern(PatternName, Args, #{}).
+     │      ╰── function create_pattern/3 undefined, did you mean create_pattern/2?
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 416 │  -spec create_pattern(atom(), term(), create_options()) ->
+     │   ╰── spec for undefined function create_pattern/3
+
+     ┌─ src/wfnet/wfnet_pattern_registry.erl:
+     │
+ 659 │      list_patterns({category, Category}).
+     │      ╰── function list_patterns/1 undefined, did you mean list_patterns_by_category/1?
+
+
+[ERROR] Compilation failed
+[INFO] Project build skipped or failed (non-fatal)
+================================================================================
+[PHASE] 6/6 Session complete
+================================================================================
+[INFO] OTP Version: 28 (target: 28)
+[INFO] OTP Path: /Users/sac/cre/.erlmcp/otp-28.3.1/bin/erl
+[INFO] Environment: gVisor sandbox detected
+[INFO] Note: Some syscalls are limited in gVisor
+[SUCCESS] SessionStart complete - ready to develop

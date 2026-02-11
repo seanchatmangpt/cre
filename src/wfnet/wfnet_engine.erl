@@ -1013,12 +1013,12 @@ emit_event(Type, CaseId, Data, #engine_state{event_subscribers = Subs}) ->
 %% Simple engine lifecycle test
 engine_lifecycle_test() ->
     Spec = #{
-        places => [start, end],
+        places => [start, 'end'],
         transitions => [t1],
         start_place => start,
-        end_place => end,
+        end_place => 'end',
         preset => #{t1 => [start]},
-        postset => #{t1 => [end]}
+        postset => #{t1 => ['end']}
     },
     {ok, Engine} = start_link(Spec),
     ?assertEqual(ok, stop(Engine)).
@@ -1026,12 +1026,12 @@ engine_lifecycle_test() ->
 %% Start case test
 start_case_test() ->
     Spec = #{
-        places => [start, end],
+        places => [start, 'end'],
         transitions => [t1],
         start_place => start,
-        end_place => end,
+        end_place => 'end',
         preset => #{t1 => [start]},
-        postset => #{t1 => [end]}
+        postset => #{t1 => ['end']}
     },
     {ok, Engine} = start_link(Spec),
     {ok, CaseId} = start_case(Engine, #{}),
@@ -1041,12 +1041,12 @@ start_case_test() ->
 %% Execute step test
 execute_step_test() ->
     Spec = #{
-        places => [start, end],
+        places => [start, 'end'],
         transitions => [t1],
         start_place => start,
-        end_place => end,
+        end_place => 'end',
         preset => #{t1 => [start]},
-        postset => #{t1 => [end]}
+        postset => #{t1 => ['end']}
     },
     {ok, Engine} = start_link(Spec),
     {ok, CaseId} = start_case(Engine, #{}),
@@ -1058,12 +1058,12 @@ execute_step_test() ->
 %% Metrics test
 get_metrics_test() ->
     Spec = #{
-        places => [start, end],
+        places => [start, 'end'],
         transitions => [t1],
         start_place => start,
-        end_place => end,
+        end_place => 'end',
         preset => #{t1 => [start]},
-        postset => #{t1 => [end]}
+        postset => #{t1 => ['end']}
     },
     {ok, Engine} = start_link(Spec),
     {ok, _} = start_case(Engine, #{}),
