@@ -1,0 +1,20 @@
+{application, f5_reg_mortgage_lender_fl,
+ [{description, "Regulation validators for Mortgage Lender (Florida)"},
+  {vsn, "0.3.0"},
+  {registered, [f5_reg_mortgage_lender_fl_sup]},
+  {mod, {f5_reg_mortgage_lender_fl_app, []}},
+  {applications, [kernel, stdlib, logger]},
+  {modules, [
+        f5_reg_mortgage_lender_fl_app,
+        f5_reg_mortgage_lender_fl_sup,
+        f5_reg_mortgage_lender_fl_fl_mortgage_lending_validator,
+        f5_reg_mortgage_lender_fl_fed_cfpb_trid_validator,
+        f5_reg_mortgage_lender_fl_fed_cfpb_reg_z_validator,
+        f5_reg_mortgage_lender_fl_fed_bsa_aml_validator
+    ]}},
+  {{env, [
+        {{customer_id, "{customer["id"]}"}},
+        {{jurisdiction, {customer["jurisdiction"]}}},
+        {{risk_tier, {customer["risk_tier"]}}}
+    ]}}
+ ]}}.

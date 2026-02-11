@@ -1,0 +1,20 @@
+{application, f5_reg_megabank_ny,
+ [{description, "Regulation validators for MegaBank (New York)"},
+  {vsn, "0.3.0"},
+  {registered, [f5_reg_megabank_ny_sup]},
+  {mod, {f5_reg_megabank_ny_app, []}},
+  {applications, [kernel, stdlib, logger]},
+  {modules, [
+        f5_reg_megabank_ny_app,
+        f5_reg_megabank_ny_sup,
+        f5_reg_megabank_ny_ny_dfs_23_nycrr_500_validator,
+        f5_reg_megabank_ny_fed_cfpb_reg_e_validator,
+        f5_reg_megabank_ny_fed_cfpb_reg_z_validator,
+        f5_reg_megabank_ny_fed_bsa_aml_validator
+    ]}},
+  {{env, [
+        {{customer_id, "{customer["id"]}"}},
+        {{jurisdiction, {customer["jurisdiction"]}}},
+        {{risk_tier, {customer["risk_tier"]}}}
+    ]}}
+ ]}}.

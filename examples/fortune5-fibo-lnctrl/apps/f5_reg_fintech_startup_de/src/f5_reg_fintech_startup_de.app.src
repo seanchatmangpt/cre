@@ -1,0 +1,19 @@
+{application, f5_reg_fintech_startup_de,
+ [{description, "Regulation validators for FinTech Startup (Delaware)"},
+  {vsn, "0.3.0"},
+  {registered, [f5_reg_fintech_startup_de_sup]},
+  {mod, {f5_reg_fintech_startup_de_app, []}},
+  {applications, [kernel, stdlib, logger]},
+  {modules, [
+        f5_reg_fintech_startup_de_app,
+        f5_reg_fintech_startup_de_sup,
+        f5_reg_fintech_startup_de_de_money_transmitter_validator,
+        f5_reg_fintech_startup_de_fed_cfpb_reg_e_validator,
+        f5_reg_fintech_startup_de_fed_bsa_aml_validator
+    ]}},
+  {{env, [
+        {{customer_id, "{customer["id"]}"}},
+        {{jurisdiction, {customer["jurisdiction"]}}},
+        {{risk_tier, {customer["risk_tier"]}}}
+    ]}}
+ ]}}.

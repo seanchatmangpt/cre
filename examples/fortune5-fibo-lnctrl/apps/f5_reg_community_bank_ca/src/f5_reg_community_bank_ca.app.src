@@ -1,0 +1,20 @@
+{application, f5_reg_community_bank_ca,
+ [{description, "Regulation validators for Community Bank (California)"},
+  {vsn, "0.3.0"},
+  {registered, [f5_reg_community_bank_ca_sup]},
+  {mod, {f5_reg_community_bank_ca_app, []}},
+  {applications, [kernel, stdlib, logger]},
+  {modules, [
+        f5_reg_community_bank_ca_app,
+        f5_reg_community_bank_ca_sup,
+        f5_reg_community_bank_ca_ca_ccpa_validator,
+        f5_reg_community_bank_ca_ca_cpra_validator,
+        f5_reg_community_bank_ca_fed_cfpb_reg_e_validator,
+        f5_reg_community_bank_ca_fed_bsa_aml_validator
+    ]}},
+  {{env, [
+        {{customer_id, "{customer["id"]}"}},
+        {{jurisdiction, {customer["jurisdiction"]}}},
+        {{risk_tier, {customer["risk_tier"]}}}
+    ]}}
+ ]}}.

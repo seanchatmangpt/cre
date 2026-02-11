@@ -1,0 +1,160 @@
+# Fortune-5 FIBO LineController Factory - ggen Configuration
+# Ontology-driven code generation for 300k+ LOC OTP applications
+
+[project]
+name = "fortune5-fibo-lnctrl"
+version = "0.3.0"
+description = "Fortune-5 FIBO-aligned LineController with 206 OTP apps"
+
+[ontology]
+source = "ontology/f5_line_control.ttl"
+base_iri = "http://fortune5.lnctrl.io/ontology#"
+
+[ontology.prefixes]
+ln = "http://lnctrl.io/ontology#"
+f5 = "http://fortune5.lnctrl.io/ontology#"
+fibo-fnd = "https://spec.edmcouncil.org/fibo/ontology/FND/"
+fibo-be = "https://spec.edmcouncil.org/fibo/ontology/BE/"
+fibo-loan = "https://spec.edmcouncil.org/fibo/ontology/LOAN/"
+rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+rdfs = "http://www.w3.org/2000/01/rdf-schema#"
+owl = "http://www.w3.org/2002/07/owl#"
+xsd = "http://www.w3.org/2001/XMLSchema#"
+
+# =============================================================================
+# GENERATION RULES
+# =============================================================================
+
+# Rule 1: Generate connector modules from ontology
+[[generation.rules]]
+name = "generate-connectors"
+description = "Generate Erlang connector modules from FIBO ontology"
+query = { file = "sparql/extract_connectors.sparql" }
+template = { file = "templates/connector_module.tera" }
+output_pattern = "apps/f5_connectors/src/f5_connector_{connectorId}.erl"
+mode = "OverwriteAll"
+
+# Rule 2: Generate connector supervisor
+[[generation.rules]]
+name = "generate-connector-supervisor"
+description = "Generate supervisor for all connectors"
+query = { inline = """
+PREFIX ln: <http://lnctrl.io/ontology#>
+SELECT (COUNT(?connector) AS ?connectorCount)
+WHERE {
+    ?connector a ln:Connector .
+}
+""" }
+template = { inline = """
+%% Generated supervisor for f5_connectors
+-module(f5_connectors_sup).
+-behaviour(supervisor).
+-export([start_link/0, init/1]).
+
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+init([]) ->
+    SupFlags = #{strategy => one_for_one, intensity => 10, period => 60},
+
+    %% Start all connector gen_servers as children
+    ChildSpecs = [
+        #{
+            id => worker_1,
+            start => {f5_connectors_worker, start_link, [#{worker_id => 1}]},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker
+        },
+        #{
+            id => worker_2,
+            start => {f5_connectors_worker, start_link, [#{worker_id => 2}]},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker
+        }
+    ],
+
+    {ok, {SupFlags, ChildSpecs}}.
+""" }
+output_file = "apps/f5_connectors/src/f5_connectors_sup.erl"
+mode = "Overwrite"
+
+# Rule 3: Generate connector app module
+[[generation.rules]]
+name = "generate-connector-app"
+description = "Generate OTP application module for connectors"
+query = { inline = "SELECT * WHERE { }" }
+template = { inline = """
+%% Generated application module for f5_connectors
+-module(f5_connectors_app).
+-behaviour(application).
+-export([start/2, stop/1]).
+
+start(_StartType, _StartArgs) ->
+    f5_connectors_sup:start_link().
+
+stop(_State) ->
+    ok.
+""" }
+output_file = "apps/f5_connectors/src/f5_connectors_app.erl"
+mode = "Overwrite"
+
+# Rule 4: Generate service apps (internal implementations)
+[[generation.rules]]
+name = "generate-service-apps"
+description = "Generate internal service apps for each connector type"
+query = { file = "sparql/extract_connectors.sparql" }
+template = { file = "templates/service_app.tera" }
+output_pattern = "apps/f5_service_{connectorId}/src/f5_service_{connectorId}_app.erl"
+mode = "OverwriteAll"
+
+# Rule 5: Generate regulation validators per customer
+[[generation.rules]]
+name = "generate-regulation-validators"
+description = "Generate customer-specific regulation validators"
+query = { inline = """
+PREFIX ln: <http://lnctrl.io/ontology#>
+PREFIX f5: <http://fortune5.lnctrl.io/ontology#>
+SELECT ?customerId ?jurisdiction ?regulationType
+WHERE {
+    ?customer a ln:Customer ;
+              ln:customerId ?customerId ;
+              ln:jurisdiction ?jurisdiction ;
+              ln:regulationType ?regulationType .
+}
+""" }
+template = { file = "templates/regulation_validator.tera" }
+output_pattern = "apps/f5_regulations_{customerId}/src/f5_reg_{regulationType}_validator.erl"
+mode = "OverwriteAll"
+
+# Rule 6: Generate adversarial validators
+[[generation.rules]]
+name = "generate-adversarial-validators"
+description = "Generate adversarial zero-downtime validators"
+query = { inline = "SELECT * WHERE { }" }
+template = { file = "templates/adversarial_validator.tera" }
+output_file = "scripts/adversarial_validator.erl"
+mode = "PreserveExisting"
+
+# =============================================================================
+# OUTPUT CONFIGURATION
+# =============================================================================
+
+[output]
+directory = "apps"
+format = "otp_application"
+preserve_timestamps = true
+create_manifest = true
+generate_receipts = true
+
+[output.receipts]
+directory = "receipts"
+format = "json"
+include_hashes = true
+include_loc_count = true
+
+[output.evidence]
+directory = "evidence"
+collect_otp_metrics = true
+generate_proofs = true

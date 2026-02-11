@@ -1,0 +1,19 @@
+{application, f5_reg_credit_union_tx,
+ [{description, "Regulation validators for Credit Union (Texas)"},
+  {vsn, "0.3.0"},
+  {registered, [f5_reg_credit_union_tx_sup]},
+  {mod, {f5_reg_credit_union_tx_app, []}},
+  {applications, [kernel, stdlib, logger]},
+  {modules, [
+        f5_reg_credit_union_tx_app,
+        f5_reg_credit_union_tx_sup,
+        f5_reg_credit_union_tx_tx_finance_code_validator,
+        f5_reg_credit_union_tx_ncua_part_701_validator,
+        f5_reg_credit_union_tx_fed_bsa_aml_validator
+    ]}},
+  {{env, [
+        {{customer_id, "{customer["id"]}"}},
+        {{jurisdiction, {customer["jurisdiction"]}}},
+        {{risk_tier, {customer["risk_tier"]}}}
+    ]}}
+ ]}}.
