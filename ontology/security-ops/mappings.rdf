@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+  xmlns:owl="http://www.w3.org/2002/07/owl#"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:secops="http://cre.local/security-ops#">
+
+  <!-- Ontology Metadata -->
+  <rdf:Description rdf:about="http://cre.local/security-ops/mappings">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Ontology"/>
+    <dc:title>Integration Transform Mappings Ontology</dc:title>
+    <dc:description>Deterministic field mappings and transformations for external system integrations</dc:description>
+    <dc:isPartOf rdf:resource="http://cre.local/security-ops"/>
+    <dc:created rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2026-02-11T00:00:00Z</dc:created>
+  </rdf:Description>
+
+  <!-- ==============================================
+       MAPPING BASE CLASS
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/security-ops#Mapping">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+    <rdfs:label>Mapping</rdfs:label>
+    <rdfs:comment>Abstract base class for field mapping and transformation rules</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       SIEM ALERT TO INCIDENT MAPPING
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/security-ops#SIEMAlertToIncidentMapping">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Mapping"/>
+    <rdfs:label>SIEM Alert to Incident</rdfs:label>
+    <rdfs:comment>Transform SIEM alert fields to CRE Incident entity</rdfs:comment>
+    <secops:source_system>SIEM</secops:source_system>
+    <secops:target_entity>Incident</secops:target_entity>
+    <secops:mapping_version>1.0</secops:mapping_version>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- SIEM alert_id -> incident_id -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#SIEMAlertToIncidentMapping_alert_id">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>alert_id to incident_id</rdfs:label>
+    <rdfs:comment>Map SIEM alert_id to incident_id; use as primary identifier</rdfs:comment>
+    <secops:source_field>alert_id</secops:source_field>
+    <secops:target_field>incident_id</secops:target_field>
+    <secops:transform_type>identity</secops:transform_type>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#SIEMAlertToIncidentMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- SIEM alert_severity -> severity -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#SIEMAlertToIncidentMapping_severity">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>alert_severity to severity</rdfs:label>
+    <rdfs:comment>Map SIEM alert_severity to CRE severity (Critical, High, Medium, Low)</rdfs:comment>
+    <secops:source_field>alert_severity</secops:source_field>
+    <secops:target_field>severity</secops:target_field>
+    <secops:transform_type>enum_mapping</secops:transform_type>
+    <secops:mapping_rules>5+ -> Critical; 3-4 -> High; 2 -> Medium; 1 -> Low</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#SIEMAlertToIncidentMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- SIEM rule_name -> classification -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#SIEMAlertToIncidentMapping_classification">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>rule_name to classification</rdfs:label>
+    <rdfs:comment>Map SIEM rule_name patterns to incident classification via regex</rdfs:comment>
+    <secops:source_field>rule_name</secops:source_field>
+    <secops:target_field>classification</secops:target_field>
+    <secops:transform_type>regex_pattern</secops:transform_type>
+    <secops:mapping_rules>.*malware.* -> Malware; .*phish.* -> Phishing; .*recon.* -> Recon; .*access.* -> UnauthorizedAccess</secops:mapping_rules>
+    <secops:default_value>SuspiciousActivity</secops:default_value>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#SIEMAlertToIncidentMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- SIEM affected_asset -> affected_systems -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#SIEMAlertToIncidentMapping_affected_systems">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>affected_asset to affected_systems</rdfs:label>
+    <rdfs:comment>Map SIEM affected_asset to affected_systems list; handle multi-value</rdfs:comment>
+    <secops:source_field>affected_asset</secops:source_field>
+    <secops:target_field>affected_systems</secops:target_field>
+    <secops:transform_type>list_extraction</secops:transform_type>
+    <secops:mapping_rules>Split comma-separated assets into list; deduplicate</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#SIEMAlertToIncidentMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- SIEM alert_timestamp -> event_timestamp -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#SIEMAlertToIncidentMapping_timestamp">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>alert_timestamp to event_timestamp</rdfs:label>
+    <rdfs:comment>Map SIEM alert_timestamp to ISO 8601 event_timestamp</rdfs:comment>
+    <secops:source_field>alert_timestamp</secops:source_field>
+    <secops:target_field>event_timestamp</secops:target_field>
+    <secops:transform_type>datetime_normalization</secops:transform_type>
+    <secops:mapping_rules>Convert to UTC ISO 8601 format</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#SIEMAlertToIncidentMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       INCIDENT TO TICKET MAPPING
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToTicketMapping">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Mapping"/>
+    <rdfs:label>Incident to Ticket</rdfs:label>
+    <rdfs:comment>Transform CRE Incident to ticketing system (Jira/ServiceNow) escalation format</rdfs:comment>
+    <secops:source_entity>Incident</secops:source_entity>
+    <secops:target_system>Ticketing</secops:target_system>
+    <secops:mapping_version>1.0</secops:mapping_version>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- incident_id -> ticket external_id -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToTicketMapping_incident_id">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>incident_id to ticket external_id</rdfs:label>
+    <rdfs:comment>Link incident_id as ticket external_id for traceability</rdfs:comment>
+    <secops:source_field>incident_id</secops:source_field>
+    <secops:target_field>external_id</secops:target_field>
+    <secops:transform_type>identity</secops:transform_type>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#IncidentToTicketMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- severity -> ticket priority -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToTicketMapping_priority">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>severity to ticket priority</rdfs:label>
+    <rdfs:comment>Map incident severity to ticket priority (1-5 scale)</rdfs:comment>
+    <secops:source_field>severity</secops:source_field>
+    <secops:target_field>priority</secops:target_field>
+    <secops:transform_type>enum_mapping</secops:transform_type>
+    <secops:mapping_rules>Critical -> 1; High -> 2; Medium -> 3; Low -> 5</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#IncidentToTicketMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- classification -> ticket type/issue_type -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToTicketMapping_type">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>classification to ticket type</rdfs:label>
+    <rdfs:comment>Map incident classification to ticket type (Security Incident)</rdfs:comment>
+    <secops:source_field>classification</secops:source_field>
+    <secops:target_field>issue_type</secops:target_field>
+    <secops:transform_type>constant_mapping</secops:transform_type>
+    <secops:mapping_rules>* -> Security Incident</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#IncidentToTicketMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- affected_systems + classification -> description -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToTicketMapping_description">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>affected_systems + classification to description</rdfs:label>
+    <rdfs:comment>Compose ticket description from incident metadata</rdfs:comment>
+    <secops:source_field>affected_systems</secops:source_field>
+    <secops:source_field>classification</secops:source_field>
+    <secops:source_field>event_timestamp</secops:source_field>
+    <secops:target_field>description</secops:target_field>
+    <secops:transform_type>template_rendering</secops:transform_type>
+    <secops:mapping_rules>Template: "{{classification}} incident detected on {{affected_systems}} at {{event_timestamp}}"</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#IncidentToTicketMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       INCIDENT TO EDR CONTAINMENT MAPPING
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToEDRMapping">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Mapping"/>
+    <rdfs:label>Incident to EDR Containment</rdfs:label>
+    <rdfs:comment>Transform Incident to EDR containment actions (isolate, kill process)</rdfs:comment>
+    <secops:source_entity>Incident</secops:source_entity>
+    <secops:target_system>EDR</secops:target_system>
+    <secops:mapping_version>1.0</secops:mapping_version>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- affected_systems -> device_id -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToEDRMapping_device_id">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>affected_systems to device_id</rdfs:label>
+    <rdfs:comment>Map incident affected_systems to EDR device_id via hostname lookup</rdfs:comment>
+    <secops:source_field>affected_systems</secops:source_field>
+    <secops:target_field>device_id</secops:target_field>
+    <secops:transform_type>system_lookup</secops:transform_type>
+    <secops:mapping_rules>Lookup each hostname in EDR asset database; return device_id list</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#IncidentToEDRMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- classification -> action_type -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToEDRMapping_action">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>classification to action_type</rdfs:label>
+    <rdfs:comment>Map incident classification to EDR action (isolate, kill_process, quarantine)</rdfs:comment>
+    <secops:source_field>classification</secops:source_field>
+    <secops:target_field>action_type</secops:target_field>
+    <secops:transform_type>enum_mapping</secops:transform_type>
+    <secops:mapping_rules>Malware -> isolate; UnauthorizedAccess -> kill_process; default -> isolate</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#IncidentToEDRMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- severity -> isolation_type -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToEDRMapping_isolation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>severity to isolation_type</rdfs:label>
+    <rdfs:comment>Map incident severity to isolation scope (full vs targeted)</rdfs:comment>
+    <secops:source_field>severity</secops:source_field>
+    <secops:target_field>isolation_type</secops:target_field>
+    <secops:transform_type>enum_mapping</secops:transform_type>
+    <secops:mapping_rules>Critical -> full_isolation; High -> full_isolation; Medium -> process_isolation; Low -> monitor_only</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#IncidentToEDRMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       INCIDENT TO NOTIFICATION MAPPING
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToNotificationMapping">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Mapping"/>
+    <rdfs:label>Incident to Notification</rdfs:label>
+    <rdfs:comment>Transform Incident to alert notification (email, Slack, PagerDuty)</rdfs:comment>
+    <secops:source_entity>Incident</secops:source_entity>
+    <secops:target_system>Notification</secops:target_system>
+    <secops:mapping_version>1.0</secops:mapping_version>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- severity -> recipient_list -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToNotificationMapping_recipients">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>severity to recipient_list</rdfs:label>
+    <rdfs:comment>Route notification recipients based on severity level</rdfs:comment>
+    <secops:source_field>severity</secops:source_field>
+    <secops:target_field>recipients</secops:target_field>
+    <secops:transform_type>enum_mapping</secops:transform_type>
+    <secops:mapping_rules>Critical -> [soc_lead, ir_manager, ciso]; High -> [soc_lead, ir_manager]; Medium -> [soc_lead]; Low -> [siem_dashboard]</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#IncidentToNotificationMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- severity -> message_template -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToNotificationMapping_template">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>severity to message_template</rdfs:label>
+    <rdfs:comment>Select message template based on severity for appropriate tone/urgency</rdfs:comment>
+    <secops:source_field>severity</secops:source_field>
+    <secops:target_field>message_template</secops:target_field>
+    <secops:transform_type>enum_mapping</secops:transform_type>
+    <secops:mapping_rules>Critical -> urgent_escalation_template; High -> escalation_template; Medium -> investigation_template; Low -> info_template</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#IncidentToNotificationMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- classification + affected_systems -> alert_body -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#IncidentToNotificationMapping_body">
+    <rdf:type rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:label>classification + affected_systems to alert_body</rdfs:label>
+    <rdfs:comment>Compose alert message body from incident details</rdfs:comment>
+    <secops:source_field>classification</secops:source_field>
+    <secops:source_field>affected_systems</secops:source_field>
+    <secops:source_field>severity</secops:source_field>
+    <secops:target_field>alert_body</secops:target_field>
+    <secops:transform_type>template_rendering</secops:transform_type>
+    <secops:mapping_rules>Template: "{{severity}} {{classification}} incident detected on {{affected_systems}}. Immediate investigation required."</secops:mapping_rules>
+    <secops:mapping rdf:resource="http://cre.local/security-ops#IncidentToNotificationMapping"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       FIELD TRANSFORM BASE CLASS
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/security-ops#FieldTransform">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+    <rdfs:label>Field Transform</rdfs:label>
+    <rdfs:comment>Individual field transformation rule within a mapping</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       TRANSFORM TYPE CLASSES
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/security-ops#TransformType">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+    <rdfs:label>Transform Type</rdfs:label>
+    <rdfs:comment>Category of field transformation (identity, enum_mapping, template, etc)</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- Identity transform -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#TransformIdentity">
+    <rdf:type rdf:resource="http://cre.local/security-ops#TransformType"/>
+    <rdfs:label>Identity</rdfs:label>
+    <rdfs:comment>Pass-through transformation; no modification</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- Enum mapping transform -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#TransformEnumMapping">
+    <rdf:type rdf:resource="http://cre.local/security-ops#TransformType"/>
+    <rdfs:label>Enum Mapping</rdfs:label>
+    <rdfs:comment>Map source values to target enumerations via lookup table</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- Regex pattern transform -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#TransformRegexPattern">
+    <rdf:type rdf:resource="http://cre.local/security-ops#TransformType"/>
+    <rdfs:label>Regex Pattern</rdfs:label>
+    <rdfs:comment>Apply regex patterns to extract and classify field values</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- Template rendering transform -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#TransformTemplateRendering">
+    <rdf:type rdf:resource="http://cre.local/security-ops#TransformType"/>
+    <rdfs:label>Template Rendering</rdfs:label>
+    <rdfs:comment>Render field value from Mustache/Handlebars template with multiple source fields</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       MAPPING PROPERTIES
+       ============================================== -->
+
+  <!-- source_field: Source field name in mapping -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#source_field">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>source_field</rdfs:label>
+    <rdfs:comment>Source field name in external system</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- target_field: Target field name -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#target_field">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>target_field</rdfs:label>
+    <rdfs:comment>Target field name in CRE entity</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- transform_type: Type of transformation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#transform_type">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>transform_type</rdfs:label>
+    <rdfs:comment>Type of field transformation (identity, enum_mapping, regex_pattern, etc)</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- mapping_rules: Deterministic transformation rules -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#mapping_rules">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>mapping_rules</rdfs:label>
+    <rdfs:comment>Deterministic transformation rules (lookup table, regex, template)</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+  <!-- default_value: Default value if source not present -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#default_value">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>default_value</rdfs:label>
+    <rdfs:comment>Default value to use if source field not present or null</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#FieldTransform"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/mappings"/>
+  </rdf:Description>
+
+</rdf:RDF>
