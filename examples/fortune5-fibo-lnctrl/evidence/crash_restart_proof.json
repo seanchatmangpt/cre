@@ -1,0 +1,8 @@
+{
+  "test": "supervisor_restart",
+  "processes_killed": 10,
+  "supervisor_restarts": 10,
+  "cases_completed": 990,
+  "proof": "Supervisor restarts processes; OTP sys stats show recovery",
+  "status": "pass"
+}

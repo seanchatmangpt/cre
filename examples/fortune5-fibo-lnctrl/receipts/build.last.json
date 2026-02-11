@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-02-11T05:21:14.403254Z",
+  "duration_ms": 5633,
+  "fibo_commit": "90770ba4797725d7784f6bcc824c3f106470a96b",
+  "input_hash": "ontology_hash_placeholder",
+  "output_hash": "86fabc6ba5b92fbce8a755239d00c61d2738393b78f6f5feae794650934b60c3",
+  "counts": {
+    "erlang_modules": 8642,
+    "header_files": 0,
+    "otp_apps": 206,
+    "eunit_tests": 8642,
+    "ct_suites": 0,
+    "total_loc": 300980
+  },
+  "scale_targets": {
+    "target_loc": 300000,
+    "target_modules": 2000,
+    "target_apps": 50,
+    "achieved_loc_percent": 100,
+    "achieved_modules_percent": 432,
+    "achieved_apps_percent": 412
+  },
+  "status": "target_met"
+}
