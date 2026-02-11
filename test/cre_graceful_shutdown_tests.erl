@@ -26,6 +26,11 @@
 %% shutdown coordination, workflow completion waiting, Mnesia checkpointing,
 %% cluster notification, and connection cleanup.
 %%
+%% Design: All tests are designed for single-node deployment and do not
+%% require distributed Erlang or multiple node support. This is appropriate
+%% for GKE containerized deployments which use Kubernetes for orchestration
+%% instead of distributed Erlang clustering.
+%%
 %% @end
 %% -------------------------------------------------------------------
 
@@ -45,9 +50,15 @@ setup() ->
     end.
 
 %% @doc Cleanup function run after each test
+%% Enhanced to handle various shutdown states safely
 cleanup(_State) ->
-    %% Reset shutdown state
-    catch cre_graceful_shutdown:stop(),
+    %% Reset shutdown state with proper error handling
+    case catch cre_graceful_shutdown:stop() of
+        ok -> ok;
+        {'EXIT', {noproc, _}} -> ok;  %% Process already dead
+        {'EXIT', _} -> ok;             %% Other errors - ignore
+        _ -> ok
+    end,
     timer:sleep(100),
     ok.
 
@@ -60,6 +71,7 @@ start_server_returns_pid_test() ->
     {ok, Pid} = cre_graceful_shutdown:start_link(),
     ?assert(is_pid(Pid)),
     cre_graceful_shutdown:stop(),
+    timer:sleep(100),
     ?assert(process_info(Pid) =:= undefined).
 
 %% @doc Test is_shutting_down returns false initially
@@ -178,6 +190,7 @@ notify_cluster_custom_timeout_test() ->
     ?assert(maps:is_key(peers_notified, Result)).
 
 %% @doc Test handle_peer_notification accepts node
+%% Note: In single-node setup, this is mostly a no-op but should succeed
 handle_peer_notification_accepts_node_test() ->
     ok = cre_graceful_shutdown:handle_peer_notification(nonode@nohost).
 

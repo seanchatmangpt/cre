@@ -455,11 +455,110 @@ build_project() {
 }
 
 #=============================================================================
-# Phase 6: Completion Report
+# Phase 6: Verify BEAM Ready for Hot Code Swapping
+#=============================================================================
+
+verify_beam_ready() {
+    local start_time=$1
+    phase "6/6 BEAM readiness verification"
+
+    info "Testing BEAM VM boot and hot code loading capabilities..."
+
+    # Create a simple test module for hot code swapping verification
+    local test_module="/tmp/beam_ready_test_$$.erl"
+    cat > "$test_module" <<'ERLTEST'
+-module(beam_ready_test).
+-export([version/0]).
+version() -> 1.
+ERLTEST
+
+    # Test 1: BEAM can boot and execute code
+    local beam_boot_start=$(date +%s%N 2>/dev/null || echo "0")
+    local boot_result
+    boot_result=$("$OTP_BIN" -noshell -eval 'io:format("READY~n"), halt().' 2>&1)
+    local beam_boot_end=$(date +%s%N 2>/dev/null || echo "0")
+
+    if [[ "$boot_result" != "READY" ]]; then
+        error "BEAM VM failed to boot properly"
+        rm -f "$test_module"
+        return 1
+    fi
+
+    # Test 2: Code compilation and hot loading capability
+    local compile_result
+    compile_result=$("$OTP_BIN" -noshell -eval "
+        Binary = case compile:file('$test_module', [binary, return]) of
+            {ok, beam_ready_test, Bin} -> Bin;
+            {ok, beam_ready_test, Bin, _Warnings} -> Bin;
+            _ -> error
+        end,
+        case Binary of
+            error ->
+                io:format('COMPILE_FAILED~n');
+            _ ->
+                case code:load_binary(beam_ready_test, \"$test_module\", Binary) of
+                    {module, beam_ready_test} ->
+                        io:format('HOT_LOAD_OK~n');
+                    _ ->
+                        io:format('HOT_LOAD_FAILED~n')
+                end
+        end,
+        halt().
+    " 2>&1)
+
+    rm -f "$test_module"
+
+    if [[ "$compile_result" != "HOT_LOAD_OK" ]]; then
+        error "BEAM hot code loading not ready"
+        return 1
+    fi
+
+    # Calculate timing
+    local end_time=$(date +%s%N 2>/dev/null || date +%s)
+    local total_time
+    if [[ "$start_time" =~ ^[0-9]+$ ]] && [[ "$end_time" =~ ^[0-9]+$ ]]; then
+        if [[ ${#start_time} -gt 10 ]]; then
+            # Nanosecond precision
+            total_time=$(( (end_time - start_time) / 1000000 ))
+            local boot_time=$(( (beam_boot_end - beam_boot_start) / 1000000 ))
+        else
+            # Second precision fallback
+            total_time=$(( (end_time - start_time) * 1000 ))
+            boot_time=0
+        fi
+    else
+        total_time="N/A"
+        boot_time="N/A"
+    fi
+
+    success "BEAM VM ready for hot code swapping"
+    echo "" >&2
+    echo "╔════════════════════════════════════════════════════════════╗" >&2
+    echo "║                   STARTUP TIMING REPORT                    ║" >&2
+    echo "╠════════════════════════════════════════════════════════════╣" >&2
+    if [[ "$total_time" != "N/A" ]]; then
+        printf "║  Total startup time:                    %8s ms     ║\n" "$total_time" >&2
+        if [[ "$boot_time" != "N/A" ]] && [[ "$boot_time" -gt 0 ]]; then
+            printf "║  BEAM VM boot time:                     %8s ms     ║\n" "$boot_time" >&2
+        fi
+        printf "║  Time to hot-swap ready:                %8s ms     ║\n" "$total_time" >&2
+    else
+        echo "║  Timing: Available (high-resolution timer unavailable)     ║" >&2
+    fi
+    echo "╠════════════════════════════════════════════════════════════╣" >&2
+    echo "║  ✓ BEAM VM boots successfully                              ║" >&2
+    echo "║  ✓ Code compilation working                                ║" >&2
+    echo "║  ✓ Hot code loading enabled                                ║" >&2
+    echo "║  ✓ Ready for development                                   ║" >&2
+    echo "╚════════════════════════════════════════════════════════════╝" >&2
+}
+
+#=============================================================================
+# Phase 7: Completion Report
 #=============================================================================
 
 completion_report() {
-    phase "6/6 Session complete"
+    phase "7/7 Session complete"
     local major
     major=$(otp_major "$OTP_BIN")
     info "OTP Version: $major (target: $OTP_MAJOR)"
@@ -480,8 +579,11 @@ completion_report() {
 #=============================================================================
 
 main() {
+    # Capture start time for timing report
+    local start_time=$(date +%s%N 2>/dev/null || date +%s)
+
     init_log
-    info "Starting SessionStart.sh (v4.0.0-gvisor)"
+    info "Starting SessionStart.sh (v4.1.0-timing)"
     info "Platform: $(detect_platform)"
 
     # Phase 1: Cache check
@@ -513,10 +615,11 @@ main() {
         fi
     fi
 
-    # Phases 3-6
+    # Phases 3-7
     setup_environment
     create_lock
     build_project || info "Project build skipped or failed (non-fatal)"
+    verify_beam_ready "$start_time"
     completion_report
 
     exit 0
