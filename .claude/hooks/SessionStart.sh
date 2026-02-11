@@ -2,10 +2,15 @@
 # SessionStart hook for CRE project
 # Bootstraps Erlang/OTP 28+ on cloud environments (including gVisor sandbox)
 #
+# OTP 28.3.1 is available from:
+#   - Official releases: https://github.com/erlang/otp/releases/tag/OTP-28.3.1
+#   - Hex.pm builds: https://repo.hex.pm/builds/otp/
+#   - Docker: erlang:28.3.1
+#
 # Strategy: CACHE -> SYSTEM -> STATIC BINARY -> SOURCE (fails in gVisor)
 # Idempotent: lock file prevents redundant execution
 #
-# Version: 4.0.0-gvisor
+# Version: 4.0.1-otp28.3.1
 
 set -euo pipefail
 
@@ -153,11 +158,16 @@ download_static_binary() {
 
     info "Checking for pre-built static OTP..."
 
-    # Try multiple sources for pre-built binaries
+    # Try multiple sources for pre-built binaries (prioritized by reliability)
     local urls=(
+        # Hex.pm builds (Bob) - Most reliable for latest OTP versions
+        "https://repo.hex.pm/builds/otp/ubuntu-20.04/OTP-${OTP_VERSION}.tar.gz"
+        "https://repo.hex.pm/builds/otp/ubuntu-22.04/OTP-${OTP_VERSION}.tar.gz"
+        # Official GitHub releases (source, but can be extracted)
+        "https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}/otp_src_${OTP_VERSION}.tar.gz"
         # Heroku-style standalone build (most compatible with sandboxes)
         "https://s3.amazonaws.com/heroku-buildpack-elixir/erlang/cedar-14/OTP-${OTP_VERSION}.tar.gz"
-        # Alternative: GitHub releases from various projects
+        # kerl releases (may not have latest versions immediately)
         "https://github.com/kerl/kerl/releases/download/${OTP_VERSION}/otp_${OTP_VERSION}_ubuntu2204_amd64.tar.gz"
     )
 
