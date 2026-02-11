@@ -313,24 +313,20 @@ policy_round_robin(Sched) ->
         [] ->
             {undefined, Sched};
         _ ->
-            NextId = case LastScheduled of
+            case LastScheduled of
                 undefined ->
-                    hd(EligibleIds);
+                    NextCaseId = hd(EligibleIds),
+                    {NextCaseId, Sched#{last_scheduled := NextCaseId}};
                 Last ->
                     case find_next_in_cycle(Last, EligibleIds) of
                         undefined ->
                             %% Completed round, start new one
                             NewRound = Round + 1,
-                            {hd(EligibleIds), Sched#{round := NewRound}};
+                            NextCaseId = hd(EligibleIds),
+                            {NextCaseId, Sched#{round := NewRound, last_scheduled := NextCaseId}};
                         Next ->
-                            Next
+                            {Next, Sched#{last_scheduled := Next}}
                     end
-            end,
-            case NextId of
-                {NextCaseId, NewSched} ->
-                    {NextCaseId, NewSched#{last_scheduled := NextCaseId}};
-                NextCaseId ->
-                    {NextCaseId, Sched#{last_scheduled := NextCaseId}}
             end
     end.
 
