@@ -10,7 +10,7 @@
 %%%   <li>`{task, TaskId}' - Execute a single task</li>
 %%%   <li>`{seq, [Plan]}' - Sequential execution</li>
 %%%   <li>`{par, [Plan]}' - Parallel execution (fork)</li>
-%%%   <li>`{xor, [Plan]}' - Exclusive choice</li>
+%%%   <li>`{choice, [Plan]}' - Exclusive choice</li>
 %%%   <li>`{join, Policy, [Plan]}' - Parallel join with policy</li>
 %%%   <li>`{loop, Policy, Plan}' - Loop construct</li>
 %%%   <li>`{defer, [Plan]}' - External choice (race)</li>
@@ -27,7 +27,7 @@
 -export([task/1]).
 -export([seq/1]).
 -export([par/1]).
--export([xor/1]).
+-export([choice/1]).
 -export([join/2]).
 -export([loop/2]).
 -export([defer/1]).
@@ -68,7 +68,7 @@
 -type plan() :: {task, task_id()}
               | {seq, [plan()]}
               | {par, [plan()]}
-              | {xor, [plan()]}
+              | {choice, [plan()]}
               | {join, join_policy(), [plan()]}
               | {loop, loop_policy(), plan()}
               | {defer, [plan()]}
@@ -100,11 +100,11 @@ par(Plans) when is_list(Plans) ->
     {par, Plans}.
 
 %% @doc Create an exclusive choice (xor) of plans.
--spec xor([plan()]) -> plan().
-xor([]) ->
-    error({empty_xor, "xor cannot be empty"});
-xor(Plans) when is_list(Plans) ->
-    {xor, Plans}.
+-spec choice([plan()]) -> plan().
+choice([]) ->
+    error({empty_choice, "choice cannot be empty"});
+choice(Plans) when is_list(Plans) ->
+    {choice, Plans}.
 
 %% @doc Create a join with policy.
 -spec join(join_policy(), [plan()]) -> plan().
@@ -158,7 +158,7 @@ validate({par, Plans}) when is_list(Plans) ->
         [] -> {error, empty_par};
         _ -> validate_list(Plans)
     end;
-validate({xor, Plans}) when is_list(Plans) ->
+validate({choice, Plans}) when is_list(Plans) ->
     case Plans of
         [] -> {error, empty_xor};
         _ -> validate_list(Plans)

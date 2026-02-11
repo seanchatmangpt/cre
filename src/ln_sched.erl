@@ -16,7 +16,7 @@
 -export([verify_choice/3]).
 
 %% Types
--export_type([mode/0, sched_state/0, choice/0, choice_type/0]).
+-export_type([mode/0, sched_state/0, sched_choice/0, choice_type/0]).
 
 %%%-------------------------------------------------------------------
 %%% Types
@@ -24,20 +24,20 @@
 
 -type mode() :: deterministic | nondeterministic | replay.
 
--type choice_type() :: xor_selection
+-type choice_type() :: select_branch
                      | defer_race
                      | task_selection
                      | join_order.
 
--record(choice, {
+-record(sched_choice, {
     type :: choice_type(),
     value :: term(),
     metadata :: term(),
     timestamp :: integer()
 }).
 
--type choice() :: #choice{}.
--type choice_log() :: [choice()].
+-type sched_choice() :: #sched_choice{}.
+-type choice_log() :: [sched_choice()].
 
 -record(sched_state, {
     mode :: mode(),
@@ -95,7 +95,7 @@ choose(Candidates, #sched_state{mode = nondeterministic} = State) ->
     %% Nondeterministic: random selection
     Index = rand:uniform(length(Candidates)),
     Selected = lists:nth(Index, Candidates),
-    Choice = #choice{
+    Choice = #sched_choice{
         type = task_selection,
         value = element(1, Selected),
         metadata = #{count => length(Candidates)},
@@ -107,9 +107,9 @@ choose(Candidates, #sched_state{mode = replay, choices = Choices, position = Pos
     case Pos < length(Choices) of
         true ->
             Choice = lists:nth(Pos + 1, Choices),
-            case lists:keyfind(element(1, Choice#choice.value), 1, Candidates) of
+            case lists:keyfind(element(1, Choice#sched_choice.value), 1, Candidates) of
                 false ->
-                    {error, {choice_not_available, Choice#choice.value}};
+                    {error, {choice_not_available, Choice#sched_choice.value}};
                 Selected ->
                     NewState = State#sched_state{position = Pos + 1},
                     {Selected, NewState}
@@ -120,7 +120,7 @@ choose(Candidates, #sched_state{mode = replay, choices = Choices, position = Pos
 
 %% @doc Record a choice point (for nondeterministic mode).
 record_choice(Type, Value, #sched_state{mode = nondeterministic} = State) ->
-    Choice = #choice{
+    Choice = #sched_choice{
         type = Type,
         value = Value,
         metadata = #{},
@@ -139,7 +139,7 @@ get_mode(#sched_state{mode = Mode}) ->
     Mode.
 
 %% @doc Verify a choice matches expected type and value is available.
-verify_choice(ExpectedType, Candidates, #choice{type = Type, value = Value}) ->
+verify_choice(ExpectedType, Candidates, #sched_choice{type = Type, value = Value}) ->
     case Type of
         ExpectedType ->
             case lists:member(Value, Candidates) of

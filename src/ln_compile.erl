@@ -27,8 +27,8 @@
                 | {op_task_complete, term()}
                 | {op_fork, [label()], label()}
                 | {op_join_wait, join_id(), label()}
-                | {op_xor_branch, [label()], label()}
-                | {op_xor_choose, reference(), label()}
+                | {op_choice_branch, [label()], label()}
+                | {op_choice_choose, reference(), label()}
                 | {op_scope_enter, scope_id()}
                 | {op_scope_exit, scope_id()}
                 | {op_defer_start, [label()], label()}
@@ -76,8 +76,8 @@ opcode_name({op_task_start, _}) -> op_task_start;
 opcode_name({op_task_complete, _}) -> op_task_complete;
 opcode_name({op_fork, _, _}) -> op_fork;
 opcode_name({op_join_wait, _, _}) -> op_join_wait;
-opcode_name({op_xor_branch, _, _}) -> op_xor_branch;
-opcode_name({op_xor_choose, _, _}) -> op_xor_choose;
+opcode_name({op_choice_branch, _, _}) -> op_choice_branch;
+opcode_name({op_choice_choose, _, _}) -> op_choice_choose;
 opcode_name({op_scope_enter, _}) -> op_scope_enter;
 opcode_name({op_scope_exit, _}) -> op_scope_exit;
 opcode_name({op_defer_start, _, _}) -> op_defer_start;
@@ -106,8 +106,8 @@ compile_plan({seq, Plans}, Label, Joins, Scopes) ->
 compile_plan({par, Plans}, Label, Joins, Scopes) ->
     compile_par(Plans, Label, Joins, Scopes);
 
-compile_plan({xor, Plans}, Label, Joins, Scopes) ->
-    compile_xor(Plans, Label, Joins, Scopes);
+compile_plan({choice, Plans}, Label, Joins, Scopes) ->
+    compile_choice(Plans, Label, Joins, Scopes);
 
 compile_plan({join, Policy, Plans}, Label, Joins, Scopes) ->
     compile_join(Policy, Plans, Label, Joins, Scopes);
@@ -157,13 +157,13 @@ compile_par(Plans, Label, Joins, Scopes) ->
     Joins2 = Joins1#{JoinId => {JoinLabel, BranchCount, all}},
     {Program, Joins2, Scopes1}.
 
-%% Compile xor: exclusive choice.
-compile_xor(Plans, Label, Joins, Scopes) ->
-    XorId = make_ref(),
+%% Compile choice: exclusive choice.
+compile_choice(Plans, Label, Joins, Scopes) ->
+    ChoiceId = make_ref(),
     {BranchProgs, NextLabel, Joins1, Scopes1} = compile_branches(Plans, Label + 2, Joins, Scopes),
     EndLabel = NextLabel,
     Program = [
-        {Label, {op_xor_branch, [L || {L, _} <- BranchProgs], EndLabel}}
+        {Label, {op_choice_branch, [L || {L, _} <- BranchProgs], EndLabel}}
     ] ++ BranchProgs,
     {Program, Joins1, Scopes1}.
 

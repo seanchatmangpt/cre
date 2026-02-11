@@ -31,8 +31,8 @@ compile_parallel_test() ->
     ?assert(maps:size(Joins) > 0).
 
 %% @doc Test compile xor.
-compile_xor_test() ->
-    Plan = ln_plan:xor([ln_plan:task(a), ln_plan:task(b)]),
+compile_choice_test() ->
+    Plan = ln_plan:choice([ln_plan:task(a), ln_plan:task(b)]),
     {ok, Bytecode} = ln_compile:compile(Plan),
     Program = maps:get(program, Bytecode),
     ?assert(length(Program) > 0).

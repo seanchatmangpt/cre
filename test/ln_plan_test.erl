@@ -34,15 +34,15 @@ par_constructor_test() ->
 par_empty_test() ->
     ?assertError({empty_par, _}, ln_plan:par([])).
 
-%% @doc Test xor/1 constructor.
-xor_constructor_test() ->
+%% @doc Test choice/1 constructor.
+choice_constructor_test() ->
     Plans = [ln_plan:task(a), ln_plan:task(b)],
-    Plan = ln_plan:xor(Plans),
-    ?assertMatch({xor, _}, Plan).
+    Plan = ln_plan:choice(Plans),
+    ?assertMatch({choice, _}, Plan).
 
-%% @doc Test xor/1 with empty list raises error.
-xor_empty_test() ->
-    ?assertError({empty_xor, _}, ln_plan:xor([])).
+%% @doc Test choice/1 with empty list raises error.
+choice_empty_test() ->
+    ?assertError({empty_choice, _}, ln_plan:choice([])).
 
 %% @doc Test join/2 constructor.
 join_constructor_test() ->
@@ -108,9 +108,9 @@ validate_par_test() ->
     Plan = ln_plan:par([ln_plan:task(a), ln_plan:task(b)]),
     ?assertEqual(ok, ln_plan:validate(Plan)).
 
-%% @doc Test validate/1 with valid xor.
-validate_xor_test() ->
-    Plan = ln_plan:xor([ln_plan:task(a), ln_plan:task(b)]),
+%% @doc Test validate/1 with valid choice.
+validate_choice_test() ->
+    Plan = ln_plan:choice([ln_plan:task(a), ln_plan:task(b)]),
     ?assertEqual(ok, ln_plan:validate(Plan)).
 
 %% @doc Test validate/1 with valid join.
@@ -145,7 +145,7 @@ validate_complex_test() ->
         ln_plan:task(init),
         ln_plan:par([
             ln_plan:task(a),
-            ln_plan:scope(s1, ln_plan:xor([ln_plan:task(b), ln_plan:task(c)]))
+            ln_plan:scope(s1, ln_plan:choice([ln_plan:task(b), ln_plan:task(c)]))
         ]),
         ln_plan:join(all, [ln_plan:task(d), ln_plan:task(e)])
     ]),

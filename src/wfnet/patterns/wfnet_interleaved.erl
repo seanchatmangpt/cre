@@ -477,20 +477,20 @@ is_enabled_select_next_test() ->
     ?assert(is_enabled(select_next, Mode, State)).
 
 is_enabled_advance_test() ->
-    State = #interleaved_state{branch_order => [a, b, c], completed => []},
+    State = #interleaved_state{branch_order = [a, b, c], completed = []},
     Mode = #{a_branch => [done], route => [selected]},
     ?assert(is_enabled(advance, Mode, State)).
 
 is_enabled_complete_all_test() ->
-    State = #interleaved_state{all_complete => true},
+    State = #interleaved_state{all_complete = true},
     ?assert(is_enabled(complete_all, #{route => [all_done]}, State)),
 
-    State2 = State#interleaved_state{all_complete => false},
+    State2 = State#interleaved_state{all_complete = false},
     ?assertNot(is_enabled(complete_all, #{}, State2)).
 
 %% fire select_next test
 fire_select_next_test() ->
-    State = #interleaved_state{branch_order => [a, b, c]},
+    State = #interleaved_state{branch_order = [a, b, c]},
     Result = fire(select_next, #{start => [init]}, State),
     ?assertMatch({produce, _, _}, Result),
     {produce, ProduceMap, _NewState} = Result,
@@ -499,7 +499,7 @@ fire_select_next_test() ->
 
 %% fire advance test - not last branch
 fire_advance_middle_test() ->
-    State = #interleaved_state{branch_order => [a, b, c], completed => [], current_index => 1},
+    State = #interleaved_state{branch_order = [a, b, c], completed = [], current_index = 1},
     Mode = #{a_branch => [done], route => [selected]},
     Result = fire(advance, Mode, State),
     ?assertMatch({produce, _, _}, Result),
@@ -510,7 +510,7 @@ fire_advance_middle_test() ->
 
 %% fire advance test - last branch
 fire_advance_last_test() ->
-    State = #interleaved_state{branch_order => [c], completed => [a, b], current_index => 3},
+    State = #interleaved_state{branch_order = [c], completed = [a, b], current_index = 3},
     Mode = #{c_branch => [done], route => [selected]},
     Result = fire(advance, Mode, State),
     ?assertMatch({produce, _, _}, Result),
@@ -521,7 +521,7 @@ fire_advance_last_test() ->
 
 %% fire complete_all test
 fire_complete_all_test() ->
-    State = #interleaved_state{completed => [a, b, c]},
+    State = #interleaved_state{completed = [a, b, c]},
     Result = fire(complete_all, #{route => [all_done]}, State),
     ?assertMatch({produce, _, _}, Result),
     {produce, ProduceMap, _NewState} = Result,

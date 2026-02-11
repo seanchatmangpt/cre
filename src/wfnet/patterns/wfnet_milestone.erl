@@ -472,20 +472,20 @@ init_test() ->
 
 %% is_enabled test
 is_enabled_check_test() ->
-    State = #milestone_state{current_state => unreached},
+    State = #milestone_state{current_state = unreached},
     Mode = #{start => [init]},
     ?assert(is_enabled(check, Mode, State)).
 
 is_enabled_reach_milestone_test() ->
-    State = #milestone_state{current_state => unreached},
+    State = #milestone_state{current_state = unreached},
     Mode = #{pending => [check]},
     ?assert(is_enabled(reach_milestone, Mode, State)).
 
 is_enabled_pass_test() ->
-    State = #milestone_state{current_state => reached},
+    State = #milestone_state{current_state = reached},
     ?assert(is_enabled(pass, #{}, State)),
 
-    State2 = State#milestone_state{current_state => unreached, check_fun => fun(_) -> true end},
+    State2 = State#milestone_state{current_state = unreached, check_fun = fun(_) -> true end},
     Mode2 = #{pending => [check]},
     ?assert(is_enabled(pass, Mode2, State2)).
 
@@ -496,7 +496,7 @@ is_enabled_bypass_test() ->
 
 %% fire check test - not reached
 fire_check_unreached_test() ->
-    State = #milestone_state{current_state => unreached},
+    State = #milestone_state{current_state = unreached},
     Result = fire(check, #{start => [init]}, State),
     ?assertMatch({produce, _, _}, Result),
     {produce, ProduceMap, _NewState} = Result,
@@ -505,7 +505,7 @@ fire_check_unreached_test() ->
 
 %% fire check test - already reached
 fire_check_reached_test() ->
-    State = #milestone_state{current_state => reached},
+    State = #milestone_state{current_state = reached},
     Result = fire(check, #{start => [init]}, State),
     ?assertMatch({produce, _, _}, Result),
     {produce, ProduceMap, _NewState} = Result,
@@ -513,7 +513,7 @@ fire_check_reached_test() ->
 
 %% fire reach_milestone test
 fire_reach_milestone_test() ->
-    State = #milestone_state{current_state => unreached, reached_count => 0},
+    State = #milestone_state{current_state = unreached, reached_count = 0},
     Result = fire(reach_milestone, #{pending => [check]}, State),
     ?assertMatch({produce, _, _}, Result),
     {produce, ProduceMap, NewState} = Result,
@@ -523,7 +523,7 @@ fire_reach_milestone_test() ->
 
 %% fire pass test
 fire_pass_test() ->
-    State = #milestone_state{current_state => reached, name => test_ms},
+    State = #milestone_state{current_state = reached, name = test_ms},
     Result = fire(pass, #{}, State),
     ?assertMatch({produce, _, _}, Result),
     {produce, ProduceMap, _NewState} = Result,
@@ -531,7 +531,7 @@ fire_pass_test() ->
 
 %% fire bypass test
 fire_bypass_test() ->
-    State = #milestone_state{name => test_ms},
+    State = #milestone_state{name = test_ms},
     Result = fire(bypass, #{reached => [bypass]}, State),
     ?assertMatch({produce, _, _}, Result),
     {produce, ProduceMap, _NewState} = Result,

@@ -584,7 +584,7 @@ wait_all_branches(Ref, Remaining, Timeout, Acc) ->
 %% normalize_branches test
 normalize_branches_test() ->
     ?assertEqual([{a, #{}}, {b, #{}}], normalize_branches([a, b])),
-    ?assertEqual([{a, #{cond => 1}}, {b, #{}}], normalize_branches([{a, #{cond => 1}}, b])).
+    ?assertEqual([{a, #{condition => 1}}, {b, #{}}], normalize_branches([{a, #{condition => 1}}, b])).
 
 %% branch_place test
 branch_place_test() ->
