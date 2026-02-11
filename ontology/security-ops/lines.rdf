@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+  xmlns:owl="http://www.w3.org/2002/07/owl#"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:secops="http://cre.local/security-ops#"
+  xmlns:line="http://cre.local/line#">
+
+  <!-- Ontology Metadata -->
+  <rdf:Description rdf:about="http://cre.local/security-ops/lines">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Ontology"/>
+    <dc:title>Security Ops Lines (Applications/Workflows) Ontology</dc:title>
+    <dc:description>Manufacturing line definitions for security incident triage and response workflows</dc:description>
+    <dc:isPartOf rdf:resource="http://cre.local/security-ops"/>
+    <dc:created rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2026-02-11T00:00:00Z</dc:created>
+  </rdf:Description>
+
+  <!-- ==============================================
+       LINE BASE CLASS
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/line#Line">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+    <rdfs:label>Line</rdfs:label>
+    <rdfs:comment>A manufacturing line (workflow application) consisting of gates and stations</rdfs:comment>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       SOC TRIAGE LINE
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line">
+    <rdf:type rdf:resource="http://cre.local/line#Line"/>
+    <rdfs:label>SOC Triage Line</rdfs:label>
+    <rdfs:comment>Primary incident triage line: ingest alerts, classify, evaluate severity, route to handlers</rdfs:comment>
+    <dc:description>Receives raw SIEM alerts, performs initial classification and severity assessment, routes to appropriate teams</dc:description>
+    <line:line_type>triage</line:line_type>
+    <line:target_throughput_sla_minutes rdf:datatype="http://www.w3.org/2001/XMLSchema#int">15</line:target_throughput_sla_minutes>
+    <line:owner>SOC Team</line:owner>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- soc_triage_line steps in sequence -->
+
+  <!-- Step 1: SIEMIngestStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_SIEMIngestStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>SIEM Ingest Station</rdfs:label>
+    <rdfs:comment>Ingest raw security events from SIEM into incident workflow</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">1</line:sequence_order>
+    <secops:operation>SIEMIngest</secops:operation>
+    <line:next_step>soc_triage_line_FalsePositiveGate</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 2: FalsePositiveGate -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_FalsePositiveGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>False Positive Gate</rdfs:label>
+    <rdfs:comment>Identify known false positive patterns; dismiss if detected</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">2</line:sequence_order>
+    <secops:gate_type>FalsePositiveGate</secops:gate_type>
+    <line:true_path>soc_triage_line_FalsePositiveStop</line:true_path>
+    <line:false_path>soc_triage_line_ClassificationStation</line:false_path>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 3: ClassificationStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_ClassificationStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Classification Station</rdfs:label>
+    <rdfs:comment>Classify incident by type (Malware, Phishing, Recon, etc) using rule engine</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">3</line:sequence_order>
+    <secops:operation>IncidentClassify</secops:operation>
+    <line:next_step>soc_triage_line_SIEMEnrichmentStation</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 4: SIEMEnrichmentStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_SIEMEnrichmentStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>SIEM Enrichment Station</rdfs:label>
+    <rdfs:comment>Query SIEM for related events and context; enrich incident with historical data</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">4</line:sequence_order>
+    <secops:operation>SIEMEnrich</secops:operation>
+    <line:next_step>soc_triage_line_SeverityGate</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 5: SeverityGate -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_SeverityGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>Severity Gate</rdfs:label>
+    <rdfs:comment>Route by severity: Critical/High to escalation; Medium/Low to investigation</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">5</line:sequence_order>
+    <secops:gate_type>SeverityGate</secops:gate_type>
+    <line:true_path>soc_triage_line_EscalationStation</line:true_path>
+    <line:false_path>soc_triage_line_InvestigationStation</line:false_path>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 6a: EscalationStation (for Critical/High) -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_EscalationStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Escalation Station</rdfs:label>
+    <rdfs:comment>Escalate Critical/High incidents to IR team; create ticket and send notifications</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">6</line:sequence_order>
+    <secops:operation>IncidentEscalate</secops:operation>
+    <line:next_step>soc_triage_line_ApprovalGate</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 6b: InvestigationStation (for Medium/Low) -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_InvestigationStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Investigation Station</rdfs:label>
+    <rdfs:comment>Perform deeper investigation on Medium/Low incidents; queue for analyst review</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">6</line:sequence_order>
+    <secops:operation>IncidentInvestigate</secops:operation>
+    <line:next_step>soc_triage_line_ClosureStop</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 7: ApprovalGate -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_ApprovalGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>Approval Gate</rdfs:label>
+    <rdfs:comment>Require analyst approval before external escalation to management</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">7</line:sequence_order>
+    <secops:gate_type>ApprovalGate</secops:gate_type>
+    <line:true_path>soc_triage_line_ExternalEscalationStation</line:true_path>
+    <line:false_path>soc_triage_line_EscalationReviewStation</line:false_path>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 8a: ExternalEscalationStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_ExternalEscalationStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>External Escalation Station</rdfs:label>
+    <rdfs:comment>Send incident to external incident response team or management</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">8</line:sequence_order>
+    <secops:operation>ExternalEscalate</secops:operation>
+    <line:next_step>soc_triage_line_ClosureStop</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 8b: EscalationReviewStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_EscalationReviewStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Escalation Review Station</rdfs:label>
+    <rdfs:comment>Hold escalation for analyst review; wait for approval before proceeding</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">8</line:sequence_order>
+    <secops:operation>AwaitingApproval</secops:operation>
+    <line:next_step>soc_triage_line_ClosureStop</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 9a: FalsePositiveStop -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_FalsePositiveStop">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Stop"/>
+    <rdfs:label>False Positive Stop</rdfs:label>
+    <rdfs:comment>Incident marked as false positive and archived</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">9</line:sequence_order>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 9b: ClosureStop -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_triage_line_ClosureStop">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Stop"/>
+    <rdfs:label>Closure Stop</rdfs:label>
+    <rdfs:comment>Incident triage complete; case closed and archived</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">9</line:sequence_order>
+    <line:line rdf:resource="http://cre.local/line#soc_triage_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       SOC REWORK LINE
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/line#soc_rework_line">
+    <rdf:type rdf:resource="http://cre.local/line#Line"/>
+    <rdfs:label>SOC Rework Line</rdfs:label>
+    <rdfs:comment>Rework line for incidents requiring classification/investigation refinement or escalation reversal</rdfs:comment>
+    <dc:description>Handles incidents rejected from primary triage, provides analyst-driven investigation and reclassification</dc:description>
+    <line:line_type>rework</line:line_type>
+    <line:target_throughput_sla_minutes rdf:datatype="http://www.w3.org/2001/XMLSchema#int">60</line:target_throughput_sla_minutes>
+    <line:owner>Senior SOC Analysts</line:owner>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- soc_rework_line steps in sequence -->
+
+  <!-- Step 1: IncidentQueueStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_rework_line_IncidentQueueStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Incident Queue Station</rdfs:label>
+    <rdfs:comment>Receive incidents from triage for rework; await analyst assignment</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">1</line:sequence_order>
+    <secops:operation>IncidentQueue</secops:operation>
+    <line:next_step>soc_rework_line_AnalystInvestigationStation</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_rework_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 2: AnalystInvestigationStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_rework_line_AnalystInvestigationStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Analyst Investigation Station</rdfs:label>
+    <rdfs:comment>Senior analyst manually investigates incident; may query SIEM, EDR, or other sources</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">2</line:sequence_order>
+    <secops:operation>AnalystInvestigate</secops:operation>
+    <line:next_step>soc_rework_line_ReclassificationGate</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_rework_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 3: ReclassificationGate -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_rework_line_ReclassificationGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>Reclassification Gate</rdfs:label>
+    <rdfs:comment>Analyst determines if original classification was correct or should be changed</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">3</line:sequence_order>
+    <secops:gate_type>ReclassificationGate</secops:gate_type>
+    <line:true_path>soc_rework_line_ClosureStop</line:true_path>
+    <line:false_path>soc_rework_line_UpdatedClassificationStation</line:false_path>
+    <line:line rdf:resource="http://cre.local/line#soc_rework_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 4: UpdatedClassificationStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_rework_line_UpdatedClassificationStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Updated Classification Station</rdfs:label>
+    <rdfs:comment>Update incident classification and resend through triage line</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">4</line:sequence_order>
+    <secops:operation>UpdateClassification</secops:operation>
+    <line:next_step>soc_rework_line_RetriageGate</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_rework_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 5: RetriageGate -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_rework_line_RetriageGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>Retriage Gate</rdfs:label>
+    <rdfs:comment>Check if reclassified incident requires re-escalation</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">5</line:sequence_order>
+    <secops:gate_type>SeverityGate</secops:gate_type>
+    <line:true_path>soc_rework_line_ReescalationStation</line:true_path>
+    <line:false_path>soc_rework_line_ClosureStop</line:false_path>
+    <line:line rdf:resource="http://cre.local/line#soc_rework_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 6: ReescalationStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_rework_line_ReescalationStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Reescalation Station</rdfs:label>
+    <rdfs:comment>Escalate reclassified incident with updated information and analyst notes</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">6</line:sequence_order>
+    <secops:operation>ReescalateIncident</secops:operation>
+    <line:next_step>soc_rework_line_ClosureStop</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_rework_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 7: ClosureStop -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_rework_line_ClosureStop">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Stop"/>
+    <rdfs:label>Closure Stop</rdfs:label>
+    <rdfs:comment>Rework complete; incident resolved or re-escalated</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">7</line:sequence_order>
+    <line:line rdf:resource="http://cre.local/line#soc_rework_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       SOC EVIDENCE LINE
+       ============================================== -->
+
+  <rdf:Description rdf:about="http://cre.local/line#soc_evidence_line">
+    <rdf:type rdf:resource="http://cre.local/line#Line"/>
+    <rdfs:label>SOC Evidence Line</rdfs:label>
+    <rdfs:comment>Evidence gathering line: enriches incidents with forensic data from EDR, network, logs</rdfs:comment>
+    <dc:description>Parallel evidence collection line for escalated incidents; gathers forensic artifacts and threat intelligence</dc:description>
+    <line:line_type>evidence</line:line_type>
+    <line:target_throughput_sla_minutes rdf:datatype="http://www.w3.org/2001/XMLSchema#int">30</line:target_throughput_sla_minutes>
+    <line:owner>Forensics Team</line:owner>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- soc_evidence_line steps in sequence -->
+
+  <!-- Step 1: EvidenceQueueStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_evidence_line_EvidenceQueueStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Evidence Queue Station</rdfs:label>
+    <rdfs:comment>Receive escalated incident for evidence collection</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">1</line:sequence_order>
+    <secops:operation>EvidenceQueue</secops:operation>
+    <line:next_step>soc_evidence_line_EDRInvestigationStation</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_evidence_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 2: EDRInvestigationStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_evidence_line_EDRInvestigationStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>EDR Investigation Station</rdfs:label>
+    <rdfs:comment>Query EDR for process, network, file, registry forensic artifacts</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">2</line:sequence_order>
+    <secops:operation>EDRGetDeviceInfo</secops:operation>
+    <line:next_step>soc_evidence_line_NetworkForensicsStation</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_evidence_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 3: NetworkForensicsStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_evidence_line_NetworkForensicsStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Network Forensics Station</rdfs:label>
+    <rdfs:comment>Collect network telemetry: flows, DNS, SSL/TLS certificates, IPs</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">3</line:sequence_order>
+    <secops:operation>NetworkForensics</secops:operation>
+    <line:next_step>soc_evidence_line_ThreadIntelligenceStation</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_evidence_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 4: ThreadIntelligenceStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_evidence_line_ThreadIntelligenceStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Threat Intelligence Station</rdfs:label>
+    <rdfs:comment>Enrich incident with threat intelligence: malware signatures, C2 domains, actor profiles</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">4</line:sequence_order>
+    <secops:operation>EnrichThreatIntel</secops:operation>
+    <line:next_step>soc_evidence_line_EvidenceAssemblyStation</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_evidence_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 5: EvidenceAssemblyStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_evidence_line_EvidenceAssemblyStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Evidence Assembly Station</rdfs:label>
+    <rdfs:comment>Assemble collected evidence into formal incident report; attach to ticket</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">5</line:sequence_order>
+    <secops:operation>AssembleEvidenceReport</secops:operation>
+    <line:next_step>soc_evidence_line_ContainmentGate</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_evidence_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 6: ContainmentGate -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_evidence_line_ContainmentGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>Containment Gate</rdfs:label>
+    <rdfs:comment>Evaluate if incident requires immediate EDR containment (isolate, kill process)</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">6</line:sequence_order>
+    <secops:gate_type>ClassificationGate</secops:gate_type>
+    <line:true_path>soc_evidence_line_ContainmentStation</line:true_path>
+    <line:false_path>soc_evidence_line_ClosureStop</line:false_path>
+    <line:line rdf:resource="http://cre.local/line#soc_evidence_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 7: ContainmentStation -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_evidence_line_ContainmentStation">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:label>Containment Station</rdfs:label>
+    <rdfs:comment>Execute EDR containment actions: isolate endpoints, kill malicious processes</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">7</line:sequence_order>
+    <secops:operation>EDRIsolate</secops:operation>
+    <line:next_step>soc_evidence_line_ClosureStop</line:next_step>
+    <line:line rdf:resource="http://cre.local/line#soc_evidence_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- Step 8: ClosureStop -->
+  <rdf:Description rdf:about="http://cre.local/line#soc_evidence_line_ClosureStop">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Stop"/>
+    <rdfs:label>Closure Stop</rdfs:label>
+    <rdfs:comment>Evidence collection complete; incident archived with full forensic report</rdfs:comment>
+    <line:sequence_order rdf:datatype="http://www.w3.org/2001/XMLSchema#int">8</line:sequence_order>
+    <line:line rdf:resource="http://cre.local/line#soc_evidence_line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       LINE PROPERTIES
+       ============================================== -->
+
+  <!-- line_type: Category of line (triage, rework, evidence) -->
+  <rdf:Description rdf:about="http://cre.local/line#line_type">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>line_type</rdfs:label>
+    <rdfs:comment>Type of manufacturing line (triage, rework, evidence, containment)</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/line#Line"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- sequence_order: Position in line sequence -->
+  <rdf:Description rdf:about="http://cre.local/line#sequence_order">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>sequence_order</rdfs:label>
+    <rdfs:comment>Sequential position of step (station or gate) in line</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#int"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- next_step: Next station or gate in line -->
+  <rdf:Description rdf:about="http://cre.local/line#next_step">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>next_step</rdfs:label>
+    <rdfs:comment>URI of next step (gate or station) in workflow sequence</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- line: Back-reference to parent line -->
+  <rdf:Description rdf:about="http://cre.local/line#line">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>line</rdfs:label>
+    <rdfs:comment>Parent manufacturing line containing this step</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Station"/>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Stop"/>
+    <rdfs:range rdf:resource="http://cre.local/line#Line"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- target_throughput_sla_minutes: SLA in minutes for line -->
+  <rdf:Description rdf:about="http://cre.local/line#target_throughput_sla_minutes">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>target_throughput_sla_minutes</rdfs:label>
+    <rdfs:comment>Target SLA for incident to traverse line (in minutes)</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/line#Line"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#int"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:Description>
+
+  <!-- owner: Team responsible for line -->
+  <rdf:Description rdf:about="http://cre.local/line#owner">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>owner</rdfs:label>
+    <rdfs:comment>Team or role responsible for operating this line</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/line#Line"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/lines"/>
+  </rdf:description>
+
+</rdf:RDF>

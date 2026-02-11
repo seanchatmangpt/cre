@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+  xmlns:owl="http://www.w3.org/2002/07/owl#"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:secops="http://cre.local/security-ops#">
+
+  <!-- Ontology Metadata -->
+  <rdf:Description rdf:about="http://cre.local/security-ops/gates">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Ontology"/>
+    <dc:title>Decision Gates Ontology</dc:title>
+    <dc:description>Decision gate definitions with SPARQL conditions, true/false paths, and evidence requirements</dc:description>
+    <dc:isPartOf rdf:resource="http://cre.local/security-ops"/>
+    <dc:created rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2026-02-11T00:00:00Z</dc:created>
+  </rdf:Description>
+
+  <!-- ==============================================
+       GATE CLASSES
+       ============================================== -->
+
+  <!-- Severity Gate: Routes critical incidents to escalation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#SeverityGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>Severity Gate</rdfs:label>
+    <rdfs:comment>Decision gate evaluating incident severity; escalates critical/high to IR team</rdfs:comment>
+    <secops:condition>
+PREFIX secops: &lt;http://cre.local/security-ops#&gt;
+ASK WHERE {
+  ?incident secops:severity ?severity .
+  FILTER(?severity IN ("Critical", "High"))
+}
+    </secops:condition>
+    <secops:true_path>EscalationStation</secops:true_path>
+    <secops:false_path>TriageStation</secops:false_path>
+    <secops:evidence_required>severity</secops:evidence_required>
+    <secops:evidence_required>classification</secops:evidence_required>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- Classification Gate: Routes by incident type -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#ClassificationGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>Classification Gate</rdfs:label>
+    <rdfs:comment>Decision gate routing incidents to handlers based on classification type</rdfs:comment>
+    <secops:condition>
+PREFIX secops: &lt;http://cre.local/security-ops#&gt;
+ASK WHERE {
+  ?incident secops:classification ?class .
+  FILTER(?class IN ("Malware", "DataExfiltration", "UnauthorizedAccess"))
+}
+    </secops:condition>
+    <secops:true_path>ContainmentStation</secops:true_path>
+    <secops:false_path>InvestigationStation</secops:false_path>
+    <secops:evidence_required>classification</secops:evidence_required>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- Approval Gate: Human sign-off required for escalation -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#ApprovalGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>Approval Gate</rdfs:label>
+    <rdfs:comment>Decision gate requiring human analyst approval before escalation to IR/management</rdfs:comment>
+    <secops:condition>
+PREFIX secops: &lt;http://cre.local/security-ops#&gt;
+ASK WHERE {
+  ?incident secops:has_receipts ?receipt .
+  ?receipt secops:action "approved" .
+}
+    </secops:condition>
+    <secops:true_path>ExternalEscalationStation</secops:true_path>
+    <secops:false_path>EscalationReviewStation</secops:false_path>
+    <secops:evidence_required>analyst_review</secops:evidence_required>
+    <secops:evidence_required>approval_timestamp</secops:evidence_required>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- Malware Gate: Detects malware classification -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#MalwareGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>Malware Gate</rdfs:label>
+    <rdfs:comment>Decision gate identifying malware incidents for automated containment response</rdfs:comment>
+    <secops:condition>
+PREFIX secops: &lt;http://cre.local/security-ops#&gt;
+ASK WHERE {
+  ?incident secops:classification secops:Malware .
+}
+    </secops:condition>
+    <secops:true_path>MalwareContainmentStation</secops:true_path>
+    <secops:false_path>InvestigationStation</secops:false_path>
+    <secops:evidence_required>classification</secops:evidence_required>
+    <secops:evidence_required>affected_systems</secops:evidence_required>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- Event Correlation Gate: Groups related events -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#EventCorrelationGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>Event Correlation Gate</rdfs:label>
+    <rdfs:comment>Decision gate checking if incident has correlated events from multiple sources</rdfs:comment>
+    <secops:condition>
+PREFIX secops: &lt;http://cre.local/security-ops#&gt;
+ASK WHERE {
+  ?incident secops:has_events ?event1 .
+  ?incident secops:has_events ?event2 .
+  ?event1 secops:event_stream ?source1 .
+  ?event2 secops:event_stream ?source2 .
+  FILTER(?event1 != ?event2 &amp;&amp; ?source1 != ?source2)
+}
+    </secops:condition>
+    <secops:true_path>EvidenceStation</secops:true_path>
+    <secops:false_path>SingleSourceStation</secops:false_path>
+    <secops:evidence_required>has_events</secops:evidence_required>
+    <secops:evidence_required>event_stream</secops:evidence_required>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- False Positive Detection Gate -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#FalsePositiveGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>False Positive Detection Gate</rdfs:label>
+    <rdfs:comment>Decision gate identifying known false positive patterns or whitelisted items</rdfs:comment>
+    <secops:condition>
+PREFIX secops: &lt;http://cre.local/security-ops#&gt;
+ASK WHERE {
+  ?incident secops:has_events ?event .
+  ?event secops:is_whitelisted "true"^^xsd:boolean .
+}
+    </secops:condition>
+    <secops:true_path>FalsePositiveStop</secops:true_path>
+    <secops:false_path>TriageStation</secops:false_path>
+    <secops:evidence_required>is_whitelisted</secops:evidence_required>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- Data Exfiltration Gate: High-risk incidents -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#DataExfiltrateGate">
+    <rdf:type rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:label>Data Exfiltration Gate</rdfs:label>
+    <rdfs:comment>Decision gate identifying data exfiltration incidents requiring immediate escalation</rdfs:comment>
+    <secops:condition>
+PREFIX secops: &lt;http://cre.local/security-ops#&gt;
+ASK WHERE {
+  ?incident secops:classification secops:DataExfiltration .
+  ?incident secops:severity ?sev .
+  FILTER(?sev IN ("Critical", "High"))
+}
+    </secops:condition>
+    <secops:true_path>CriticalEscalationStation</secops:true_path>
+    <secops:false_path>EscalationStation</secops:false_path>
+    <secops:evidence_required>classification</secops:evidence_required>
+    <secops:evidence_required>severity</secops:evidence_required>
+    <secops:evidence_required>affected_systems</secops:evidence_required>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- ==============================================
+       GATE ROUTING LOGIC PROPERTIES
+       ============================================== -->
+
+  <!-- Gate description -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#gate_type">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>gate_type</rdfs:label>
+    <rdfs:comment>Type of gate (severity, classification, malware, etc)</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- Gate decision metric -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#decision_metric">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>decision_metric</rdfs:label>
+    <rdfs:comment>Metric or attribute used to make decision (severity level, count, timestamp, etc)</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- Gate SLA timeout -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#sla_timeout_seconds">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>sla_timeout_seconds</rdfs:label>
+    <rdfs:comment>SLA timeout in seconds; if gate not traversed by then, escalate</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#int"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- Gate retry logic -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#retry_on_false">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>retry_on_false</rdfs:label>
+    <rdfs:comment>Whether to retry gate evaluation after period of time if condition was false</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#boolean"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- Condition satisfied metadata -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#condition_satisfied">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>condition_satisfied</rdfs:label>
+    <rdfs:comment>Boolean result of gate condition evaluation</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#boolean"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+  <!-- Condition evaluation timestamp -->
+  <rdf:Description rdf:about="http://cre.local/security-ops#condition_evaluated_at">
+    <rdf:type rdf:resource="http://www.w3.org/1999/02/22-rdf-syntax-ns#Property"/>
+    <rdfs:label>condition_evaluated_at</rdfs:label>
+    <rdfs:comment>ISO 8601 timestamp when gate condition was last evaluated</rdfs:comment>
+    <rdfs:domain rdf:resource="http://cre.local/security-ops#Gate"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#dateTime"/>
+    <rdfs:isDefinedBy rdf:resource="http://cre.local/security-ops/gates"/>
+  </rdf:Description>
+
+</rdf:RDF>
