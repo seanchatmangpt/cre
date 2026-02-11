@@ -2,6 +2,7 @@
  [{description, "Fortune-5 f5_app_07 application"},
   {vsn, "0.3.0"},
   {registered, []},
+  {mod, {f5_app_07_app, []}},
   {applications, [kernel, stdlib]},
   {modules, [
         f5_app_07_mod_01,

@@ -2,6 +2,7 @@
  [{description, "Fortune-5 f5_connectors application"},
   {vsn, "0.3.0"},
   {registered, []},
+  {mod, {f5_connectors_app, []}},
   {applications, [kernel, stdlib]},
   {modules, [
         f5_connector_crm,
