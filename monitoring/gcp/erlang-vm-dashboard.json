@@ -50,10 +50,6 @@
       },
       {
         "title": "Runtime Utilization",
-        "gaugeView": {
-          "lowerBound": 0,
-          "upperBound": 100
-        },
         "scorecard": {
           "gaugeView": {
             "lowerBound": 0,
