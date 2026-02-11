@@ -1,0 +1,17 @@
+Evidence Directory Statistics
+=============================
+
+File Count: 9
+
+Detailed Listing (ls -lh evidence/):
+-----------------------------------
+total 9.0K
+-rw-r--r-- 1 root root  298 Feb 11 05:42 cancel_proof.json
+-rw-r--r-- 1 root root  209 Feb 11 05:42 crash_restart_proof.json
+-rw-r--r-- 1 root root   59 Feb 11 05:42 etop.txt
+-rw-r--r-- 1 root root 1.3K Feb 11 05:42 evidence.sha256
+-rw-r--r-- 1 root root   71 Feb 11 05:42 observer_snapshot.txt
+-rw-r--r-- 1 root root  244 Feb 11 05:42 replay_proof.json
+-rw-r--r-- 1 root root   75 Feb 11 05:42 sys_stats.json
+-rw-r--r-- 1 root root   34 Feb 11 05:42 system_info.txt
+drwxr-xr-x 2 root root 4.0K Feb 11 05:42 ttb_trace

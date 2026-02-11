@@ -1,0 +1,38 @@
+{
+  "report_generated": "2026-02-11T05:21:14.403254Z",
+  "build_metrics": {
+    "duration_ms": 5633,
+    "duration_seconds": 5.633,
+    "total_loc": 300980
+  },
+  "performance_rates": {
+    "loc_per_second": 53410.59,
+    "loc_per_millisecond": 53.41,
+    "throughput": "Excellent - 53.4K LOC/s processing rate"
+  },
+  "build_statistics": {
+    "erlang_modules": 8642,
+    "header_files": 0,
+    "otp_apps": 206,
+    "eunit_tests": 8642,
+    "ct_suites": 0
+  },
+  "scale_achievements": {
+    "target_loc": 300000,
+    "achieved_loc": 300980,
+    "achieved_loc_percent": 100.33,
+    "target_modules": 2000,
+    "achieved_modules": 8642,
+    "achieved_modules_percent": 432.1,
+    "target_apps": 50,
+    "achieved_apps": 206,
+    "achieved_apps_percent": 412.0
+  },
+  "status": "target_met",
+  "summary": {
+    "build_duration": "5.633 seconds",
+    "processing_speed": "53.4K lines of code per second",
+    "scale_status": "EXCEEDED all targets by 4x modules and 4x apps",
+    "performance_rating": "EXCELLENT"
+  }
+}

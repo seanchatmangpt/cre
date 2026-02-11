@@ -1,0 +1,12 @@
+=== Templates Directory Listing ===
+Location: /home/user/cre/examples/fortune5-fibo-lnctrl/templates/
+
+Templates Found:
+- connector_module.tera (3.1K)
+
+Total Templates: 1
+
+=== Detailed Information ===
+File: connector_module.tera
+Size: 3.1K (3174 bytes)
+Type: Tera template file

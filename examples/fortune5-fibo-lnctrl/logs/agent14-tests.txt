@@ -1,0 +1,11 @@
+Test Pattern Analysis for fortune5-fibo-lnctrl
+==============================================
+
+1. Count of _test() function definitions in source files:
+   grep -r "_test()" apps/*/src/*.erl | wc -l
+   Result: 2091
+
+2. Count of ?assert macro usages in source files:
+   grep -r "?assert" apps/*/src/*.erl | wc -l
+   Result: 17490
+
