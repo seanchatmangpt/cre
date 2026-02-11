@@ -53,11 +53,10 @@ sync() ->
 sync_external(GgenPath) ->
     Command = GgenPath ++ " sync",
     io:format("  Executing: ~s~n", [Command]),
-    case os:cmd(Command) of
-        Output ->
-            io:format("~s~n", [Output]),
-            io:format("✓ ggen sync complete~n")
-    end.
+    Output = os:cmd(Command),
+    %% Use io:put_chars to handle Unicode properly
+    io:put_chars(Output),
+    io:format("~n✓ ggen CLI execution complete~n").
 
 %% Erlang fallback implementation
 sync_erlang() ->
