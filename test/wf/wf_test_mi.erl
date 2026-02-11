@@ -86,11 +86,11 @@ fixed_mi_policy_non_integer_invalid_test() ->
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @doc Test dynamic MI policy with count function.
+%% @doc Test dynamic MI policy with iterator function.
 %%--------------------------------------------------------------------
 dynamic_mi_policy_function_test() ->
-    CountFun = fun(Ctx) -> length(maps:get(items, Ctx, [])) end,
-    Policy = {dynamic, CountFun},
+    IteratorFun = fun(_Ctx) -> done end,
+    Policy = {dynamic, IteratorFun},
     ?assert(wf_term:is_valid_mi_policy(Policy)).
 
 %%--------------------------------------------------------------------
@@ -109,21 +109,23 @@ dynamic_mi_policy_wrong_arity_invalid_test() ->
     ?assertNot(wf_term:is_valid_mi_policy(Policy)).
 
 %%--------------------------------------------------------------------
-%% @doc Test dynamic MI policy with data-driven count.
+%% @doc Test dynamic MI policy with iterator returns next or done.
 %%--------------------------------------------------------------------
 dynamic_mi_policy_data_driven_test() ->
-    CountFun = fun(Ctx) -> maps:get(count, Ctx, 0) end,
-    Policy = {dynamic, CountFun},
+    IteratorFun = fun(Ctx) ->
+        case maps:get(remaining, Ctx, []) of
+            [] -> done;
+            [Item | Rest] -> {next, Ctx#{remaining => Rest, current => Item}}
+        end
+    end,
+    Policy = {dynamic, IteratorFun},
     ?assert(wf_term:is_valid_mi_policy(Policy)),
 
-    Ctx1 = #{count => 3},
-    ?assertEqual(3, CountFun(Ctx1)),
+    Ctx1 = #{remaining => [a, b, c]},
+    ?assertMatch({next, _}, IteratorFun(Ctx1)),
 
-    Ctx2 = #{count => 10},
-    ?assertEqual(10, CountFun(Ctx2)),
-
-    Ctx3 = #{},
-    ?assertEqual(0, CountFun(Ctx3)).
+    Ctx2 = #{remaining => []},
+    ?assertEqual(done, IteratorFun(Ctx2)).
 
 %%====================================================================
 %% MI Term Construction Tests
@@ -141,9 +143,9 @@ mi_term_fixed_test() ->
 %% @doc Test MI term with dynamic policy.
 %%--------------------------------------------------------------------
 mi_term_dynamic_test() ->
-    Task = {task, process_item, fun(_) -> ok end},
-    CountFun = fun(_) -> 5 end,
-    MITerm = wf_term:mi({dynamic, CountFun}, Task),
+    Task = {task, process_item, fun(_) -> {ok, #{}} end},
+    IteratorFun = fun(_) -> done end,
+    MITerm = wf_term:mi({dynamic, IteratorFun}, Task),
     ?assertMatch({mi, {dynamic, _}, _}, MITerm).
 
 %%--------------------------------------------------------------------
@@ -179,8 +181,8 @@ mi_spawn_opcode_fixed_test() ->
 %% @doc Test dynamic MI spawn opcode creation.
 %%--------------------------------------------------------------------
 mi_spawn_opcode_dynamic_test() ->
-    CountFun = fun(_) -> 3 end,
-    Policy = {dynamic, CountFun},
+    IteratorFun = fun(_) -> done end,
+    Policy = {dynamic, IteratorFun},
     Opcode = wf_vm:op_mi_spawn(Policy),
     ?assertMatch({mi_spawn, {dynamic, _}}, Opcode),
     ?assert(wf_vm:is_opcode(Opcode)).
