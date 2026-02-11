@@ -428,6 +428,9 @@ build_project() {
         info "Re-compilation needed..."
     fi
 
+    # Apply OTP 28 compatibility fixes before fetching deps
+    apply_otp28_fixes
+
     info "Fetching dependencies..."
     if ! "$REBAR3_BIN" get-deps 2>&1 | tee -a "$LOG_FILE" | tail -10; then
         error "Failed to fetch dependencies"
@@ -442,6 +445,51 @@ build_project() {
         return 1
     fi
     success "Project compiled successfully"
+}
+
+#=============================================================================
+# Phase 5B: Apply OTP 28 Compatibility Fixes
+#=============================================================================
+
+apply_otp28_fixes() {
+    info "Applying OTP 28 compatibility fixes..."
+    cd "$PROJECT_ROOT"
+
+    # Fix 1: Update yamerl tag (0.10.0 -> v0.10.0)
+    if grep -q 'yamerl.*{tag, "0\.10\.0"}' rebar.config 2>/dev/null; then
+        info "Fixing yamerl tag..."
+        sed -i.bak 's/\({tag, "\)0\.10\.0\("}\)/\1v0.10.0\2/' rebar.config
+        rm -f rebar.config.bak
+        success "yamerl tag fixed"
+    fi
+
+    # Fix 2: Remove jiffy dependency
+    if grep -q 'jiffy' rebar.config 2>/dev/null; then
+        info "Removing jiffy dependency..."
+        sed -i.bak '/^[[:space:]]*{jiffy,.*$/d' rebar.config
+        rm -f rebar.config.bak
+        success "jiffy removed from rebar.config"
+    fi
+
+    # Fix 3: Update prometheus_exporter.erl to use jsone
+    local prom_file="src/telemetry/prometheus_exporter.erl"
+    if [[ -f "$prom_file" ]] && grep -q 'jiffy:encode' "$prom_file" 2>/dev/null; then
+        info "Updating prometheus_exporter to use jsone..."
+        sed -i.bak 's/jiffy:encode/jsone:encode/' "$prom_file"
+        rm -f "$prom_file.bak"
+        success "prometheus_exporter.erl updated"
+    fi
+
+    # Fix 4: Remove jiffy from rebar.lock if present
+    if [[ -f "rebar.lock" ]] && grep -q 'jiffy' rebar.lock 2>/dev/null; then
+        info "Removing jiffy from rebar.lock..."
+        # Create temp file without jiffy entry
+        awk '/<<"jiffy">>/,/^  0}/{next} 1' rebar.lock > rebar.lock.tmp
+        mv rebar.lock.tmp rebar.lock
+        success "jiffy removed from rebar.lock"
+    fi
+
+    info "OTP 28 compatibility fixes applied"
 }
 
 #=============================================================================
