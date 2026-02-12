@@ -873,14 +873,14 @@ concurrent_limit_checks_test(_Config) ->
 
     %% Use up cost before effects
     {ok, B1} = ln_ctrl_budget:check_effect(Budget, 25.0),
-    {ok, B2} = ln_ctrl_budget:check_effect(B1, 24.0),  % Total 49.0
+    {ok, B2} = ln_ctrl_budget:check_effect(B1, 24.5),  % Total 49.5
 
-    %% Effects used = 2, cost used = 49.0
+    %% Effects used = 2, cost used = 49.5
     Status2 = ln_ctrl_budget:status(B2),
     ?assertEqual(2, maps:get(effects_used, Status2)),
-    ?assertEqual(49.0, maps:get(cost_used_usd, Status2)),
+    ?assertEqual(49.5, maps:get(cost_used_usd, Status2)),
 
-    %% Next effect at 1.0 exceeds cost (50.0) but not effects (10)
+    %% Next effect at 1.0 exceeds cost (50.5 > 50.0) but not effects (3 < 10)
     Result = ln_ctrl_budget:check_effect(B2, 1.0),
     ?assertMatch({budget_exceeded, {max_cost_exceeded, _, 50.0}, _}, Result),
 
@@ -894,7 +894,7 @@ large_numbers_test(_Config) ->
 
     %% Many effects
     FinalBudget = lists:foldl(
-        fun(N, B) ->
+        fun(_N, B) ->
             {ok, NextB} = ln_ctrl_budget:check_effect(B, 0.001),
             NextB
         end,
@@ -904,7 +904,9 @@ large_numbers_test(_Config) ->
 
     Status = ln_ctrl_budget:status(FinalBudget),
     ?assertEqual(1000, maps:get(effects_used, Status)),
-    ?assertEqual(1.0, maps:get(cost_used_usd, Status)),
+    %% Allow floating point tolerance for accumulated cost
+    CostUsed = maps:get(cost_used_usd, Status),
+    ?assert(abs(CostUsed - 1.0) < 0.0001, {cost_tolerance_violated, CostUsed}),
     ?assertEqual(false, maps:get(exceeded, Status)),
 
     %% Large latency
