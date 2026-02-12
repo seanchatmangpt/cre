@@ -42,58 +42,58 @@
 
 -export([
     %% new_cancel_signal/1 tests
-    new_cancel_signal_creates_record_test/1,
-    new_cancel_signal_has_valid_scope_test/1,
-    new_cancel_signal_has_timestamp_test/1,
-    new_cancel_signal_unique_timestamps_test/1,
+    new_cancel_signal_creates_record/1,
+    new_cancel_signal_has_valid_scope/1,
+    new_cancel_signal_has_timestamp/1,
+    new_cancel_signal_unique_timestamps/1,
 
     %% is_cancelled/2 tests
-    is_cancelled_returns_false_initially_test/1,
-    is_cancelled_returns_true_after_propagate_test/1,
-    is_cancelled_multiple_scopes_test/1,
-    is_cancelled_unknown_scope_returns_false_test/1,
+    is_cancelled_returns_false_initially/1,
+    is_cancelled_returns_true_after_propagate/1,
+    is_cancelled_multiple_scopes/1,
+    is_cancelled_unknown_scope_returns_false/1,
 
     %% propagate_cancel/2 tests
-    propagate_cancel_sets_flag_test/1,
-    propagate_cancel_preserves_other_flags_test/1,
-    propagate_cancel_is_idempotent_test/1,
-    propagate_cancel_nested_scopes_test/1,
-    propagate_cancel_multiple_scopes_test/1,
+    propagate_cancel_sets_flag/1,
+    propagate_cancel_preserves_other_flags/1,
+    propagate_cancel_is_idempotent/1,
+    propagate_cancel_nested_scopes/1,
+    propagate_cancel_multiple_scopes/1,
 
     %% stop_effects_in_scope/2 tests
-    stop_effects_keeps_pre_cancel_effects_test/1,
-    stop_effects_removes_post_cancel_effects_test/1,
-    stop_effects_keeps_effect_at_exact_timestamp_test/1,
-    stop_effects_empty_log_test/1,
-    stop_effects_malformed_effects_test/1,
+    stop_effects_keeps_pre_cancel_effects/1,
+    stop_effects_removes_post_cancel_effects/1,
+    stop_effects_keeps_effect_at_exact_timestamp/1,
+    stop_effects_empty_log/1,
+    stop_effects_malformed_effects/1,
 
     %% Cancel scope tests
-    cancel_scope_nested_isolation_test/1,
-    cancel_scope_boundary_test/1,
-    cancel_scope_propagation_to_parent_test/1,
+    cancel_scope_nested_isolation/1,
+    cancel_scope_boundary/1,
+    cancel_scope_propagation_to_parent/1,
 
     %% Effect filtering tests
-    filter_effects_by_type_test/1,
-    filter_effects_keep_specific_types_test/1,
-    filter_effects_empty_result_test/1,
+    filter_effects_by_type/1,
+    filter_effects_keep_specific_types/1,
+    filter_effects_empty_result/1,
 
     %% Deferred actions on cancel tests
-    defer_single_action_executes_on_cancel_test/1,
-    defer_multiple_actions_reverse_order_test/1,
-    defer_nested_actions_test/1,
-    defer_no_actions_no_error_test/1,
+    defer_single_action_executes_on_cancel/1,
+    defer_multiple_actions_reverse_order/1,
+    defer_nested_actions/1,
+    defer_no_actions_no_error/1,
 
     %% Concurrent cancellation tests
-    concurrent_cancel_same_scope_test/1,
-    concurrent_cancel_different_scopes_test/1,
-    concurrent_cancel_race_conditions_test/1,
+    concurrent_cancel_same_scope/1,
+    concurrent_cancel_different_scopes/1,
+    concurrent_cancel_race_conditions/1,
 
     %% Edge case tests
-    cancel_already_completed_case_test/1,
-    cancel_non_existent_case_test/1,
-    double_cancellation_test/1,
-    cancel_with_empty_exec_state_test/1,
-    cancel_preserves_other_state_test/1
+    cancel_already_completed_case/1,
+    cancel_non_existent_case/1,
+    double_cancellation/1,
+    cancel_with_empty_exec_state/1,
+    cancel_preserves_other_state/1
 ]).
 
 %%%===================================================================
@@ -126,58 +126,58 @@ all() ->
 groups() ->
     [
         {new_cancel_signal_tests, [shuffle, {repeat, 1}], [
-            new_cancel_signal_creates_record_test,
-            new_cancel_signal_has_valid_scope_test,
-            new_cancel_signal_has_timestamp_test,
-            new_cancel_signal_unique_timestamps_test
+            new_cancel_signal_creates_record,
+            new_cancel_signal_has_valid_scope,
+            new_cancel_signal_has_timestamp,
+            new_cancel_signal_unique_timestamps
         ]},
         {is_cancelled_tests, [shuffle, {repeat, 1}], [
-            is_cancelled_returns_false_initially_test,
-            is_cancelled_returns_true_after_propagate_test,
-            is_cancelled_multiple_scopes_test,
-            is_cancelled_unknown_scope_returns_false_test
+            is_cancelled_returns_false_initially,
+            is_cancelled_returns_true_after_propagate,
+            is_cancelled_multiple_scopes,
+            is_cancelled_unknown_scope_returns_false
         ]},
         {propagate_cancel_tests, [shuffle, {repeat, 1}], [
-            propagate_cancel_sets_flag_test,
-            propagate_cancel_preserves_other_flags_test,
-            propagate_cancel_is_idempotent_test,
-            propagate_cancel_nested_scopes_test,
-            propagate_cancel_multiple_scopes_test
+            propagate_cancel_sets_flag,
+            propagate_cancel_preserves_other_flags,
+            propagate_cancel_is_idempotent,
+            propagate_cancel_nested_scopes,
+            propagate_cancel_multiple_scopes
         ]},
         {stop_effects_tests, [shuffle, {repeat, 1}], [
-            stop_effects_keeps_pre_cancel_effects_test,
-            stop_effects_removes_post_cancel_effects_test,
-            stop_effects_keeps_effect_at_exact_timestamp_test,
-            stop_effects_empty_log_test,
-            stop_effects_malformed_effects_test
+            stop_effects_keeps_pre_cancel_effects,
+            stop_effects_removes_post_cancel_effects,
+            stop_effects_keeps_effect_at_exact_timestamp,
+            stop_effects_empty_log,
+            stop_effects_malformed_effects
         ]},
         {cancel_scope_tests, [shuffle, {repeat, 1}], [
-            cancel_scope_nested_isolation_test,
-            cancel_scope_boundary_test,
-            cancel_scope_propagation_to_parent_test
+            cancel_scope_nested_isolation,
+            cancel_scope_boundary,
+            cancel_scope_propagation_to_parent
         ]},
         {effect_filtering_tests, [shuffle, {repeat, 1}], [
-            filter_effects_by_type_test,
-            filter_effects_keep_specific_types_test,
-            filter_effects_empty_result_test
+            filter_effects_by_type,
+            filter_effects_keep_specific_types,
+            filter_effects_empty_result
         ]},
         {deferred_actions_tests, [shuffle, {repeat, 1}], [
-            defer_single_action_executes_on_cancel_test,
-            defer_multiple_actions_reverse_order_test,
-            defer_nested_actions_test,
-            defer_no_actions_no_error_test
+            defer_single_action_executes_on_cancel,
+            defer_multiple_actions_reverse_order,
+            defer_nested_actions,
+            defer_no_actions_no_error
         ]},
         {concurrent_cancellation_tests, [], [
-            concurrent_cancel_same_scope_test,
-            concurrent_cancel_different_scopes_test,
-            concurrent_cancel_race_conditions_test
+            concurrent_cancel_same_scope,
+            concurrent_cancel_different_scopes,
+            concurrent_cancel_race_conditions
         ]},
         {edge_case_tests, [], [
-            cancel_already_completed_case_test,
-            cancel_non_existent_case_test,
-            double_cancellation_test,
-            cancel_with_empty_exec_state_test,
-            cancel_preserves_other_state_test
+            cancel_already_completed_case,
+            cancel_non_existent_case,
+            double_cancellation,
+            cancel_with_empty_exec_state,
+            cancel_preserves_other_state
         ]}
     ].
 
@@ -290,9 +290,9 @@ new_cancel_signal_has_timestamp(_Config) ->
     Signal = ln_ctrl_cancel:new_cancel_signal(test_scope),
     Timestamp = element(3, Signal),
 
-    %% Timestamp should be a positive integer (monotonic time in ms)
+    %% Timestamp should be an integer (monotonic time in ms)
+    %% Note: monotonic time can be negative depending on Erlang version
     ?assert(is_integer(Timestamp)),
-    ?assert(Timestamp > 0),
 
     {comment, "new_cancel_signal generates valid timestamp"}.
 
@@ -376,8 +376,8 @@ is_cancelled_unknown_scope_returns_false(_Config) ->
 %%%===================================================================
 
 %% @doc Test that propagate_cancel sets the cancellation flag.
--spec propagate_cancel_sets_flag_test(config()) -> {comment, string()}.
-propagate_cancel_sets_flag_test(_Config) ->
+-spec propagate_cancel_sets_flag(config()) -> {comment, string()}.
+propagate_cancel_sets_flag(_Config) ->
     ExecState = make_exec_state(),
     NewState = ln_ctrl_cancel:propagate_cancel(ExecState, test_scope),
 
@@ -387,8 +387,8 @@ propagate_cancel_sets_flag_test(_Config) ->
     {comment, "propagate_cancel sets cancellation flag"}.
 
 %% @doc Test that propagate_cancel preserves other cancellation flags.
--spec propagate_cancel_preserves_other_flags_test(config()) -> {comment, string()}.
-propagate_cancel_preserves_other_flags_test(_Config) ->
+-spec propagate_cancel_preserves_other_flags(config()) -> {comment, string()}.
+propagate_cancel_preserves_other_flags(_Config) ->
     %% Start with some existing cancel flags
     InitialCancels = #{scope_a => true, scope_b => false},
     ExecState = make_exec_state_with_cancels(InitialCancels),
@@ -405,8 +405,8 @@ propagate_cancel_preserves_other_flags_test(_Config) ->
     {comment, "propagate_cancel preserves other flags"}.
 
 %% @doc Test that propagate_cancel is idempotent.
--spec propagate_cancel_is_idempotent_test(config()) -> {comment, string()}.
-propagate_cancel_is_idempotent_test(_Config) ->
+-spec propagate_cancel_is_idempotent(config()) -> {comment, string()}.
+propagate_cancel_is_idempotent(_Config) ->
     ExecState = make_exec_state(),
 
     %% Cancel same scope multiple times
@@ -426,26 +426,25 @@ propagate_cancel_is_idempotent_test(_Config) ->
     {comment, "propagate_cancel is idempotent"}.
 
 %% @doc Test propagate_cancel with nested scopes (child scope cancellation).
--spec propagate_cancel_nested_scopes_test(config()) -> {comment, string()}.
-propagate_cancel_nested_scopes_test(_Config) ->
+-spec propagate_cancel_nested_scopes(config()) -> {comment, string()}.
+propagate_cancel_nested_scopes(_Config) ->
     ExecState = make_exec_state(),
 
     %% Cancel parent scope
     State1 = ln_ctrl_cancel:propagate_cancel(ExecState, parent_scope),
 
-    %% Cancel child scope
-    State2 = ln_ctrl_cancel:propagate_cancel(State1, {parent_scope, child_scope}),
+    %% Cancel child scope (using an atom as scope ID per function spec)
+    State2 = ln_ctrl_cancel:propagate_cancel(State1, child_scope),
 
     %% Both should be cancelled
     ?assert(ln_ctrl_cancel:is_cancelled(parent_scope, State2)),
-    %% Note: The child scope uses a tuple as ID, which is valid
-    ?assertEqual(true, maps:get({parent_scope, child_scope}, wf_vm:exec_cancel(State2), false)),
+    ?assert(ln_ctrl_cancel:is_cancelled(child_scope, State2)),
 
     {comment, "propagate_cancel handles nested scopes"}.
 
 %% @doc Test propagate_cancel with multiple different scopes.
--spec propagate_cancel_multiple_scopes_test(config()) -> {comment, string()}.
-propagate_cancel_multiple_scopes_test(_Config) ->
+-spec propagate_cancel_multiple_scopes(config()) -> {comment, string()}.
+propagate_cancel_multiple_scopes(_Config) ->
     ExecState = make_exec_state(),
     Scopes = [scope_1, scope_2, scope_3, scope_4, scope_5],
 
@@ -476,8 +475,8 @@ propagate_cancel_multiple_scopes_test(_Config) ->
 %%%===================================================================
 
 %% @doc Test that effects before cancel time are kept.
--spec stop_effects_keeps_pre_cancel_effects_test(config()) -> {comment, string()}.
-stop_effects_keeps_pre_cancel_effects_test(_Config) ->
+-spec stop_effects_keeps_pre_cancel_effects(config()) -> {comment, string()}.
+stop_effects_keeps_pre_cancel_effects(_Config) ->
     CancelTime = erlang:monotonic_time(millisecond),
     Signal = {cancel_signal, my_scope, CancelTime},
 
@@ -495,8 +494,8 @@ stop_effects_keeps_pre_cancel_effects_test(_Config) ->
     {comment, "Effects before cancel are kept"}.
 
 %% @doc Test that effects after cancel time are removed.
--spec stop_effects_removes_post_cancel_effects_test(config()) -> {comment, string()}.
-stop_effects_removes_post_cancel_effects_test(_Config) ->
+-spec stop_effects_removes_post_cancel_effects(config()) -> {comment, string()}.
+stop_effects_removes_post_cancel_effects(_Config) ->
     CancelTime = erlang:monotonic_time(millisecond),
     Signal = {cancel_signal, my_scope, CancelTime},
 
@@ -519,8 +518,8 @@ stop_effects_removes_post_cancel_effects_test(_Config) ->
     {comment, "Effects after cancel are removed"}.
 
 %% @doc Test that effect at exact cancel timestamp is kept.
--spec stop_effects_keeps_effect_at_exact_timestamp_test(config()) -> {comment, string()}.
-stop_effects_keeps_effect_at_exact_timestamp_test(_Config) ->
+-spec stop_effects_keeps_effect_at_exact_timestamp(config()) -> {comment, string()}.
+stop_effects_keeps_effect_at_exact_timestamp(_Config) ->
     ExactTime = 10000,
     Signal = {cancel_signal, my_scope, ExactTime},
 
@@ -536,8 +535,8 @@ stop_effects_keeps_effect_at_exact_timestamp_test(_Config) ->
     {comment, "Effect at exact cancel timestamp is kept"}.
 
 %% @doc Test stop_effects_in_scope with empty log.
--spec stop_effects_empty_log_test(config()) -> {comment, string()}.
-stop_effects_empty_log_test(_Config) ->
+-spec stop_effects_empty_log(config()) -> {comment, string()}.
+stop_effects_empty_log(_Config) ->
     Signal = {cancel_signal, my_scope, erlang:monotonic_time(millisecond)},
     FilteredLog = ln_ctrl_cancel:stop_effects_in_scope([], Signal),
 
@@ -546,8 +545,8 @@ stop_effects_empty_log_test(_Config) ->
     {comment, "Empty effect log returns empty"}.
 
 %% @doc Test stop_effects_in_scope with malformed effects (missing timestamp).
--spec stop_effects_malformed_effects_test(config()) -> {comment, string()}.
-stop_effects_malformed_effects_test(_Config) ->
+-spec stop_effects_malformed_effects(config()) -> {comment, string()}.
+stop_effects_malformed_effects(_Config) ->
     CancelTime = erlang:monotonic_time(millisecond),
     Signal = {cancel_signal, my_scope, CancelTime},
 
@@ -571,8 +570,8 @@ stop_effects_malformed_effects_test(_Config) ->
 %%%===================================================================
 
 %% @doc Test nested cancellation scope isolation.
--spec cancel_scope_nested_isolation_test(config()) -> {comment, string()}.
-cancel_scope_nested_isolation_test(_Config) ->
+-spec cancel_scope_nested_isolation(config()) -> {comment, string()}.
+cancel_scope_nested_isolation(_Config) ->
     ExecState = make_exec_state(),
 
     %% Cancel inner scope only
@@ -592,8 +591,8 @@ cancel_scope_nested_isolation_test(_Config) ->
     {comment, "Nested scope isolation verified"}.
 
 %% @doc Test cancel scope boundary behavior.
--spec cancel_scope_boundary_test(config()) -> {comment, string()}.
-cancel_scope_boundary_test(_Config) ->
+-spec cancel_scope_boundary(config()) -> {comment, string()}.
+cancel_scope_boundary(_Config) ->
     ExecState = make_exec_state(),
 
     %% Simulate scope boundaries with different IDs
@@ -610,8 +609,8 @@ cancel_scope_boundary_test(_Config) ->
     {comment, "Cancel scope boundary verified"}.
 
 %% @doc Test cancellation propagation to parent scope (if applicable).
--spec cancel_scope_propagation_to_parent_test(config()) -> {comment, string()}.
-cancel_scope_propagation_to_parent_test(_Config) ->
+-spec cancel_scope_propagation_to_parent(config()) -> {comment, string()}.
+cancel_scope_propagation_to_parent(_Config) ->
     ExecState = make_exec_state(),
 
     %% In this implementation, cancellation does NOT automatically propagate to parent.
@@ -633,8 +632,8 @@ cancel_scope_propagation_to_parent_test(_Config) ->
 %%%===================================================================
 
 %% @doc Test filtering effects by type during cancellation.
--spec filter_effects_by_type_test(config()) -> {comment, string()}.
-filter_effects_by_type_test(_Config) ->
+-spec filter_effects_by_type(config()) -> {comment, string()}.
+filter_effects_by_type(_Config) ->
     CancelTime = erlang:monotonic_time(millisecond),
     Signal = {cancel_signal, my_scope, CancelTime},
 
@@ -657,8 +656,8 @@ filter_effects_by_type_test(_Config) ->
     {comment, "Effect filtering by timestamp verified"}.
 
 %% @doc Test keeping specific effect types.
--spec filter_effects_keep_specific_types_test(config()) -> {comment, string()}.
-filter_effects_keep_specific_types_test(_Config) ->
+-spec filter_effects_keep_specific_types(config()) -> {comment, string()}.
+filter_effects_keep_specific_types(_Config) ->
     CancelTime = erlang:monotonic_time(millisecond),
     Signal = {cancel_signal, my_scope, CancelTime},
 
@@ -679,8 +678,8 @@ filter_effects_keep_specific_types_test(_Config) ->
     {comment, "Pre-cancel effects of all types are kept"}.
 
 %% @doc Test filtering resulting in empty list.
--spec filter_effects_empty_result_test(config()) -> {comment, string()}.
-filter_effects_empty_result_test(_Config) ->
+-spec filter_effects_empty_result(config()) -> {comment, string()}.
+filter_effects_empty_result(_Config) ->
     CancelTime = erlang:monotonic_time(millisecond),
     Signal = {cancel_signal, my_scope, CancelTime},
 
@@ -703,8 +702,8 @@ filter_effects_empty_result_test(_Config) ->
 
 %% @doc Test single deferred action executes on cancellation.
 %% Note: This tests the pattern - actual defer handling is in wf_exec.
--spec defer_single_action_executes_on_cancel_test(config()) -> {comment, string()}.
-defer_single_action_executes_on_cancel_test(_Config) ->
+-spec defer_single_action_executes_on_cancel(config()) -> {comment, string()}.
+defer_single_action_executes_on_cancel(_Config) ->
     %% In the actual system, deferred actions are tracked in the exec_state
     %% and executed when a cancel_scope_exit is reached.
     %%
@@ -732,8 +731,8 @@ defer_single_action_executes_on_cancel_test(_Config) ->
     {comment, "Defer scope cancellation sets flags correctly"}.
 
 %% @doc Test multiple deferred actions execute in reverse order.
--spec defer_multiple_actions_reverse_order_test(config()) -> {comment, string()}.
-defer_multiple_actions_reverse_order_test(_Config) ->
+-spec defer_multiple_actions_reverse_order(config()) -> {comment, string()}.
+defer_multiple_actions_reverse_order(_Config) ->
     %% Multiple defer frames should be processed LIFO (reverse order)
     ExecState = make_exec_state(),
 
@@ -757,8 +756,8 @@ defer_multiple_actions_reverse_order_test(_Config) ->
     {comment, "Multiple defer scopes can be cancelled"}.
 
 %% @doc Test nested deferred actions.
--spec defer_nested_actions_test(config()) -> {comment, string()}.
-defer_nested_actions_test(_Config) ->
+-spec defer_nested_actions(config()) -> {comment, string()}.
+defer_nested_actions(_Config) ->
     ExecState = make_exec_state(),
 
     %% Nested defer frames
@@ -780,8 +779,8 @@ defer_nested_actions_test(_Config) ->
     {comment, "Nested defer scopes handled correctly"}.
 
 %% @doc Test that no deferred actions doesn't cause error.
--spec defer_no_actions_no_error_test(config()) -> {comment, string()}.
-defer_no_actions_no_error_test(_Config) ->
+-spec defer_no_actions_no_error(config()) -> {comment, string()}.
+defer_no_actions_no_error(_Config) ->
     ExecState = make_exec_state(),
 
     %% Cancel a scope that has no associated defer actions
@@ -797,25 +796,33 @@ defer_no_actions_no_error_test(_Config) ->
 %%%===================================================================
 
 %% @doc Test concurrent cancel requests for same scope.
--spec concurrent_cancel_same_scope_test(config()) -> {comment, string()}.
-concurrent_cancel_same_scope_test(_Config) ->
+-spec concurrent_cancel_same_scope(config()) -> {comment, string()}.
+concurrent_cancel_same_scope(_Config) ->
     ExecState = make_exec_state(),
     Scope = concurrent_scope,
 
     %% Simulate concurrent cancellation (sequential in test, but same effect)
     Self = self(),
-    Pid1 = spawn_link(fun() ->
+    _Pid1 = spawn_link(fun() ->
         State = ln_ctrl_cancel:propagate_cancel(ExecState, Scope),
         Self ! {done, 1, State}
     end),
-    Pid2 = spawn_link(fun() ->
+    _Pid2 = spawn_link(fun() ->
         State = ln_ctrl_cancel:propagate_cancel(ExecState, Scope),
         Self ! {done, 2, State}
     end),
 
-    %% Receive both results
-    receive {done, 1, State1} -> ok after 1000 -> exit(timeout1) end,
-    receive {done, 2, State2} -> ok after 1000 -> exit(timeout2) end,
+    %% Receive both results and verify
+    State1 = receive
+        {done, 1, S1} -> S1
+    after 1000 ->
+        exit(timeout1)
+    end,
+    State2 = receive
+        {done, 2, S2} -> S2
+    after 1000 ->
+        exit(timeout2)
+    end,
 
     %% Both should show the scope as cancelled
     ?assert(ln_ctrl_cancel:is_cancelled(Scope, State1)),
@@ -824,15 +831,15 @@ concurrent_cancel_same_scope_test(_Config) ->
     {comment, "Concurrent cancel of same scope is safe"}.
 
 %% @doc Test concurrent cancel requests for different scopes.
--spec concurrent_cancel_different_scopes_test(config()) -> {comment, string()}.
-concurrent_cancel_different_scopes_test(_Config) ->
+-spec concurrent_cancel_different_scopes(config()) -> {comment, string()}.
+concurrent_cancel_different_scopes(_Config) ->
     ExecState = make_exec_state(),
 
     %% Multiple processes cancelling different scopes
     Self = self(),
     Scopes = [scope_a, scope_b, scope_c],
 
-    Pids = lists:map(
+    _Pids = lists:map(
         fun(Scope) ->
             spawn_link(fun() ->
                 State = ln_ctrl_cancel:propagate_cancel(ExecState, Scope),
@@ -845,7 +852,11 @@ concurrent_cancel_different_scopes_test(_Config) ->
     %% Collect all results
     Results = lists:map(
         fun(Scope) ->
-            receive {done, Scope, State} -> {Scope, State} after 1000 -> exit({timeout, Scope}) end
+            receive
+                {done, Scope, State} -> {Scope, State}
+            after 1000 ->
+                exit({timeout, Scope})
+            end
         end,
         Scopes
     ),
@@ -861,8 +872,8 @@ concurrent_cancel_different_scopes_test(_Config) ->
     {comment, "Concurrent cancel of different scopes is safe"}.
 
 %% @doc Test race conditions in cancellation.
--spec concurrent_cancel_race_conditions_test(config()) -> {comment, string()}.
-concurrent_cancel_race_conditions_test(_Config) ->
+-spec concurrent_cancel_race_conditions(config()) -> {comment, string()}.
+concurrent_cancel_race_conditions(_Config) ->
     %% Test rapid sequential cancellations (simulating race conditions)
     ExecState = make_exec_state(),
 
@@ -886,8 +897,8 @@ concurrent_cancel_race_conditions_test(_Config) ->
 %%%===================================================================
 
 %% @doc Test cancelling an already completed case.
--spec cancel_already_completed_case_test(config()) -> {comment, string()}.
-cancel_already_completed_case_test(_Config) ->
+-spec cancel_already_completed_case(config()) -> {comment, string()}.
+cancel_already_completed_case(_Config) ->
     %% A "completed" case would have a halt in its trace
     ExecState = make_exec_state(),
 
@@ -905,8 +916,8 @@ cancel_already_completed_case_test(_Config) ->
     {comment, "Cancelling completed case succeeds"}.
 
 %% @doc Test cancelling a non-existent case (scope doesn't exist in state).
--spec cancel_non_existent_case_test(config()) -> {comment, string()}.
-cancel_non_existent_case_test(_Config) ->
+-spec cancel_non_existent_case(config()) -> {comment, string()}.
+cancel_non_existent_case(_Config) ->
     ExecState = make_exec_state(),
 
     %% Cancel a scope that was never defined
@@ -918,8 +929,8 @@ cancel_non_existent_case_test(_Config) ->
     {comment, "Cancelling non-existent scope creates entry"}.
 
 %% @doc Test double cancellation of same scope.
--spec double_cancellation_test(config()) -> {comment, string()}.
-double_cancellation_test(_Config) ->
+-spec double_cancellation(config()) -> {comment, string()}.
+double_cancellation(_Config) ->
     ExecState = make_exec_state(),
     Scope = double_cancel_scope,
 
@@ -937,8 +948,8 @@ double_cancellation_test(_Config) ->
     {comment, "Double cancellation is idempotent"}.
 
 %% @doc Test cancellation with completely empty exec_state.
--spec cancel_with_empty_exec_state_test(config()) -> {comment, string()}.
-cancel_with_empty_exec_state_test(_Config) ->
+-spec cancel_with_empty_exec_state(config()) -> {comment, string()}.
+cancel_with_empty_exec_state(_Config) ->
     %% Empty state
     ExecState = {[], 0, [], #{}, #{}, #{}, []},
 
@@ -949,8 +960,8 @@ cancel_with_empty_exec_state_test(_Config) ->
     {comment, "Cancelling empty exec_state succeeds"}.
 
 %% @doc Test that cancellation preserves other state components.
--spec cancel_preserves_other_state_test(config()) -> {comment, string()}.
-cancel_preserves_other_state_test(_Config) ->
+-spec cancel_preserves_other_state(config()) -> {comment, string()}.
+cancel_preserves_other_state(_Config) ->
     %% Create state with various components
     Program = [wf_vm:op_halt()],
     PC = 5,

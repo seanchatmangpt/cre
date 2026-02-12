@@ -419,7 +419,7 @@ nondeterministic_multiple_branches_test(_Config) ->
     Policy = ln_ctrl_sched:new_nondeterministic(),
 
     %% Different types of branches
-    Choices1 = [{tuple, data}, [list, of, atoms], #{map => value}, atom_branch],
+    Choices1 = [{tuple, data}, [list, items, here], #{map => value}, atom_branch],
     {Choice1, P1} = ln_ctrl_sched:apply_policy(Policy, undefined, Choices1),
     ?assertEqual({tuple, data}, Choice1),
 
@@ -447,11 +447,11 @@ replay_follows_recorded_trace_test(_Config) ->
     ?assertEqual(a, Choice1),
 
     %% Second apply should use {1, 101} -> pick index 1
-    {Choice2, P2} = ln_ctrl_sched:apply_policy(Policy, undefined, Choices),
+    {Choice2, P2} = ln_ctrl_sched:apply_policy(P1, undefined, Choices),
     ?assertEqual(b, Choice2),
 
     %% Third apply should use {0, 102} -> pick index 0
-    {Choice3, _} = ln_ctrl_sched:apply_policy(Policy, undefined, Choices),
+    {Choice3, _} = ln_ctrl_sched:apply_policy(P2, undefined, Choices),
     ?assertEqual(a, Choice3),
 
     {comment, "replay follows recorded trace verified"}.
