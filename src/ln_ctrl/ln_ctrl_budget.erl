@@ -94,7 +94,9 @@ check_effect(Budget, Cost) when is_number(Cost), Cost >= 0 ->
         unlimited ->
             ok;
         MaxEffects when EffectsUsed > MaxEffects ->
-            return_exceeded(NewBudget, {max_effects_exceeded, EffectsUsed, MaxEffects})
+            return_exceeded(NewBudget, {max_effects_exceeded, EffectsUsed, MaxEffects});
+        _ ->
+            ok
     end,
 
     %% Check cost
