@@ -20,23 +20,9 @@
 ]).
 
 -include_lib("eunit/include/eunit.hrl").
+-include("ln_ctrl_sched.hrl").
 
 %%% TYPES ===================================================================
-
--record(deterministic, {
-    name = deterministic :: atom()
-}).
-
--record(nondeterministic, {
-    name = nondeterministic :: atom(),
-    choice_log = [] :: choice_log()
-}).
-
--record(replay, {
-    name = replay :: atom(),
-    choice_log :: choice_log(),
-    index = 0 :: non_neg_integer()
-}).
 
 -type policy() ::
       #deterministic{}
