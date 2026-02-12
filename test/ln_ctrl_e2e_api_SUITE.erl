@@ -491,7 +491,7 @@ cancel_scope_invalid_scope_test(_Config) ->
     Result = ln_ctrl:cancel_scope(CasePid, non_existent_scope),
 
     %% Should succeed (scope not found is acceptable)
-    ?assert(Result =:= ok orelse Result =:= {error, _}),
+    ?assert(Result =:= ok orelse (is_tuple(Result) andalso element(1, Result) =:= error)),
 
     %% Cleanup
     cleanup_case(CasePid),
@@ -751,7 +751,7 @@ trace_range_extraction_test(_Config) ->
     %% Get trace for specific range
     TraceResult = ln_ctrl:trace(CasePid, 0, 5),
 
-    ?assert(is_list(TraceResult) orelse TraceResult =:= {error, _}),
+    ?assert(is_list(TraceResult) orelse (is_tuple(TraceResult) andalso element(1, TraceResult) =:= error)),
 
     %% Cleanup
     cleanup_case(CasePid),
@@ -770,7 +770,7 @@ trace_empty_range_test(_Config) ->
     %% Get trace for empty range
     TraceResult = ln_ctrl:trace(CasePid, 10, 5),  % From > To
 
-    ?assert(is_list(TraceResult) orelse TraceResult =:= {error, _}),
+    ?assert(is_list(TraceResult) orelse (is_tuple(TraceResult) andalso element(1, TraceResult) =:= error)),
 
     %% Cleanup
     cleanup_case(CasePid),
@@ -793,7 +793,7 @@ trace_full_range_test(_Config) ->
     %% Get full trace
     TraceResult = ln_ctrl:trace(CasePid, 0, 1000),
 
-    ?assert(is_list(TraceResult) orelse TraceResult =:= {error, _}),
+    ?assert(is_list(TraceResult) orelse (is_tuple(TraceResult) andalso element(1, TraceResult) =:= error)),
 
     %% Cleanup
     cleanup_case(CasePid),

@@ -582,7 +582,7 @@ export_to_xml_not_found_test() ->
 build_xes_xml_test() ->
     Trace = {<<"case1">>, 1000000000, 1000100, [
         {1000000000, <<"Activity">>, <<"start">>, #{<<"task">> => <<"A">>}},
-        {1000000050, <<"Activity">>, <<"complete">>, #{<<"result">> => <<"done">>>}
+        {1000000050, <<"Activity">>, <<"complete">>, #{<<"result">> => <<"done">>}}
     ]},
     XML = build_xes_xml([Trace]),
     ?assert(is_binary(XML)),
@@ -660,12 +660,12 @@ trace_matches_time_range_test() ->
     ?assert(trace_matches(Trace, [{time_range, {500, 1500}}])).
 
 trace_matches_data_test() ->
-    Events = [{1000, <<"C">>, <<"start">>, #{<<"key">> => <<"value">>}],
+    Events = [{1000, <<"C">>, <<"start">>, #{<<"key">> => <<"value">>}}],
     Trace = {<<"case1">>, 1000, 2000, Events},
     ?assert(trace_matches(Trace, [{data_matches, #{<<"key">> => <<"value">>}}])).
 
 trace_matches_multiple_filters_test() ->
-    Events = [{1000, <<"C">>, <<"start">>, #{<<"k">> => <<"v">>}],
+    Events = [{1000, <<"C">>, <<"start">>, #{<<"k">> => <<"v">>}}],
     Trace = {<<"case1">>, 1000, 2000, Events},
     ?assert(trace_matches(Trace, [
         {concept, <<"C">>},
@@ -674,7 +674,7 @@ trace_matches_multiple_filters_test() ->
     ])).
 
 trace_matches_no_match_test() ->
-    Events = [{1000, <<"C">>, <<"start">>, #{<<"k">> => <<"v">>}],
+    Events = [{1000, <<"C">>, <<"start">>, #{<<"k">> => <<"v">>}}],
     Trace = {<<"case1">>, 1000, 2000, Events},
     ?assertNot(trace_matches(Trace, [{concept, <<"NonExistent">>}])).
 
@@ -692,7 +692,7 @@ match_filter_time_range_test() ->
     ?assert(match_filter({time_range, {500, 1500}}, {Events, <<"case">>})).
 
 match_filter_data_matches_test() ->
-    Events = [{1000, <<"C">>, <<"start">>, #{<<"key">> => <<"value">>}],
+    Events = [{1000, <<"C">>, <<"start">>, #{<<"key">> => <<"value">>}}],
     ?assert(match_filter({data_matches, #{<<"key">> => <<"value">>}}, {Events, <<"case">>})).
 
 match_filter_no_match_test() ->
