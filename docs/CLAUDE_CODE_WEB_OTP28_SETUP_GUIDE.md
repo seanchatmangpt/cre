@@ -11,11 +11,20 @@
 The `.claude/hooks/SessionStart.sh` hook automatically sets up OTP 28 when you:
 
 1. Clone/open the CRE project in Claude Code web
-2. The hook runs automatically on session start
+2. The hook runs automatically on session start (first run: ~7-10 minutes, subsequent: ~1-2 minutes)
 3. OTP 28 is available in your bash shell
 4. You can compile and test Erlang code immediately
 
 **No manual setup required** unless you have a non-standard environment.
+
+### ⚠️ Important: How Setup Actually Works
+
+Despite the script's name suggesting "pre-built binaries," the actual process is:
+- **Phase 2B:** Attempts to download partial OTP artifacts (usually fails detection)
+- **Phase 2D:** Falls back to building OTP 28 from source (~5-8 minutes)
+- **Phase 6:** Compiles the CRE project (~2-3 minutes)
+
+This is reliable in gVisor because gcc/make ARE available. First-run time is 7-10 minutes total.
 
 ---
 
@@ -67,20 +76,21 @@ Looks for OTP in standard locations:
 
 If found and version ≥ 28: Uses system installation ✓
 
-### Phase 3: Download Pre-built Static Binary (Recommended for Cloud)
-Tries multiple sources in priority order:
+### Phase 3: Download Pre-built Static Binary (Less Reliable Than Expected)
 
-| Source | Speed | Reliability | Notes |
-|--------|-------|-------------|-------|
-| Hex.pm Bob builds | Fast | Excellent | Official, always latest |
-| GitHub releases | Medium | Good | Source, can extract |
-| Heroku buildpack | Medium | Fair | Legacy but compatible |
-| kerl releases | Fast | Good | Community-maintained |
+**⚠️ IMPORTANT:** Despite the script's name, these downloads do NOT provide true pre-built static binaries:
 
-Each URL is tried with exponential backoff. First success is cached.
+| Source | What You Get | Status |
+|--------|--------------|--------|
+| Hex.pm Bob builds | Partially compiled (beam.smp exists, but erl.src is template) | ❌ Detection fails |
+| GitHub releases | Source distribution (otp_src_*.tar.gz) | ❌ Requires compilation |
+| Heroku buildpack | Historical, may not have 28.3.1 | ❌ Often missing |
+| kerl releases | Community pre-built binaries | ⚠️ Inconsistent availability |
 
-### Phase 4: Build from Source (Last Resort)
-If all downloads fail, attempts to compile from source using:
+Each URL is tried with exponential backoff, but **most fail detection** and flow through to Phase 4.
+
+### Phase 4: Build from Source (Actual Primary Method)
+If all downloads fail detection, compiles OTP from source using:
 ```bash
 ./configure --prefix=$OTP_DIR \
   --disable-debug \
@@ -92,7 +102,7 @@ make -j$(nproc)
 make install
 ```
 
-⚠️ **This usually fails in gVisor** due to missing syscalls.
+**Status:** Works in gVisor when gcc/make are available. This is what actually happens in most Claude Code web sessions, despite Phase 3 being named "download pre-built binary."
 
 ---
 
@@ -109,9 +119,13 @@ When you start a Claude Code web session with this project:
 
 [2B] Download pre-built binary
   → Downloads from Hex.pm (~50MB)
-  → Extracts to .erlmcp/otp-28.3.1/
+  → Extraction succeeds, but detection fails
+  → (Hex.pm tarballs are partial, not full OTP)
 
-[2D] (Skipped, binary acquired)
+[2D] Build from source
+  → Downloads source tarball
+  → ./configure && make && make install
+  → ✓ This step usually succeeds in gVisor
 
 [3] Environment setup
   → PATH includes .erlmcp/otp-28.3.1/bin
@@ -140,14 +154,17 @@ When you start a Claude Code web session with this project:
 ### First Run vs. Subsequent Runs
 
 **First session:**
-- Downloads OTP: ~100-200s
+- Downloads OTP tarball: ~30-60s
+- Builds OTP from source: ~250-350s (this is the main work)
 - Compiles project: ~150-200s
-- Total: ~300-400s
+- Total: ~430-610s
 
 **Subsequent sessions:**
 - Cache check passes: ~100ms
 - Project verification: ~5-30s
 - Total: ~40-100ms
+
+**Note:** The "download pre-built binary" phase typically fails detection, so we actually build from source on every new machine. This is why first-run time is long.
 
 ---
 
@@ -388,10 +405,12 @@ After setup, these variables are available:
 
 | Scenario | Time | Notes |
 |----------|------|-------|
-| First run (download OTP) | 300-400s | Network + extraction + compile |
+| First run (build OTP from source) | 430-610s | Download source + configure + make + install |
 | Cached (no changes) | 40-100ms | Just verification |
 | After code changes | 5-30s | Recompilation only |
 | BEAM boot | 420-440ms | In gVisor sandbox |
+
+**Note:** Building from source is 6-10 times slower than downloading pre-built binaries would be, but it's the only reliable method for OTP 28.3.1 in cloud environments.
 
 ### Storage
 
@@ -406,24 +425,28 @@ After setup, these variables are available:
 
 ## Architecture Decisions
 
-### Why Pre-built Binary?
+### Reality: Build from Source is Primary
 
-1. **gVisor compatible:** Extraction uses standard syscalls
-2. **Fast:** ~50MB download vs 6+ hours building
-3. **Reliable:** Consistent across all deployments
-4. **No build tools needed:** gcc, make, autoconf not required
+The SessionStart.sh hook **claims** to download pre-built binaries, but actually:
 
-### Why Not Container-in-Container?
+1. **Phase 2B downloads are incomplete** - Hex.pm provides partial builds that fail detection
+2. **Phase 2D builds from source** - This is the fallback that actually works
+3. **Build from source works in gVisor** - Despite common misconceptions, gcc/make ARE available
 
-1. gVisor already provides sandbox isolation
-2. Docker-in-Docker has compatibility issues
-3. Extracting tarball is simpler
+### Why Not True Pre-built Binaries?
+
+**Problem:** No official OTP 28.3.1 pre-built static binaries exist for Linux
+- Erlang/OTP upstream only provides source distributions
+- Hex.pm "builds" are partial artifacts, not complete installations
+- Community-maintained pre-builts (kerl) are inconsistent
+
+**Result:** The most reliable approach is to build from source, which gVisor actually allows.
 
 ### Why Multiple Download Sources?
 
-1. **Resilience:** If one source is down, others work
-2. **Performance:** Try fastest sources first (Hex.pm Bob)
-3. **Fallback compatibility:** Different glibc versions available
+1. **Resilience:** If one source is down, another might work
+2. **Attempt caching:** Try to cache any downloaded artifacts
+3. **Graceful fallback:** Eventually fall through to build-from-source
 
 ---
 
