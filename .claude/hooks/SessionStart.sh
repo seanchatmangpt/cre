@@ -113,6 +113,15 @@ is_gvisor() {
     return 1
 }
 
+# Check if running in Claude Code Web (gVisor sandbox with SessionStart hook)
+is_claude_code_web() {
+    # CLAUDE_CODE_REMOTE is set by SessionStart hook in web environments
+    [[ "${CLAUDE_CODE_REMOTE:-}" == "true" ]] && return 0
+    # Fallback: detect gVisor (Claude Code Web uses gVisor sandbox)
+    is_gvisor && return 0
+    return 1
+}
+
 #=============================================================================
 # Phase 2A: Check System OTP (works if pre-installed)
 #=============================================================================
@@ -151,17 +160,21 @@ check_system_otp() {
 }
 
 #=============================================================================
-# Phase 2B: Download Pre-built Binary from Hex.pm (gVisor compatible)
+# Phase 2B: Download Pre-built Binary from Hex.pm (Claude Code Web only)
 #=============================================================================
 
 download_static_binary() {
-    phase "2B/6 Download pre-built OTP (Hex.pm Bob builds)"
+    phase "2B/6 Download pre-built OTP (Hex.pm Bob builds for Claude Code Web)"
     mkdir -p "$OTP_DIR"
 
-    info "Downloading pre-built OTP 28.3.1 from Hex.pm..."
+    info "Downloading pre-built OTP 28.3.1 from Hex.pm (Claude Code Web gVisor)..."
 
     # Hex.pm Bob builds - Complete pre-built OTP binaries (not partial CI artifacts)
-    # These include all binaries, libraries, and boot files
+    # IMPORTANT: This is only used in Claude Code Web (gVisor sandbox) because:
+    #   - Bob builds require the Install script to generate bin/erl from templates
+    #   - Install script is a workaround for gVisor sandbox limitations
+    #   - In Docker/local, system OTP or source build is preferred
+    #
     # URL pattern: https://builds.hex.pm/builds/otp/{arch}/{os_version}/OTP-{version}.tar.gz
     local urls=(
         # Ubuntu 22.04 LTS (most compatible with gVisor)
@@ -595,11 +608,14 @@ completion_report() {
     info "OTP Version: $major (target: $OTP_MAJOR)"
     info "OTP Path: ${OTP_DIR}/bin/erl"
 
-    if is_gvisor; then
-        info "Environment: gVisor sandbox detected"
+    if is_claude_code_web; then
+        info "Environment: Claude Code Web (gVisor sandbox)"
+        info "Note: Some syscalls are limited in gVisor"
+    elif is_gvisor; then
+        info "Environment: gVisor sandbox (non-Claude Code Web)"
         info "Note: Some syscalls are limited in gVisor"
     else
-        info "Environment: native $(detect_platform)"
+        info "Environment: native $(detect_platform) (Docker or local)"
     fi
 
     success "SessionStart complete - ready to develop"
@@ -628,23 +644,33 @@ main() {
             # macOS: Try existing installation or kerl
             search_existing_macos && acquired=true
         elif [[ "$plat" == "linux" ]]; then
-            # Linux: System OTP -> Hex.pm pre-built (FAST) -> Build from source (SLOW)
+            # Linux: System OTP -> (Claude Code Web only: Hex.pm pre-built) -> Source
             check_system_otp && acquired=true
-            # Hex.pm Bob builds are complete pre-built binaries with Install script
-            # Much faster than building from source (~2 min vs ~7-10 min)
-            download_static_binary && acquired=true
+
+            # Hex.pm Bob builds with Install script are only used in Claude Code Web
+            # because the Install script is a workaround for gVisor sandbox limitations.
+            # In Docker/local, system OTP or source build is preferred.
+            if [[ "$acquired" != "true" ]] && is_claude_code_web; then
+                info "Claude Code Web detected - attempting Hex.pm pre-built..."
+                download_static_binary && acquired=true
+            fi
         fi
 
-        # Fallback: build from source (5-8 minutes, slower but reliable in gVisor)
+        # Fallback: build from source (5-8 minutes, slower but reliable)
         if [[ "$acquired" != "true" ]]; then
             if ! build_from_source; then
                 error "All OTP acquisition methods failed"
                 info ""
-                info "GVisor/Sandbox detected? Build from source often fails."
-                info "Solutions:"
-                info "  1. Install OTP on the host system outside the sandbox"
-                info "  2. Use a pre-built binary from Hex.pm (usually faster)"
-                info "  3. Request OTP support in the sandbox environment"
+                if is_claude_code_web; then
+                    info "Claude Code Web (gVisor) detected. Build from source often fails here."
+                    info "Solutions:"
+                    info "  1. Ensure Hex.pm is accessible (check network)"
+                    info "  2. Request OTP support in the sandbox environment"
+                else
+                    info "Solutions:"
+                    info "  1. Install OTP on your system"
+                    info "  2. Check that Hex.pm is accessible for pre-built downloads"
+                fi
                 exit 1
             fi
         fi
