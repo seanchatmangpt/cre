@@ -76,18 +76,21 @@ Looks for OTP in standard locations:
 
 If found and version ≥ 28: Uses system installation ✓
 
-### Phase 3: Download Pre-built Static Binary (Less Reliable Than Expected)
+### Phase 3: Download Pre-built Static Binary (Incomplete Artifacts)
 
-**⚠️ IMPORTANT:** Despite the script's name, these downloads do NOT provide true pre-built static binaries:
+**⚠️ IMPORTANT:** Extensive testing reveals **no complete pre-built OTP 28.3.1 binaries exist**:
 
-| Source | What You Get | Status |
-|--------|--------------|--------|
-| Hex.pm Bob builds | Partially compiled (beam.smp exists, but erl.src is template) | ❌ Detection fails |
-| GitHub releases | Source distribution (otp_src_*.tar.gz) | ❌ Requires compilation |
-| Heroku buildpack | Historical, may not have 28.3.1 | ❌ Often missing |
-| kerl releases | Community pre-built binaries | ⚠️ Inconsistent availability |
+| Source | Available? | Complete? | Status |
+|--------|------------|-----------|--------|
+| Hex.pm Bob builds | ✅ Yes (~100MB) | ❌ **No** (missing boot files) | Detection fails |
+| GitHub releases | ✅ Yes (~100MB) | ❌ Source code only | Requires build |
+| Heroku buildpack | ❌ No | N/A | Not available |
+| kerl releases | ⚠️ Inconsistent | Variable | Unreliable |
+| Docker image | ✅ Yes | ✅ Complete | Can't use in gVisor |
 
-Each URL is tried with exponential backoff, but **most fail detection** and flow through to Phase 4.
+**Root cause:** Hex.pm Bob tarballs are partial CI artifacts with compiled binaries (erlc, beam.smp) but missing boot files (`start.boot`, `start.script`) and post-install setup. They cannot run the BEAM VM standalone.
+
+See: [`docs/OTP28_DOWNLOAD_VALIDATION.md`](/docs/OTP28_DOWNLOAD_VALIDATION.md) for detailed testing results.
 
 ### Phase 4: Build from Source (Actual Primary Method)
 If all downloads fail detection, compiles OTP from source using:
@@ -425,22 +428,26 @@ After setup, these variables are available:
 
 ## Architecture Decisions
 
-### Reality: Build from Source is Primary
+### Reality: Build from Source is the Correct Approach
 
-The SessionStart.sh hook **claims** to download pre-built binaries, but actually:
+SessionStart.sh implements an intelligent fallback strategy:
 
-1. **Phase 2B downloads are incomplete** - Hex.pm provides partial builds that fail detection
-2. **Phase 2D builds from source** - This is the fallback that actually works
-3. **Build from source works in gVisor** - Despite common misconceptions, gcc/make ARE available
+1. **Phase 2B attempts partial downloads** - Hex.pm Bob tarballs have compiled binaries (erlc, beam.smp) but are **missing boot files** (`start.boot`) and post-install setup. Detection correctly fails.
+2. **Phase 2D builds from source** - Downloads OTP source, configures, builds, and installs a **complete** OTP installation.
+3. **Reliability:** Building from source is more reliable than downloading incomplete artifacts
 
-### Why Not True Pre-built Binaries?
+### Why Complete Pre-built Binaries Don't Exist
 
-**Problem:** No official OTP 28.3.1 pre-built static binaries exist for Linux
-- Erlang/OTP upstream only provides source distributions
-- Hex.pm "builds" are partial artifacts, not complete installations
-- Community-maintained pre-builts (kerl) are inconsistent
+**Tested and verified:** No complete OTP 28.3.1 pre-built binaries are available for download.
 
-**Result:** The most reliable approach is to build from source, which gVisor actually allows.
+**Reasons:**
+- **Erlang/OTP upstream** only publishes source distributions
+- **Hex.pm "builds"** are CI artifacts, not finished products (missing post-build setup)
+- **Docker images** are complete but unavailable in gVisor
+- **Snap packages** are maintained by community but untested in gVisor
+- **Community tools** (kerl) require infrastructure not available in gVisor
+
+**Result:** Building from source (~5-8 min) is faster and more reliable than managing incomplete pre-built artifacts. See `docs/OTP28_DOWNLOAD_VALIDATION.md` for detailed testing results.
 
 ### Why Multiple Download Sources?
 
@@ -572,9 +579,15 @@ If problems persist:
 
 ## References
 
+**CRE Project Documentation:**
 - **SessionStart Hook:** `.claude/hooks/SessionStart.sh`
+- **OTP 28 Download Validation:** `docs/OTP28_DOWNLOAD_VALIDATION.md` (technical testing results)
+- **gVisor OTP Setup (Legacy):** `docs/GVISOR_OTP_SETUP.md` (original approach, superseded by SessionStart)
+
+**External Resources:**
 - **gVisor Docs:** https://gvisor.dev/docs/user_guide/compatibility/linux/
-- **Erlang/OTP:** https://github.com/erlang/otp/releases
+- **Erlang/OTP Releases:** https://github.com/erlang/otp/releases
+- **Erlang Official Docker:** https://hub.docker.com/_/erlang/
 - **CRE Project:** https://github.com/joergen7/cre
 
 ---
