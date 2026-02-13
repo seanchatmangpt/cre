@@ -8,11 +8,18 @@
 #   - Official source releases: https://github.com/erlang/otp/releases/tag/OTP-28.3.1
 #   - Docker: erlang:28.3.1 (unavailable in gVisor)
 #
-# Strategy: CACHE -> SYSTEM -> HEX.PM PRE-BUILT (+ Install) -> SOURCE (fallback)
+# Strategy (Toyota Production System - TPS):
+#   Claude Code Web:    CACHE -> SYSTEM -> HEX.PM (must succeed, fail fast if not)
+#   Docker/Local:       CACHE -> SYSTEM -> SOURCE (fallback OK)
+#
+# TPS Principle: "Stop the line" - fail hard on infrastructure problems rather than
+# mask them with fallbacks. In Claude Code Web, if Hex.pm fails, that's a critical
+# issue requiring investigation. Don't hide it with a source build that may mask the root cause.
+#
 # Performance: Pre-built (~2 min) vs source build (~7-10 min)
 # Idempotent: lock file prevents redundant execution
 #
-# Version: 4.2.0-hexpm-optimized
+# Version: 4.4.0-tps-failfast
 
 set -euo pipefail
 
@@ -160,20 +167,26 @@ check_system_otp() {
 }
 
 #=============================================================================
-# Phase 2B: Download Pre-built Binary from Hex.pm (Claude Code Web only)
+# Phase 2B: Download Pre-built Binary from Hex.pm (Claude Code Web critical path)
+#=============================================================================
+# TPS PRINCIPLE: This is the REQUIRED acquisition method for Claude Code Web.
+# No fallback to source build - if this fails, it's a critical infrastructure issue.
+# Fail fast and clearly report the root cause rather than masking it with workarounds.
 #=============================================================================
 
 download_static_binary() {
-    phase "2B/6 Download pre-built OTP (Hex.pm Bob builds for Claude Code Web)"
+    phase "2B/6 Download pre-built OTP (Hex.pm Bob builds - Claude Code Web critical)"
     mkdir -p "$OTP_DIR"
 
     info "Downloading pre-built OTP 28.3.1 from Hex.pm (Claude Code Web gVisor)..."
+    info "TPS: This is the required path - no fallback to source build"
 
     # Hex.pm Bob builds - Complete pre-built OTP binaries (not partial CI artifacts)
-    # IMPORTANT: This is only used in Claude Code Web (gVisor sandbox) because:
-    #   - Bob builds require the Install script to generate bin/erl from templates
-    #   - Install script is a workaround for gVisor sandbox limitations
-    #   - In Docker/local, system OTP or source build is preferred
+    # CRITICAL: This is REQUIRED in Claude Code Web (gVisor sandbox):
+    #   - Bob builds require Install script to generate bin/erl from templates
+    #   - Install script is the workaround for gVisor sandbox limitations
+    #   - Building from source in gVisor masks infrastructure problems
+    #   - Failure here is a critical issue, not a fallback opportunity
     #
     # URL pattern: https://builds.hex.pm/builds/otp/{arch}/{os_version}/OTP-{version}.tar.gz
     local urls=(
@@ -602,7 +615,7 @@ ERLTEST
 #=============================================================================
 
 completion_report() {
-    phase "7/7 Session complete"
+    phase "7/7 Session complete (TPS validated)"
     local major
     major=$(otp_major "$OTP_BIN")
     info "OTP Version: $major (target: $OTP_MAJOR)"
@@ -610,12 +623,14 @@ completion_report() {
 
     if is_claude_code_web; then
         info "Environment: Claude Code Web (gVisor sandbox)"
+        info "Strategy: TPS - Pre-built (required), no fallback to source"
         info "Note: Some syscalls are limited in gVisor"
     elif is_gvisor; then
         info "Environment: gVisor sandbox (non-Claude Code Web)"
         info "Note: Some syscalls are limited in gVisor"
     else
         info "Environment: native $(detect_platform) (Docker or local)"
+        info "Strategy: System OTP → Source build fallback"
     fi
 
     success "SessionStart complete - ready to develop"
@@ -644,33 +659,57 @@ main() {
             # macOS: Try existing installation or kerl
             search_existing_macos && acquired=true
         elif [[ "$plat" == "linux" ]]; then
-            # Linux: System OTP -> (Claude Code Web only: Hex.pm pre-built) -> Source
+            # Linux: System OTP first (works everywhere)
             check_system_otp && acquired=true
 
-            # Hex.pm Bob builds with Install script are only used in Claude Code Web
-            # because the Install script is a workaround for gVisor sandbox limitations.
-            # In Docker/local, system OTP or source build is preferred.
+            # Claude Code Web: Hex.pm pre-built REQUIRED (no fallback per TPS)
+            # In gVisor, source build often fails. If Hex.pm fails, that's a
+            # critical infrastructure issue - STOP and report it clearly.
             if [[ "$acquired" != "true" ]] && is_claude_code_web; then
-                info "Claude Code Web detected - attempting Hex.pm pre-built..."
-                download_static_binary && acquired=true
+                phase "2B/6 Claude Code Web detected - Hex.pm pre-built (TPS: no fallback)"
+                info "Toyota Production System: Failing fast on infrastructure issues"
+                info "In Claude Code Web, we REQUIRE pre-built binaries (Hex.pm)"
+                info "Building from source in gVisor often masks root causes"
+
+                if download_static_binary; then
+                    acquired=true
+                else
+                    # TPS PRINCIPLE: STOP THE LINE - fail hard, don't mask the problem
+                    error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    error "CRITICAL: Hex.pm OTP acquisition failed in Claude Code Web"
+                    error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    error ""
+                    error "Toyota Production System (TPS) Principle:"
+                    error "  'Stop the line' - Do NOT mask infrastructure failures"
+                    error "  with fallback mechanisms. Report and fix the root cause."
+                    error ""
+                    error "Root causes to investigate:"
+                    error "  1. Network connectivity to Hex.pm (builds.hex.pm)"
+                    error "  2. Firewall/DNS blocking external repos"
+                    error "  3. gVisor sandbox resource constraints"
+                    error "  4. Corrupted cache (.erlmcp directory)"
+                    error ""
+                    error "Actions to take:"
+                    error "  1. Check: curl -I https://builds.hex.pm/builds/otp/amd64/ubuntu-22.04/OTP-28.3.1.tar.gz"
+                    error "  2. Check network in Claude Code Web logs"
+                    error "  3. Report issue with full logs: $(pwd)/.erlmcp/sessionstart.log"
+                    error ""
+                    error "DO NOT use source build as a workaround - it masks the issue."
+                    error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    exit 1
+                fi
             fi
         fi
 
-        # Fallback: build from source (5-8 minutes, slower but reliable)
+        # Fallback: build from source (only in Docker/local, NOT in Claude Code Web)
         if [[ "$acquired" != "true" ]]; then
             if ! build_from_source; then
                 error "All OTP acquisition methods failed"
                 info ""
-                if is_claude_code_web; then
-                    info "Claude Code Web (gVisor) detected. Build from source often fails here."
-                    info "Solutions:"
-                    info "  1. Ensure Hex.pm is accessible (check network)"
-                    info "  2. Request OTP support in the sandbox environment"
-                else
-                    info "Solutions:"
-                    info "  1. Install OTP on your system"
-                    info "  2. Check that Hex.pm is accessible for pre-built downloads"
-                fi
+                info "Solutions:"
+                info "  1. Install OTP on your system (e.g., apt-get install erlang)"
+                info "  2. Check that Hex.pm is accessible for pre-built downloads"
+                info "  3. Verify build tools (gcc/clang) and dependencies are available"
                 exit 1
             fi
         fi
