@@ -1,5 +1,11 @@
 # OTP 28 Setup for Claude Code Web (gVisor Sandbox)
 
+> **Quick Start:** See [OTP28_QUICKSTART.md](./OTP28_QUICKSTART.md) for copy-paste setup
+>
+> **Complete Guide:** See [OTP28_CLAUDE_CODE_WEB_GUIDE.md](./OTP28_CLAUDE_CODE_WEB_GUIDE.md) for architecture and troubleshooting
+
+---
+
 ## Problem
 
 Claude Code Web runs bash commands in a **gVisor sandbox** which has significant limitations:
@@ -12,9 +18,16 @@ Claude Code Web runs bash commands in a **gVisor sandbox** which has significant
 - Network access is **filtered through a proxy** - only allowed domains work
 - Standard package managers (apt, yum) may not work
 
-## Solution: Pre-built Static OTP Binary
+## Solution: Automated SessionStart Hook
 
-The only reliable solution is to **build OTP outside the sandbox** and host the binary for download.
+The CRE project provides a **SessionStart hook** that automatically:
+1. Downloads pre-built OTP 28 binaries (from Hex.pm or GitHub)
+2. Caches locally in `.erlmcp/otp-28.3.1/`
+3. Sets up environment variables
+4. Downloads and caches rebar3
+5. Builds your project
+
+**Setup time:** 60-120 seconds (first run), 15-20 seconds (cached)
 
 ### Quick Start (For Claude Code Web Users)
 
