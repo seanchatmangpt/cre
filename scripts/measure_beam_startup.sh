@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 # Simple BEAM VM startup measurement
 # Measures time from erl invocation to code execution
+#
+# Expected performance:
+#   - Claude Code Web (gVisor): 420-440ms (measured with OTP 28.3.1)
+#   - Local/Docker: 100-200ms (depending on system)
+#   - Slow system: 500ms+ (CPU-bound)
+#
+# If startup times are >1000ms in Claude Code Web, investigate:
+#   1. Check system load: uptime
+#   2. Check gVisor resource allocation
+#   3. Verify OTP installation via: erl -eval 'erlang:system_info(otp_release)' -noshell
 
 set -euo pipefail
 

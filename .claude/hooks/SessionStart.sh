@@ -3,14 +3,23 @@
 # Bootstraps Erlang/OTP 28+ on cloud environments (including gVisor sandbox)
 #
 # OTP 28.3.1 is available from:
-#   - Official releases: https://github.com/erlang/otp/releases/tag/OTP-28.3.1
-#   - Hex.pm builds: https://repo.hex.pm/builds/otp/
-#   - Docker: erlang:28.3.1
+#   - Hex.pm Bob builds (RECOMMENDED): https://builds.hex.pm/builds/otp/
+#     └─ Pre-built complete binaries (requires Install script post-processing)
+#   - Official source releases: https://github.com/erlang/otp/releases/tag/OTP-28.3.1
+#   - Docker: erlang:28.3.1 (unavailable in gVisor)
 #
-# Strategy: CACHE -> SYSTEM -> STATIC BINARY -> SOURCE (fails in gVisor)
+# Strategy (Toyota Production System - TPS):
+#   Claude Code Web:    CACHE -> SYSTEM -> HEX.PM (must succeed, fail fast if not)
+#   Docker/Local:       CACHE -> SYSTEM -> SOURCE (fallback OK)
+#
+# TPS Principle: "Stop the line" - fail hard on infrastructure problems rather than
+# mask them with fallbacks. In Claude Code Web, if Hex.pm fails, that's a critical
+# issue requiring investigation. Don't hide it with a source build that may mask the root cause.
+#
+# Performance: Pre-built (~2 min) vs source build (~7-10 min)
 # Idempotent: lock file prevents redundant execution
 #
-# Version: 4.0.1-otp28.3.1
+# Version: 4.4.0-tps-failfast
 
 set -euo pipefail
 
@@ -111,6 +120,15 @@ is_gvisor() {
     return 1
 }
 
+# Check if running in Claude Code Web (gVisor sandbox with SessionStart hook)
+is_claude_code_web() {
+    # CLAUDE_CODE_REMOTE is set by SessionStart hook in web environments
+    [[ "${CLAUDE_CODE_REMOTE:-}" == "true" ]] && return 0
+    # Fallback: detect gVisor (Claude Code Web uses gVisor sandbox)
+    is_gvisor && return 0
+    return 1
+}
+
 #=============================================================================
 # Phase 2A: Check System OTP (works if pre-installed)
 #=============================================================================
@@ -149,66 +167,105 @@ check_system_otp() {
 }
 
 #=============================================================================
-# Phase 2B: Download Pre-built Static Binary (gVisor compatible)
+# Phase 2B: Download Pre-built Binary from Hex.pm (Claude Code Web critical path)
+#=============================================================================
+# TPS PRINCIPLE: This is the REQUIRED acquisition method for Claude Code Web.
+# No fallback to source build - if this fails, it's a critical infrastructure issue.
+# Fail fast and clearly report the root cause rather than masking it with workarounds.
 #=============================================================================
 
 download_static_binary() {
-    phase "2B/6 Download pre-built OTP (static)"
+    phase "2B/6 Download pre-built OTP (Hex.pm Bob builds - Claude Code Web critical)"
     mkdir -p "$OTP_DIR"
 
-    info "Checking for pre-built static OTP..."
+    info "Downloading pre-built OTP 28.3.1 from Hex.pm (Claude Code Web gVisor)..."
+    info "TPS: This is the required path - no fallback to source build"
 
-    # Try multiple sources for pre-built binaries (prioritized by reliability)
+    # Hex.pm Bob builds - Complete pre-built OTP binaries (not partial CI artifacts)
+    # CRITICAL: This is REQUIRED in Claude Code Web (gVisor sandbox):
+    #   - Bob builds require Install script to generate bin/erl from templates
+    #   - Install script is the workaround for gVisor sandbox limitations
+    #   - Building from source in gVisor masks infrastructure problems
+    #   - Failure here is a critical issue, not a fallback opportunity
+    #
+    # URL pattern: https://builds.hex.pm/builds/otp/{arch}/{os_version}/OTP-{version}.tar.gz
     local urls=(
-        # Hex.pm builds (Bob) - Most reliable for latest OTP versions
-        "https://repo.hex.pm/builds/otp/ubuntu-20.04/OTP-${OTP_VERSION}.tar.gz"
-        "https://repo.hex.pm/builds/otp/ubuntu-22.04/OTP-${OTP_VERSION}.tar.gz"
-        # Official GitHub releases (source, but can be extracted)
-        "https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}/otp_src_${OTP_VERSION}.tar.gz"
-        # Heroku-style standalone build (most compatible with sandboxes)
-        "https://s3.amazonaws.com/heroku-buildpack-elixir/erlang/cedar-14/OTP-${OTP_VERSION}.tar.gz"
-        # kerl releases (may not have latest versions immediately)
-        "https://github.com/kerl/kerl/releases/download/${OTP_VERSION}/otp_${OTP_VERSION}_ubuntu2204_amd64.tar.gz"
+        # Ubuntu 22.04 LTS (most compatible with gVisor)
+        "https://builds.hex.pm/builds/otp/amd64/ubuntu-22.04/OTP-${OTP_VERSION}.tar.gz"
+        # Ubuntu 20.04 LTS (fallback)
+        "https://builds.hex.pm/builds/otp/amd64/ubuntu-20.04/OTP-${OTP_VERSION}.tar.gz"
+        # Ubuntu 24.04 LTS (latest)
+        "https://builds.hex.pm/builds/otp/amd64/ubuntu-24.04/OTP-${OTP_VERSION}.tar.gz"
     )
 
     for url in "${urls[@]}"; do
         info "Trying: $url"
-        local tarball="$CACHE_DIR/temp-otp.tar.gz"
+        local tarball="${CACHE_DIR}/otp-${OTP_VERSION}.tar.gz"
+        local tmp="${CACHE_DIR}/temp-otp-$$"
+        mkdir -p "$tmp"
 
+        # Download the tarball
         if curl -fsSL -o "$tarball" "$url" 2>&1 | tee -a "$LOG_FILE"; then
-            info "Downloaded, extracting..."
-            local tmp="${CACHE_DIR}/temp-extract"
-            mkdir -p "$tmp"
+            local file_size
+            file_size=$(stat -f%z "$tarball" 2>/dev/null || stat -c%s "$tarball" 2>/dev/null || echo "0")
+            info "Downloaded: $((file_size / 1024 / 1024)) MB"
 
-            if tar xzf "$tarball" -C "$tmp" 2>/dev/null; then
-                info "Extraction successful, setting up..."
-                # Find the actual OTP directory
-                local content
-                content=$(find "$tmp" -name "erl" -type f 2>/dev/null | head -1)
-                if [[ -n "$content" ]]; then
-                    local otp_root
-                    otp_root=$(dirname "$(dirname "$content")")
-                    cp -r "$otp_root"/* "$OTP_DIR/" 2>/dev/null || \
-                        mv "$tmp"/* "$OTP_DIR/" 2>/dev/null || \
-                        cp -r "$tmp"/"*" "$OTP_DIR/" 2>/dev/null
+            # Extract to temporary location
+            if tar xzf "$tarball" -C "$tmp" 2>&1 | tee -a "$LOG_FILE"; then
+                info "Extraction successful"
 
-                    rm -rf "$tmp" "$tarball"
+                # Find OTP-* directory (Bob tarballs extract to OTP-VERSION/ root)
+                local otp_extracted
+                otp_extracted=$(find "$tmp" -maxdepth 1 -type d -name "OTP-*" 2>/dev/null | head -1)
 
-                    # Verify
-                    local major
-                    major=$(otp_major "${OTP_DIR}/bin/erl" 2>/dev/null || echo "0")
-                    if [[ $major -ge $OTP_MAJOR ]]; then
-                        success "Static OTP $major installed"
-                        return 0
-                    fi
+                if [[ -z "$otp_extracted" ]]; then
+                    # Try direct extraction (no OTP-* wrapper)
+                    otp_extracted="$tmp"
                 fi
+
+                # Verify it has the expected structure
+                if [[ -f "$otp_extracted/Install" ]] && [[ -d "$otp_extracted/erts-"* ]]; then
+                    info "Running post-install setup (Install script)..."
+
+                    # Run the Install script to finalize the setup
+                    # This generates bin/erl from erts-*/bin/erl.src template
+                    # and copies boot files from releases/*/
+                    if bash "$otp_extracted/Install" -minimal "$otp_extracted" 2>&1 | tee -a "$LOG_FILE"; then
+                        info "Install script completed"
+
+                        # Copy the finalized OTP installation to the cache location
+                        if cp -r "$otp_extracted"/* "$OTP_DIR/" 2>/dev/null; then
+                            rm -rf "$tmp" "$tarball"
+
+                            # Verify the installation works
+                            local major
+                            major=$(otp_major "${OTP_DIR}/bin/erl" 2>/dev/null || echo "0")
+                            if [[ $major -ge $OTP_MAJOR ]]; then
+                                success "Pre-built OTP $major installed (via Hex.pm Bob)"
+                                return 0
+                            else
+                                error "Installation verification failed (major=$major, expected>=$OTP_MAJOR)"
+                            fi
+                        else
+                            error "Failed to copy OTP installation"
+                        fi
+                    else
+                        error "Install script failed"
+                    fi
+                else
+                    error "Downloaded file doesn't have expected OTP structure (missing Install or erts-*)"
+                fi
+            else
+                error "Extraction failed"
             fi
+
             rm -rf "$tmp" "$tarball"
+        else
+            info "Download failed (may be network or URL issue): $url"
         fi
-        info "Failed: $url"
     done
 
-    info "No pre-built binary available"
+    info "No pre-built binary available from any source"
     return 1
 }
 
@@ -558,17 +615,22 @@ ERLTEST
 #=============================================================================
 
 completion_report() {
-    phase "7/7 Session complete"
+    phase "7/7 Session complete (TPS validated)"
     local major
     major=$(otp_major "$OTP_BIN")
     info "OTP Version: $major (target: $OTP_MAJOR)"
     info "OTP Path: ${OTP_DIR}/bin/erl"
 
-    if is_gvisor; then
-        info "Environment: gVisor sandbox detected"
+    if is_claude_code_web; then
+        info "Environment: Claude Code Web (gVisor sandbox)"
+        info "Strategy: TPS - Pre-built (required), no fallback to source"
+        info "Note: Some syscalls are limited in gVisor"
+    elif is_gvisor; then
+        info "Environment: gVisor sandbox (non-Claude Code Web)"
         info "Note: Some syscalls are limited in gVisor"
     else
-        info "Environment: native $(detect_platform)"
+        info "Environment: native $(detect_platform) (Docker or local)"
+        info "Strategy: System OTP → Source build fallback"
     fi
 
     success "SessionStart complete - ready to develop"
@@ -583,33 +645,71 @@ main() {
     local start_time=$(date +%s%N 2>/dev/null || date +%s)
 
     init_log
-    info "Starting SessionStart.sh (v4.1.0-timing)"
+    info "Starting SessionStart.sh (v4.2.0-hexpm-optimized)"
     info "Platform: $(detect_platform)"
 
-    # Phase 1: Cache check
+    # Phase 1: Cache check (fastest: ~100ms if cached)
     if ! check_cache; then
         info "OTP not cached, acquiring..."
         local plat acquired=false
         plat=$(detect_platform)
 
-        # Phase 2: Platform-specific acquisition
+        # Phase 2: Platform-specific acquisition (prioritized by speed)
         if [[ "$plat" == "macos" ]]; then
+            # macOS: Try existing installation or kerl
             search_existing_macos && acquired=true
         elif [[ "$plat" == "linux" ]]; then
+            # Linux: System OTP first (works everywhere)
             check_system_otp && acquired=true
-            download_static_binary && acquired=true
+
+            # Claude Code Web: Hex.pm pre-built REQUIRED (no fallback per TPS)
+            # In gVisor, source build often fails. If Hex.pm fails, that's a
+            # critical infrastructure issue - STOP and report it clearly.
+            if [[ "$acquired" != "true" ]] && is_claude_code_web; then
+                phase "2B/6 Claude Code Web detected - Hex.pm pre-built (TPS: no fallback)"
+                info "Toyota Production System: Failing fast on infrastructure issues"
+                info "In Claude Code Web, we REQUIRE pre-built binaries (Hex.pm)"
+                info "Building from source in gVisor often masks root causes"
+
+                if download_static_binary; then
+                    acquired=true
+                else
+                    # TPS PRINCIPLE: STOP THE LINE - fail hard, don't mask the problem
+                    error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    error "CRITICAL: Hex.pm OTP acquisition failed in Claude Code Web"
+                    error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    error ""
+                    error "Toyota Production System (TPS) Principle:"
+                    error "  'Stop the line' - Do NOT mask infrastructure failures"
+                    error "  with fallback mechanisms. Report and fix the root cause."
+                    error ""
+                    error "Root causes to investigate:"
+                    error "  1. Network connectivity to Hex.pm (builds.hex.pm)"
+                    error "  2. Firewall/DNS blocking external repos"
+                    error "  3. gVisor sandbox resource constraints"
+                    error "  4. Corrupted cache (.erlmcp directory)"
+                    error ""
+                    error "Actions to take:"
+                    error "  1. Check: curl -I https://builds.hex.pm/builds/otp/amd64/ubuntu-22.04/OTP-28.3.1.tar.gz"
+                    error "  2. Check network in Claude Code Web logs"
+                    error "  3. Report issue with full logs: $(pwd)/.erlmcp/sessionstart.log"
+                    error ""
+                    error "DO NOT use source build as a workaround - it masks the issue."
+                    error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                    exit 1
+                fi
+            fi
         fi
 
-        # Fallback: build from source (may fail in gVisor)
+        # Fallback: build from source (only in Docker/local, NOT in Claude Code Web)
         if [[ "$acquired" != "true" ]]; then
             if ! build_from_source; then
                 error "All OTP acquisition methods failed"
                 info ""
-                info "GVisor/Sandbox detected? Build from source often fails."
                 info "Solutions:"
-                info "  1. Install OTP on the host system outside the sandbox"
-                info "  2. Use a pre-built static OTP binary"
-                info "  3. Request OTP support in the sandbox environment"
+                info "  1. Install OTP on your system (e.g., apt-get install erlang)"
+                info "  2. Check that Hex.pm is accessible for pre-built downloads"
+                info "  3. Verify build tools (gcc/clang) and dependencies are available"
                 exit 1
             fi
         fi

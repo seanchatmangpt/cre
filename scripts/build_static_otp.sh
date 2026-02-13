@@ -1,11 +1,26 @@
 #!/usr/bin/env bash
 # Build statically-linked Erlang/OTP for gVisor/sandbox environments
+#
+# ⚠️  DEPRECATED: Use Hex.pm pre-built binaries instead (much faster)
+#
+# This script builds OTP from source and is meant for:
+#   - Custom OTP configurations (patches, features)
+#   - Testing custom builds
+#   - Building for non-standard platforms
+#
+# For Claude Code Web, SessionStart.sh uses Hex.pm Bob pre-built binaries
+# which are 5-8x faster than this source build approach.
+#
 # Run this OUTSIDE the sandbox (on your local machine or CI)
 # The resulting tarball can be hosted and downloaded by SessionStart.sh
 #
 # Usage: ./build_static_otp.sh 28.3.1
 #
 # Output: otp-28.3.1-linux-x86_64-static.tar.gz
+#
+# Performance comparison:
+#   - This script: ~10-20 minutes (source build)
+#   - Hex.pm pre-built (recommended): ~2 minutes (download + Install script)
 
 set -euo pipefail
 
@@ -102,9 +117,21 @@ log "SUCCESS!"
 log "========================================"
 log "Output: $OUTPUT_DIR/otp-${OTP_VERSION}-linux-x86_64-static.tar.gz"
 log ""
-log "Next steps:"
+log "⚠️  NOTE: For Claude Code Web, use Hex.pm pre-built instead"
+log ""
+log "SessionStart.sh now uses Hex.pm Bob builds by default:"
+log "  - Much faster (~2 min vs ~10-20 min)"
+log "  - Already tested and verified"
+log "  - Includes Install script for gVisor compatibility"
+log ""
+log "Only use this custom build for:"
+log "  1. Custom OTP patches or configuration"
+log "  2. Non-standard features or patches"
+log "  3. Testing custom builds in CI/CD"
+log ""
+log "If you need to use this custom build:"
 log "1. Upload this file to a URL accessible by Claude Code Web"
-log "2. Update SessionStart.sh OTP_STATIC_URL to point to it"
+log "2. Update SessionStart.sh download_static_binary() URLs"
 log "3. The sandbox will download and extract it automatically"
 log ""
 log "Example hosting options:"

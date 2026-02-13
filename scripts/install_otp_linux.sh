@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 # Install OTP 28 on Debian-based Linux using kerl
-# This is a more reliable alternative to building from source manually
+#
+# This script is a FALLBACK method for local development
+# NOT used in Claude Code Web (SessionStart.sh has better options)
+#
+# Hierarchy (from SessionStart.sh):
+#   1. ✅ Cache (fastest, if available)
+#   2. ✅ System OTP (if installed)
+#   3. ✅ Hex.pm pre-built (Claude Code Web only)
+#   4. 🔧 This kerl-based build (fallback, ~15-20 min)
+#   5. 📖 Source build (last resort, ~10-20 min)
+#
+# Use this when:
+#   - You want to test kerl locally
+#   - You need to build OTP for custom configurations
+#   - You prefer kerl over other methods on your local machine
+#
+# Performance: ~15-20 minutes (includes dependencies, compilation)
 
 set -euo pipefail
 
