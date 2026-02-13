@@ -3,14 +3,16 @@
 # Bootstraps Erlang/OTP 28+ on cloud environments (including gVisor sandbox)
 #
 # OTP 28.3.1 is available from:
-#   - Official releases: https://github.com/erlang/otp/releases/tag/OTP-28.3.1
-#   - Hex.pm builds: https://repo.hex.pm/builds/otp/
-#   - Docker: erlang:28.3.1
+#   - Hex.pm Bob builds (RECOMMENDED): https://builds.hex.pm/builds/otp/
+#     └─ Pre-built complete binaries (requires Install script post-processing)
+#   - Official source releases: https://github.com/erlang/otp/releases/tag/OTP-28.3.1
+#   - Docker: erlang:28.3.1 (unavailable in gVisor)
 #
-# Strategy: CACHE -> SYSTEM -> STATIC BINARY -> SOURCE (fails in gVisor)
+# Strategy: CACHE -> SYSTEM -> HEX.PM PRE-BUILT (+ Install) -> SOURCE (fallback)
+# Performance: Pre-built (~2 min) vs source build (~7-10 min)
 # Idempotent: lock file prevents redundant execution
 #
-# Version: 4.0.1-otp28.3.1
+# Version: 4.2.0-hexpm-optimized
 
 set -euo pipefail
 
@@ -149,66 +151,95 @@ check_system_otp() {
 }
 
 #=============================================================================
-# Phase 2B: Download Pre-built Static Binary (gVisor compatible)
+# Phase 2B: Download Pre-built Binary from Hex.pm (gVisor compatible)
 #=============================================================================
 
 download_static_binary() {
-    phase "2B/6 Download pre-built OTP (static)"
+    phase "2B/6 Download pre-built OTP (Hex.pm Bob builds)"
     mkdir -p "$OTP_DIR"
 
-    info "Checking for pre-built static OTP..."
+    info "Downloading pre-built OTP 28.3.1 from Hex.pm..."
 
-    # Try multiple sources for pre-built binaries (prioritized by reliability)
+    # Hex.pm Bob builds - Complete pre-built OTP binaries (not partial CI artifacts)
+    # These include all binaries, libraries, and boot files
+    # URL pattern: https://builds.hex.pm/builds/otp/{arch}/{os_version}/OTP-{version}.tar.gz
     local urls=(
-        # Hex.pm builds (Bob) - Most reliable for latest OTP versions
-        "https://repo.hex.pm/builds/otp/ubuntu-20.04/OTP-${OTP_VERSION}.tar.gz"
-        "https://repo.hex.pm/builds/otp/ubuntu-22.04/OTP-${OTP_VERSION}.tar.gz"
-        # Official GitHub releases (source, but can be extracted)
-        "https://github.com/erlang/otp/releases/download/OTP-${OTP_VERSION}/otp_src_${OTP_VERSION}.tar.gz"
-        # Heroku-style standalone build (most compatible with sandboxes)
-        "https://s3.amazonaws.com/heroku-buildpack-elixir/erlang/cedar-14/OTP-${OTP_VERSION}.tar.gz"
-        # kerl releases (may not have latest versions immediately)
-        "https://github.com/kerl/kerl/releases/download/${OTP_VERSION}/otp_${OTP_VERSION}_ubuntu2204_amd64.tar.gz"
+        # Ubuntu 22.04 LTS (most compatible with gVisor)
+        "https://builds.hex.pm/builds/otp/amd64/ubuntu-22.04/OTP-${OTP_VERSION}.tar.gz"
+        # Ubuntu 20.04 LTS (fallback)
+        "https://builds.hex.pm/builds/otp/amd64/ubuntu-20.04/OTP-${OTP_VERSION}.tar.gz"
+        # Ubuntu 24.04 LTS (latest)
+        "https://builds.hex.pm/builds/otp/amd64/ubuntu-24.04/OTP-${OTP_VERSION}.tar.gz"
     )
 
     for url in "${urls[@]}"; do
         info "Trying: $url"
-        local tarball="$CACHE_DIR/temp-otp.tar.gz"
+        local tarball="${CACHE_DIR}/otp-${OTP_VERSION}.tar.gz"
+        local tmp="${CACHE_DIR}/temp-otp-$$"
+        mkdir -p "$tmp"
 
+        # Download the tarball
         if curl -fsSL -o "$tarball" "$url" 2>&1 | tee -a "$LOG_FILE"; then
-            info "Downloaded, extracting..."
-            local tmp="${CACHE_DIR}/temp-extract"
-            mkdir -p "$tmp"
+            local file_size
+            file_size=$(stat -f%z "$tarball" 2>/dev/null || stat -c%s "$tarball" 2>/dev/null || echo "0")
+            info "Downloaded: $((file_size / 1024 / 1024)) MB"
 
-            if tar xzf "$tarball" -C "$tmp" 2>/dev/null; then
-                info "Extraction successful, setting up..."
-                # Find the actual OTP directory
-                local content
-                content=$(find "$tmp" -name "erl" -type f 2>/dev/null | head -1)
-                if [[ -n "$content" ]]; then
-                    local otp_root
-                    otp_root=$(dirname "$(dirname "$content")")
-                    cp -r "$otp_root"/* "$OTP_DIR/" 2>/dev/null || \
-                        mv "$tmp"/* "$OTP_DIR/" 2>/dev/null || \
-                        cp -r "$tmp"/"*" "$OTP_DIR/" 2>/dev/null
+            # Extract to temporary location
+            if tar xzf "$tarball" -C "$tmp" 2>&1 | tee -a "$LOG_FILE"; then
+                info "Extraction successful"
 
-                    rm -rf "$tmp" "$tarball"
+                # Find OTP-* directory (Bob tarballs extract to OTP-VERSION/ root)
+                local otp_extracted
+                otp_extracted=$(find "$tmp" -maxdepth 1 -type d -name "OTP-*" 2>/dev/null | head -1)
 
-                    # Verify
-                    local major
-                    major=$(otp_major "${OTP_DIR}/bin/erl" 2>/dev/null || echo "0")
-                    if [[ $major -ge $OTP_MAJOR ]]; then
-                        success "Static OTP $major installed"
-                        return 0
-                    fi
+                if [[ -z "$otp_extracted" ]]; then
+                    # Try direct extraction (no OTP-* wrapper)
+                    otp_extracted="$tmp"
                 fi
+
+                # Verify it has the expected structure
+                if [[ -f "$otp_extracted/Install" ]] && [[ -d "$otp_extracted/erts-"* ]]; then
+                    info "Running post-install setup (Install script)..."
+
+                    # Run the Install script to finalize the setup
+                    # This generates bin/erl from erts-*/bin/erl.src template
+                    # and copies boot files from releases/*/
+                    if bash "$otp_extracted/Install" -minimal "$otp_extracted" 2>&1 | tee -a "$LOG_FILE"; then
+                        info "Install script completed"
+
+                        # Copy the finalized OTP installation to the cache location
+                        if cp -r "$otp_extracted"/* "$OTP_DIR/" 2>/dev/null; then
+                            rm -rf "$tmp" "$tarball"
+
+                            # Verify the installation works
+                            local major
+                            major=$(otp_major "${OTP_DIR}/bin/erl" 2>/dev/null || echo "0")
+                            if [[ $major -ge $OTP_MAJOR ]]; then
+                                success "Pre-built OTP $major installed (via Hex.pm Bob)"
+                                return 0
+                            else
+                                error "Installation verification failed (major=$major, expected>=$OTP_MAJOR)"
+                            fi
+                        else
+                            error "Failed to copy OTP installation"
+                        fi
+                    else
+                        error "Install script failed"
+                    fi
+                else
+                    error "Downloaded file doesn't have expected OTP structure (missing Install or erts-*)"
+                fi
+            else
+                error "Extraction failed"
             fi
+
             rm -rf "$tmp" "$tarball"
+        else
+            info "Download failed (may be network or URL issue): $url"
         fi
-        info "Failed: $url"
     done
 
-    info "No pre-built binary available"
+    info "No pre-built binary available from any source"
     return 1
 }
 
@@ -583,24 +614,28 @@ main() {
     local start_time=$(date +%s%N 2>/dev/null || date +%s)
 
     init_log
-    info "Starting SessionStart.sh (v4.1.0-timing)"
+    info "Starting SessionStart.sh (v4.2.0-hexpm-optimized)"
     info "Platform: $(detect_platform)"
 
-    # Phase 1: Cache check
+    # Phase 1: Cache check (fastest: ~100ms if cached)
     if ! check_cache; then
         info "OTP not cached, acquiring..."
         local plat acquired=false
         plat=$(detect_platform)
 
-        # Phase 2: Platform-specific acquisition
+        # Phase 2: Platform-specific acquisition (prioritized by speed)
         if [[ "$plat" == "macos" ]]; then
+            # macOS: Try existing installation or kerl
             search_existing_macos && acquired=true
         elif [[ "$plat" == "linux" ]]; then
+            # Linux: System OTP -> Hex.pm pre-built (FAST) -> Build from source (SLOW)
             check_system_otp && acquired=true
+            # Hex.pm Bob builds are complete pre-built binaries with Install script
+            # Much faster than building from source (~2 min vs ~7-10 min)
             download_static_binary && acquired=true
         fi
 
-        # Fallback: build from source (may fail in gVisor)
+        # Fallback: build from source (5-8 minutes, slower but reliable in gVisor)
         if [[ "$acquired" != "true" ]]; then
             if ! build_from_source; then
                 error "All OTP acquisition methods failed"
@@ -608,7 +643,7 @@ main() {
                 info "GVisor/Sandbox detected? Build from source often fails."
                 info "Solutions:"
                 info "  1. Install OTP on the host system outside the sandbox"
-                info "  2. Use a pre-built static OTP binary"
+                info "  2. Use a pre-built binary from Hex.pm (usually faster)"
                 info "  3. Request OTP support in the sandbox environment"
                 exit 1
             fi
