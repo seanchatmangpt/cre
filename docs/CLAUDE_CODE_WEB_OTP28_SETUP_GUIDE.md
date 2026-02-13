@@ -19,12 +19,17 @@ The `.claude/hooks/SessionStart.sh` hook automatically sets up OTP 28 when you:
 
 ### ⚠️ Important: How Setup Actually Works
 
-Despite the script's name suggesting "pre-built binaries," the actual process is:
-- **Phase 2B:** Attempts to download partial OTP artifacts (usually fails detection)
-- **Phase 2D:** Falls back to building OTP 28 from source (~5-8 minutes)
+The SessionStart.sh script attempts to use pre-built binaries but currently falls back to source builds:
+
+- **Phase 2B:** Downloads Hex.pm pre-built binaries ✅ (74-77 MB, ~2 min download)
+- **Missing step:** Run the `Install` script to finalize setup (not currently done)
+- **Phase 2D:** Falls back to building from source (~5-8 minutes)
 - **Phase 6:** Compiles the CRE project (~2-3 minutes)
 
-This is reliable in gVisor because gcc/make ARE available. First-run time is 7-10 minutes total.
+**Current behavior:** 7-10 minutes (downloads pre-built but doesn't use it)
+**Optimal behavior:** 1-2 minutes (download + install + cache reuse)
+
+This fallback is reliable in gVisor because gcc/make ARE available, but it wastes time downloading a complete binary that doesn't get used.
 
 ---
 
@@ -76,21 +81,42 @@ Looks for OTP in standard locations:
 
 If found and version ≥ 28: Uses system installation ✓
 
-### Phase 3: Download Pre-built Static Binary (Incomplete Artifacts)
+### Phase 3: Download Pre-built Static Binary
 
-**⚠️ IMPORTANT:** Extensive testing reveals **no complete pre-built OTP 28.3.1 binaries exist**:
+**✅ PRE-BUILT OTP 28.3.1 BINARIES ARE AVAILABLE FROM HEX.PM**
 
 | Source | Available? | Complete? | Status |
 |--------|------------|-----------|--------|
-| Hex.pm Bob builds | ✅ Yes (~100MB) | ❌ **No** (missing boot files) | Detection fails |
-| GitHub releases | ✅ Yes (~100MB) | ❌ Source code only | Requires build |
-| Heroku buildpack | ❌ No | N/A | Not available |
-| kerl releases | ⚠️ Inconsistent | Variable | Unreliable |
+| **Hex.pm Bob builds** | ✅ Yes (74-77 MB) | ✅ **Yes** | Requires Install script |
+| GitHub releases | ✅ Yes (100 MB) | ❌ Source code only | Requires build |
 | Docker image | ✅ Yes | ✅ Complete | Can't use in gVisor |
 
-**Root cause:** Hex.pm Bob tarballs are partial CI artifacts with compiled binaries (erlc, beam.smp) but missing boot files (`start.boot`, `start.script`) and post-install setup. They cannot run the BEAM VM standalone.
+**Direct Download URLs:**
+```bash
+# Ubuntu 22.04 LTS (recommended)
+https://builds.hex.pm/builds/otp/amd64/ubuntu-22.04/OTP-28.3.1.tar.gz
 
-See: [`docs/OTP28_DOWNLOAD_VALIDATION.md`](/docs/OTP28_DOWNLOAD_VALIDATION.md) for detailed testing results.
+# Ubuntu 20.04 LTS
+https://builds.hex.pm/builds/otp/amd64/ubuntu-20.04/OTP-28.3.1.tar.gz
+
+# ARM64
+https://builds.hex.pm/builds/otp/arm64/ubuntu-22.04/OTP-28.3.1.tar.gz
+```
+
+**Why SessionStart.sh Falls Back to Building:**
+
+Hex.pm tarballs are complete but require post-install setup:
+
+```bash
+tar xzf OTP-28.3.1.tar.gz
+cd OTP-28.3.1
+bash ./Install -minimal $(pwd)  # Generates bin/erl from template
+./bin/erl -noshell -eval 'halt().'  # ✅ Works
+```
+
+SessionStart.sh doesn't run the Install script, so it rejects Hex.pm downloads when looking for a ready-to-use `erl` executable. This causes fallback to source compilation.
+
+**For manual setup or optimization:** See [`docs/OTP28_PREBUILD_VALIDATION.md`](/docs/OTP28_PREBUILD_VALIDATION.md) for complete instructions on using pre-built binaries (saves 5-8 minutes vs. building from source).
 
 ### Phase 4: Build from Source (Actual Primary Method)
 If all downloads fail detection, compiles OTP from source using:
@@ -428,26 +454,32 @@ After setup, these variables are available:
 
 ## Architecture Decisions
 
-### Reality: Build from Source is the Correct Approach
+### The Real Solution: Pre-built Binaries + Install Script
 
-SessionStart.sh implements an intelligent fallback strategy:
+**Tested and verified:** Complete OTP 28.3.1 pre-built binaries ARE available from Hex.pm.
 
-1. **Phase 2B attempts partial downloads** - Hex.pm Bob tarballs have compiled binaries (erlc, beam.smp) but are **missing boot files** (`start.boot`) and post-install setup. Detection correctly fails.
-2. **Phase 2D builds from source** - Downloads OTP source, configures, builds, and installs a **complete** OTP installation.
-3. **Reliability:** Building from source is more reliable than downloading incomplete artifacts
+**Why they work:**
+1. **Hex.pm Bob builds** - Complete, compiled OTP installations (74-77 MB)
+   - Have all binaries (beam.smp, erlc, dialyzer, etc.)
+   - Have all libraries (kernel, stdlib, et al.)
+   - Have boot scripts in `releases/28/` directory
+   - Require `./Install` script to finalize (generates `bin/erl`, sets up paths)
 
-### Why Complete Pre-built Binaries Don't Exist
+2. **Install script** (~10 seconds)
+   - Processes `erl.src` template with proper ROOTDIR
+   - Copies boot files from `releases/28/` to `bin/`
+   - Sets up start launcher and metadata
+   - Creates a ready-to-use OTP installation
 
-**Tested and verified:** No complete OTP 28.3.1 pre-built binaries are available for download.
+3. **Performance**
+   - Download: ~2 minutes (74-77 MB gzipped)
+   - Install: ~10 seconds
+   - Total: ~2 minutes vs. 7-10 minutes from source
+   - **Saves 5-8 minutes on first run**
 
-**Reasons:**
-- **Erlang/OTP upstream** only publishes source distributions
-- **Hex.pm "builds"** are CI artifacts, not finished products (missing post-build setup)
-- **Docker images** are complete but unavailable in gVisor
-- **Snap packages** are maintained by community but untested in gVisor
-- **Community tools** (kerl) require infrastructure not available in gVisor
+**Current issue:** SessionStart.sh downloads the complete binary but doesn't run the Install script, so it falls back to building from source. This is inefficient but reliable.
 
-**Result:** Building from source (~5-8 min) is faster and more reliable than managing incomplete pre-built artifacts. See `docs/OTP28_DOWNLOAD_VALIDATION.md` for detailed testing results.
+**See:** `docs/OTP28_PREBUILD_VALIDATION.md` for complete technical details, download URLs, and manual installation instructions.
 
 ### Why Multiple Download Sources?
 
