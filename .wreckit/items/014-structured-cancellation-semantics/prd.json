@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "id": "014-structured-cancellation-semantics",
+  "branch_name": "wreckit/014-structured-cancellation-semantics",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Add scope type definitions and token creation to wf_cancel",
+      "acceptance_criteria": [
+        "Scope type cancel_scope() defined with activity, region, and case variants",
+        "create_activity_cancel/1 function returns {cancel, {activity, TaskId}} token",
+        "create_region_cancel/1 function returns {cancel, {region, RegionId}} token",
+        "create_case_cancel/0 function returns {cancel, {case, all}} token",
+        "is_cancel_token/1 validates both legacy and scope token formats",
+        "All functions are pure (no side effects)",
+        "EUnit tests pass for all new functions"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Foundation for all scope-aware cancellation. Must be completed before US-002."
+    },
+    {
+      "id": "US-002",
+      "title": "Implement scope resolution in wf_cancel",
+      "acceptance_criteria": [
+        "resolve_scope/3 function resolves activity scope to task places using binding table",
+        "resolve_scope/3 resolves region scope to all places in cancellation set from spec",
+        "resolve_scope/3 resolves case scope to all places in workflow specification",
+        "Returns empty list for unknown scopes (total function)",
+        "Uses wf_scope:binding_table for parent-child mapping",
+        "Uses wf_spec:cancellation_set/2 for region definitions",
+        "EUnit tests cover all three scope types with real specs"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Requires wf_spec:task_places/2 and wf_spec:all_places/1 functions. May need to add these to wf_spec if not present."
+    },
+    {
+      "id": "US-003",
+      "title": "Add cancellation token handler to yawl_cancel_runtime",
+      "acceptance_criteria": [
+        "handle_cancel_token/4 function processes {cancel, Scope} tokens in trigger callback",
+        "Resolves scope to concrete places using wf_cancel:resolve_scope/3",
+        "Applies cancellation to marking via wf_cancel:apply_cancellation/2",
+        "Returns {pass, UpdatedNetState} or {drop, UpdatedNetState} tuple",
+        "Handles legacy {cancel, [Place]} token format for backward compatibility",
+        "EUnit tests verify correct marking updates for all scope types"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "This is the core integration point with gen_pnet:trigger/3 callback. Must be pure functional (no process state)."
+    },
+    {
+      "id": "US-004",
+      "title": "Implement workflow state cancellation updates",
+      "acceptance_criteria": [
+        "mark_workflow_cancelled/2 function updates yawl_state status to cancelled",
+        "Updates usr_info with modified yawl_state",
+        "Calls yawl_state:mark_cancelled/1 to set status and timestamp",
+        "Only triggers on {case, all} scope cancellation",
+        "Handles missing yawl_state in usr_info gracefully",
+        "EUnit tests verify state transitions from running to cancelled"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Integrates with existing yawl_state module. Check if yawl_state:mark_cancelled/1 exists and is sufficient."
+    },
+    {
+      "id": "US-005",
+      "title": "Store spec and binding table in gen_yawl wrapper state",
+      "acceptance_criteria": [
+        "wrapper_state record extended with spec and binding_table fields",
+        "init/1 extracts spec from NetArg and stores in wrapper_state",
+        "init/1 extracts binding_table from NetArg and stores in wrapper_state",
+        "Handles missing spec/binding_table gracefully (defaults to undefined/#{})",
+        "Backward compatible with existing workflows not providing these fields",
+        "Compilation succeeds without breaking existing patterns"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Required for trigger/3 callback to access spec and binding table during cancellation processing."
+    },
+    {
+      "id": "US-006",
+      "title": "Integrate trigger callback in pattern modules",
+      "acceptance_criteria": [
+        "cancel_activity.erl trigger/3 delegates to handle_cancel_token/4",
+        "cancel_case.erl trigger/3 delegates to handle_cancel_token/4",
+        "Pattern modules extract wrapper_state from NetState",
+        "Returns pass/drop based on handle_cancel_token/4 result",
+        "Existing pattern tests still pass after trigger/3 changes",
+        "Cancellation tokens processed correctly in pattern workflows"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Need to determine how to pass wrapper_state to trigger callback. May require NetState structure change or usr_info convention."
+    },
+    {
+      "id": "US-007",
+      "title": "Create wf_compensation module for hook management",
+      "acceptance_criteria": [
+        "wf_compensation.erl module created with pure functional API",
+        "register_hook/3 registers compensation hook for scope in usr_info",
+        "unregister_hook/2 removes compensation hook from usr_info",
+        "get_hooks/1 retrieves all registered hooks from usr_info",
+        "is_valid_hook/1 validates function arity (must be 2)",
+        "is_valid_scope/1 validates scope type (activity/region/case)",
+        "All functions are pure (no side effects)",
+        "EUnit test suite passes with 100% coverage"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "New module. Foundation for compensation hook infrastructure. Must follow pure functional design pattern."
+    },
+    {
+      "id": "US-008",
+      "title": "Implement compensation hook execution",
+      "acceptance_criteria": [
+        "execute_hook/3 executes single hook with error handling",
+        "execute_hooks/3 executes all matching hooks for scope",
+        "Hooks execute in post-order (children before parents)",
+        "Hook failures caught and logged via telemetry",
+        "Execution continues after hook failures (log-and-continue)",
+        "Returns execution result with success and failed hook lists",
+        "EUnit tests verify post-order traversal correctness"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Need to verify telemetry module exists and has logging function. If not, use logger or add telemetry dependency."
+    },
+    {
+      "id": "US-009",
+      "title": "Integrate compensation hooks with cancellation runtime",
+      "acceptance_criteria": [
+        "handle_cancel_token/4 calls execute_compensation_hooks/3 after marking update",
+        "Compensation hooks execute before workflow state update",
+        "hook_matches_scope/2 matches exact and parent scopes",
+        "Wildcard {any, any} hook matches all cancellations",
+        "Hook failures don't prevent cancellation (log-and-continue)",
+        "Integration tests verify hooks fire on activity/region/case cancellation"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Requires US-007 and US-008 to be complete. Integration point between cancellation and compensation."
+    },
+    {
+      "id": "US-010",
+      "title": "Initialize compensation hooks in gen_yawl",
+      "acceptance_criteria": [
+        "gen_yawl init/1 ensures compensation_hooks map exists in usr_info",
+        "Initializes empty map if not provided by workflow",
+        "Existing workflows without compensation hooks unaffected",
+        "Backward compatible with all existing patterns",
+        "No breaking changes to gen_yawl API"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Simple defensive initialization. Should not affect existing workflows."
+    },
+    {
+      "id": "US-011",
+      "title": "Add performance tests for O(scope size) cancellation",
+      "acceptance_criteria": [
+        "Benchmark test for 10-place cancellation executes in < 1ms",
+        "Benchmark test for 100-place cancellation executes in < 10ms",
+        "Performance test verifies no whole-marking scan occurs",
+        "Test measures trigger callback overhead separately",
+        "Results documented and meet success criteria",
+        "Performance regression test added to CI"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Critical validation of O(scope size) requirement. Use proper Erlang benchmarking tools (timer:tc/1 or similar)."
+    },
+    {
+      "id": "US-012",
+      "title": "Add integration tests for end-to-end cancellation scenarios",
+      "acceptance_criteria": [
+        "Test workflow with activity cancellation verifies single task cancelled",
+        "Test workflow with region cancellation verifies all tasks in region cancelled",
+        "Test workflow with case cancellation verifies entire workflow terminated",
+        "Test verifies unrelated tasks remain uncorrupted",
+        "Test verifies compensation hooks execute in correct order",
+        "Test verifies yawl_state status updated to cancelled",
+        "Test covers backward compatibility with legacy tokens",
+        "All tests pass with real YAWL specifications"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Requires test workflow definitions. Should use existing test patterns if possible, or create minimal test workflows."
+    },
+    {
+      "id": "US-013",
+      "title": "Update documentation and examples",
+      "acceptance_criteria": [
+        "wf_cancel module documentation updated with scope examples",
+        "wf_compensation module documentation added with examples",
+        "gen_yawl trigger callback documented for cancellation",
+        "Migration guide written for existing workflows",
+        "Example workflow demonstrating compensation hooks added",
+        "Architecture.md updated with cancellation flow diagram"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Documentation is essential for adoption. Should include examples of all three cancellation types and compensation hook patterns."
+    }
+  ]
+}

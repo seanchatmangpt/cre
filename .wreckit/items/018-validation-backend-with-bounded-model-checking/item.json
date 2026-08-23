@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "018-validation-backend-with-bounded-model-checking",
+  "title": "Validation backend with bounded model checking",
+  "section": "tooling",
+  "state": "implementing",
+  "overview": "Complex workflows can have subtle bugs like deadlocks, unreachable states, or incorrect synchronization. Need automated validation beyond unit tests to catch these issues before production.\n\n**Motivation:** Provides formal verification of workflow correctness, catches design flaws early, supports confidence in pattern implementations, and is a competitive advantage for workflow reliability.\n\n**Success criteria:**\n- Detect at least one known deadlock case\n- Bounded exploration completes in reasonable time\n- Reports specific validation issues\n- Not used in runtime path\n\n**Technical constraints:**\n- Validation backend only (not runtime)\n- Compile to Petri net or LTS\n- Bounded exploration (depth D, token bound K)\n- Check: dead transitions, completion option, deadlock\n\n**Signals:** priority: high, urgency: Key quality assurance requirement",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Failed to checkout base branch main",
+  "created_at": "2026-02-11T01:57:00.429Z",
+  "updated_at": "2026-02-11T04:50:17.235Z",
+  "problem_statement": "Complex workflows can have subtle bugs like deadlocks, unreachable states, or incorrect synchronization. Need automated validation beyond unit tests to catch these issues before production.",
+  "motivation": "Provides formal verification of workflow correctness, catches design flaws early, supports confidence in pattern implementations, and is a competitive advantage for workflow reliability.",
+  "success_criteria": [
+    "Detect at least one known deadlock case",
+    "Bounded exploration completes in reasonable time",
+    "Reports specific validation issues",
+    "Not used in runtime path"
+  ],
+  "technical_constraints": [
+    "Validation backend only (not runtime)",
+    "Compile to Petri net or LTS",
+    "Bounded exploration (depth D, token bound K)",
+    "Check: dead transitions, completion option, deadlock"
+  ],
+  "priority_hint": "high",
+  "urgency_hint": "Key quality assurance requirement"
+}

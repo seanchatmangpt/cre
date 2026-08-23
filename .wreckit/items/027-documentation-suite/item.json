@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "027-documentation-suite",
+  "title": "Documentation suite",
+  "section": "docs",
+  "state": "idea",
+  "overview": "Complex system with novel approach to workflow patterns requires thorough documentation for understanding, usage, and maintenance.\n\n**Motivation:** Enables knowledge transfer, supports onboarding, documents design decisions, provides semantics reference, operational guidance.\n\n**Success criteria:**\n- All 5 docs created and complete\n- Semantics clearly defined\n- Pattern mapping table included\n- Testing strategy documented\n- Ops guidance provided\n\n**Signals:** priority: medium, urgency: Required for maintainability",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Research phase detected unauthorized file modifications:\n\n  Modified M src/wfnet/patterns/wfnet_interleaved.erl\n\nThe research phase must be read-only. Only research.md may be created.\nAny code changes should be made during the implementation phase.",
+  "created_at": "2026-02-11T01:57:00.432Z",
+  "updated_at": "2026-02-11T05:27:08.462Z",
+  "problem_statement": "Complex system with novel approach to workflow patterns requires thorough documentation for understanding, usage, and maintenance.",
+  "motivation": "Enables knowledge transfer, supports onboarding, documents design decisions, provides semantics reference, operational guidance.",
+  "success_criteria": [
+    "All 5 docs created and complete",
+    "Semantics clearly defined",
+    "Pattern mapping table included",
+    "Testing strategy documented",
+    "Ops guidance provided"
+  ],
+  "priority_hint": "medium",
+  "urgency_hint": "Required for maintainability"
+}

@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "id": "004-implement-marketplace-billing-metering-and-licensi",
+  "branch_name": "wreckit/004-implement-marketplace-billing-metering-and-licensi",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Create license enforcer gen_server module",
+      "acceptance_criteria": [
+        "Module compiles successfully with rebar3 compile",
+        "gen_server implements start_link/0, start_link/1 callbacks",
+        "Exports check_license/0, get_license_status/0, accept_eula/1, validate_startup/0 functions",
+        "Handles EULA acceptance with timestamp, version, and acceptor tracking",
+        "Calculates grace period correctly (default 30 days, configurable)",
+        "Validates license state: valid, invalid, expired, grace_period",
+        "Persists EULA acceptance to /opt/cre/data/license/eula_acceptance.json",
+        "Loads EULA acceptance from disk on startup",
+        "Logs license events with appropriate severity (info, warning, error)",
+        "Handles file I/O errors gracefully (missing file, permission errors)"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Follow cre_cost_reporter gen_server pattern (src/telemetry/cre_cost_reporter.erl:10-26). Use JSX for JSON encoding/decoding."
+    },
+    {
+      "id": "US-002",
+      "title": "Create license supervisor module",
+      "acceptance_criteria": [
+        "Module compiles successfully",
+        "Supervisor uses one_for_one strategy",
+        "Registers license_enforcer as child with permanent restart",
+        "Starts successfully via license_sup:start_link/0",
+        "Child spec includes correct shutdown timeout (5000ms)",
+        "Supervisor restarts license_enforcer on crash",
+        "Integration test verifies supervision tree works"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Follow cre_sup pattern (src/app/cre_sup.erl). Simple supervisor with one child (license_enforcer)."
+    },
+    {
+      "id": "US-003",
+      "title": "Add license modules to CRE application",
+      "acceptance_criteria": [
+        "src/cre.app.src includes license_enforcer and license_sup in modules list",
+        "Application starts successfully with license modules loaded",
+        "rebar3 compile passes with no warnings",
+        "Dialyzer passes with no type errors",
+        "license modules are in applications list or loaded as dependencies"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Add to src/cre.app.src modules list (line 13-175). Ensure proper dependency loading."
+    },
+    {
+      "id": "US-004",
+      "title": "Integrate license supervisor into CRE supervision tree",
+      "acceptance_criteria": [
+        "src/app/cre_sup.erl includes license_sup as child spec",
+        "License supervisor starts when CRE application starts",
+        "CRE supervision tree has 8 children (was 7, added license_sup)",
+        "Child spec uses correct restart strategy (permanent)",
+        "Child spec uses correct shutdown timeout (5000ms)",
+        "CRE application starts and stops cleanly with license supervisor"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Add LicenseSupSpec to init/1 function in src/app/cre_sup.erl:211-282. Follow existing child spec patterns."
+    },
+    {
+      "id": "US-005",
+      "title": "Add license check to startup health probe",
+      "acceptance_criteria": [
+        "cre_health.erl startup/0 function calls license validation",
+        "check_license/0 function returns subsystem_status map",
+        "License check returns 'healthy' when EULA accepted",
+        "License check returns 'unhealthy' when EULA not accepted",
+        "License check returns 'unhealthy' with warning during grace period",
+        "Startup probe fails when license is invalid",
+        "Startup probe succeeds when license is valid or in grace period",
+        "License status appears in /startup endpoint JSON response",
+        "Subsystem status includes helpful error messages",
+        "Grace period warnings logged to CRE logs"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Integrate into src/api/cre_health.erl:188-207. Add check_license/0 private function. Follow existing subsystem check pattern (lines 327-498)."
+    },
+    {
+      "id": "US-006",
+      "title": "Implement usage tracking in cost reporter",
+      "acceptance_criteria": [
+        "cre_cost_reporter.erl export_to_gcp/1 implemented (not just a stub)",
+        "Calculates workflow_hours metering unit",
+        "Calculates node_hours metering unit",
+        "Stores usage metrics to /opt/cre/data/usage/usage_metrics.jsonl",
+        "Usage data includes timestamp, environment, and metrics map",
+        "Usage data stored in JSONL format (one line per export)",
+        "Creates usage data directory if missing",
+        "Logs usage metrics on export (info level)",
+        "Handles file I/O errors gracefully",
+        "No Marketplace Metering API calls in v1 (logs placeholder comment)"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Implement export_to_gcp/1 at src/telemetry/cre_cost_reporter.erl:397-403. Add calculate_workflow_hours/1, calculate_node_hours/1, store_usage_metrics/1 helper functions."
+    },
+    {
+      "id": "US-007",
+      "title": "Add /usage endpoint to health API",
+      "acceptance_criteria": [
+        "cre_health.erl handles /usage GET request",
+        "usage/0 function returns map with usage, cost, timestamp",
+        "Usage data includes node_count, active_workflows, memory_bytes, cpu_utilization",
+        "Usage data includes workflow_hours and node_hours metering units",
+        "Cost data includes estimated_daily_cost and estimated_monthly_cost",
+        "Returns JSON response with correct Content-Type header",
+        "Endpoint returns 200 status code",
+        "Handles errors gracefully (e.g., cost reporter not started)"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Add usage/0 function to src/api/cre_health.erl. Add route to Cowboy dispatcher in src/app/cre.erl."
+    },
+    {
+      "id": "US-008",
+      "title": "Update Helm chart with license configuration",
+      "acceptance_criteria": [
+        "values.yaml includes license configuration section",
+        "License section has acceptEula, gracePeriodDays, licenseFile, usageDataDir fields",
+        "acceptEula defaults to false",
+        "gracePeriodDays defaults to 30",
+        "Helm chart lints successfully",
+        "YAML syntax is valid",
+        "Configuration is well-documented with comments"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Add license section to k8s/charts/cre/values.yaml at end of file. Follow existing config section pattern (lines 44-67)."
+    },
+    {
+      "id": "US-009",
+      "title": "Add license volume mounts to Helm deployment",
+      "acceptance_criteria": [
+        "Pod template includes license-data volume mount at /opt/cre/data/license",
+        "Pod template includes usage-data volume mount at /opt/cre/data/usage",
+        "Volumes defined as emptyDir for both license-data and usage-data",
+        "Volume mounts are in correct container section",
+        "Helm template renders valid Kubernetes manifests",
+        "Dry-run deployment succeeds",
+        "Volumes are documented with comments"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Modify k8s/charts/cre/templates/deployment.yaml (or StatefulSet). Add to volumeMounts and volumes sections."
+    },
+    {
+      "id": "US-010",
+      "title": "Add license environment variables to Helm deployment",
+      "acceptance_criteria": [
+        "CRE_LICENSE_ACCEPT_EULA environment variable set from values.yaml",
+        "CRE_LICENSE_GRACE_PERIOD_DAYS environment variable set from values.yaml",
+        "CRE_LICENSE_FILE environment variable set from values.yaml",
+        "Environment variables use proper Helm template syntax",
+        "Values are converted to strings correctly",
+        "Helm template renders valid container spec",
+        "Environment variables are documented"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Add env vars to k8s/charts/cre/templates/deployment.yaml container spec. Use .Values.license.* template variables."
+    },
+    {
+      "id": "US-011",
+      "title": "Create license init container in Helm chart",
+      "acceptance_criteria": [
+        "Init container named 'accept-license' added to deployment",
+        "Init container uses busybox:1.36 image",
+        "Init container creates /opt/cre/data/license directory",
+        "Init container writes eula_acceptance.json if CRE_LICENSE_ACCEPT_EULA=true",
+        "JSON includes accepted=true, timestamp, version=1.0, acceptor='marketplace-deployment'",
+        "Init container logs EULA acceptance or grace period message",
+        "Init container mounts license-data volume",
+        "Init container runs before main CRE container",
+        "Grace period logged when CRE_LICENSE_ACCEPT_EULA=false"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Add init container to k8s/charts/cre/templates/deployment.yaml. Use shell script to create JSON file. Follow existing init container patterns."
+    },
+    {
+      "id": "US-012",
+      "title": "Create BYOL licensing guide documentation",
+      "acceptance_criteria": [
+        "docs/license/BYOL_LICENSING_GUIDE.md created",
+        "Explains BYOL model and compliance requirements",
+        "Documents EULA acceptance process",
+        "Documents grace period behavior",
+        "Explains how to check license status",
+        "Documents usage tracking and /usage endpoint",
+        "Includes troubleshooting section",
+        "Includes FAQ section",
+        "Links to Apache License 2.0 terms",
+        "Links to Marketplace deployment terms",
+        "Documents migration path to usage-based billing (v2)"
+      ],
+      "priority": 4,
+      "status": "done",
+      "notes": "Write comprehensive guide in Markdown. Include code examples for curl commands and Erlang console. Target audience: Marketplace customers."
+    },
+    {
+      "id": "US-013",
+      "title": "Create enterprise support options documentation",
+      "acceptance_criteria": [
+        "docs/license/ENTERPRISE_SUPPORT.md created",
+        "Documents Community Support (free) options",
+        "Documents Silver, Gold, Platinum enterprise tiers",
+        "Includes pricing for each tier",
+        "Includes SLA details (response time, uptime)",
+        "Documents premium features (security, HA, performance)",
+        "Includes getting started contact information",
+        "Includes comparison table",
+        "Includes training options",
+        "Includes FAQ section"
+      ],
+      "priority": 4,
+      "status": "done",
+      "notes": "Write sales-oriented documentation in Markdown. Target audience: enterprise customers considering paid support."
+    },
+    {
+      "id": "US-014",
+      "title": "Create usage tracking documentation",
+      "acceptance_criteria": [
+        "docs/metering/USAGE_TRACKING.md created",
+        "Documents what metrics are tracked",
+        "Documents how to access usage data (/usage endpoint)",
+        "Documents usage metrics file format and location",
+        "Includes code examples for parsing usage data",
+        "Documents cost estimation methodology",
+        "Documents optimization recommendations",
+        "Explains future v2 usage-based billing plans",
+        "Documents data privacy and ownership",
+        "Includes troubleshooting section",
+        "Includes FAQ section"
+      ],
+      "priority": 4,
+      "status": "done",
+      "notes": "Write technical documentation in Markdown. Target audience: DevOps engineers monitoring CRE deployments. Include Python parsing example."
+    }
+  ]
+}

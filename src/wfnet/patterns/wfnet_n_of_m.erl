@@ -143,16 +143,16 @@ start_link(Name, M, Options) ->
 %% @doc Create an N-out-of-M merge workflow specification.
 %%
 %% @param M Total number of branches (generates branch1..branchM)
-%% @param Options Configuration map with required n key
+%% @param N Number of branches needed to proceed
+%% @param Options Additional configuration options
 %% @returns workflow_spec()
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec new(m_value(), map()) -> wfnet_types:workflow_spec().
-new(M, Options) when is_integer(M), M > 0, is_map(Options) ->
-    N = maps:get(n, Options, 1),
+-spec new(m_value(), n_value(), map()) -> wfnet_types:workflow_spec().
+new(M, N, Options) when is_integer(M), M > 0, is_integer(N), N > 0, N =< M, is_map(Options) ->
     Branches = [list_to_atom("branch_" ++ integer_to_list(I)) || I <- lists:seq(1, M)],
-    new(Branches, #{n => N}).
+    new(Branches, Options#{n => N}).
 
 %%--------------------------------------------------------------------
 %% @doc Create an N-out-of-M merge workflow specification.
@@ -486,26 +486,26 @@ init_test() ->
 
 %% is_enabled test
 is_enabled_complete_test() ->
-    State = #n_of_m_state{n => 2, completion_count => 1, merged => false},
+    State = #n_of_m_state{n = 2, completion_count = 1, merged = false},
     Mode = #{a_branch => [done], waiting => []},
     ?assert(is_enabled(complete_branch, Mode, State)),
 
     %% After merge, complete should be disabled
-    State2 = State#n_of_m_state{merged => true},
+    State2 = State#n_of_m_state{merged = true},
     ?assertNot(is_enabled(complete_branch, Mode, State2)).
 
 is_enabled_merge_n_test() ->
-    State = #n_of_m_state{n => 2, completion_count => 2, merged => false},
+    State = #n_of_m_state{n = 2, completion_count = 2, merged = false},
     ?assert(is_enabled(merge_n, #{waiting => [a, b]}, State)),
 
     %% Not enough completions
-    State2 = State#n_of_m_state{completion_count => 1},
+    State2 = State#n_of_m_state{completion_count = 1},
     ?assertNot(is_enabled(merge_n, #{waiting => [a]}, State2)).
 
 %% fire complete_branch test
 fire_complete_test() ->
     Branches = [{a, #{}}, {b, #{}}, {c, #{}}],
-    State = #n_of_m_state{branches = Branches, completed = [], completion_count => 0},
+    State = #n_of_m_state{branches = Branches, completed = [], completion_count = 0},
     Mode = #{a_branch => [done], b_branch => [done], waiting => []},
 
     Result = fire(complete_branch, Mode, State),
@@ -516,7 +516,7 @@ fire_complete_test() ->
 
 %% fire merge_n test
 fire_merge_n_test() ->
-    State = #n_of_m_state{n => 2, completed => [a, b], completion_count => 2},
+    State = #n_of_m_state{n = 2, completed = [a, b], completion_count = 2},
     Result = fire(merge_n, #{waiting => [a, b]}, State),
     ?assertMatch({produce, _, _}, Result),
     {produce, ProduceMap, NewState} = Result,
@@ -525,7 +525,7 @@ fire_merge_n_test() ->
 
 %% fire reset test
 fire_reset_test() ->
-    State = #n_of_m_state{n => 2, completed => [a, b], completion_count => 2, merged => true},
+    State = #n_of_m_state{n = 2, completed = [a, b], completion_count = 2, merged = true},
     Result = fire(reset, #{}, State),
     ?assertMatch({produce, _, _}, Result),
     {produce, _ProduceMap, NewState} = Result,

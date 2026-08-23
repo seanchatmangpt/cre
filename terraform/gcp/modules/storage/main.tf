@@ -10,9 +10,11 @@ locals {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type             = "pd-ssd"
-        fstype           = "ext4"
-        replication-type = "none"
+        type               = "pd-ssd"
+        fstype             = "ext4"
+        replication-type    = "none"
+        # Add CMEK key if provided (optional)
+        encryptionKeyKMSKey = try(var.cmek_key_name, null)
       }
     }
     ssd_regional = {
@@ -22,9 +24,11 @@ locals {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type             = "pd-ssd"
-        fstype           = "ext4"
-        replication-type = "regional-pd"
+        type               = "pd-ssd"
+        fstype             = "ext4"
+        replication-type    = "regional-pd"
+        # Add CMEK key if provided (optional)
+        encryptionKeyKMSKey = try(var.cmek_key_name, null)
       }
     }
     balanced = {
@@ -34,9 +38,11 @@ locals {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type             = "pd-balanced"
-        fstype           = "ext4"
-        replication-type = "none"
+        type               = "pd-balanced"
+        fstype             = "ext4"
+        replication-type    = "none"
+        # Add CMEK key if provided (optional)
+        encryptionKeyKMSKey = try(var.cmek_key_name, null)
       }
     }
     standard = {
@@ -46,9 +52,11 @@ locals {
       allow_volume_expansion = true
       reclaim_policy         = "Delete"
       parameters = {
-        type             = "pd-standard"
-        fstype           = "ext4"
-        replication-type = "none"
+        type               = "pd-standard"
+        fstype             = "ext4"
+        replication-type    = "none"
+        # Add CMEK key if provided (optional)
+        encryptionKeyKMSKey = try(var.cmek_key_name, null)
       }
     }
   }

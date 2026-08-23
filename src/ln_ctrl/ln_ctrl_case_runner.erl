@@ -42,6 +42,7 @@
     effects_queue :: [term()],
     effect_results :: #{atom() => any()},
     receipt_log :: [ln_ctrl_receipt:receipt()],
+    andon_handle :: ln_receipt_andon:andon_handle() | undefined,
     trace_level :: none | basic | full,
     start_time :: integer(),
     awaiting_clients :: [from()]
@@ -105,6 +106,9 @@ init({Compiled, InitCtx, Options}) ->
     Scheduler = maps:get(scheduler, Options, ln_ctrl_sched:new_deterministic()),
     TraceLevel = maps:get(trace_level, Options, basic),
 
+    %% Initialize andon for status signaling
+    {ok, AndonHandle} = ln_receipt_andon:new_andon(),
+
     State = #state{
         exec_state = ExecState,
         compiled = Compiled,
@@ -115,6 +119,7 @@ init({Compiled, InitCtx, Options}) ->
         effects_queue = [],
         effect_results = #{},
         receipt_log = [],
+        andon_handle = AndonHandle,
         trace_level = TraceLevel,
         start_time = erlang:monotonic_time(millisecond),
         awaiting_clients = []
@@ -255,12 +260,12 @@ execute_effect(State, Spec) ->
                         {ok, Result} ->
                             Latency = erlang:monotonic_time(millisecond) - StartTime,
                             {ok, Receipt} = ln_receipt_effect:complete(Handle, Result, Latency),
-                            ln_receipt_andon:set_green(State#state.receipt_log),
+                            ln_receipt_andon:set_green(State#state.andon_handle),
                             update_with_effect_result(State, EffectID, Result, NewBudget);
                         {error, Reason} ->
                             Latency = erlang:monotonic_time(millisecond) - StartTime,
                             {ok, Receipt} = ln_receipt_effect:failed(Handle, Reason, Latency),
-                            ln_receipt_andon:set_red(State#state.receipt_log, Reason),
+                            ln_receipt_andon:set_red(State#state.andon_handle, Reason),
                             State#state{
                                 case_status = error,
                                 error_reason = {effect_failed, EffectID, Reason},
@@ -270,7 +275,7 @@ execute_effect(State, Spec) ->
             end;
         {budget_exceeded, Details, NewBudget} ->
             %% Budget exceeded, halt execution
-            ln_receipt_andon:set_red(State#state.receipt_log, Details),
+            ln_receipt_andon:set_red(State#state.andon_handle, Details),
             State#state{
                 case_status = error,
                 error_reason = {budget_exceeded, Details},

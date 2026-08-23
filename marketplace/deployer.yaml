@@ -1,0 +1,52 @@
+# CRE Marketplace Deployment Specification
+# This file defines how CRE is deployed from Google Cloud Marketplace
+
+apiVersion: marketplace.cloud.google.com/v1beta1
+kind: MarketplaceDeployment
+metadata:
+  name: cre-deployment
+  namespace: cre
+spec:
+  application: cre
+  version: 0.3.0
+
+  # Billing model: BYOL (Bring Your Own License)
+  billing:
+    type: BYOL
+    license: Apache-2.0
+
+  # Deployment parameters
+  cluster:
+    type: GKE
+    version: ">= 1.25.0"
+
+  # Helm chart reference
+  chart:
+    name: cre
+    repository: https://storage.googleapis.com/cre-marketplace/charts
+    version: 0.3.0
+
+  # Default values (can be overridden by user in Marketplace UI)
+  values:
+    replicaCount: 3
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: standard-rwo
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+    monitoring:
+      enabled: true
+
+  # Post-deployment instructions
+  output:
+    - name: clusterEndpoint
+      type: SERVICE_ENDPOINT
+      reference:
+        type: SERVICE
+        name: cre

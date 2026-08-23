@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cre
+  labels:
+    name: cre
+    marketplace.cloud.google.com/deployment: cre

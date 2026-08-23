@@ -58,6 +58,7 @@
 
 -module(wf_engine).
 -behaviour(gen_server).
+-include_lib("kernel/include/logger.hrl").
 
 %%====================================================================
 %% Exports
@@ -871,6 +872,7 @@ handle_call({start_case, Options, Now}, _From, State) ->
     Data = maps:get(data, Options, #{}),
     CaseId = generate_case_id(State#engine_state.next_seq),
     NextSeq = State#engine_state.next_seq + 1,
+    ?LOG_INFO("Case started", #{case_id => CaseId, data => Data, timestamp => Now}),
 
     %% Get initial places from spec
     Places = maps:get(places, State#engine_state.spec, [p_start, p_end]),
@@ -945,10 +947,22 @@ handle_call({start_work, WiId, User, Now}, _From, State) ->
     end;
 
 handle_call({complete, WiId, User, Data, Now}, _From, State) ->
+    ?LOG_INFO("Work item completion requested", #{
+        wi_id => WiId,
+        user => User,
+        data => Data,
+        timestamp => Now
+    }),
     case find_workitem(WiId, State#engine_state.cases) of
         {ok, Case, #work_item{status = started, assigned_to = User, task = Task}} ->
             %% Complete the work item
             {NewCase, NewState} = complete_workitem(Case, WiId, Task, Data, Now, State),
+            ?LOG_INFO("Work item completed", #{
+                wi_id => WiId,
+                user => User,
+                task => Task,
+                timestamp => Now
+            }),
             {reply, ok, NewState};
         {ok, _Case, #work_item{status = Status}} ->
             {reply, {error, {invalid_status, Status}}, State};

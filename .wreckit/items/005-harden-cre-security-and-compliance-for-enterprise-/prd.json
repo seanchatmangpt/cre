@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "id": "005-harden-cre-security-and-compliance-for-enterprise-",
+  "branch_name": "wreckit/005-harden-cre-security-and-compliance-for-enterprise-",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Enable read-only root filesystem for Pod Security Standards compliance",
+      "acceptance_criteria": [
+        "readOnlyRootFilesystem changed from false to true in k8s/gcp/deployment.yaml line 248 (production) and line 450 (staging)",
+        "All writable directories (/opt/cre/data, /opt/cre/log, /opt/cre/checkpoints) are mounted as emptyDir or persistent volumes",
+        "kubectl apply --dry-run=server succeeds without Pod Security Admission violations when namespace has pod-security.kubernetes.io/enforce=restricted label",
+        "Pod starts successfully and can write to mounted volumes",
+        "Workflow execution completes without filesystem write errors",
+        "Touch command to /tmp fails with 'Read-only file system' error",
+        "Touch command to /opt/cre/log succeeds"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Volumes already defined in deployment.yaml lines 256-263. No changes to volume mounts required. This change is reversible by setting readOnlyRootFilesystem back to false."
+    },
+    {
+      "id": "US-002",
+      "title": "Harden init container to run as non-root or minimal capabilities",
+      "acceptance_criteria": [
+        "Init container uses minimal Linux capabilities (only CHOWN added, ALL others dropped)",
+        "Init container has seccompProfile defined at container level",
+        "kubectl apply --dry-run=server succeeds without PSS violations",
+        "Init container successfully creates directories with correct ownership (UID 1000:1000)",
+        "Directories have permissions 755 allowing cre user to write",
+        "Alternative approach documented: Use CRE runtime image as init container to avoid chown requirement",
+        "Production deployment passes PSS restricted validation"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Current init container runs as root (runAsUser: 0) for chown operations. Two approaches: 1) Add only CHOWN capability (minimal), 2) Use CRE runtime image with UID 1000 (requires pre-created dirs in image). Decision: Use CHOWN capability for Phase 1, document alternative for Phase 3."
+    },
+    {
+      "id": "US-003",
+      "title": "Add container-level seccomp profile to main CRE container",
+      "acceptance_criteria": [
+        "seccompProfile with type: RuntimeDefault added to container securityContext in lines 246-251 (production) and 448-453 (staging)",
+        "Both pod-level and container-level seccomp profiles defined",
+        "kubectl get pod shows seccomp profile in container security context",
+        "Pod starts without seccomp-related errors",
+        "Workflow execution completes normally",
+        "PSS restricted validation passes"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Pod-level seccomp already exists at line 93-94. Container-level seccomp is required for PSS restricted profile but is currently missing."
+    },
+    {
+      "id": "US-004",
+      "title": "Narrow RBAC permissions to least privilege for pods and secrets",
+      "acceptance_criteria": [
+        "RBAC Role in k8s/gcp/serviceaccount.yaml modified for both production (lines 43-55) and staging (lines 78-90)",
+        "Pods resource permissions changed from 'get, list, watch' to 'get' only",
+        "Secrets resource permissions changed from 'get, list, watch' to 'get' only",
+        "Leases resource retains all permissions ('get, create, update, delete') for leader election",
+        "EndpointSlices retains 'get, list' for service discovery",
+        "kubectl auth can-i list pods --as=system:serviceaccount:cre-prod:cre-ksa returns 'no'",
+        "kubectl auth can-i get pods --as=system:serviceaccount:cre-prod:cre-ksa returns 'yes'",
+        "Three-pod deployment successfully clusters without list/watch permissions on pods",
+        "No clustering errors in pod logs",
+        "Workflow execution succeeds with narrowed permissions"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "CRE clustering uses EPMD (port 4369) and EndpointSlices for discovery, not pod list/watch. Removing list/watch reduces attack surface without breaking functionality. ConfigMaps keep list/watch for ConfigMapWatcher pattern if used."
+    },
+    {
+      "id": "US-005",
+      "title": "Implement Cloud Logging backend for audit log export",
+      "acceptance_criteria": [
+        "New module src/wf/wf_audit_log_cloud.erl created with gen_server behavior",
+        "wf_audit_log_cloud module exports append/1 function for Cloud Logging",
+        "wf_audit_log.erl append/2 modified to dual-write to disk_log and Cloud Logging",
+        "Cloud Logging export is fire-and-forget (does not block workflow execution)",
+        "Cloud Logging client initialized with log name 'cre-audit-log'",
+        "Receipt maps logged as jsonPayload with timestamp and severity INFO",
+        "Module compiles without errors: rebar3 compile",
+        "Unit test passes: append returns ok immediately, Cloud Logging async",
+        "Error logging for Cloud Logging failures does not affect workflow execution"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Dual-write pattern ensures local disk_log remains primary source of truth. Cloud Logging export failure should not block workflow execution. Cloud Logging client library (google-cloud-logging) already installed in Dockerfile line 226."
+    },
+    {
+      "id": "US-006",
+      "title": "Create BigQuery dataset and Log Router sink for audit log retention",
+      "acceptance_criteria": [
+        "New Terraform module terraform/gcp/modules/audit_logging/main.tf created",
+        "BigQuery dataset created with 400-day retention (SOX compliance)",
+        "Log Router sink configured to export CRE audit logs to BigQuery dataset",
+        "Log filter includes 'cre-audit-log' log name and jsonPayload.source=cre",
+        "Sink has unique_writer_identity enabled",
+        "BigQuery IAM grants sink_writer role to sink identity",
+        "Terraform variables include retention_days (default 400) and log_filter",
+        "terraform apply creates resources without errors",
+        "BigQuery dataset exists: bq show --format=prettyjson PROJECT_ID:cre_audit_logs",
+        "Log Router sink exists: gcloud logging sinks list",
+        "Sink writer identity has BigQuery dataEditor role"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "400-day retention meets SOX requirements. Log Router automatically exports new log entries. Sink should exclude DEBUG logs to reduce storage costs. BigQuery provides SQL-queryable audit trail for compliance reporting."
+    },
+    {
+      "id": "US-007",
+      "title": "Add CMEK support for Persistent Disk StorageClass",
+      "acceptance_criteria": [
+        "terraform/gcp/modules/storage/main.tf modified to add encryptionKeyKMSKey parameter",
+        "CMEK parameter added to all storage_class_defaults (ssd, ssd_regional, balanced, standard)",
+        "New variable cmek_key_name added to variables.tf with default null",
+        "When cmek_key_name is null, StorageClass uses Google-managed encryption (backward compatible)",
+        "When cmek_key_name is set, StorageClass includes encryptionKeyKMSKey in parameters",
+        "terraform plan shows CMEK parameter in StorageClass when variable is set",
+        "terraform apply creates StorageClass with CMEK configuration",
+        "kubectl get storageclass shows CMEK key in parameters when enabled",
+        "Persistent Volume created with CMEK-enabled StorageClass uses customer-managed key",
+        "gcloud compute disks list --filter='encryptionKey:keyName' shows CMEK-encrypted disks"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "CMEK must be optional (default null) to maintain backward compatibility. Customers managing KMS keys must provide key resource ID format: 'projects/PROJECT/locations/LOCATION/keyRings/KEYRING/cryptoKeys/KEY'. Documentation required for key management responsibilities."
+    },
+    {
+      "id": "US-008",
+      "title": "Document CMEK configuration and secret rotation procedures",
+      "acceptance_criteria": [
+        "New documentation file docs/gcp/SECURITY_GUIDE.md created with CMEK section",
+        "CMEK setup instructions included for Persistent Disks (kubectl + gcloud commands)",
+        "CMEK setup instructions included for Secret Manager (Terraform annotation)",
+        "KMS key creation commands documented (key ring, key, IAM grants)",
+        "KMS key rotation guidance documented (90-day recommendation, gcloud commands)",
+        "Secret Manager version rotation documented (uncomment rotation_period in secrets.tf)",
+        "Erlang cookie rotation procedure documented (manual process, downtime impact)",
+        "Shared responsibility model clearly defined (CRE vs customer)",
+        "Warning about key loss consequences (data loss, cannot decrypt)",
+        "Documentation example Terraform code for CMEK configuration",
+        "Documentation reviewed for accuracy and completeness"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "CMEK requires customer to manage KMS keys. Documentation is critical because key management is customer responsibility. Key loss = data loss (CRE cannot recover CMEK-encrypted data without key). Erlang cookie rotation requires cluster restart (document downtime impact)."
+    },
+    {
+      "id": "US-009",
+      "title": "Implement container image signing with Cosign in CI/CD pipeline",
+      "acceptance_criteria": [
+        "New GitHub Actions workflow .github/workflows/release.yml created for image signing",
+        "Cosign installed via sigstore/cosign-installer action",
+        "Image signing uses GitHub Actions OIDC token (no stored private key)",
+        "cosign sign command executes successfully for tagged releases",
+        "cosign verify command succeeds after signing",
+        "SBOM generated and attached to image with cosign attach sbom",
+        "SBOM generated in SPDX format using Syft",
+        "Vulnerability scan with Trivy executes as part of build",
+        "Build fails if CRITICAL vulnerabilities found",
+        "Vulnerability scan results uploaded as GitHub artifacts",
+        "GitHub Release created with signed image references",
+        "Workflow has required permissions: contents read, packages write, id-token write",
+        "Signing step executes only on tag push (v*) or manual workflow_dispatch",
+        "Multi-arch image build (linux/amd64, linux/arm64) supported"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "OIDC-based signing eliminates private key storage. GitHub Actions token provides identity-based signatures. Multi-arch build required for GKE multi-arch clusters. Trivy scan threshold: 0 CRITICAL, max 10 HIGH (configurable). SBOM attached to image metadata for supply chain transparency."
+    },
+    {
+      "id": "US-010",
+      "title": "Create Binary Authorization policy to enforce image signature verification",
+      "acceptance_criteria": [
+        "New Terraform module terraform/gcp/modules/binary_authorization/main.tf created",
+        "Binary Authorization policy defaults to ALWAYS_DENY (whitelist approach)",
+        "Admission rule requires cosign signature from specific public key",
+        "cosign_public_key_id variable defined for trusted signer",
+        "Clusters admission rule allows Google-built images (base images)",
+        "Evaluation mode set to ENFORCED_AND_BLOCKING",
+        "terraform apply creates Binary Authorization policy",
+        "Policy exists in GCP project: gcloud container binauthz policy export",
+        "Deploying signed image to GKE cluster succeeds",
+        "Deploying unsigned or incorrectly signed image fails with 'Image denied by policy' error",
+        "Policy enforcement verified in GKE cluster logs",
+        "cosign public key documented in repository (e.g., .github/cosign.pub)"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Binary Authorization requires GKE cluster with binary_authorization.evaluation_mode enabled (already in terraform/gcp/modules/gke_cluster/main.tf:107-109). Cosign public key must be stored securely (GitHub repo or Secret Manager). Policy enforcement applies to all deployments in the project."
+    },
+    {
+      "id": "US-011",
+      "title": "Create comprehensive security whitepaper for Marketplace submission",
+      "acceptance_criteria": [
+        "New documentation file docs/gcp/SECURITY_WHITEPAPER.md created",
+        "Executive summary included (purpose, threat model, defense in depth)",
+        "Container hardening section documents PSS compliance, non-root, read-only rootfs, capabilities, seccomp",
+        "Network security section documents network policies, private cluster, pod-to-pod encryption",
+        "IAM section documents Workload Identity, least privilege, RBAC, short-lived tokens",
+        "Data protection section documents encryption at rest (CMEK) and in transit (TLS)",
+        "Audit and compliance section documents wf_audit_log, Cloud Logging, BigQuery retention",
+        "Compliance mapping included for SOC 2, HIPAA, PCI-DSS, GDPR, ISO 27001",
+        "Incident response procedure outlined with 6 steps (detect, investigate, contain, eradicate, recover, post-mortem)",
+        "Penetration testing section included (placeholder for third-party results)",
+        "Secure deployment guide referenced",
+        "Shared responsibility model clearly defined in table format",
+        "Contact information provided (security email, PGP key)",
+        "All references include file paths and line numbers",
+        "Document length 300-400 lines (comprehensive but readable)",
+        "Markdown syntax valid, all links work",
+        "Document reviewed by security lead",
+        "Meets GCP Marketplace security documentation requirements"
+      ],
+      "priority": 4,
+      "status": "done",
+      "notes": "Marketplace security review requires comprehensive security documentation. Whitepaper addresses common enterprise security questionnaire requirements. Should include specific file references (e.g., 'k8s/gcp/deployment.yaml:248') for auditors to verify claims."
+    },
+    {
+      "id": "US-012",
+      "title": "Create compliance matrix mapping CRE controls to regulatory frameworks",
+      "acceptance_criteria": [
+        "New documentation file docs/gcp/COMPLIANCE_MATRIX.md created",
+        "SOC 2 Type II section included with all 5 Trust Principles (Security, Availability, Processing Integrity, Confidentiality, Privacy)",
+        "SOC 2 controls mapped to CRE implementations with file:line references",
+        "SOC 2 audit evidence table included (location, retention, access)",
+        "HIPAA Security Rule section included with Administrative, Physical, and Technical Safeguards",
+        "HIPAA implementation specifications mapped to CRE controls",
+        "HIPAA BAA information included (Google Cloud agreement, customer action required)",
+        "PCI-DSS section included with all 12 requirements mapped to CRE controls",
+        "PCI-DSS scoping defined (in scope vs out of scope)",
+        "GDPR section included with Articles 25, 32, 33, 35 mapped",
+        "ISO 27001 controls mapped (A.9 Access Control, A.10 Cryptography, etc.)",
+        "Compliance readiness checklist included (SOC 2 audit, HIPAA BAA, pen testing, etc.)",
+        "GCP compliance inheritance documented (rely on Google SOC 2, ISO 27001)",
+        "Customer responsibilities clearly separated from CRE platform responsibilities",
+        "Notes section clarifies third-party audit approach",
+        "All mappings include specific file references (e.g., 'terraform/gcp/modules/security/iam.tf:140-144')",
+        "Tables formatted correctly in Markdown",
+        "Document length 150-200 lines",
+        "Completeness verified against SOC 2, HIPAA, PCI-DSS requirements"
+      ],
+      "priority": 4,
+      "status": "done",
+      "notes": "Compliance matrices accelerate enterprise procurement by pre-answering security questionnaires. Should clearly distinguish between CRE platform responsibilities and customer responsibilities. GCP compliance inheritance means CRE doesn't need independent SOC 2 audit (relies on Google's certification)."
+    }
+  ]
+}

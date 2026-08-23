@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "id": "026-public-api-surface",
+  "branch_name": "wreckit/026-public-api-surface",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Create cre_case module skeleton with type definitions and documentation",
+      "acceptance_criteria": [
+        "Module cre_case.erl exists in src/api/ directory",
+        "Module compiles without errors or warnings",
+        "All required types are exported: case_id, case_status, case_info, option, options",
+        "Module has comprehensive -moduledoc with overview and examples",
+        "Type definitions match the requirements from research",
+        "All exported function signatures are declared with -spec attributes",
+        "Documentation follows cre_client.erl pattern"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "Foundation for the entire public API. Must be completed before any implementation work."
+    },
+    {
+      "id": "US-002",
+      "title": "Implement start_case/3 and start_case/4 with option parsing",
+      "acceptance_criteria": [
+        "start_case/3 accepts SpecId and InitialData, uses default options",
+        "start_case/4 accepts SpecId, InitialData, and Options list",
+        "Options are parsed with proplists:get_value using defaults: scheduler_policy=nondeterministic, step_quanta=1, trace_level=min, effect_handler=ln_effect, timeout=5000",
+        "Options are validated using validate_options internal function",
+        "Valid options are passed through to wf_case_sup:start_case/3",
+        "Returns {ok, CaseId} on success, {error, Reason} on failure",
+        "Function has comprehensive -doc with Parameters, Returns, Options, and Examples sections",
+        "Type specs are present and correct"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "Core function for creating workflow cases. Must properly parse and validate all required options."
+    },
+    {
+      "id": "US-003",
+      "title": "Implement case query functions (get_case_info, get_case_status, get_case_results, list_cases, find_case)",
+      "acceptance_criteria": [
+        "get_case_info/1 returns sanitized #case_info{} record hiding internal fields",
+        "get_case_status/1 returns {ok, Status} where Status is case_status() atom",
+        "get_case_results/1 returns {ok, Results} map for completed cases, {error, not_completed} otherwise",
+        "list_cases/0 returns {ok, [CaseId]} list of all active case IDs",
+        "find_case/1 returns {ok, Pid} or {error, not_found}",
+        "All functions delegate to wf_case_sup and wf_case_runner",
+        "sanitize_case_info/1 removes internal fields like marking, rng_state",
+        "All functions have comprehensive documentation",
+        "Type specs are present for all functions"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Query functions are read-only operations. Critical for monitoring and inspecting case state."
+    },
+    {
+      "id": "US-004",
+      "title": "Implement case control functions (suspend_case, resume_case, cancel_case)",
+      "acceptance_criteria": [
+        "suspend_case/2 accepts CaseId and Reason, delegates to wf_engine:suspend_case/3",
+        "resume_case/2 accepts CaseId and Reason, delegates to wf_engine:resume_case/3",
+        "cancel_case/2 accepts CaseId and Reason, delegates to wf_engine:cancel_case/3",
+        "All functions return ok on success, {error, Reason} on failure",
+        "Functions have comprehensive documentation with examples",
+        "Type specs are present and correct"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Case control functions enable lifecycle management. Required for production use cases."
+    },
+    {
+      "id": "US-005",
+      "title": "Implement work item query functions (get_worklist, get_workitem_info)",
+      "acceptance_criteria": [
+        "get_worklist/2 accepts CaseId and UserId, returns {ok, [WorkItemMap]}",
+        "Work items are sanitized - internal record fields converted to maps",
+        "WorkItemMap contains: id, task_name, offered_to, status",
+        "get_workitem_info/2 accepts CaseId and WorkItemId, returns {ok, WorkItemMap}",
+        "Functions delegate to wf_engine:worklist/2",
+        "Functions have comprehensive documentation",
+        "Type specs are present"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Read-only work item queries. Allocation operations (allocate, start, complete) are out of scope for this initial API."
+    },
+    {
+      "id": "US-006",
+      "title": "Add doctest_test/0 function and create example workflows",
+      "acceptance_criteria": [
+        "doctest_test/0 function exists and tests option validation",
+        "doctest_test/0 tests sanitize_case_info logic",
+        "docs/examples/cre_case_example.erl file exists",
+        "basic_example/0 demonstrates start_case, get_case_status, list_cases, get_worklist, suspend_case, resume_case, cancel_case",
+        "options_example/0 demonstrates all four options: scheduler_policy, step_quanta, trace_level, effect_handler",
+        "Examples compile and run successfully in Erlang shell",
+        "Documentation can be generated with edoc"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Examples and doctests are critical for user onboarding and documentation."
+    },
+    {
+      "id": "US-007",
+      "title": "Create integration tests for cre_case API",
+      "acceptance_criteria": [
+        "test/cre_case_integration_tests.erl file exists",
+        "Test for start_case with default options passes",
+        "Test for start_case with custom options passes",
+        "Test for full case lifecycle (start, suspend, resume, cancel) passes",
+        "Test for list_cases and find_case passes",
+        "All tests use EUnit framework",
+        "Tests clean up cases after completion",
+        "Code coverage > 80%",
+        "All tests pass with erl -eval 'eunit:test(cre_case_integration_tests, [verbose])'"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Integration tests verify that the facade properly delegates to underlying modules."
+    }
+  ]
+}

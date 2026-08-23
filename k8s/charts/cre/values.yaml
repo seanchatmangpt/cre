@@ -203,7 +203,7 @@ persistence:
 probes:
   liveness:
     httpGet:
-      path: /status.json
+      path: /health
       port: http
     initialDelaySeconds: 30
     periodSeconds: 15
@@ -212,7 +212,7 @@ probes:
 
   readiness:
     httpGet:
-      path: /status.json
+      path: /ready
       port: http
     initialDelaySeconds: 10
     periodSeconds: 10
@@ -221,7 +221,7 @@ probes:
 
   startup:
     httpGet:
-      path: /status.json
+      path: /startup
       port: http
     initialDelaySeconds: 5
     periodSeconds: 5
@@ -274,8 +274,8 @@ backup:
     bucket: s3://cre-backups
     region: us-east-1
 
-  # Existing secret name for backup credentials
-  existingSecret: ""
+  # Note: For backup credentials, use External Secrets Operator or Secret Manager
+  # Do not specify existingSecret in values.yaml for Marketplace deployments
 
 # -- Monitoring configuration
 monitoring:
@@ -291,11 +291,28 @@ monitoring:
   # ServiceMonitor scrape timeout
   scrapeTimeout: 10s
 
-# -- Existing secrets (for production use)
-existingSecret: ""
-
 # -- External configuration (for reference only)
+# NOTE: For Marketplace deployments, secrets must be provided via External Secrets
+# Operator or Google Secret Manager. Do not use existingSecret pattern in values.yaml
+# as it violates Marketplace security requirements.
+# See README.md for secret management configuration.
 externalConfig:
   dbHost: ""
   dbPort: ""
   dbName: ""
+
+# -- License configuration for Google Cloud Marketplace BYOL model
+license:
+  # -- EULA acceptance (must be true for Marketplace deployment)
+  # Set to true in Marketplace UI to accept the Apache License 2.0
+  acceptEula: false
+
+  # -- Grace period in days (for deployments without EULA acceptance)
+  # CRE will run for this many days without EULA acceptance
+  gracePeriodDays: 30
+
+  # -- License file mount path (where EULA acceptance is stored)
+  licenseFile: /opt/cre/data/license/eula_acceptance.json
+
+  # -- Usage data directory (for v2 usage-based billing migration)
+  usageDataDir: /opt/cre/data/usage

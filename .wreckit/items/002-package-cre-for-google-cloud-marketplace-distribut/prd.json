@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "id": "002-package-cre-for-google-cloud-marketplace-distribut",
+  "branch_name": "wreckit/002-package-cre-for-google-cloud-marketplace-distribut",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Fix health check endpoint integration",
+      "acceptance_criteria": [
+        "Health check routes (/health, /ready, /startup) are added to Cowboy dispatch table in src/app/cre.erl:339",
+        "Helm probe paths in values.yaml:206, 215, 224 are updated to use /health, /ready, /startup instead of /status.json",
+        "All health endpoints return JSON with 'status' field set to 'healthy', 'unhealthy', or 'starting'",
+        "/health returns 200 when BEAM VM is responsive",
+        "/ready returns 200 when Mnesia, worker pool, and CRE master are healthy",
+        "/startup returns 200 when initialization completes successfully",
+        "Existing /status.json endpoint remains functional for status monitoring",
+        "All endpoints tested with curl and return valid JSON"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "CRITICAL BLOCKER: Current Helm chart uses /status.json for health probes, but this is a status endpoint, not a health endpoint. GCP-ready health endpoints exist in cre_health.erl but are not routed. This WILL cause deployments to fail health checks."
+    },
+    {
+      "id": "US-002",
+      "title": "Create GKE Application schema for Marketplace UI",
+      "acceptance_criteria": [
+        "k8s/charts/cre/application.yaml created following marketplace.cloud.google.com/v1alpha1 schema",
+        "Schema defines all user-configurable parameters: replicaCount, autoscaling settings, persistence, resources, networking, TLS",
+        "Parameters include appropriate constraints (e.g., maxReplicas only visible when autoscaling.enabled=true)",
+        "License acceptance parameter (acceptEula) is required with constraint",
+        "Output variables defined: serviceUrl and markdown instructions",
+        "Schema validates against GKE Application API",
+        "Marketplace UI renders all parameters correctly",
+        "Default values are appropriate for production deployments"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "REQUIRED for Marketplace submission - application.yaml is the primary input schema for the Marketplace deployment UI"
+    },
+    {
+      "id": "US-003",
+      "title": "Remove secret references from Helm values",
+      "acceptance_criteria": [
+        "Line 295 'existingSecret: \"\"' is removed from k8s/charts/cre/values.yaml",
+        "Comment added explaining Marketplace requirement for External Secrets Operator",
+        "No secrets remain in values.yaml (verified by grep)",
+        "Documentation added explaining how to use External Secrets Operator with Secret Manager",
+        "Helm chart templates handle missing secret values gracefully"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Marketplace constraint violation: 'No secrets in Helm values.yaml'. Must use External Secrets Operator or Secret Manager references instead."
+    },
+    {
+      "id": "US-004",
+      "title": "Implement complete Cloud Build configuration",
+      "acceptance_criteria": [
+        "cloudbuild.yaml implements full multi-arch build pipeline (currently only 3 lines)",
+        "Build steps include: multi-arch docker buildx (amd64, arm64), Trivy security scanning, Syft SBOM generation, Artifact Registry push, cosign image signing",
+        "Immutable version tags enforced (vX.Y.Z format only, no 'latest' in Marketplace)",
+        "SBOM generated in SPDX format and uploaded to GCS",
+        "Images signed with cosign and signatures stored in Artifact Registry",
+        "Build completes successfully with 'gcloud builds submit --config cloudbuild.yaml .'",
+        "No CRITICAL vulnerabilities in Trivy scan",
+        "Multi-arch manifest created and pushed to Artifact Registry"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Current cloudbuild.yaml is essentially empty (only comments). Cloud Build is required for Marketplace image publishing."
+    },
+    {
+      "id": "US-005",
+      "title": "Create Marketplace deployment specification",
+      "acceptance_criteria": [
+        "marketplace/deployer.yaml created with marketplace.cloud.google.com/v1beta1 schema",
+        "BYOL (Bring Your Own License) billing model specified",
+        "Helm chart reference included with repository and version",
+        "Default values match application.yaml defaults",
+        "Post-deployment output variables defined",
+        "Deployment spec validates with kubectl apply --dry-run=client"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "BYOL model recommended for v1 to simplify Marketplace submission. Usage-based billing can be added in v2 based on customer feedback."
+    },
+    {
+      "id": "US-006",
+      "title": "Create GKE-specific deployment manifests",
+      "acceptance_criteria": [
+        "k8s/gke/00-namespace.yaml creates 'cre' namespace with Marketplace labels",
+        "k8s/gke/01-serviceaccount.yaml creates K8s SA with Workload Identity annotation",
+        "k8s/gke/02-rolebinding.yaml creates RBAC binding",
+        "k8s/gke/03-network-policy.yaml implements default-deny with explicit allow rules for Erlang ports (4142, 4368, 9100)",
+        "All manifests apply successfully with kubectl apply --dry-run=client",
+        "Network policies allow CRE pod-to-pod communication",
+        "Workload Identity properly configured with IAM annotation"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "GKE-specific manifests enable proper security and networking for Marketplace deployments. Note: Research document incorrectly claimed these files already exist."
+    },
+    {
+      "id": "US-007",
+      "title": "Create GKE Marketplace-specific Helm values override",
+      "acceptance_criteria": [
+        "k8s/charts/cre/values-gke-marketplace.yaml created",
+        "Image repository references Artifact Registry with PROJECT_ID variable",
+        "Node selector configured for CRE node pool",
+        "Pod Security Standards enforcement enabled (RuntimeDefault seccomp profile)",
+        "Workload Identity annotation added to service account",
+        "Persistence uses premium-rwo StorageClass",
+        "Health probe paths updated to /health, /ready, /startup",
+        "Monitoring enabled for Cloud Operations integration"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Separate values file for Marketplace deployments ensures proper GKE configuration and separation from generic deployments."
+    },
+    {
+      "id": "US-008",
+      "title": "Create Marketplace documentation package",
+      "acceptance_criteria": [
+        "marketplace/README.md provides clear quick start instructions",
+        "marketplace/LICENSE.txt contains Apache 2.0 license with Marketplace deployment terms",
+        "README includes: Prerequisites (GKE 1.25+), Deployment steps, Configuration examples, Monitoring instructions, Architecture overview, Support information",
+        "License terms are acceptable for BYOL model",
+        "Documentation verified by technical writer",
+        "Examples tested and verified to work"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Marketplace requires comprehensive documentation for customer onboarding."
+    },
+    {
+      "id": "US-009",
+      "title": "Update Helm chart metadata for Marketplace",
+      "acceptance_criteria": [
+        "k8s/charts/cre/Chart.yaml includes Marketplace annotations",
+        "Annotations added: marketplace.cloud.google.com/deployer: 'Helm', marketplace.cloud.google.com/verified: 'false'",
+        "Chart version follows semver (0.3.0)",
+        "appVersion matches container image tag",
+        "Helm chart passes lint: helm lint k8s/charts/cre",
+        "Helm chart packages successfully: helm package k8s/charts/cre"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Marketplace requires specific annotations in Helm chart metadata for deployment integration."
+    },
+    {
+      "id": "US-010",
+      "title": "Create automated deployment test script",
+      "acceptance_criteria": [
+        "scripts/marketplace/test-deployment.sh created and made executable",
+        "Script performs: Create test GKE cluster, Deploy CRE via Helm, Wait for pod readiness, Verify all health endpoints (/health, /ready, /startup, /status.json), Verify StatefulSet health, Verify persistent volumes, Test pod disruption, Cleanup resources",
+        "Script accepts PROJECT_ID, CLUSTER_NAME, ZONE parameters",
+        "Script exits with error code if any test fails",
+        "Script produces clear output for each test step",
+        "Script successfully completes in fresh GCP project",
+        "Script cleanup removes all test resources"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Automated E2E testing required to verify one-click deployment works in fresh GCP project (Marketplace success criterion)."
+    },
+    {
+      "id": "US-011",
+      "title": "Create security validation script",
+      "acceptance_criteria": [
+        "scripts/marketplace/security-scan.sh created and made executable",
+        "Script accepts IMAGE_URI parameter",
+        "Script runs Trivy scan for CRITICAL and HIGH vulnerabilities",
+        "Script fails if CRITICAL vulnerabilities found",
+        "Script fails if more than 10 HIGH vulnerabilities found",
+        "Script outputs vulnerability counts and details",
+        "Script integrates with Cloud Build pipeline",
+        "Security scan passes for published images"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Marketplace technical assessment requires evidence of security scanning with acceptable vulnerability levels."
+    },
+    {
+      "id": "US-012",
+      "title": "Create Marketplace submission checklist",
+      "acceptance_criteria": [
+        "marketplace/SUBMISSION_CHECKLIST.md created with all required items",
+        "Checklist sections include: Container Images, Kubernetes Deployment, Security & Compliance, Documentation, Testing, Marketplace Listing, Post-Submission",
+        "Each item is verifiable (checkbox with specific command or test)",
+        "Checklist references all created artifacts",
+        "All items in checklist completed",
+        "Checklist reviewed by Marketplace submission team"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Comprehensive checklist ensures all Marketplace requirements are met before submission."
+    },
+    {
+      "id": "US-013",
+      "title": "Update GitHub Actions workflow for Marketplace builds",
+      "acceptance_criteria": [
+        ".github/workflows/gcp-cloud-build.yml updated to reference complete cloudbuild.yaml",
+        "Immutable version tag enforcement added (only vX.Y.Z allowed for Marketplace)",
+        "Marketplace compliance validation added: check for application.yaml, check for secrets in values.yaml, validate Helm chart",
+        "SBOM upload step added to GitHub Releases",
+        "Workflow triggers on version tags (v*)",
+        "Workflow completes successfully for tagged releases"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "CI/CD workflow already comprehensive but references incomplete cloudbuild.yaml. Needs Marketplace-specific validation steps."
+    },
+    {
+      "id": "US-014",
+      "title": "Verify health endpoints in production container image",
+      "acceptance_criteria": [
+        "Container image built from updated Dockerfile includes health endpoint routes",
+        "Local test: docker run -p 4142:4142 cre:test responds to /health, /ready, /startup",
+        "All health endpoints return valid JSON with 'status' field",
+        "Health endpoints return appropriate HTTP codes (200, 503, 202)",
+        "Endpoints work in GKE deployment with kubelet probes",
+        "Health checks pass in StatefulSet with 3+ nodes",
+        "No regressions in existing /status.json endpoint"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Must verify that health endpoint integration works in actual containerized environment before submitting to Marketplace."
+    }
+  ]
+}

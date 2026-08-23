@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "id": "023-multiple-instance-pattern-implementations",
+  "branch_name": "wreckit/023-multiple-instance-pattern-implementations",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Create mi_all_pattern gen_yawl module",
+      "acceptance_criteria": [
+        "Module compiles without errors: rebar3 compile",
+        "Implements all gen_yawl callbacks (place_lst, trsn_lst, init_marking, preset, is_enabled, fire, trigger)",
+        "Supports arbitrary instance count M (not hardcoded to 4)",
+        "Petri net structure is sound (option to complete, proper completion, no dead transitions)",
+        "XES logging events emitted for spawn, complete, and sync",
+        "fire/3 returns 3-tuple {produce, Map, NewState} for state updates",
+        "Follows n_out_of_m.erl structure and conventions",
+        "Doctests pass: erl -noshell -e \"eunit:test(mi_all_pattern, [verbose])\" -s init stop"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "Reference implementation: /Users/sac/cre/src/patterns/n_out_of_m.erl. Generalize multiple_instances_sync.erl to support any M."
+    },
+    {
+      "id": "US-002",
+      "title": "Create mi_first_n_pattern gen_yawl module",
+      "acceptance_criteria": [
+        "Module compiles without errors",
+        "Implements all gen_yawl callbacks",
+        "Proceeds after first N instances complete (non-blocking downstream)",
+        "Continues processing remaining M-N instances after threshold",
+        "Result aggregation: return first N results immediately, all M at completion",
+        "Petri net includes p_proceed (trigger downstream) and p_all_done (track completion)",
+        "XES logging for threshold_met event",
+        "Follows n_out_of_m.erl structure",
+        "Doctests pass"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "New pattern - not based on existing code. Key innovation: split output into proceed and all_done."
+    },
+    {
+      "id": "US-003",
+      "title": "Create mi_discriminator_pattern gen_yawl module",
+      "acceptance_criteria": [
+        "Module compiles without errors",
+        "Implements all gen_yawl callbacks",
+        "First completion wins, produces output immediately",
+        "trigger/3 callback cancels remaining instance tokens",
+        "Cancellation tokens propagate to instance execution",
+        "State tracks winner, cancelled instances",
+        "XES logging for winner selection and cancellation events",
+        "Integrates blocking_discriminator.erl logic",
+        "Doctests pass"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Integrate blocking_discriminator.erl:83 logic into MI framework. Use trigger/3 for atomic cancellation."
+    },
+    {
+      "id": "US-004",
+      "title": "Create mi_pattern unified facade module",
+      "acceptance_criteria": [
+        "Module compiles without errors",
+        "execute/3 API: execute(Spec, JoinPolicy, Funs) -> {ok, Results} | {error, Reason}",
+        "validate_spec/1: validates {fixed, M} and {dynamic, Fun, Max} specs",
+        "validate_join_policy/2: validates policy matches spec (e.g., N <= M for n_of_m)",
+        "pattern_module/1: dispatches to correct implementation (mi_all_pattern, mi_first_n_pattern, n_out_of_m, mi_discriminator_pattern)",
+        "Clear error messages for invalid specs and policies",
+        "Module documentation with examples",
+        "Doctests pass"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "This is the main user-facing API. Should be intuitive and well-documented."
+    },
+    {
+      "id": "US-005",
+      "title": "Fix test suite to use mi_pattern facade",
+      "acceptance_criteria": [
+        "All cre_yawl_patterns references replaced with mi_pattern calls",
+        "rebar3 eunit passes (test suite executes without errors)",
+        "Test coverage > 80% for MI patterns",
+        "No compiler warnings about undefined functions",
+        "Tests cover all MI patterns (all, first_n, n_of_m, discriminator)",
+        "Integration tests for MI in sequences and cancellations",
+        "Property-based tests for invariants (optional)"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "File to update: /Users/sac/cre/test/yawl_multiple_instances_test.erl:194+. Search for cre_yawl_patterns and replace."
+    },
+    {
+      "id": "US-006",
+      "title": "Verify and complete bytecode execution (wf_exec)",
+      "acceptance_criteria": [
+        "Inspect wf_exec.erl for MI opcode handlers (exec({mi_spawn, Policy}, State), exec({mi_join, Policy}, State))",
+        "If missing, implement handlers for MI_SPAWN and MI_JOIN opcodes",
+        "Create wf_mi_exec_test.erl with unit tests for MI opcode execution",
+        "rebar3 eunit passes (including new MI exec tests)",
+        "Bytecode execution produces same results as gen_yawl patterns",
+        "Code coverage shows MI opcode handlers are exercised",
+        "No VM crashes during MI execution"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Opcodes are defined in wf_vm.erl:28-29, 102-103. Need to verify wf_exec handles them. If not, implement handlers."
+    },
+    {
+      "id": "US-007",
+      "title": "Integrate cancellation support (Item 014)",
+      "acceptance_criteria": [
+        "All MI patterns implement trigger/3 for cancellation token filtering",
+        "State tracks cancel_requested and cancelled_instances",
+        "handle_cast({cancel, all}, NetState) implemented in all MI patterns",
+        "mi_pattern facade exports cancel/1 function",
+        "Cancellation tests pass: instances halt when cancelled",
+        "No race conditions: instance completing as cancellation arrives",
+        "Dialyzer confirms trigger/3 return types are correct",
+        "Manual verification: no orphaned processes after cancellation",
+        "XES logs show cancellation events"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Integrates with Item 014 (structured cancellation). If Item 014 not complete, implement minimal support and document integration points."
+    },
+    {
+      "id": "US-008",
+      "title": "Create documentation and examples",
+      "acceptance_criteria": [
+        "Create /Users/sac/cre/docs/mi_patterns.md with user guide",
+        "Document all 5 pattern types (all, first_n, n_of_m, discriminator, dynamic)",
+        "Include code examples for each pattern type",
+        "Document cancellation API",
+        "Create /Users/sac/cre/examples/mi_patterns_examples.erl",
+        "Examples compile and execute without errors",
+        "Examples include: parallel_map, quorum_decision, race, stream_processor",
+        "Documentation renders correctly",
+        "Use cases are realistic and helpful"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Documentation is critical for adoption. Include both reference docs and practical examples."
+    },
+    {
+      "id": "US-009",
+      "title": "Performance benchmark and optimization",
+      "acceptance_criteria": [
+        "Benchmark gen_yawl MI patterns with various instance counts (1, 10, 100, 1000)",
+        "Measure spawn latency, completion time, memory usage",
+        "Compare gen_yawl vs. bytecode execution performance",
+        "Identify bottlenecks (if any)",
+        "Optimize hot paths if performance is unacceptable",
+        "Document performance characteristics",
+        "Set target: < 1ms spawn overhead per instance",
+        "Set target: < 100ms total overhead for 1000 instances"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Optional but important. Establish performance baselines before optimization."
+    }
+  ]
+}

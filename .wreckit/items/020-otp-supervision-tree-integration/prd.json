@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "id": "020-otp-supervision-tree-integration",
+  "branch_name": "wreckit/020-otp-supervision-tree-integration",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Create wf_case_sup supervisor module",
+      "acceptance_criteria": [
+        "Module compiles without errors",
+        "Exports start_link/0, start_case/3, stop_case/1, stop_case/2, list_cases/0, find_case/1, get_case_status/1, case_count/0",
+        "init/1 returns proper supervisor flags with simple_one_for_one strategy, intensity 10, period 60",
+        "Child spec template points to wf_case_runner with temporary restart",
+        "Dialyzer passes with no warnings",
+        "Doctests validate module structure"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Core supervisor infrastructure following pattern from yawl_workflow_supervisor:84-98"
+    },
+    {
+      "id": "US-002",
+      "title": "Create wf_case_runner gen_server wrapper",
+      "acceptance_criteria": [
+        "Module compiles without errors",
+        "Implements gen_server behavior with init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3",
+        "Exports start_link/3, get_info/1, cancel/1",
+        "State record includes case_id, spec_id, case_type, status, workflow_pid, started_at, completed_at, data, options",
+        "Registers case with gproc using {wf_case, CaseId} key",
+        "Supports gen_yawl workflow type (initially)",
+        "Handles workflow process EXIT messages",
+        "Unregisters from gproc in terminate/2",
+        "Generates unique case IDs using crypto:hash",
+        "Dialyzer passes with no warnings"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Case runner isolates workflow execution from supervision concerns. Pattern from active_token_sup.erl"
+    },
+    {
+      "id": "US-003",
+      "title": "Integrate wf_case_sup into cre_sup",
+      "acceptance_criteria": [
+        "wf_case_sup child spec added to cre_sup init/1",
+        "Child spec uses permanent restart and infinity shutdown",
+        "wf_case_sup appears in supervisor:which_children(cre_sup)",
+        "cre_sup doctest updated to expect 9 children (7 workers, 3 supervisors)",
+        "All existing doctests pass",
+        "CRE application starts successfully with new supervisor",
+        "All existing services (cre_master, yawl_timeout, etc.) still running after start"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Add child spec after yawl_workflow_supervisor (line 266), following pattern from cre_sup.erl:259-266"
+    },
+    {
+      "id": "US-004",
+      "title": "Create unit tests for wf_case_sup",
+      "acceptance_criteria": [
+        "wf_case_sup_tests.erl module created",
+        "Tests cover: start/stop, list_cases/0 empty, find_case/1 not_found, case_count/0",
+        "Tests use EUnit framework",
+        "All tests pass",
+        "Test coverage >80% for wf_case_sup module",
+        "Setup/teardown properly starts/stops supervisor"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Focus on supervisor API and behavior, not actual workflow execution"
+    },
+    {
+      "id": "US-005",
+      "title": "Create unit tests for wf_case_runner",
+      "acceptance_criteria": [
+        "wf_case_runner_tests.erl module created",
+        "Tests cover: case_id generation uniqueness, gproc registration, init/1 with gen_yawl type",
+        "Tests use EUnit framework",
+        "All tests pass",
+        "Test coverage >80% for wf_case_runner module"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Mock gen_yawl for testing to avoid dependencies on actual workflows"
+    },
+    {
+      "id": "US-006",
+      "title": "Create integration tests",
+      "acceptance_criteria": [
+        "wf_case_integration_tests.erl module created",
+        "Tests verify: wf_case_sup starts under cre_sup, list_cases/0 works, case_count/0 works",
+        "Tests use EUnit with setup/teardown starting/stopping CRE application",
+        "All tests pass",
+        "Integration tests can run against full CRE stack"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Verify supervisor integrates properly with existing supervision tree"
+    },
+    {
+      "id": "US-007",
+      "title": "Create user documentation",
+      "acceptance_criteria": [
+        "Documentation file created (wf_case_supervision.md or README update)",
+        "Includes: overview, basic usage examples, architecture diagram, migration notes",
+        "Code examples compile and run without errors",
+        "Explains relationship to existing supervisors (yawl_workflow_supervisor, yawl_supervisor)",
+        "Documents API functions with parameter types and return values"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Focus on clear adoption path for new users"
+    }
+  ]
+}

@@ -81,6 +81,35 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
+      - name: Enforce immutable version tags
+        run: |
+          if [[ "${{ github.event_name }}" == "tag" ]]; then
+            # Only vX.Y.Z tags allowed for Marketplace
+            if ! [[ "${{ steps.meta.outputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Error: Marketplace requires immutable version tags (vX.Y.Z)"
+              exit 1
+            fi
+          fi
+
+      - name: Validate Marketplace compliance
+        run: |
+          # Check for application.yaml
+          if [ ! -f "k8s/charts/cre/application.yaml" ]; then
+            echo "Error: application.yaml required for Marketplace"
+            exit 1
+          fi
+
+          # Check for secrets in values.yaml
+          if grep -q "existingSecret:" k8s/charts/cre/values.yaml; then
+            echo "Error: Secrets not allowed in values.yaml for Marketplace"
+            exit 1
+          fi
+
+          # Validate Helm chart
+          helm lint k8s/charts/cre
+
+          echo "Marketplace compliance checks passed"
+
       - name: Submit build to Cloud Build
         id: trigger
         run: |

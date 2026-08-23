@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "id": "019-per-case-state-management-with-atomic-commits",
+  "branch_name": "wreckit/019-per-case-state-management-with-atomic-commits",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Create case_state_manager module with Mnesia schema",
+      "acceptance_criteria": [
+        "Mnesia tables case_commit and case_latest are created with correct indexes",
+        "case_state_manager:start_link/0 starts gen_server successfully",
+        "case_state_manager:init_schema/0 creates tables or returns ok if already exists",
+        "Unit tests pass: rebar3 eunit --module=case_state_manager",
+        "Dialyzer shows no errors for case_state_manager module"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "Create new module at /Users/sac/cre/src/wf/case_state_manager.erl with Mnesia tables for atomic commit log"
+    },
+    {
+      "id": "US-002",
+      "title": "Implement commit/4 function with atomic Mnesia transaction",
+      "acceptance_criteria": [
+        "commit/4 accepts CaseId, Marking, UsrInfo, Effects and returns {ok, CommitId, Receipt}",
+        "Commit writes to both case_commit and case_latest tables in single Mnesia transaction",
+        "Commit record includes: commit_id (UUID v4), case_id, parent_commit_id, marking, usr_info, rng_state, effects_receipt, timestamp, version",
+        "Receipt includes: commit_id, before_hash (SHA-256), after_hash (SHA-256), effects, timestamp",
+        "Parent commit pointer correctly references previous commit or undefined for initial commit",
+        "Unit tests verify transaction atomicity (simulate crash during write)",
+        "Version increments correctly in commit chain"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "Core atomic commit protocol. Reference Mnesia transaction pattern from yawl_recovery:303-322"
+    },
+    {
+      "id": "US-003",
+      "title": "Implement read functions: get_state/2, get_commit/2, get_commit_history/1",
+      "acceptance_criteria": [
+        "get_state/2 reads from case_latest and case_commit tables, returns {ok, Marking, UsrInfo, Effects}",
+        "get_commit/2 reads specific commit by commit_id, returns {ok, #case_commit{}}",
+        "get_commit_history/1 returns all commits for case sorted by version ascending",
+        "All read functions use Mnesia transactions for consistency",
+        "get_commit_history/1 returns empty list for non-existent case",
+        "Unit tests verify read-after-write consistency",
+        "Performance test: 1000 reads/sec per case"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "Read operations are hot path - optimize with Mnesia dirty_ops if needed"
+    },
+    {
+      "id": "US-004",
+      "title": "Implement rollback/2 function",
+      "acceptance_criteria": [
+        "rollback/2 accepts CaseId and TargetCommitId, updates case_latest pointer",
+        "Rollback verifies target commit exists and belongs to specified case",
+        "Rollback is atomic (single Mnesia transaction)",
+        "After rollback, get_state/2 returns target commit's state",
+        "Rollback aborts if target commit_id not found",
+        "Unit tests verify rollback to previous commit and verify state matches",
+        "Integration test: rollback then create new commit verifies new commit branches from rollback point"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Rollback just moves pointer - commits are append-only, no deletion"
+    },
+    {
+      "id": "US-005",
+      "title": "Integrate case_state_manager into wf_engine start_case/3",
+      "acceptance_criteria": [
+        "wf_engine:init/1 starts case_state_manager if not already running",
+        "start_case/3 creates initial commit via case_state_manager:commit/4",
+        "Initial commit contains marking from spec initial_marking and data from Opts",
+        "wf_case record created with case_id, status=running, data, but marking=undefined (stored in commit)",
+        "Commit history shows 1 commit after start_case/3",
+        "Error handling: if commit fails, start_case/3 returns {error, {commit_failed, Reason}}"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "This begins migration of wf_engine from in-memory state to commit-based state"
+    },
+    {
+      "id": "US-006",
+      "title": "Modify wf_engine complete_workitem/6 to use case_state_manager commit",
+      "acceptance_criteria": [
+        "complete_workitem/6 calls case_state_manager:get_state/2 to load current marking before firing transition",
+        "After firing transition, complete_workitem/6 calls case_state_manager:commit/4 atomically",
+        "Commit includes: new marking, merged data, effects [{transition, Task}, {work_item_completed, WiId}, {produce_map, ProduceMap}]",
+        "If commit succeeds, work item status updated to completed and wf_case updated",
+        "If commit fails, error logged and old state preserved (no partial update)",
+        "Commit history shows N+1 commits after completing N work items",
+        "Legacy receipt still created for backwards compatibility"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Critical change - moves state mutation from in-memory to atomic commits. Reference existing complete_workitem at wf_engine:1240-1285"
+    },
+    {
+      "id": "US-007",
+      "title": "Add load_case_marking/1 helper to wf_engine",
+      "acceptance_criteria": [
+        "load_case_marking/1 calls case_state_manager:get_state/2 and returns marking",
+        "Returns undefined if case not found or state loading fails",
+        "Function is private (not exported)",
+        "Used by process_enabled/3, check_completion/3, fire_enabled_transition/5 to access marking",
+        "Unit tests verify correct marking returned for active case"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Bridges gap between commit storage and functions that need marking"
+    },
+    {
+      "id": "US-008",
+      "title": "Update wf_engine functions to use load_case_marking/1 instead of wf_case.marking",
+      "acceptance_criteria": [
+        "process_enabled/3 calls load_case_marking(CaseId) instead of reading Case#wf_case.marking",
+        "check_completion/3 calls load_case_marking(CaseId) instead of reading Case#wf_case.marking",
+        "fire_enabled_transition/5 receives marking as parameter (caller uses load_case_marking)",
+        "inject_service_reply/4 calls load_case_marking(CaseId) instead of reading Case#wf_case.marking",
+        "is_transition_enabled/3 unchanged (receives marking as parameter)",
+        "All wf_engine tests pass with no regressions",
+        "Integration test: complete work item and verify marking in commit matches what process_enabled sees"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Prepares for removing marking field from wf_case record in Phase 4"
+    },
+    {
+      "id": "US-009",
+      "title": "Migrate gen_yawl to use case_state_manager instead of yawl_recovery checkpoints",
+      "acceptance_criteria": [
+        "gen_yawl init/1 sets checkpoint_interval = 0 in wrapper_state",
+        "handle_cast(continue, ...) extracts case_id from net_arg",
+        "After progress/4 produces new marking, gen_yawl calls case_state_manager:commit/4",
+        "Commit includes effects: [{transition, Trsn}, {mode, Mode}, {produce_map, Pm}]",
+        "Commit replaces yawl_recovery:maybe_checkpoint/5 call (removed)",
+        "If commit succeeds, gen_yawl continues with new marking",
+        "If commit fails, error logged and execution halts (does not continue with inconsistent state)",
+        "Commit history shows commits for each gen_yawl step",
+        "yawl_recovery checkpoint table not written to (verify with query)"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Eliminates independent checkpoint path. Reference gen_yawl:994-1000 for removed checkpoint code"
+    },
+    {
+      "id": "US-010",
+      "title": "Remove marking field from wf_case record",
+      "acceptance_criteria": [
+        "wf_case record in wf_engine.hrl no longer has marking field (or marked as deprecated comment)",
+        "All #wf_case{} constructions updated to remove marking field",
+        "wf_persistence#wf_persistent_case record no longer has marking field",
+        "wf_persistence:save_case/1 stores latest_commit_id reference instead of marking",
+        "wf_persistence:load_case/1 loads marking from case_state_manager via commit_id",
+        "Compile succeeds with no undefined marking field errors",
+        "All wf_engine and wf_persistence tests pass"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Eliminates shadow state duplication. marking now only in case_commits table"
+    },
+    {
+      "id": "US-011",
+      "title": "Implement replay_from_commit/2 in case_state_manager",
+      "acceptance_criteria": [
+        "replay_from_commit/2 loads commit and returns {ok, Marking, UsrInfo, RngState}",
+        "RngState correctly restored from commit's rng_state field",
+        "Returns {error, commit_not_found} if commit_id doesn't exist",
+        "Returns {error, {commit_belongs_to_other_case, OtherId}} if commit belongs to different case",
+        "After replay, case can resume execution from restored state",
+        "Unit test: create commit, replay, verify marking and usr_info match",
+        "Integration test: replay from first commit and verify engine can continue"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Foundation for deterministic replay and debugging"
+    },
+    {
+      "id": "US-012",
+      "title": "Implement verify_replay/1 for commit chain validation",
+      "acceptance_criteria": [
+        "verify_replay/1 returns true if commit parent pointers form valid chain",
+        "verify_replay/1 returns false if parent pointer chain is broken",
+        "verify_replay/1 loads each commit and verifies parent_commit_id matches previous commit's commit_id",
+        "Returns true for single-commit history",
+        "Unit tests verify valid and invalid chains detected",
+        "Property-based test: generate random commits and verify chain validity"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Ensures commit log integrity for audit and debugging"
+    },
+    {
+      "id": "US-013",
+      "title": "Add rollback and replay APIs to wf_engine",
+      "acceptance_criteria": [
+        "wf_engine:rollback_case/3 exposed as public API",
+        "rollback_case/3 calls case_state_manager:rollback/2 and updates wf_case data to match commit state",
+        "rollback_case/3 clears in-memory receipts and events",
+        "rollback_case/3 sets rolled_back_at timestamp",
+        "wf_engine:commit_history/2 returns list of commits with commit_id, parent_commit_id, transition, timestamp, version",
+        "Commit history sorted newest first (reverse chronological)",
+        "Both functions return {error, not_found} if case doesn't exist",
+        "Unit tests for rollback and history retrieval",
+        "Integration test: execute workflow, rollback to earlier commit, verify state, execute new steps"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Exposes rollback and replay capabilities through wf_engine API"
+    },
+    {
+      "id": "US-014",
+      "title": "Create data migration script for existing cases",
+      "acceptance_criteria": [
+        "Migration script lists all cases from wf_persistent_case table",
+        "For each case, load marking and data from wf_persistent_case",
+        "Create initial commit via case_state_manager:commit/4 with migration flag in effects",
+        "Log success/failure for each migrated case",
+        "Handle cases with missing data gracefully (log warning)",
+        "Script can be run multiple times safely (idempotent)",
+        "Document migration procedure in README",
+        "Test migration on copy of production data"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Required for production deployment. Must not lose data."
+    },
+    {
+      "id": "US-015",
+      "title": "Add comprehensive test coverage for atomic commits",
+      "acceptance_criteria": [
+        "Unit tests for all case_state_manager functions (commit, get_state, get_commit, get_commit_history, rollback, replay, verify_replay)",
+        "Integration tests for wf_engine with commits (start_case, complete work item, rollback)",
+        "Crash recovery test: execute steps, kill process, restart, verify state from commits",
+        "Property-based test: commit chain always valid after random commits",
+        "Property-based test: rollback to any commit then continue produces valid chain",
+        "Performance test: 1000 commits/sec sustained throughput",
+        "All tests pass with rebar3 eunit and rebar3 ct"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "Critical for confidence in atomic commit correctness. Add tests in /Users/sac/cre/test/"
+    },
+    {
+      "id": "US-016",
+      "title": "Document atomic commit architecture and usage",
+      "acceptance_criteria": [
+        "README in case_state_manager module documents API and usage patterns",
+        "Architecture diagram shows case_state_manager, Mnesia tables, and commit flow",
+        "Migration guide explains how to migrate existing code",
+        "Rollback procedure documented with examples",
+        "Troubleshooting guide for common issues (commit conflicts, recovery, etc.)",
+        "Documentation reviewed and approved",
+        "Examples in docbook format tested with rebar3 doc"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Essential for maintenance and onboarding"
+    }
+  ]
+}

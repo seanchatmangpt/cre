@@ -484,7 +484,7 @@ is_enabled_begin_defer_test() ->
     ?assertNot(is_enabled(begin_defer, Mode, State2)).
 
 is_enabled_choose_test() ->
-    State = #deferred_state{triggered = false, pending => [a, b]},
+    State = #deferred_state{triggered = false, pending = [a, b]},
     Mode = #{a_option => [available], b_option => []},
     ?assert(is_enabled(choose, Mode, State)).
 
@@ -495,7 +495,7 @@ is_enabled_complete_test() ->
 
 %% fire begin_defer test
 fire_begin_defer_test() ->
-    State = #deferred_state{pending => [a, b]},
+    State = #deferred_state{pending = [a, b]},
     Result = fire(begin_defer, #{start => [init]}, State),
     ?assertMatch({produce, _, _}, Result),
     {produce, ProduceMap, NewState} = Result,
@@ -506,7 +506,7 @@ fire_begin_defer_test() ->
 %% fire choose test
 fire_choose_test() ->
     Options = [{a, #{priority => 0}}, {b, #{priority => 1}}],
-    State = #deferred_state{pending => [a, b], options => Options},
+    State = #deferred_state{pending = [a, b], options = Options},
     Mode = #{a_option => [available], b_option => [available]},
 
     Result = fire(choose, Mode, State),
@@ -518,7 +518,7 @@ fire_choose_test() ->
 
 %% fire complete test
 fire_complete_test() ->
-    State = #deferred_state{chosen => a, pending => []},
+    State = #deferred_state{chosen = a, pending = []},
     Result = fire(complete, #{chosen => [a]}, State),
     ?assertMatch({produce, _, _}, Result),
     {produce, ProduceMap, _NewState} = Result,

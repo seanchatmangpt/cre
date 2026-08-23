@@ -189,11 +189,31 @@ open(_Config) ->
 %%--------------------------------------------------------------------
 -spec append(Log :: log(), Receipt :: receipt()) -> ok | {error, term()}.
 
-append(#log{disk_log = LogName}, Receipt) when is_map(Receipt) ->
-    case disk_log:alog_terms(LogName, [Receipt]) of
+append(#log{disk_log = LogName} = Log, Receipt) when is_map(Receipt) ->
+    %% Write to local disk_log (primary storage)
+    LocalResult = case disk_log:alog_terms(LogName, [Receipt]) of
         ok -> ok;
         {error, Reason} -> {error, Reason}
-    end.
+    end,
+
+    %% Export to Cloud Logging (fire-and-forget, non-blocking)
+    %% This spawns a separate process so Cloud Logging issues never block workflow execution
+    spawn(fun() ->
+        case wf_audit_log_cloud:append(Receipt) of
+            ok ->
+                ok;
+            {error, CloudReason} ->
+                %% Log to local logger but don't fail the write
+                error_logger:error_msg(
+                    "Failed to export audit log to Cloud Logging: ~p~nReceipt: ~p~n",
+                    [CloudReason, Receipt]
+                ),
+                ok
+        end
+    end),
+
+    %% Return local disk_log result (success/failure)
+    LocalResult.
 
 %%--------------------------------------------------------------------
 %% @doc Reads receipts from the log starting at a cursor position.

@@ -288,12 +288,18 @@ hex_to_bin(<<C:8, Rest/binary>>, Acc) when C >= $A, C =< $F ->
     hex_to_bin(Rest, <<Acc/binary, (C - $A + 10)>>).
 
 %% @private Export a span for collection.
+%% Sends the span to cloud_trace_exporter if available.
 -spec export_span(span()) -> ok.
 export_span(Span) ->
-    %% In production, this would send to an OTLP exporter
-    %% For now, log the span completion
     Duration = maps:get(end_time, Span, 0) - maps:get(start_time, Span),
-    logger:debug("Span completed: ~p duration=~pus trace_id=~p",
-         [maps:get(name, Span), Duration,
-          bin_to_hex(maps:get(trace_id, Span))]),
+    case whereis(cloud_trace_exporter) of
+        undefined ->
+            %% Fallback to logging if exporter not available
+            logger:debug("Span completed: ~p duration=~pus trace_id=~p",
+                 [maps:get(name, Span), Duration,
+                  bin_to_hex(maps:get(trace_id, Span))]);
+        _Pid ->
+            %% Export to Cloud Trace
+            cloud_trace_exporter:export_span(Span)
+    end,
     ok.

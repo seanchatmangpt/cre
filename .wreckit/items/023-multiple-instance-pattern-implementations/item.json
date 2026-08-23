@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "023-multiple-instance-pattern-implementations",
+  "title": "Multiple instance pattern implementations",
+  "section": "backend",
+  "state": "researched",
+  "overview": "Parallel execution of same task with data variations is a common workflow requirement. Need patterns that handle multiple instances with well-defined semantics and synchronization.\n\n**Motivation:** Supports fan-out/fan-in patterns, enables data parallelism, covers important workflow patterns, provides flexible synchronization options.\n\n**Success criteria:**\n- Fixed MI spawns exact count\n- Dynamic MI spawns based on runtime data\n- All sync variants work correctly\n- Join policies enforced\n\n**Signals:** priority: high, urgency: Required for pattern coverage",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Plan phase detected unauthorized file modifications:\n\n  Modified .erlmcp/env.sh\n  Modified M .erlmcp/otp-28.3.1/bin/ct_run\n  Modified M .erlmcp/otp-28.3.1/bin/dialyzer\n  Modified M .erlmcp/otp-28.3.1/bin/epmd\n  Modified M .erlmcp/otp-28.3.1/bin/erl\n  Modified M .erlmcp/otp-28.3.1/bin/erlc\n  Modified M .erlmcp/otp-28.3.1/bin/escript\n  Modified M .erlmcp/otp-28.3.1/bin/run_erl\n  Modified M .erlmcp/otp-28.3.1/bin/to_erl\n  Modified M .erlmcp/otp-28.3.1/bin/typer\n  Modified M .erlmcp/sessionstart.log\n  Modified M src/core/yawl_validate.erl\n  Modified M src/wfnet/patterns/wfnet_n_of_m.erl\n\nThe plan phase must be design-only. Only plan.md and prd.json may be created.\nAny code changes should be made during the implementation phase.",
+  "created_at": "2026-02-11T01:57:00.431Z",
+  "updated_at": "2026-02-11T05:15:33.090Z",
+  "problem_statement": "Parallel execution of same task with data variations is a common workflow requirement. Need patterns that handle multiple instances with well-defined semantics and synchronization.",
+  "motivation": "Supports fan-out/fan-in patterns, enables data parallelism, covers important workflow patterns, provides flexible synchronization options.",
+  "success_criteria": [
+    "Fixed MI spawns exact count",
+    "Dynamic MI spawns based on runtime data",
+    "All sync variants work correctly",
+    "Join policies enforced"
+  ],
+  "priority_hint": "high",
+  "urgency_hint": "Required for pattern coverage"
+}

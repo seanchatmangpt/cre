@@ -68,7 +68,7 @@ fire(t_cancel, _Mode, UsrInfo) ->
     {produce, #{p_cancelled => [cancelled]}, NewState};
 fire(t_finish, _Mode, UsrInfo) ->
     {produce, #{p_end => [done]}, UsrInfo};
-fire(_Trsn, _Mode, UsrInfo) ->
+fire(_Trsn, _Mode, _UsrInfo) ->
     abort.
 
 get_state(UsrInfo) when is_map(UsrInfo) ->
@@ -91,3 +91,45 @@ handle_cast(_Request, State) -> {noreply, State}.
 handle_info(_Info, State) -> {noreply, State}.
 terminate(_Reason, _State) -> ok.
 trigger(_Place, _Token, _NetState) -> pass.
+
+%%====================================================================
+%% Unit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+%% Test place_lst/0
+place_lst_test() ->
+    Places = place_lst(),
+    ?assert(lists:member(p_start, Places)),
+    ?assert(lists:member(p_instances, Places)),
+    ?assert(lists:member(p_threshold_met, Places)),
+    ?assert(lists:member(p_cancelled, Places)),
+    ?assert(lists:member(p_end, Places)).
+
+%% Test trsn_lst/0
+trsn_lst_test() ->
+    Transitions = trsn_lst(),
+    ?assert(lists:member(t_create_instances, Transitions)),
+    ?assert(lists:member(t_complete_instance, Transitions)),
+    ?assert(lists:member(t_threshold, Transitions)),
+    ?assert(lists:member(t_cancel, Transitions)),
+    ?assert(lists:member(t_finish, Transitions)).
+
+%% Test init/1
+init_custom_test() ->
+    State = init(#{total_instances => 8, threshold => 5}),
+    ?assertEqual(8, maps:get(total_instances, State)),
+    ?assertEqual(5, maps:get(threshold, State)),
+    ?assertEqual(0, maps:get(completed, State)),
+    ?assertEqual(false, maps:get(cancelled, State)).
+
+init_default_test() ->
+    State = init(#{}),
+    ?assertEqual(5, maps:get(total_instances, State)),
+    ?assertEqual(3, maps:get(threshold, State)),
+    ?assertEqual(0, maps:get(completed, State)),
+    ?assertEqual(false, maps:get(cancelled, State)).
+
+-endif.

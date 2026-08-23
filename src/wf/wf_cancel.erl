@@ -28,6 +28,8 @@ workflows to model scenarios where the occurrence of a specific event
 (e.g., cancellation, timeout, or error) should terminate all activities
 within a designated region.
 
+## Legacy Token API
+
 ```erlang
 > wf_cancel:is_cancel_token({cancel, [p1, p2]}).
 true
@@ -43,24 +45,36 @@ false
 > Marking = #{p1 => [a], p2 => [b], p3 => [c]}.
 > wf_cancel:apply_cancellation(Marking, [p1, p2]).
 #{p1 => [], p2 => [], p3 => [c]}
+```
 
-> Marking = #{p1 => [a], p2 => [b], p3 => [c], p4 => [d]}.
-> Region = [p2, p3].
-> wf_cancel:cancel_region(Marking, Region).
-#{p1 => [a], p2 => [], p3 => [], p4 => [d]}
+## Scope-Based Cancellation API
 
-> wf_cancel:is_cancellation_set([p1, p2, p3]).
+```erlang
+> wf_cancel:create_activity_cancel(task1).
+{cancel, {activity, task1}}
+
+> wf_cancel:create_region_cancel(payment_region).
+{cancel, {region, payment_region}}
+
+> wf_cancel:create_case_cancel().
+{cancel, {case, all}}
+
+> wf_cancel:is_cancel_token({cancel, {activity, task1}}).
 true
-> wf_cancel:is_cancellation_set(not_a_list).
-false
-> wf_cancel:is_cancellation_set([p1, "not_an_atom"]).
-false
 ```
 
 <h3>Token Types</h3>
 <ul>
-  <li><strong>cancel_token:</strong> `{cancel, [atom()]}` - Identifies targets to cancel</li>
+  <li><strong>cancel_token (legacy):</strong> `{cancel, [atom()]}` - Identifies targets to cancel</li>
+  <li><strong>cancel_token (scope):</strong> `{cancel, {ScopeType, ScopeId}}` - Scope-based cancellation</li>
   <li><strong>cancel_region:</strong> `{cancel_region, atom(), [atom()]}` - Named region with places</li>
+</ul>
+
+<h3>Scope Types</h3>
+<ul>
+  <li><strong>{activity, TaskId}:</strong> Cancel single task/activity</li>
+  <li><strong>{region, RegionId}:</strong> Cancel all tasks in region</li>
+  <li><strong>{case, all}:</strong> Cancel entire workflow case</li>
 </ul>
 
 <h3>Cancellation Behavior</h3>
@@ -88,7 +102,11 @@ Cancellation tokens are typically used in workflow patterns such as:
 -export([is_cancel_token/1]).
 
 %% Token creation
--export([create_cancel_token/1]).
+-export([create_cancel_token/1, create_activity_cancel/1,
+         create_region_cancel/1, create_case_cancel/0]).
+
+%% Scope resolution
+-export([resolve_scope/3]).
 
 %% Token inspection
 -export([cancel_targets/1]).
@@ -104,12 +122,26 @@ Cancellation tokens are typically used in workflow patterns such as:
 %%====================================================================
 
 %%--------------------------------------------------------------------
+%% @doc Cancellation scope types.
+%%
+%% Three granularity levels:
+%% - `{activity, TaskId}`: Cancel single task/activity
+%% - `{region, RegionId}`: Cancel all tasks in region
+%% - `{'case', all}`: Cancel entire workflow case
+%%--------------------------------------------------------------------
+-type cancel_scope() :: {activity, atom()} |
+                       {region, atom()} |
+                       {'case', all}.
+
+%%--------------------------------------------------------------------
 %% @doc A cancel token identifies places to be cleared.
 %%
-%% The first element is the atom `cancel` and the second is a list
-%% of place atoms that should have their tokens removed.
+%% Supports both legacy format (list of places) and scope-based format.
+%% Legacy: `{cancel, [Place]}`
+%% Scope: `{cancel, {ScopeType, ScopeId}}`
 %%--------------------------------------------------------------------
--type cancel_token() :: {cancel, [atom()]}.
+-type cancel_token() :: {cancel, [atom()]} |                       % legacy
+                       {cancel, cancel_scope()}.                    % scope
 
 %%--------------------------------------------------------------------
 %% @doc A cancel region defines a named region with its places.
@@ -135,7 +167,7 @@ Cancellation tokens are typically used in workflow patterns such as:
 -type marking() :: #{atom() => [term()]}.
 
 %% Export types
--export_type([cancel_token/0, cancel_region/0, cancellation_set/0]).
+-export_type([cancel_token/0, cancel_region/0, cancellation_set/0, cancel_scope/0]).
 
 %%====================================================================
 %% Token Validation Functions
@@ -145,11 +177,16 @@ Cancellation tokens are typically used in workflow patterns such as:
 %% @doc Checks if a term is a valid cancel token.
 %%
 %% A valid cancel token is a 2-tuple where the first element is the
-%% atom `cancel` and the second element is a list of place atoms.
+%% atom `cancel`. The second element can be:
+%% - A list of place atoms (legacy format)
+%% - A scope tuple {activity, TaskId}, {region, RegionId}, or {case, all}
+%%
 %% The function never crashes.
 %%
 %% ```erlang
 %% > wf_cancel:is_cancel_token({cancel, [p1, p2]}).
+%% true
+%% > wf_cancel:is_cancel_token({cancel, {activity, task1}}).
 %% true
 %% > wf_cancel:is_cancel_token({cancel, "not_a_list"}).
 %% false
@@ -161,8 +198,14 @@ Cancellation tokens are typically used in workflow patterns such as:
 -spec is_cancel_token(term()) -> boolean().
 
 is_cancel_token({cancel, Targets}) when is_list(Targets) ->
-    %% Verify all targets are atoms (places)
+    %% Legacy format - verify all targets are atoms (places)
     lists:all(fun(T) -> is_atom(T) end, Targets);
+is_cancel_token({cancel, {activity, TaskId}}) when is_atom(TaskId) ->
+    true;
+is_cancel_token({cancel, {region, RegionId}}) when is_atom(RegionId) ->
+    true;
+is_cancel_token({cancel, {'case', all}}) ->
+    true;
 is_cancel_token(_) ->
     false.
 
@@ -191,6 +234,130 @@ create_cancel_token(Target) when is_atom(Target) ->
 create_cancel_token(Targets) when is_list(Targets) ->
     {cancel, Targets}.
 
+%%--------------------------------------------------------------------
+%% @doc Creates a cancellation token for an activity scope.
+%%
+%% Activity scope cancels a single task's places.
+%%
+%% ```erlang
+%% > wf_cancel:create_activity_cancel(task1).
+%% {cancel, {activity, task1}}
+%% ```
+%% @end
+%%--------------------------------------------------------------------
+-spec create_activity_cancel(TaskId :: atom()) -> cancel_token().
+
+create_activity_cancel(TaskId) when is_atom(TaskId) ->
+    {cancel, {activity, TaskId}}.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a cancellation token for a region scope.
+%%
+%% Region scope cancels all places within a named region.
+%%
+%% ```erlang
+%% > wf_cancel:create_region_cancel(payment_region).
+%% {cancel, {region, payment_region}}
+%% ```
+%% @end
+%%--------------------------------------------------------------------
+-spec create_region_cancel(RegionId :: atom()) -> cancel_token().
+
+create_region_cancel(RegionId) when is_atom(RegionId) ->
+    {cancel, {region, RegionId}}.
+
+%%--------------------------------------------------------------------
+%% @doc Creates a cancellation token for case scope.
+%%
+%% Case scope cancels the entire workflow.
+%%
+%% ```erlang
+%% > wf_cancel:create_case_cancel().
+%% {cancel, {'case', all}}
+%% ```
+%% @end
+%%--------------------------------------------------------------------
+-spec create_case_cancel() -> cancel_token().
+
+create_case_cancel() ->
+    {cancel, {'case', all}}.
+
+%%====================================================================
+%% Scope Resolution Functions
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc Resolves a cancellation scope to a concrete list of places.
+%%
+%% Uses the binding table (from wf_spec) to map scope identifiers to
+%% actual place atoms in the Petri net. Returns empty list for unknown
+%% scopes to maintain totality.
+%%
+%% ```erlang
+%% > BT = #{task1 => #{p1_in => child_p1_in, p1_out => child_p1_out}}.
+%% > wf_cancel:resolve_scope({activity, task1}, BT, Spec).
+%% [child_p1_in, child_p1_out]
+%%
+%% > wf_cancel:resolve_scope({'case', all}, BT, Spec).
+%% [p1, p2, p3, ...]  % all places in workflow
+%% ```
+%% @end
+%%--------------------------------------------------------------------
+-spec resolve_scope(Scope :: cancel_scope(),
+                   BindingTable :: wf_scope:binding_table(),
+                   Spec :: wf_spec:yawl_spec() | undefined) -> [atom()].
+
+resolve_scope({activity, TaskId}, BindingTable, Spec) ->
+    %% Get places for this task from binding table
+    case maps:get(TaskId, BindingTable, undefined) of
+        undefined ->
+            %% No binding - try spec fallback
+            case Spec of
+                undefined -> [];
+                _ ->
+                    try wf_spec:task_places(Spec, TaskId) of
+                        undefined -> [];
+                        Places -> Places
+                    catch
+                        _:_ -> []
+                    end
+            end;
+        Mapping when is_map(Mapping) ->
+            %% Extract all child places from the mapping
+            maps:values(Mapping)
+    end;
+
+resolve_scope({region, RegionId}, BindingTable, Spec) ->
+    %% Get cancellation set from spec
+    case Spec of
+        undefined -> [];
+        _ ->
+            try wf_spec:cancellation_set(Spec, RegionId) of
+                [] -> [];
+                TaskIds ->
+                    %% Resolve each task to its places
+                    lists:flatmap(
+                        fun(TaskId) ->
+                            resolve_scope({activity, TaskId}, BindingTable, Spec)
+                        end,
+                        TaskIds
+                    )
+            catch
+                _:_ -> []
+            end
+    end;
+
+resolve_scope({'case', all}, _BindingTable, Spec) ->
+    %% Return all places in the workflow specification
+    case Spec of
+        undefined -> [];
+        _ ->
+            try wf_spec:all_places(Spec)
+            catch
+                _:_ -> []
+            end
+    end.
+
 %%====================================================================
 %% Token Inspection Functions
 %%====================================================================
@@ -198,13 +365,16 @@ create_cancel_token(Targets) when is_list(Targets) ->
 %%--------------------------------------------------------------------
 %% @doc Extracts the list of target places from a cancel token.
 %%
-%% Returns the list of places that will be affected by the cancellation.
+%% For legacy tokens, returns the place list directly.
+%% For scope tokens, returns empty list (must use resolve_scope/3).
 %% The function is total and returns an empty list for invalid tokens.
 %%
 %% ```erlang
 %% > Token = {cancel, [p1, p2, p3]}.
 %% > wf_cancel:cancel_targets(Token).
 %% [p1, p2, p3]
+%% > wf_cancel:cancel_targets({cancel, {activity, task1}}).
+%% []  % scope token - use resolve_scope/3
 %% > wf_cancel:cancel_targets(not_a_token).
 %% []
 %% ```
@@ -213,7 +383,11 @@ create_cancel_token(Targets) when is_list(Targets) ->
 -spec cancel_targets(Token :: cancel_token() | term()) -> [atom()].
 
 cancel_targets({cancel, Targets}) when is_list(Targets) ->
+    %% Legacy token format
     Targets;
+cancel_targets({cancel, {_, _}}) ->
+    %% Scope token - must be resolved
+    [];
 cancel_targets(_) ->
     [].
 
@@ -430,5 +604,85 @@ complex_place_names_test() ->
     Token = create_cancel_token(['place-1', 'place_2', 'place.3']),
     ?assertEqual(true, is_cancel_token(Token)),
     ?assertEqual(['place-1', 'place_2', 'place.3'], cancel_targets(Token)).
+
+%%--------------------------------------------------------------------
+%% @doc Test scope-based token creation functions.
+%%--------------------------------------------------------------------
+create_activity_cancel_test() ->
+    ?assertEqual({cancel, {activity, task1}}, create_activity_cancel(task1)),
+    ?assertEqual({cancel, {activity, my_task}}, create_activity_cancel(my_task)).
+
+create_region_cancel_test() ->
+    ?assertEqual({cancel, {region, region1}}, create_region_cancel(region1)),
+    ?assertEqual({cancel, {region, payment}}, create_region_cancel(payment)).
+
+create_case_cancel_test() ->
+    ?assertEqual({cancel, {'case', all}}, create_case_cancel()),
+    ?assertEqual({cancel, {'case', all}}, create_case_cancel()).
+
+%%--------------------------------------------------------------------
+%% @doc Test is_cancel_token/1 with scope tokens.
+%%--------------------------------------------------------------------
+is_cancel_token_scope_test() ->
+    %% Activity scope
+    ?assertEqual(true, is_cancel_token({cancel, {activity, task1}})),
+    ?assertEqual(true, is_cancel_token({cancel, {activity, my_task}})),
+
+    %% Region scope
+    ?assertEqual(true, is_cancel_token({cancel, {region, region1}})),
+    ?assertEqual(true, is_cancel_token({cancel, {region, payment_region}})),
+
+    %% Case scope
+    ?assertEqual(true, is_cancel_token({cancel, {'case', all}})),
+
+    %% Invalid scope tokens
+    ?assertEqual(false, is_cancel_token({cancel, {activity, "not_atom"}})),
+    ?assertEqual(false, is_cancel_token({cancel, {region, "not_atom"}})),
+    ?assertEqual(false, is_cancel_token({cancel, {'case', "not_all"}})),
+    ?assertEqual(false, is_cancel_token({cancel, {invalid, type}})).
+
+%%--------------------------------------------------------------------
+%% @doc Test cancel_targets/1 with scope tokens.
+%%--------------------------------------------------------------------
+cancel_targets_scope_test() ->
+    %% Legacy tokens return the list
+    ?assertEqual([p1, p2], cancel_targets({cancel, [p1, p2]})),
+
+    %% Scope tokens return empty list
+    ?assertEqual([], cancel_targets({cancel, {activity, task1}})),
+    ?assertEqual([], cancel_targets({cancel, {region, region1}})),
+    ?assertEqual([], cancel_targets({cancel, {'case', all}})),
+
+    %% Invalid tokens return empty list
+    ?assertEqual([], cancel_targets(not_a_token)),
+    ?assertEqual([], cancel_targets({other, [p1]})).
+
+%%--------------------------------------------------------------------
+%% @doc Test resolve_scope/3 for activity scope.
+%%--------------------------------------------------------------------
+resolve_scope_activity_test() ->
+    %% Test with binding table (primary use case)
+    BT = #{task1 => #{parent_in => child_in, parent_out => child_out}},
+
+    %% Need to create a minimal yawl_spec record for the spec functions to work
+    %% For unit testing, just test that the binding table path works
+    ?assertEqual([child_in, child_out], resolve_scope({activity, task1}, BT, undefined)),
+
+    %% Unknown task with no binding table returns empty list
+    ?assertEqual([], resolve_scope({activity, unknown_task}, #{}, undefined)).
+
+%%--------------------------------------------------------------------
+%% @doc Test resolve_scope/3 for region scope.
+%%--------------------------------------------------------------------
+resolve_scope_region_test() ->
+    %% Test with undefined spec - will return empty list from cancellation_set
+    ?assertEqual([], resolve_scope({region, unknown_region}, #{}, undefined)).
+
+%%--------------------------------------------------------------------
+%% @doc Test resolve_scope/3 for case scope.
+%%--------------------------------------------------------------------
+resolve_scope_case_test() ->
+    %% Test with undefined spec - returns empty list from all_places
+    ?assertEqual([], resolve_scope({'case', all}, #{}, undefined)).
 
 -endif.

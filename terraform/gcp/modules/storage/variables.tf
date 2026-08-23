@@ -165,3 +165,9 @@ variable "snapshot_schedule" {
     snapshot_location = "us-central1"
   }
 }
+
+variable "cmek_key_name" {
+  description = "KMS key resource ID for CMEK encryption (e.g., projects/my-project/locations/global/keyRings/my-keyRing/cryptoKeys/my-key). Leave null for Google-managed encryption."
+  type        = string
+  default     = null
+}

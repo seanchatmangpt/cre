@@ -101,8 +101,12 @@ spec:
             - sh
             - -c
             - |
+              # Create directories with correct ownership from the start
               mkdir -p /opt/cre/data /opt/cre/log /opt/cre/checkpoints
+              # Set ownership to UID 1000 (cre user)
               chown -R 1000:1000 /opt/cre
+              # Set permissions to allow cre user to write
+              chmod -R 755 /opt/cre
           volumeMounts:
             - name: data
               mountPath: /opt/cre/data
@@ -111,8 +115,15 @@ spec:
             - name: checkpoints
               mountPath: /opt/cre/checkpoints
           securityContext:
-            runAsNonRoot: true
+            runAsNonRoot: false  # Still need root for chown
             runAsUser: 0
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - CHOWN  # Only add CHOWN capability
 
       containers:
         # Main CRE container
@@ -245,10 +256,12 @@ spec:
           # Security context
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false  # Set to true with proper volume mounts
+            readOnlyRootFilesystem: true  # PSS restricted compliance - writable dirs mounted as volumes
             capabilities:
               drop:
                 - ALL
+            seccompProfile:
+              type: RuntimeDefault
 
       # Volumes
       volumes:
@@ -346,8 +359,12 @@ spec:
             - sh
             - -c
             - |
+              # Create directories with correct ownership from the start
               mkdir -p /opt/cre/data /opt/cre/log /opt/cre/checkpoints
+              # Set ownership to UID 1000 (cre user)
               chown -R 1000:1000 /opt/cre
+              # Set permissions to allow cre user to write
+              chmod -R 755 /opt/cre
           volumeMounts:
             - name: data
               mountPath: /opt/cre/data
@@ -356,8 +373,15 @@ spec:
             - name: checkpoints
               mountPath: /opt/cre/checkpoints
           securityContext:
-            runAsNonRoot: true
+            runAsNonRoot: false  # Still need root for chown
             runAsUser: 0
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - CHOWN  # Only add CHOWN capability
 
       containers:
         - name: cre
@@ -447,10 +471,12 @@ spec:
 
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
+            readOnlyRootFilesystem: true  # PSS restricted compliance - writable dirs mounted as volumes
             capabilities:
               drop:
                 - ALL
+            seccompProfile:
+              type: RuntimeDefault
 
       volumes:
         - name: data

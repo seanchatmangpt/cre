@@ -1,0 +1,37 @@
+# GCP Cloud Build - Invokes platform-agnostic CICD script
+#
+# Usage: gcloud builds submit . --config=cicd/cloud/cloudbuild-cicd.yaml
+#
+# Substitutions:
+#   _REGISTRY: us-central1-docker.pkg.dev/PROJECT_ID/cre
+#   _PUSH: "true" (optional)
+#
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    id: cicd
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        chmod +x scripts/cicd-pipeline.sh
+        export CICD_REGISTRY="${_REGISTRY}"
+        export CICD_PUSH="${_PUSH:-false}"
+        export CICD_OUTPUT_DIR="/workspace/cicd-artifacts"
+        ./scripts/cicd-pipeline.sh
+
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args:
+      - '-m'
+      - 'cp'
+      - '-r'
+      - '/workspace/cicd-artifacts/*'
+      - 'gs://${PROJECT_ID}_cloudbuild/cicd/${BUILD_ID}/'
+    waitFor: ['cicd']
+
+substitutions:
+  _REGISTRY: 'us-central1-docker.pkg.dev/${PROJECT_ID}/cre'
+  _PUSH: 'false'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

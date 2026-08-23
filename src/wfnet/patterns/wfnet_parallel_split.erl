@@ -562,7 +562,7 @@ execute_error_test() ->
 new_5_branches_test() ->
     Spec = new([a, b, c, d, e]),
     ?assertEqual(5, maps:get(branch_count, maps:get(optional, Spec))),
-    ?assertEqual(7, length(maps:get(places, Spec)))).
+    ?assertEqual(7, length(maps:get(places, Spec))).
 
 %% options test
 new_with_timeout_test() ->

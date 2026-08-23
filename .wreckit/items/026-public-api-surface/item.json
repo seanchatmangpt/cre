@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "026-public-api-surface",
+  "title": "Public API surface",
+  "section": "backend",
+  "state": "researched",
+  "overview": "Users need clean, well-documented API for creating and managing workflow cases without exposing internal complexity.\n\n**Motivation:** Provides clear abstraction boundary, enables ergonomic usage, supports integration into applications, follows Erlang/OTP conventions.\n\n**Success criteria:**\n- All documented functions implemented\n- Options cover key configuration\n- API tested through examples\n\n**Technical constraints:**\n- Minimal surface - only essential functions\n- Options: scheduler_policy, step_quanta, trace_level, effect_handler\n\n**Signals:** priority: medium, urgency: Required for usability",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Plan phase detected unauthorized file modifications:\n\n  Modified M src/wfnet/patterns/wfnet_parallel_split.erl\n\nThe plan phase must be design-only. Only plan.md and prd.json may be created.\nAny code changes should be made during the implementation phase.",
+  "created_at": "2026-02-11T01:57:00.432Z",
+  "updated_at": "2026-02-11T05:23:22.962Z",
+  "problem_statement": "Users need clean, well-documented API for creating and managing workflow cases without exposing internal complexity.",
+  "motivation": "Provides clear abstraction boundary, enables ergonomic usage, supports integration into applications, follows Erlang/OTP conventions.",
+  "success_criteria": [
+    "All documented functions implemented",
+    "Options cover key configuration",
+    "API tested through examples"
+  ],
+  "technical_constraints": [
+    "Minimal surface - only essential functions",
+    "Options: scheduler_policy, step_quanta, trace_level, effect_handler"
+  ],
+  "priority_hint": "medium",
+  "urgency_hint": "Required for usability"
+}

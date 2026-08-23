@@ -18,6 +18,8 @@
 %%   <li>`fire/3' - Returns tokens produced when a transition fires</li>
 %% </ul>
 %%
+-include_lib("kernel/include/logger.hrl").
+%%
 %% <h3>Interface Callback Functions</h3>
 %%
 %% Seven callbacks determine how the net instance appears as an Erlang
@@ -673,10 +675,19 @@ handle_call({inject, ProduceMap}, _From, NetState) ->
     end;
 
 handle_call(step, _From, NetState) ->
+    ?LOG_DEBUG("Reduction step starting", #{}),
     case fire_transition(NetState) of
         abort ->
+            ?LOG_DEBUG("Reduction step aborted (no enabled transition)", #{}),
             {reply, abort, NetState};
         {ok, Receipt, NetState1} ->
+            %% Log successful step with receipt information
+            #{before_hash := Before, after_hash := After, move := Move} = Receipt,
+            ?LOG_DEBUG("Reduction step completed", #{
+                before_hash => base64:encode(Before),
+                after_hash => base64:encode(After),
+                transition => maps:get(trsn, Move)
+            }),
             {reply, {ok, Receipt}, NetState1}
     end;
 

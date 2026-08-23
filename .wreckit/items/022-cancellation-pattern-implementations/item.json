@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "022-cancellation-pattern-implementations",
+  "title": "Cancellation pattern implementations",
+  "section": "backend",
+  "state": "idea",
+  "overview": "Workflows require granular cancellation capabilities at different scopes. Need patterns that compose with other workflow constructs and handle cleanup reliably.\n\n**Motivation:** Enables graceful error handling, supports timeout enforcement, provides resource cleanup through compensation, essential for long-running workflows.\n\n**Success criteria:**\n- Cancel Activity terminates single task\n- Cancel Case terminates entire workflow\n- Cancel Region terminates scoped subtree\n- Unrelated scopes remain uncorrupted\n- Compensation hooks execute\n\n**Signals:** priority: high, urgency: Critical reliability feature",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Research phase detected unauthorized file modifications:\n\n  Modified .wreckit/items/001-centralize-genyawl-as-single-workflow-execution-au/item.json\n  Modified .wreckit/items/002-package-cre-for-google-cloud-marketplace-distribut/item.json\n  Modified .wreckit/items/003-implement-gcp-native-observability-and-logging/item.json\n  Modified .wreckit/items/004-implement-marketplace-billing-metering-and-licensi/item.json\n  Modified .wreckit/items/005-harden-cre-security-and-compliance-for-enterprise-/item.json\n  Modified .wreckit/items/006-create-cre-documentation-for-google-cloud-marketpl/item.json\n  Modified .wreckit/items/007-implement-marketplace-testing-validation-and-sre-r/item.json\n  Modified .wreckit/items/008-define-upgrade-and-lifecycle-management-strategy/item.json\n  Modified k8s/charts/cre/templates/statefulset.yaml\n  Modified k8s/charts/cre/values.yaml\n  Modified k8s/gcp/deployment.yaml\n  Modified k8s/gcp/serviceaccount.yaml\n  Modified rebar.config\n  Modified src/api/cre_health.erl\n  Modified src/app/cre_sup.erl\n  Modified src/core/yawl_validate.erl\n  Added src/license/license_enforcer.erl\n  Added src/license/license_sup.erl\n  Modified src/telemetry/cre_cost_reporter.erl\n  Added src/validate/README.md\n  Added src/validate/yawl_explorer.erl\n  Added src/validate/yawl_model_checker.erl\n  Added src/validate/yawl_model_checker_tests.erl\n  Added src/validate/yawl_pnet_compiler.erl\n  Modified src/wf/wf_audit_log.erl\n  Modified terraform/gcp/modules/storage/main.tf\n  Modified terraform/gcp/modules/storage/variables.tf\n\nThe research phase must be read-only. Only research.md may be created.\nAny code changes should be made during the implementation phase.",
+  "created_at": "2026-02-11T01:57:00.430Z",
+  "updated_at": "2026-02-11T05:11:06.190Z",
+  "problem_statement": "Workflows require granular cancellation capabilities at different scopes. Need patterns that compose with other workflow constructs and handle cleanup reliably.",
+  "motivation": "Enables graceful error handling, supports timeout enforcement, provides resource cleanup through compensation, essential for long-running workflows.",
+  "success_criteria": [
+    "Cancel Activity terminates single task",
+    "Cancel Case terminates entire workflow",
+    "Cancel Region terminates scoped subtree",
+    "Unrelated scopes remain uncorrupted",
+    "Compensation hooks execute"
+  ],
+  "priority_hint": "high",
+  "urgency_hint": "Critical reliability feature"
+}

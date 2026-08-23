@@ -53,6 +53,7 @@
 %%   <li><b>EPMD:</b> Erlang Port Mapper Daemon connectivity</li>
 %%   <li><b>CRE Master:</b> Master process status</li>
 %%   <li><b>Worker Pool:</b> Active worker count</li>
+%%   <li><b>License:</b> EULA acceptance and grace period status</li>
 %%   <li><b>Spanner:</b> Cloud SQL/Spanner connectivity (if configured)</li>
 %%   <li><b>Redis:</b> Memorystore connectivity (if configured)</li>
 %% </ul>
@@ -75,6 +76,7 @@
 -export([liveness/0]).
 -export([readiness/0]).
 -export([startup/0]).
+-export([usage/0]).
 
 %%====================================================================
 %% Types
@@ -119,6 +121,8 @@ init(Req, State) ->
             handle_readiness(Req, State);
         {<<"GET">>, <<"/startup">>} ->
             handle_startup(Req, State);
+        {<<"GET">>, <<"/usage">>} ->
+            handle_usage(Req, State);
         {<<"GET">>, _} ->
             ReplyJson = jsone:encode(#{
                 <<"status">> => <<"error">>,
@@ -206,6 +210,20 @@ handle_startup(Req, State) ->
         ReplyJson, Req),
     {ok, Req2, State}.
 
+%% @doc Handle GET /usage - Usage metrics endpoint
+%%
+%% Returns current usage and cost metrics for CRE deployment.
+%%
+%% @end
+-spec handle_usage(cowboy_req:req(), term()) -> {ok, cowboy_req:req(), term()}.
+handle_usage(Req, State) ->
+    Response = usage(),
+    ReplyJson = jsone:encode(Response),
+    Req2 = cowboy_req:reply(200,
+        #{<<"content-type">> => <<"application/json">>},
+        ReplyJson, Req),
+    {ok, Req2, State}.
+
 %%====================================================================
 %% Public API Functions
 %%====================================================================
@@ -254,6 +272,7 @@ readiness() ->
 %% @doc Perform startup check
 %%
 %% Startup indicates the service has completed initialization.
+%% Checks Mnesia, EPMD, CRE master, and license status.
 %%
 %% @end
 -spec startup() -> health_response().
@@ -262,13 +281,29 @@ startup() ->
         check_beam(),
         check_epmd(),
         check_mnesia(),
-        check_cre_master()
+        check_cre_master(),
+        check_license()
     ],
     Status = aggregate_status(Subsystems),
     #{
         status => Status,
         timestamp => erlang:system_time(millisecond),
         subsystems => Subsystems
+    }.
+
+%% @doc Get usage and cost metrics
+%%
+%% Returns current resource usage and cost estimates for CRE deployment.
+%%
+%% @end
+-spec usage() -> map().
+usage() ->
+    {ok, Usage} = cre_cost_reporter:get_resource_usage(),
+    {ok, Cost} = cre_cost_reporter:get_cost_summary(),
+    #{
+        usage => Usage,
+        cost => Cost,
+        timestamp => erlang:system_time(millisecond)
     }.
 
 %% @doc Handle health check request (callback interface)
@@ -419,6 +454,84 @@ check_cre_master() ->
             }
     end.
 
+%% @doc Check license status
+%%
+%% Verifies EULA acceptance and grace period for Marketplace BYOL compliance.
+%% Returns unhealthy if license validation fails (EULA not accepted).
+%% Returns healthy if license is valid or in grace period.
+%%
+%% @end
+-spec check_license() -> subsystem_status().
+check_license() ->
+    try
+        case license_enforcer:validate_startup() of
+            ok ->
+                %% Get detailed status
+                {ok, LicenseStatus} = license_enforcer:get_license_status(),
+                Status = maps:get(status, LicenseStatus),
+                EulaAccepted = maps:get(eula_accepted, LicenseStatus),
+                GracePeriodRemaining = maps:get(grace_period_remaining, LicenseStatus),
+
+                case {Status, EulaAccepted} of
+                    {valid, true} ->
+                        #{
+                            name => <<"license">>,
+                            status => healthy,
+                            message => <<"License valid">>,
+                            details => #{
+                                eula_accepted => true,
+                                eula_version => maps_get(eula_version, LicenseStatus, <<"1.0">>)
+                            }
+                        };
+                    {grace_period, _} ->
+                        #{
+                            name => <<"license">>,
+                            status => healthy,
+                            message => list_to_binary(
+                                io_lib:format("License in grace period, ~p days remaining",
+                                    [GracePeriodRemaining])
+                            ),
+                            details => #{
+                                grace_period_days_remaining => GracePeriodRemaining,
+                                eula_accepted => false,
+                                action => <<"Accept EULA to avoid service interruption">>
+                            }
+                        };
+                    {invalid, false} ->
+                        #{
+                            name => <<"license">>,
+                            status => unhealthy,
+                            message => <<"EULA not accepted - service cannot start">>,
+                            details => #{
+                                eula_accepted => false,
+                                action => <<"Set license.acceptEula=true in Marketplace UI">>
+                            }
+                        }
+                end;
+            {error, Reason} ->
+                #{
+                    name => <<"license">>,
+                    status => unhealthy,
+                    message => <<"License validation failed">>,
+                    details => #{
+                        error => list_to_binary(io_lib:format("~p", [Reason])),
+                        action => <<"Verify license configuration">>
+                    }
+                }
+        end
+    catch
+        _:Error ->
+            #{
+                name => <<"license">>,
+                status => unhealthy,
+                message => list_to_binary(io_lib:format("License check error: ~p", [Error])),
+                details => #{
+                    error => term_to_binary(Error),
+                    action => <<"Check license_enforcer is running">>
+                }
+            }
+    end.
+
 %% @private Get any registered CRE master process
 -spec get_registered_cre_master() -> atom() | undefined.
 get_registered_cre_master() ->
@@ -527,6 +640,7 @@ aggregate_status(Subsystems) ->
 %% @private Check if a subsystem is critical for health
 -spec is_critical(binary()) -> boolean().
 is_critical(<<"beam">>) -> true;
+is_critical(<<"license">>) -> true;   %% License is critical for Marketplace
 is_critical(<<"mnesia">>) -> false;  %% Can be disabled
 is_critical(<<"epmd">>) -> false;    %% Can be disabled
 is_critical(<<"cre_master">>) -> false;  %% Can be disabled
@@ -534,3 +648,12 @@ is_critical(<<"worker_pool">>) -> false;  %% Can be disabled
 is_critical(<<"spanner">>) -> false;  %% External dependency
 is_critical(<<"redis">>) -> false;   %% External dependency
 is_critical(_) -> false.
+
+%% @private Helper for maps:get with default
+-spec maps_get(term(), map(), term()) -> term().
+maps_get(Key, Map, Default) ->
+    try maps:get(Key, Map) of
+        Value -> Value
+    catch
+        error:{badkey, _} -> Default
+    end.

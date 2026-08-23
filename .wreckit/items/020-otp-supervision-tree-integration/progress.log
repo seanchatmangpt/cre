@@ -1,0 +1,101 @@
+# Implementation Progress
+
+## 2025-01-21 - All Stories Completed
+
+### Phase 1: Core Supervision Infrastructure (US-001, US-002)
+✅ Created `wf_case_sup.erl` module
+- Implements `simple_one_for_one` supervisor strategy
+- Exports complete API: start_link/0, start_case/3, stop_case/1-2, list_cases/0, find_case/1, get_case_status/1, case_count/0
+- Child spec configured with temporary restart for completed cases
+- Integrates with gproc for case registry lookup
+
+✅ Created `wf_case_runner.erl` module
+- Implements gen_server behavior for case lifecycle management
+- Supports gen_yawl workflow type (wf_engine and custom types stubbed for future)
+- Registers cases with gproc using {wf_case, CaseId} key
+- Handles workflow process EXIT messages for status updates
+- Generates unique case IDs using crypto:hash
+
+### Phase 2: Integration with cre_sup (US-003)
+✅ Integrated wf_case_sup into cre_sup supervision tree
+- Added child spec after yawl_workflow_supervisor
+- Configured with permanent restart and infinity shutdown
+- Updated cre_sup doctest to expect 9 children (7 workers, 3 supervisors)
+- All existing doctests pass
+
+### Phase 3: Unit Testing (US-004, US-005)
+✅ Created wf_case_sup_tests.erl
+- Tests supervisor init/1 flags and child spec structure
+- Tests API function exports
+- All 3 tests pass
+
+✅ Created wf_case_runner_tests.erl
+- Tests case ID generation format and uniqueness
+- All 2 tests pass
+
+### Phase 4: Integration Testing (US-006)
+✅ Created wf_case_integration_tests.erl
+- Tests wf_case_sup starts under cre_sup
+- Tests list_cases/0 and case_count/0 operations
+- Tests supervisor configuration
+- Requires CRE application and gproc to run
+
+### Phase 5: Documentation (US-007)
+✅ Created comprehensive documentation: docs/wf_case_supervision.md
+- Overview and architecture diagram
+- Basic usage examples for all API functions
+- API reference with parameters and return values
+- Comparison with existing supervisors
+- Migration notes and examples
+- Error handling and monitoring guidance
+- Best practices and future enhancements
+
+## Files Created
+- src/wf/wf_case_sup.erl (126 lines)
+- src/wf/wf_case_runner.erl (213 lines)
+- test/wf_case_sup_tests.erl (41 lines)
+- test/wf_case_runner_tests.erl (35 lines)
+- test/wf_case_integration_tests.erl (67 lines)
+- docs/wf_case_supervision.md (300+ lines)
+
+## Files Modified
+- src/app/cre_sup.erl
+  - Added CaseSupSpec child spec (lines 267-274)
+  - Updated children list to include CaseSupSpec (line 304)
+  - Updated doctest to expect 9 children (line 354)
+  - Updated worker/supervisor counts (lines 403-404)
+  - Added wf_case_sup to child IDs test (line 378)
+
+## Verification Results
+✅ All modules compile without errors
+✅ All unit tests pass (5 tests)
+✅ cre_sup doctest passes
+✅ No breaking changes to existing code
+
+## Key Implementation Decisions
+
+1. **simple_one_for_one Strategy**: Chosen for dynamic case creation, following yawl_workflow_supervisor pattern
+2. **Case Runner Wrapper**: Isolates workflow execution from supervision concerns, allows mixed engine types
+3. **gproc Integration**: Used for case lookup, following yawl_supervisor pattern
+4. **Temporary Restart**: Completed cases don't restart (prevents zombie processes)
+5. **No wf_engine Refactoring**: Cases remain as data within wf_engine to minimize risk
+6. **Additive Only**: Existing supervisors unchanged, zero breaking changes
+
+## Notes
+
+- wf_engine support is stubbed and returns {error, wf_engine_not_supported}
+- Custom workflow type requires start_module and start_function in options
+- Case IDs are MD5 hashes of PID + unique integer (sufficient for non-distributed use)
+- Effect worker supervision deferred to future work
+- Hot code upgrade not implemented (standard OTP upgrade assumed)
+
+## Next Steps (Future Work)
+
+1. Add wf_engine process-level supervision if needed
+2. Implement effect worker supervision
+3. Add per-case metrics and telemetry
+4. Support distributed case execution across nodes
+5. Implement case data persistence integration
+6. Add hot code upgrade support (appup/relup)
+
+[2026-02-11T05:04:55.478Z] Completed iteration 1 for story US-001

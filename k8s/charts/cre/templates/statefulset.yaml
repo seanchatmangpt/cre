@@ -47,6 +47,40 @@ spec:
           volumeMounts:
             - name: mnesia-data
               mountPath: /opt/cre/data
+            - name: license-data
+              mountPath: /opt/cre/data/license
+            - name: usage-data
+              mountPath: /opt/cre/data/usage
+        - name: accept-license
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              if [ "${CRE_LICENSE_ACCEPT_EULA}" = "true" ]; then
+                mkdir -p /opt/cre/data/license
+                cat > /opt/cre/data/license/eula_acceptance.json <<EOF
+              {"accepted":true,"timestamp":$(date +%s),"version":"1.0","acceptor":"marketplace-deployment"}
+              EOF
+                echo "EULA accepted via Marketplace deployment"
+                cat /opt/cre/data/license/eula_acceptance.json
+              else
+                echo "EULA not accepted, grace period will apply"
+                mkdir -p /opt/cre/data/license
+                cat > /opt/cre/data/license/eula_acceptance.json <<EOF
+              {"accepted":false,"timestamp":0,"version":"1.0","acceptor":""}
+              EOF
+              fi
+          env:
+            - name: CRE_LICENSE_ACCEPT_EULA
+              value: {{ .Values.license.acceptEula | quote }}
+          volumeMounts:
+            - name: license-data
+              mountPath: /opt/cre/data/license
+      volumes:
+        - name: license-data
+          emptyDir: {}
+        - name: usage-data
+          emptyDir: {}
       containers:
         - name: cre
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -96,6 +130,12 @@ spec:
               value: {{ .Values.erlang.maxPorts | quote }}
             - name: ERL_MAX_ETS_TABLES
               value: {{ .Values.erlang.maxEtsTables | quote }}
+            - name: CRE_LICENSE_ACCEPT_EULA
+              value: {{ .Values.license.acceptEula | quote }}
+            - name: CRE_LICENSE_GRACE_PERIOD_DAYS
+              value: {{ .Values.license.gracePeriodDays | quote }}
+            - name: CRE_LICENSE_FILE
+              value: {{ .Values.license.licenseFile | quote }}
           envFrom:
             - configMapRef:
                 name: {{ include "cre.fullname" . }}-config
@@ -106,6 +146,10 @@ spec:
               mountPath: /opt/cre/data
             - name: checkpoints
               mountPath: {{ .Values.config.checkpointDir }}
+            - name: license-data
+              mountPath: /opt/cre/data/license
+            - name: usage-data
+              mountPath: /opt/cre/data/usage
           {{- with .Values.probes.liveness }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
