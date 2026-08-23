@@ -1,0 +1,296 @@
+@prefix a2a: <https://a2a-construct.dev/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+#==============================================================================
+# A2A-CONSTRUCT Ontology
+# Deterministic Agent-to-Agent Protocol Execution Framework
+#
+# Version: 1.0.0
+# Date: 2026-02-10
+# Description: Closed ontology for typed, deterministic protocol execution
+#              without AI. Implements Σ (types), H (refusals), Q (invariants),
+#              Λ (ordering), Δ (actuation).
+#==============================================================================
+
+#------------------------------------------------------------------------------
+# Core Classes (Σ - Type Discipline)
+#------------------------------------------------------------------------------
+
+a2a:Task a owl:Class ;
+    rdfs:label "Task" ;
+    rdfs:comment "Work order with typed inputs/outputs. A task is a protocol execution request." ;
+    a2a:hasProperty a2a:taskId ;
+    a2a:hasProperty a2a:protocol ;
+    a2a:hasProperty a2a:inputTypes ;
+    a2a:hasProperty a2a:outputTypes ;
+    a2a:hasProperty a2a:timestamp ;
+    a2a:hasProperty a2a:metadata .
+
+a2a:Artifact a owl:Class ;
+    rdfs:label "Artifact" ;
+    rdfs:comment "Typed data packet with content-addressed hash." ;
+    a2a:hasProperty a2a:artifactId ;
+    a2a:hasProperty a2a:type ;
+    a2a:hasProperty a2a:data ;
+    a2a:hasProperty a2a:hash ;
+    a2a:hasProperty a2a:timestamp .
+
+a2a:Event a owl:Class ;
+    rdfs:label "Event" ;
+    rdfs:comment "Telemetry event with causality tracking." ;
+    a2a:hasProperty a2a:eventId ;
+    a2a:hasProperty a2a:eventType ;
+    a2a:hasProperty a2a:stationId ;
+    a2a:hasProperty a2a:timestamp ;
+    a2a:hasProperty a2a:cause ;
+    a2a:hasProperty a2a:data .
+
+a2a:Receipt a owl:Class ;
+    rdfs:label "Receipt" ;
+    rdfs:comment "Proof object binding input state to output behavior. Cryptographic receipt chain." ;
+    a2a:hasProperty a2a:receiptId ;
+    a2a:hasProperty a2a:taskId ;
+    a2a:hasProperty a2a:stationId ;
+    a2a:hasProperty a2a:inputs ;
+    a2a:hasProperty a2a:outputs ;
+    a2a:hasProperty a2a:signature ;
+    a2a:hasProperty a2a:timestamp ;
+    a2a:hasProperty a2a:deterministic .
+
+a2a:Station a owl:Class ;
+    rdfs:label "Station" ;
+    rdfs:comment "Typed protocol executor (agent without AI). Bounded state machine." ;
+    a2a:hasProperty a2a:stationId ;
+    a2a:hasProperty a2a:protocols ;
+    a2a:hasProperty a2a:state ;
+    a2a:hasProperty a2a:receipts ;
+    a2a:hasProperty a2a:invariants .
+
+a2a:Refusal a owl:Class ;
+    rdfs:label "Refusal" ;
+    rdfs:comment "Typed terminal refusal (H - refusal determinism). No AI arbitration." ;
+    a2a:hasProperty a2a:refusalType ;
+    a2a:hasProperty a2a:reason ;
+    a2a:hasProperty a2a:taskId ;
+    a2a:hasProperty a2a:stationId ;
+    a2a:hasProperty a2a:timestamp ;
+    a2a:hasProperty a2a:terminal .
+
+#------------------------------------------------------------------------------
+# Refusal Types (H - Refusal Guards)
+#------------------------------------------------------------------------------
+
+a2a:TypeMismatch a owl:Class ;
+    rdfs:subClassOf a2a:Refusal ;
+    rdfs:label "Type Mismatch" ;
+    rdfs:comment "Input/output types do not match protocol signature." .
+
+a2a:PreconditionFailed a owl:Class ;
+    rdfs:subClassOf a2a:Refusal ;
+    rdfs:label "Precondition Failed" ;
+    rdfs:comment "Guard predicate evaluated to false." .
+
+a2a:InvariantViolated a owl:Class ;
+    rdfs:subClassOf a2a:Refusal ;
+    rdfs:label "Invariant Violated" ;
+    rdfs:comment "Q constraint broken during execution." .
+
+a2a:Timeout a owl:Class ;
+    rdfs:subClassOf a2a:Refusal ;
+    rdfs:label "Timeout" ;
+    rdfs:comment "Bounded time limit exceeded (Δ violation)." .
+
+a2a:CapacityExceeded a owl:Class ;
+    rdfs:subClassOf a2a:Refusal ;
+    rdfs:label "Capacity Exceeded" ;
+    rdfs:comment "Resource limit reached." .
+
+a2a:ProtocolUnknown a owl:Class ;
+    rdfs:subClassOf a2a:Refusal ;
+    rdfs:label "Protocol Unknown" ;
+    rdfs:comment "Σ violation - protocol not in closed ontology." .
+
+#------------------------------------------------------------------------------
+# Event Types (Telemetry)
+#------------------------------------------------------------------------------
+
+a2a:TaskReceived a owl:Class ;
+    rdfs:subClassOf a2a:Event ;
+    rdfs:label "Task Received" ;
+    rdfs:comment "Station received task from orchestrator." .
+
+a2a:TaskStarted a owl:Class ;
+    rdfs:subClassOf a2a:Event ;
+    rdfs:label "Task Started" ;
+    rdfs:comment "Station began task execution." .
+
+a2a:TaskCompleted a owl:Class ;
+    rdfs:subClassOf a2a:Event ;
+    rdfs:label "Task Completed" ;
+    rdfs:comment "Station completed task successfully." .
+
+a2a:TaskRefused a owl:Class ;
+    rdfs:subClassOf a2a:Event ;
+    rdfs:label "Task Refused" ;
+    rdfs:comment "Station refused task with typed refusal." .
+
+a2a:ArtifactProduced a owl:Class ;
+    rdfs:subClassOf a2a:Event ;
+    rdfs:label "Artifact Produced" ;
+    rdfs:comment "Station produced output artifact." .
+
+#------------------------------------------------------------------------------
+# Station States (Λ - Deterministic Ordering)
+#------------------------------------------------------------------------------
+
+a2a:Idle a owl:Class ;
+    rdfs:label "Idle" ;
+    rdfs:comment "Station ready to accept tasks." .
+
+a2a:Processing a owl:Class ;
+    rdfs:label "Processing" ;
+    rdfs:comment "Station executing task." .
+
+a2a:Refused a owl:Class ;
+    rdfs:label "Refused" ;
+    rdfs:comment "Station refused task." .
+
+a2a:Completed a owl:Class ;
+    rdfs:label "Completed" ;
+    rdfs:comment "Station completed task." .
+
+#------------------------------------------------------------------------------
+# Protocol Definitions
+#------------------------------------------------------------------------------
+
+a2a:EchoProtocol a owl:Class ;
+    rdfs:subClassOf a2a:Protocol ;
+    rdfs:label "Echo Protocol" ;
+    rdfs:comment "Simple echo protocol - returns input as output." ;
+    a2a:protocolId "echo" ;
+    a2a:inputTypes "string" ;
+    a2a:outputTypes "string" .
+
+a2a:TransformProtocol a owl:Class ;
+    rdfs:subClassOf a2a:Protocol ;
+    rdfs:label "Transform Protocol" ;
+    rdfs:comment "Data transformation protocol." ;
+    a2a:protocolId "transform" ;
+    a2a:inputTypes "json" ;
+    a2a:outputTypes "xml" .
+
+a2a:AggregateProtocol a owl:Class ;
+    rdfs:subClassOf a2a:Protocol ;
+    rdfs:label "Aggregate Protocol" ;
+    rdfs:comment "Data aggregation protocol." ;
+    a2a:protocolId "aggregate" ;
+    a2a:inputTypes "list" ;
+    a2a:outputTypes "summary" .
+
+a2a:ValidateProtocol a owl:Class ;
+    rdfs:subClassOf a2a:Protocol ;
+    rdfs:label "Validate Protocol" ;
+    rdfs:comment "Validation protocol." ;
+    a2a:protocolId "validate" ;
+    a2a:inputTypes "data" ;
+    a2a:outputTypes "boolean" .
+
+a2a:RouteProtocol a owl:Class ;
+    rdfs:subClassOf a2a:Protocol ;
+    rdfs:label "Route Protocol" ;
+    rdfs:comment "Routing protocol." ;
+    a2a:protocolId "route" ;
+    a2a:inputTypes "message" ;
+    a2a:outputTypes "destination" .
+
+#------------------------------------------------------------------------------
+# Properties
+#------------------------------------------------------------------------------
+
+a2a:taskId a owl:DatatypeProperty ;
+    rdfs:domain a2a:Task ;
+    rdfs:range xsd:string .
+
+a2a:protocol a owl:ObjectProperty ;
+    rdfs:domain a2a:Task ;
+    rdfs:range a2a:Protocol .
+
+a2a:inputTypes a owl:DatatypeProperty ;
+    rdfs:domain a2a:Task ;
+    rdfs:range xsd:string .
+
+a2a:outputTypes a owl:DatatypeProperty ;
+    rdfs:domain a2a:Task ;
+    rdfs:range xsd:string .
+
+a2a:timestamp a owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+a2a:hash a owl:DatatypeProperty ;
+    rdfs:domain a2a:Artifact ;
+    rdfs:range xsd:string .
+
+a2a:signature a owl:DatatypeProperty ;
+    rdfs:domain a2a:Receipt ;
+    rdfs:range xsd:string .
+
+a2a:deterministic a owl:DatatypeProperty ;
+    rdfs:domain a2a:Receipt ;
+    rdfs:range xsd:boolean .
+
+#------------------------------------------------------------------------------
+# Invariants (Q)
+#------------------------------------------------------------------------------
+
+a2a:StationHasValidId a owl:Class ;
+    rdfs:label "Station Has Valid ID" ;
+    rdfs:comment "Invariant: Station ID must be non-empty binary." ;
+    a2a:invariantType "station_has_valid_id" .
+
+a2a:StationProtocolsNonEmpty a owl:Class ;
+    rdfs:label "Station Protocols Non-Empty" ;
+    rdfs:comment "Invariant: Station must support at least one protocol." ;
+    a2a:invariantType "station_protocols_non_empty" .
+
+a2a:TaskHasInputTypes a owl:Class ;
+    rdfs:label "Task Has Input Types" ;
+    rdfs:comment "Invariant: Task must specify input types." ;
+    a2a:invariantType "task_has_input_types" .
+
+a2a:TaskHasOutputTypes a owl:Class ;
+    rdfs:label "Task Has Output Types" ;
+    rdfs:comment "Invariant: Task must specify output types." ;
+    a2a:invariantType "task_has_output_types" .
+
+a2a:ReceiptHasValidSignature a owl:Class ;
+    rdfs:label "Receipt Has Valid Signature" ;
+    rdfs:comment "Invariant: Receipt signature must be valid SHA256 hash." ;
+    a2a:invariantType "receipt_has_valid_signature" .
+
+#------------------------------------------------------------------------------
+# Execution Rules (Δ - Bounded Actuation)
+#------------------------------------------------------------------------------
+
+a2a:MaxConcurrentTasks a owl:Class ;
+    rdfs:label "Max Concurrent Tasks" ;
+    rdfs:comment "Maximum number of concurrent tasks per station." ;
+    a2a:defaultValue "10"^^xsd:integer .
+
+a2a:TaskTimeout a owl:Class ;
+    rdfs:label "Task Timeout" ;
+    rdfs:comment "Maximum task execution time in milliseconds." ;
+    a2a:defaultValue "30000"^^xsd:integer .
+
+#------------------------------------------------------------------------------
+# Metadata
+#------------------------------------------------------------------------------
+
+<https://a2a-construct.dev/> a owl:Ontology ;
+    rdfs:label "A2A-CONSTRUCT Ontology" ;
+    rdfs:comment "Deterministic agent-to-agent protocol execution without AI" ;
+    owl:versionInfo "1.0.0" ;
+    a2a:createdDate "2026-02-10"^^xsd:date ;
+    a2a:implements "Closed Ontology: Σ (types), H (refusals), Q (invariants), Λ (ordering), Δ (actuation)" .
