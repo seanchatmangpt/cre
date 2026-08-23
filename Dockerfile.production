@@ -1,26 +1,43 @@
+# CRE Production Dockerfile (Simplified, uses main Dockerfile)
+# This is a compatibility shim - the actual production Dockerfile is ./Dockerfile
+# Build with: docker build -f Dockerfile -t cre:latest .
+#
+# For GCP Marketplace multi-arch builds, use docker-bake.hcl:
+#   docker buildx bake --load cre
+
 # Multi-stage production Dockerfile for CRE YAWL
 # Stage 1: Build
-FROM erlang:28-alpine AS builder
+FROM --platform=$BUILDPLATFORM erlang:28-alpine AS builder
+
+ARG TARGETPLATFORM
+ARG TARGETARCH
+ARG BUILDPLATFORM
+ARG VERSION=0.3.0
+ARG GIT_REVISION=unknown
+ARG BUILD_DATE=unknown
 
 # Install build dependencies
 RUN apk add --no-cache \
     git \
     curl \
     build-base \
-    openssl-dev
+    openssl-dev \
+    ca-certificates
 
-# Install rebar3
-RUN git clone --depth 1 https://github.com/erlang/rebar3 /tmp/rebar3 && \
+# Install rebar3 with proper bootstrap
+RUN git clone --depth 1 --branch 3.24.0 https://github.com/erlang/rebar3 /tmp/rebar3 && \
     cd /tmp/rebar3 && \
-    ./bootstrap && \
-    mv rebar3 /usr/local/bin/ && \
-    rm -rf /tmp/rebar3
+    ./bootstrap --bootstrapper sh && \
+    mv rebar3 /usr/local/bin/rebar3 && \
+    chmod +x /usr/local/bin/rebar3 && \
+    rm -rf /tmp/rebar3 && \
+    rebar3 version
 
 # Set working directory
 WORKDIR /build
 
 # Copy project files
-COPY rebar.config ./
+COPY rebar.config rebar.lock ./
 COPY src ./src
 COPY include ./include
 
@@ -30,7 +47,23 @@ RUN rebar3 get-deps && \
     rebar3 as prod tar
 
 # Stage 2: Runtime
-FROM alpine:3.20
+FROM --platform=$TARGETPLATFORM alpine:3.20
+
+ARG VERSION=0.3.0
+ARG GIT_REVISION=unknown
+ARG BUILD_DATE=unknown
+ARG TARGETPLATFORM
+
+# OCI metadata labels
+LABEL org.opencontainers.image.title="CRE" \
+      org.opencontainers.image.description="Common Runtime Environment for YAWL workflow engine" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${GIT_REVISION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.source="https://github.com/joergen7/cre" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.vendor="CRE Project" \
+      org.opencontainers.image.platform="${TARGETPLATFORM}"
 
 # Install runtime dependencies
 RUN apk add --no-cache \
@@ -38,37 +71,56 @@ RUN apk add --no-cache \
     ncurses-libs \
     libstdc++ \
     tzdata \
-    curl
+    curl \
+    bash \
+    ca-certificates
 
-# Create non-root user
-RUN addgroup -g 1000 cre && \
-    adduser -D -u 1000 -G cre cre
+# Create non-root user with explicit UID/GID
+RUN addgroup -g 1000 -S cre && \
+    adduser -S -u 1000 -G cre -s /bin/bash -h /opt/cre cre
 
 # Extract and install the release
-COPY --from=builder /build/_build/prod/rel/cre /opt/cre
+COPY --from=builder --chown=cre:cre /build/_build/prod/rel/cre /opt/cre
+
+# Copy entrypoint script
+COPY --chown=cre:cre docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Create directories for runtime data
-RUN mkdir -p /opt/cre/data /opt/cre/log /opt/cre/checkpoints && \
+RUN mkdir -p /opt/cre/data /opt/cre/log /opt/cre/checkpoints /opt/cre/mnesia && \
     chown -R cre:cre /opt/cre
 
 # Switch to non-root user
-USER cre
+USER 1000:1000
 WORKDIR /opt/cre
 
-# Expose CRE default port
-EXPOSE 4142
+# Expose CRE ports
+# 4142 - CRE HTTP API
+# 4369 - EPMD (Erlang Port Mapper Daemon)
+# 9100-9200 - Distributed Erlang
+EXPOSE 4142 4369 9100-9200
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:4142/status.json || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:4142/api/v1/health || exit 1
 
 # Signal handling for graceful shutdown
 STOPSIGNAL SIGTERM
 
-# Default command
-ENTRYPOINT ["/opt/cre/bin/cre", "foreground"]
+# Environment variables
+ENV CRE_NODE_NAME=cre \
+    CRE_HOSTNAME=cre \
+    CRE_MODE=init \
+    CRE_CLUSTER_PEERS="" \
+    ERL_MAX_PORTS=65536 \
+    ERL_MAX_ETS_TABLES=2000 \
+    CRE_VERSION="${VERSION}" \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
 
-# Metadata
-LABEL maintainer="CRE Team"
-LABEL version="0.3.0"
-LABEL description="CRE YAWL Workflow Engine - Production Build"
+# Persistent data volumes
+VOLUME ["/opt/cre/data", "/opt/cre/log", "/opt/cre/mnesia", "/opt/cre/checkpoints"]
+
+# Use entrypoint script for proper initialization
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["foreground"]

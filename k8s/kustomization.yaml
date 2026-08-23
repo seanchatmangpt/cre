@@ -1,0 +1,55 @@
+# Kustomization for CRE deployment
+# Usage:
+#   kubectl apply -k k8s/
+#   kubectl apply -k k8s/overlays/production/
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: cre
+  app.kubernetes.io/component: workflow-engine
+  app.kubernetes.io/version: "0.3.0"
+  app.kubernetes.io/managed-by: kubectl
+
+# Base resources
+resources:
+  - base/service.yaml
+  - base/configmap.yaml
+  - base/statefulset.yaml
+
+# Images to replace
+images:
+  - name: cre
+    newName: cre
+    newTag: "0.3.0"
+
+# ConfigMap generator (for environment-specific overrides)
+configMapGenerator:
+  - name: cre-env
+    literals:
+      - ENV=production
+      - REGION=us-east-1
+
+# Secret generator (for development only - use proper secrets in production)
+# secretGenerator:
+#   - name: cre-secrets
+#     literals:
+#       - erlang-cookie=change-me-in-production
+#       - db-password=change-me-in-production
+
+# Patches for base resources
+patches:
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: ENV
+          valueFrom:
+            configMapKeyRef:
+              name: cre-env
+              key: ENV
+    target:
+      kind: StatefulSet
+      name: cre

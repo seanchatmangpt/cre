@@ -1,0 +1,221 @@
+FORTUNE5 SAMPLE MODULE VERIFICATION
+====================================
+Generated: $(date)
+Total .erl files in project: 8643
+Sample size: 10 random modules
+
+SAMPLED FILES AND FIRST 20 LINES:
+================================
+
+====== FILE: /home/user/cre/examples/fortune5-fibo-lnctrl/apps/f5_app_123/src/f5_app_123_mod_20.erl ======
+%% Generated module f5_app_123_mod_20
+-module(f5_app_123_mod_20).
+-export([process/1, validate/1, transform/1]).
+
+process(Data) ->
+    Validated = validate(Data),
+    transform(Validated).
+
+validate(Data) when is_map(Data) ->
+    Data;
+validate(_) ->
+    error(invalid_data).
+
+transform(Data) ->
+    #{result => ok, data => Data, timestamp => erlang:system_time(microsecond)}.
+
+%% Tests
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+====== FILE: /home/user/cre/examples/fortune5-fibo-lnctrl/apps/f5_app_136/src/f5_app_136_mod_05.erl ======
+%% Generated module f5_app_136_mod_05
+-module(f5_app_136_mod_05).
+-export([process/1, validate/1, transform/1]).
+
+process(Data) ->
+    Validated = validate(Data),
+    transform(Validated).
+
+validate(Data) when is_map(Data) ->
+    Data;
+validate(_) ->
+    error(invalid_data).
+
+transform(Data) ->
+    #{result => ok, data => Data, timestamp => erlang:system_time(microsecond)}.
+
+%% Tests
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+====== FILE: /home/user/cre/examples/fortune5-fibo-lnctrl/apps/f5_app_80/src/f5_app_80_sup.erl ======
+%% Generated supervisor for f5_app_80
+-module(f5_app_80_sup).
+-behaviour(supervisor).
+-export([start_link/0, init/1]).
+
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+init([]) ->
+    SupFlags = #{strategy => one_for_one, intensity => 10, period => 60},
+    ChildSpecs = [],
+    {ok, {SupFlags, ChildSpecs}}.
+
+====== FILE: /home/user/cre/examples/fortune5-fibo-lnctrl/apps/f5_app_24/src/f5_app_24_mod_10.erl ======
+%% Generated module f5_app_24_mod_10
+-module(f5_app_24_mod_10).
+-export([process/1, validate/1, transform/1]).
+
+process(Data) ->
+    Validated = validate(Data),
+    transform(Validated).
+
+validate(Data) when is_map(Data) ->
+    Data;
+validate(_) ->
+    error(invalid_data).
+
+transform(Data) ->
+    #{result => ok, data => Data, timestamp => erlang:system_time(microsecond)}.
+
+%% Tests
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+====== FILE: /home/user/cre/examples/fortune5-fibo-lnctrl/apps/f5_app_10/src/f5_app_10_mod_36.erl ======
+%% Generated module f5_app_10_mod_36
+-module(f5_app_10_mod_36).
+-export([process/1, validate/1, transform/1]).
+
+process(Data) ->
+    Validated = validate(Data),
+    transform(Validated).
+
+validate(Data) when is_map(Data) ->
+    Data;
+validate(_) ->
+    error(invalid_data).
+
+transform(Data) ->
+    #{result => ok, data => Data, timestamp => erlang:system_time(microsecond)}.
+
+%% Tests
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+====== FILE: /home/user/cre/examples/fortune5-fibo-lnctrl/apps/f5_app_54/src/f5_app_54_mod_24.erl ======
+%% Generated module f5_app_54_mod_24
+-module(f5_app_54_mod_24).
+-export([process/1, validate/1, transform/1]).
+
+process(Data) ->
+    Validated = validate(Data),
+    transform(Validated).
+
+validate(Data) when is_map(Data) ->
+    Data;
+validate(_) ->
+    error(invalid_data).
+
+transform(Data) ->
+    #{result => ok, data => Data, timestamp => erlang:system_time(microsecond)}.
+
+%% Tests
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+====== FILE: /home/user/cre/examples/fortune5-fibo-lnctrl/apps/f5_app_136/src/f5_app_136_mod_15.erl ======
+%% Generated module f5_app_136_mod_15
+-module(f5_app_136_mod_15).
+-export([process/1, validate/1, transform/1]).
+
+process(Data) ->
+    Validated = validate(Data),
+    transform(Validated).
+
+validate(Data) when is_map(Data) ->
+    Data;
+validate(_) ->
+    error(invalid_data).
+
+transform(Data) ->
+    #{result => ok, data => Data, timestamp => erlang:system_time(microsecond)}.
+
+%% Tests
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+====== FILE: /home/user/cre/examples/fortune5-fibo-lnctrl/apps/f5_app_181/src/f5_app_181_mod_38.erl ======
+%% Generated module f5_app_181_mod_38
+-module(f5_app_181_mod_38).
+-export([process/1, validate/1, transform/1]).
+
+process(Data) ->
+    Validated = validate(Data),
+    transform(Validated).
+
+validate(Data) when is_map(Data) ->
+    Data;
+validate(_) ->
+    error(invalid_data).
+
+transform(Data) ->
+    #{result => ok, data => Data, timestamp => erlang:system_time(microsecond)}.
+
+%% Tests
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+====== FILE: /home/user/cre/examples/fortune5-fibo-lnctrl/apps/f5_app_177/src/f5_app_177_mod_17.erl ======
+%% Generated module f5_app_177_mod_17
+-module(f5_app_177_mod_17).
+-export([process/1, validate/1, transform/1]).
+
+process(Data) ->
+    Validated = validate(Data),
+    transform(Validated).
+
+validate(Data) when is_map(Data) ->
+    Data;
+validate(_) ->
+    error(invalid_data).
+
+transform(Data) ->
+    #{result => ok, data => Data, timestamp => erlang:system_time(microsecond)}.
+
+%% Tests
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+====== FILE: /home/user/cre/examples/fortune5-fibo-lnctrl/apps/f5_connectors/src/f5_connector_connector_05.erl ======
+%% Generated connector module for connector_05
+%% DO NOT EDIT - Generated by Fortune-5 FIBO LineController Factory
+
+-module(f5_connector_connector_05).
+-behaviour(gen_server).
+
+%% API
+-export([start_link/0, stop/0]).
+-export([operation01/1, operation02/1, operation03/1, operation04/1, operation05/1, operation06/1, operation07/1, operation08/1, operation09/1, operation10/1, operation11/1, operation12/1, operation13/1, operation14/1, operation15/1, operation16/1, operation17/1, operation18/1, operation19/1, operation20/1]).
+
+%% gen_server callbacks
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+
+-record(state, {
+    auth_token :: binary(),
+    rate_limit :: integer(),
+    auth_scheme :: atom(),
+    request_count = 0 :: integer(),
+    last_reset :: integer()
+}).
+

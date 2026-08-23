@@ -1,0 +1,43 @@
+---
+# PersistentVolumeClaim for additional CRE data storage
+# This is used alongside the StatefulSet volumeClaimTemplate
+# for optional additional storage needs (backups, exports, etc.)
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cre-data-pvc
+  labels:
+    app: cre
+    component: workflow-engine
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+  # Uncomment if using a specific storage class
+  # storageClassName: nfs-storage
+---
+# StorageClass for CRE Mnesia data (high performance)
+# Uncomment and customize for your environment
+
+# apiVersion: storage.k8s.io/v1
+# kind: StorageClass
+# metadata:
+#   name: cre-mnesia-sc
+#   labels:
+#     app: cre
+# provisioner: kubernetes.io/aws-ebs
+# parameters:
+#   type: gp3
+#   iops: "3000"
+#   throughput: "125"
+#   encrypted: "true"
+# allowVolumeExpansion: true
+# volumeBindingMode: WaitForFirstConsumer
+# reclaimPolicy: Delete
+# mountOptions:
+#   - noatime
+#   - nodiratime

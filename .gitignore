@@ -35,6 +35,9 @@ Mnesia.nonode@nohost/
 # Build artifacts
 rebar3.crashdump
 
+# CICD pipeline artifacts (SBOM, scan reports)
+cicd-artifacts/
+
 # LaTeX build artifacts
 texput.log
 thesis/*.aux
@@ -57,3 +60,9 @@ Mnesia.*/
 *.bak
 *_temp.erl
 *temp.erl
+
+# Terraform
+terraform/gcp/.terraform/
+terraform/gcp/**/.terraform/
+*.tfstate
+*.tfstate.*

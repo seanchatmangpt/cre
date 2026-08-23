@@ -1,0 +1,145 @@
+[package]
+name = "paper-implementations"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Wil M. P. van der Aalst Collection",
+    "Implemented as Hyper-Advanced Rust Algorithms"
+]
+
+[dependencies]
+# Core algorithms and data structures
+itertools = "0.13.0"
+rayon = "1.8.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+crossbeam = "0.8"
+petgraph = "0.6"
+ndarray = "0.15"
+rand = "0.8"
+smallvec = "1.11"
+hashbrown = "0.14"
+parking_lot = "0.12"
+
+# Machine Learning and AI (for LLM implementations)
+candle-core = "0.3"
+candle-nn = "0.3"
+tokenizers = "0.19"
+hf-hub = "0.3"
+
+# Numerical computing and optimization
+nalgebra = "0.32"
+approx = "0.5"
+ordered-float = "4.2"
+
+# Process mining specific
+csv = "1.3"
+polars = { version = "0.39", features = ["ndarray", "serde"] }
+arrow2 = { version = "0.18", features = ["io_parquet"] }
+
+# Performance and profiling
+criterion = { version = "0.5", features = ["html_reports"] }
+perfcnt = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Concurrency and parallelism
+tokio = { version = "1.35", features = ["full"] }
+futures = "0.3"
+async-stream = "0.3"
+dashmap = "5.5"
+
+# Cryptography and privacy
+rand_chacha = "0.3"
+aes-gcm = "0.10"
+sha2 = "0.10"
+zeroize = { version = "1.7", features = ["zeroize_derive"] }
+
+# Error handling and validation
+anyhow = "1.0"
+thiserror = "1.0"
+validator = { version = "0.18", features = ["derive"] }
+edit-distance = "2.1"
+
+# Scientific computing
+statrs = "0.16"
+rand_distr = "0.4"
+
+# Logging and monitoring
+log = "0.4"
+env_logger = "0.10"
+simplelog = "0.12"
+
+# Configuration
+clap = { version = "4.4", features = ["derive"] }
+config = "0.14"
+figment = { version = "0.10", features = ["toml", "yaml"] }
+
+# Development tools
+[dev-dependencies]
+proptest = "1.4"
+cargo-fuzz = "0.11"
+iai = "0.1"
+
+[features]
+default = ["std"]
+std = []
+no_std = []
+nightly = []
+# simd = ["dep:simd-json"]
+# avx2 = ["dep:packed_simd_2"]
+# profile-with-perfetto = ["dep:perfetto"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.bench]
+debug = true
+inherits = "release"
+
+[[bench]]
+name = "alpha_algorithm"
+harness = false
+[[bench]]
+name = "heuristic_miner"
+harness = false
+[[bench]]
+name = "conformance_checking"
+harness = false
+[[bench]]
+name = "object_centric"
+harness = false
+[[bench]]
+name = "uncertain_data"
+harness = false
+
+[[bin]]
+name = "process_mining_benchmark"
+path = "src/bin/benchmark.rs"
+required-features = ["benchmark"]
+
+[[bin]]
+name = "llm_process_modeling"
+path = "src/bin/llm_modeling.rs"
+required-features = ["llm"]
+
+[workspace]
+members = [
+    "algorithms/alpha",
+    "algorithms/heuristic_miner",
+    "algorithms/conformance_checking",
+    "algorithms/object_centric",
+    "algorithms/uncertain_event_data",
+    "algorithms/llm_process_mining",
+    "algorithms/local_process_mining",
+    "algorithms/differential_privacy",
+    "algorithms/petri_nets",
+    "algorithms/performance_analysis",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+targets = ["x86_64-unknown-linux-gnu"]

@@ -49,13 +49,14 @@
 %%====================================================================
 
 -include_lib("kernel/include/logger.hrl").
+-include("ga_constitution.hrl").
 
 %%====================================================================
 %% Records
 %%====================================================================
 
 -record(compilation, {
-    constitution :: ga_constitution:constitution(),
+    constitution :: constitution(),
     errors = [] :: [binary()],
     warnings = [] :: [binary()],
     generated_module :: undefined | atom(),
@@ -210,7 +211,7 @@ supported_patterns() ->
         <<"P13_MultipleInstancesWithoutSynchronization">>,
         <<"P14_MultipleInstancesWithAPrioriDesignTimeKnowledge">>,
         <<"P15_MultipleInstancesWithAPrioriRuntimeKnowledge">>,
-        <<"P16_MultiMerge"WithDesignTimeKnowledge">>,
+        <<"P16_MultiMerge_WithDesignTimeKnowledge">>,
         <<"P17_CancelActivity">>,
         <<"P18_CancelCase">>,
         <<"P19_GeneralCancelRegion">>,
@@ -279,7 +280,7 @@ constitution_template() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec parse(map()) -> {ok, ga_constitution:constitution()} | {error, term()}.
+-spec parse(map()) -> {ok, constitution()} | {error, term()}.
 
 parse(ConstitutionMap) when is_map(ConstitutionMap) ->
     try
@@ -296,8 +297,8 @@ parse(ConstitutionMap) when is_map(ConstitutionMap) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec validate(ga_constitution:constitution()) ->
-          {ok, ga_constitution:constitution()} | {error, [binary()]}.
+-spec validate(constitution()) ->
+          {ok, constitution()} | {error, [binary()]}.
 
 validate(Constitution) ->
     case ga_constitution:validate(Constitution) of
@@ -314,10 +315,10 @@ validate(Constitution) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec type_check(ga_constitution:constitution()) ->
-          {ok, ga_constitution:constitution()} | {error, [binary()]}.
+-spec type_check(constitution()) ->
+          {ok, constitution()} | {error, [binary()]}.
 
-type_check(Constitution = #ga_constitution{sigma = Sigma}) ->
+type_check(Constitution = #constitution{sigma = Sigma}) ->
     %% Check type bindings
     Errors = check_type_bindings(Sigma),
     case Errors of
@@ -332,10 +333,10 @@ type_check(Constitution = #ga_constitution{sigma = Sigma}) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec compose_patterns(ga_constitution:constitution()) ->
-          {ok, ga_constitution:constitution()} | {error, [binary()]}.
+-spec compose_patterns(constitution()) ->
+          {ok, constitution()} | {error, [binary()]}.
 
-compose_patterns(Constitution = #ga_constitution{lambda = Lambda}) ->
+compose_patterns(Constitution = #constitution{lambda = Lambda}) ->
     %% Validate pattern sequence
     Errors = check_pattern_sequence(Lambda),
     case Errors of
@@ -350,10 +351,10 @@ compose_patterns(Constitution = #ga_constitution{lambda = Lambda}) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec generate_code(ga_constitution:constitution()) ->
+-spec generate_code(constitution()) ->
           {ok, module(), binary()} | {error, [binary()]}.
 
-generate_code(Constitution = #ga_constitution{id = Id}) ->
+generate_code(Constitution = #constitution{id = Id}) ->
     try
         %% Generate module name from constitution ID
         ModuleName = binary_to_atom(<<"wf_", Id/binary>>, utf8),
@@ -433,36 +434,42 @@ do_generate_code(Constitution, Options) ->
     end.
 
 %% @private
-check_type_bindings(#ga_constitution:sigma{type_bindings = Bindings}) ->
+check_type_bindings(#sigma{type_bindings = TypeBindings}) ->
     lists:filtermap(
-        fun(#ga_constitution:type_binding{term = Term, type = Type}) ->
+        fun(#type_binding{term = Term, type = Type}) ->
             case {is_binary(Term), is_binary(Type)} of
                 {true, true} -> false;
                 _ -> {true, <<"Invalid type binding for ", Term/binary>>}
-            end
+            end;
+           (_) ->
+            {true, <<"Invalid type binding format">>}
         end,
-        Bindings
-    ).
+        TypeBindings
+    );
+check_type_bindings(_Sigma) ->
+    [<<"Sigma must be a sigma record">>].
 
 %% @private
-check_pattern_sequence(#ga_constitution:lambda{pattern_sequence = Sequence}) ->
+check_pattern_sequence(#lambda{pattern_sequence = Sequence}) ->
     Supported = sets:from_list(supported_patterns()),
     lists:filtermap(
-        fun(#ga_constitution:pattern_instance{pattern = Pattern}) ->
+        fun(#pattern_instance{pattern = Pattern}) ->
             case sets:is_element(Pattern, Supported) of
                 true -> false;
                 false -> {true, <<"Unsupported pattern: ", Pattern/binary>>}
-            end
+            end;
+           (_) ->
+            {true, <<"Invalid pattern instance">>}
         end,
         Sequence
-    ).
+    );
+check_pattern_sequence(_Lambda) ->
+    [<<"Lambda must be a lambda record">>].
 
 %% @private
 emit_module(Constitution, ModuleName) ->
     %% Generate gen_yawl module source code
-    #ga_constitution{id = Id, lambda = Lambda} = Constitution,
-
-    PatternInstances = Lambda#ga_constitution:lambda.pattern_sequence,
+    #constitution{id = Id, lambda = #lambda{pattern_sequence = PatternInstances}} = Constitution,
 
     %% Build module header
     Header = [

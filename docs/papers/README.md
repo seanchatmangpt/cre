@@ -1,75 +1,101 @@
-# Wil van der Aalst Papers
+# Process Mining Research Papers
 
-Collection of academic papers by Wil van der Aalst related to workflow patterns, YAWL, Petri nets, process mining, and business process management.
+Collection of research papers on process mining, workflow patterns, and YAWL.
 
-## Workflow Patterns
+---
 
-| File | Year | Citation Count |
-|------|------|----------------|
-| `workflow_patterns_2003.pdf` | 2003 | 4,700+ |
-| `fundamentals_of_control_flow_in_workflows_2000.pdf` | 2000 | 300+ |
-| `workflow_exception_patterns_2008.pdf` | 2008 | 300+ |
-| `workflow_modeling_using_proclets_2000.pdf` | 2000 | 100+ |
-| `diagnosing_workflow_processes_woflan_2001.pdf` | 2001 | 400+ |
-| `p2p_approach_interorganizational_workflows_2000.pdf` | 2000 | 400+ |
+## Overview
 
-## YAWL (Yet Another Workflow Language)
+This directory contains research papers (PDF format) covering:
 
-| File | Year | Description |
-|------|------|-------------|
-| `yawl_yet_another_workflow_language_2005.pdf` | 2005 | Seminal YAWL paper (2,100+ citations) |
-| `yawl_design_implementation_2004.pdf` | 2004 | Design and implementation |
-| `yawl_design_implementation_qut_2004.pdf` | 2004 | QUT version |
-| `YAWL_Technical_Manual.pdf` | - | Technical reference |
+- **Workflow Patterns** - Foundational research on workflow control-flow patterns
+- **Process Mining** - Process discovery, conformance checking, and analysis
+- **Petri Net Theory** - Theoretical foundations of Petri nets
+- **YAWL Language** - YAWL specifications and technical manuals
+- **Object-Centric Process Mining** - Modern approaches to multi-object processes
 
-## Petri Nets
+---
 
-| File | Year | Citation Count |
-|------|------|----------------|
-| `application_petri_nets_workflow_management_1998.pdf` | 1998 | 4,500+ |
-| `verification_of_workflow_nets_1997.pdf` | 1997 | 1,400+ |
-| `verification_business_processes_petri_nets_2000.pdf` | 2000 | 90+ |
-| `structural_characterizations_sound_workflow_nets_1996.pdf` | 1996 | - |
-| `soundness_of_workflow_nets_2011.pdf` | 2011 | 500+ |
-| `designing_workflow_coloured_petri_nets.pdf` | - | - |
+## Wil M. P. van der Aalst Collection
 
-## Process Mining
+This directory includes **121 papers** by Wil M. P. van der Aalst downloaded from arXiv.
 
-| File | Year | Citation Count |
-|------|------|----------------|
-| `workflow_mining_discovering_process_models_2001.pdf` | 2001 | 3,400+ |
-| `process_mining_discovering_workflow_models_2001.pdf` | 2001 | 200+ |
-| `process_mining_overview_and_opportunities_2011.pdf` | 2011 | 900+ |
-| `process_mining_manifesto_2011.pdf` | 2011 | 2,100+ |
-| `process_mining_manifesto_tue_2011.pdf` | 2011 | - |
-| `process_mining_research_agenda_2003.pdf` | 2003 | 1,000+ |
-| `process_mining_tutorial_2012.pdf` | 2012 | 100+ |
-| `foundations_of_process_discovery_2019.pdf` | 2019 | - |
-| `conformance_checking_uncertain_event_data_2020.pdf` | 2020 | - |
-| `business_process_mining_industrial_application_2007.pdf` | 2007 | 1,200+ |
-| `supporting_full_bpm_lifecycle_2009.pdf` | 2009 | - |
-| `mining_process_models_non_free_choice.pdf` | - | 400+ |
-| `process_mining_case_handling_2005.pdf` | 2005 | - |
-| `discovering_process_models_empirical_data_2003.pdf` | 2003 | - |
-| `rediscovering_workflow_models_2001.pdf` | 2001 | - |
-| `repairing_process_models_2011.pdf` | 2011 | 100+ |
+### Key Features
 
-## Business Process Management
+- **Date Range**: 1996-2026 (30 years of research)
+- **Topics**: Object-centric process mining, AI/ML integration, privacy-preserving mining
+- **Format**: Clean filenames with year, title, and arXiv ID
 
-| File | Year | Citation Count |
-|------|------|----------------|
-| `tutorial_models_systems_standards_workflow_2004.pdf` | 2004 | 2,500+ |
-| `business_process_management_survey_2013.pdf` | 2013 | - |
-| `business_process_simulation_2013.pdf` | 2013 | 200+ |
-| `decade_bpm_conferences_2010.pdf` | 2010 | - |
-| `effectiveness_workflow_management_systems.pdf` | - | - |
+### Generated Files
 
-## Total: 37 Papers
+| File | Description |
+|------|-------------|
+| `papers_info.json` | Complete metadata for all 121 papers |
+| `PAPER_SUMMARIES.md` | Organized summary by year and paper |
+| `download_report.txt` | Detailed download status report |
 
-## Sources
+---
 
-- [Wil van der Aalst's Publications](https://www.vdaalst.com/publications/)
-- [TU/e Research Portal](https://research.tue.nl/)
-- [RWTH Aachen Publications](https://www.vdaalst.rwth-aachen.de/publications/)
-- [Workflow Patterns](https://www.workflowpatterns.com/)
-- [YAWL Foundation](https://yawlfoundation.github.io/)
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [PAPER_SUMMARIES.md](PAPER_SUMMARIES.md) | Summaries of key papers |
+| [analysis_readme.md](analysis_readme.md) | Analysis documentation index |
+| [analysis_summary.md](analysis_summary.md) | Analysis summary |
+| [algorithm_mapping.csv](algorithm_mapping.csv) | Algorithm to implementation mapping |
+| [rust_implementation.md](rust_implementation.md) | Rust implementation notes |
+
+---
+
+## Key Papers
+
+### Foundational
+
+| Paper | Year | Topic |
+|-------|------|-------|
+| `workflow_patterns_2003.pdf` | 2003 | Original 20 workflow patterns |
+| `application_petri_nets_workflow_management_1998.pdf` | 1998 | Petri nets in workflow management |
+| `verification_of_workflow_nets_1997.pdf` | 1997 | Workflow net soundness verification |
+
+### YAWL
+
+| Paper | Year | Topic |
+|-------|------|-------|
+| `yawl_yet_another_workflow_language_2005.pdf` | 2005 | YAWL introduction |
+| `yawl_design_implementation_2004.pdf` | 2004 | YAWL design and implementation |
+| `YAWL_Technical_Manual.pdf` | - | Complete technical reference |
+
+### Process Mining
+
+| Paper | Year | Topic |
+|-------|------|-------|
+| `process_mining_manifesto_2011.pdf` | 2011 | Process mining manifesto |
+| `foundations_of_process_discovery_2019.pdf` | 2019 | Process discovery foundations |
+| `conformance_checking_uncertain_event_data_2020.pdf` | 2020 | Conformance checking with uncertain data |
+
+### Recent Van der Aalst Papers
+
+| Paper | Year | Topic |
+|-------|------|-------|
+| `van_der_aalst_2025_no_ai_without_pi.pdf` | 2025 | AI requires Process Intelligence |
+| `van_der_Aalst_2023_Advancements_and_Challenges_in_Object_Centric_Process_Mining.pdf` | 2023 | OCPM advances and challenges |
+| `van_der_Aalst_2021_Precision_and_Fitness_in_Object_Centric_Process_Mining.pdf` | 2021 | OCPM precision and fitness |
+
+---
+
+## Citation Information
+
+When referencing these papers, please use the original citation information provided in each PDF.
+
+---
+
+## Related Documentation
+
+- [Pattern Catalog](../yawl_pattern_catalog.md) - Implementation of patterns
+- [GEN_PNET_USER_GUIDE.md](../GEN_PNET_USER_GUIDE.md) - Petri net runtime guide
+- [Analysis](../analysis/) - Technical analysis documents
+
+---
+
+**Last Updated:** 2026-02-08 | **Paper Count:** 166+ papers | **Summaries Completed:** 15 high-quality paper summaries enhanced

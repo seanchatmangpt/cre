@@ -1,0 +1,33 @@
+---
+# GKE Production Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cre-prod
+  labels:
+    name: cre-prod
+    environment: production
+    app: cre-workflow-engine
+    # GKE-specific labels for Network Policies
+    networking.gke.io/simulator-mode: "false"
+    # Cloud Operations labels
+    cloud.google.com/usage: production
+  annotations:
+    # GKE namespace labels for organization
+    contact: "platform-team@example.com"
+    cost-center: "engineering"
+---
+# GKE Staging Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cre-staging
+  labels:
+    name: cre-staging
+    environment: staging
+    app: cre-workflow-engine
+    networking.gke.io/simulator-mode: "false"
+    cloud.google.com/usage: development
+  annotations:
+    contact: "platform-team@example.com"
+    cost-center: "engineering"

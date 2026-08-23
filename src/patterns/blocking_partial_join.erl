@@ -76,7 +76,7 @@ fire(t_final, Mode, UsrInfo) ->
     {produce, #{p_final_out => [final]}, NewState};
 fire(t_finish, _Mode, UsrInfo) ->
     {produce, #{p_end => [done]}, UsrInfo};
-fire(_Trsn, _Mode, UsrInfo) ->
+fire(_Trsn, _Mode, _UsrInfo) ->
     abort.
 
 count_completions(Mode) ->
@@ -102,3 +102,59 @@ handle_cast(_Request, State) -> {noreply, State}.
 handle_info(_Info, State) -> {noreply, State}.
 terminate(_Reason, _State) -> ok.
 trigger(_Place, _Token, _NetState) -> pass.
+
+%%====================================================================
+%% Unit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+%% Test place_lst/0
+place_lst_test() ->
+    Places = place_lst(),
+    ?assert(lists:member(p_start, Places)),
+    ?assert(lists:member(p_branch1, Places)),
+    ?assert(lists:member(p_branch2, Places)),
+    ?assert(lists:member(p_branch3, Places)),
+    ?assert(lists:member(p_partial_out, Places)),
+    ?assert(lists:member(p_final_out, Places)),
+    ?assert(lists:member(p_end, Places)).
+
+%% Test trsn_lst/0
+trsn_lst_test() ->
+    Transitions = trsn_lst(),
+    ?assert(lists:member(t_split, Transitions)),
+    ?assert(lists:member(t_complete1, Transitions)),
+    ?assert(lists:member(t_complete2, Transitions)),
+    ?assert(lists:member(t_complete3, Transitions)),
+    ?assert(lists:member(t_partial, Transitions)),
+    ?assert(lists:member(t_final, Transitions)),
+    ?assert(lists:member(t_finish, Transitions)).
+
+%% Test count_completions/1
+count_completions_test() ->
+    Mode = #{p_branch1 => [token], p_branch2 => [], p_branch3 => [token]},
+    ?assertEqual(2, count_completions(Mode)).
+
+count_completions_empty_test() ->
+    Mode = #{},
+    ?assertEqual(0, count_completions(Mode)).
+
+%% Test init/1
+init_custom_test() ->
+    State = init(#{m => 5, n => 2,
+                  partial_out => out1, final_out => out2}),
+    ?assertEqual(5, maps:get(m, State)),
+    ?assertEqual(2, maps:get(n, State)),
+    ?assertEqual(out1, maps:get(partial_out, State)),
+    ?assertEqual(out2, maps:get(final_out, State)).
+
+init_default_test() ->
+    State = init(#{}),
+    ?assertEqual(3, maps:get(m, State)),
+    ?assertEqual(2, maps:get(n, State)),
+    ?assertEqual(p_partial_out, maps:get(partial_out, State)),
+    ?assertEqual(p_final_out, maps:get(final_out, State)).
+
+-endif.

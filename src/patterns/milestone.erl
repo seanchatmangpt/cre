@@ -67,6 +67,43 @@ This module implements the Milestone pattern as a gen_yawl behaviour.
 The Milestone pattern enables an activity only when a specific milestone
 state has been reached.
 
+## Milestone Pattern Overview
+
+The Milestone pattern (WCP-18) enables/disables activities based on whether
+the workflow has reached a certain point. Once a milestone is reached,
+it remains valid for the duration of the process instance. This is useful for:
+
+- Preventing activities after a deadline
+- Enabling activities only after approval
+- State-based workflow guards
+- Progress-dependent task execution
+
+## State-Based Utility Functions
+
+The module provides utility functions for state-based milestone checking:
+
+```erlang
+%% Check if milestone place is marked (has tokens)
+> milestone:milestone_reached(Marking, 'p_milestone_reached').
+
+%% Enable activity only after milestone reached
+> milestone:enable_on_milestone(Marking, 'p_milestone', 'p_activity').
+
+%% Disable activity after milestone reached (inverse of enable)
+> milestone:disable_on_milestone(Marking, 'p_milestone', 'p_activity').
+
+%% Verify workflow respects milestone constraints
+> milestone:milestone_check(Marking, #{
+    milestone_place => 'p_milestone',
+    disabled_after => ['p_before'],
+    enabled_after => ['p_after']
+}).
+
+%% Check if workflow has passed the milestone
+> milestone:milestone_passed(Marking, 'p_milestone').
+> milestone:milestone_passed(Marking, {'p_milestone', ['p_downstream']}).
+```
+
 ## Example: Place List
 
 ```erlang
@@ -123,7 +160,12 @@ state has been reached.
     run/2,
     get_state/1,
     execute/3,
-    set_milestone/1
+    set_milestone/1,
+    milestone_reached/2,
+    enable_on_milestone/3,
+    disable_on_milestone/3,
+    milestone_check/2,
+    milestone_passed/2
 ]).
 
 %%====================================================================
@@ -283,6 +325,175 @@ execute(ActivityFun, MilestoneFun, InitialState) when is_function(ActivityFun), 
 
 set_milestone(Pid) ->
     gen_yawl:cast(Pid, set_milestone_reached).
+
+%%--------------------------------------------------------------------
+%% @doc Checks if a milestone has been reached in the marking.
+%%
+%% Milestone is considered reached when the milestone place contains
+%% a token indicating the milestone state has been achieved.
+%%
+%% @param Marking The current marking of the workflow.
+%% @param MilestonePlace The place atom representing the milestone.
+%% @return true if milestone place has tokens, false otherwise.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec milestone_reached(Marking :: pnet_marking:marking(),
+                        MilestonePlace :: atom()) -> boolean().
+
+milestone_reached(Marking, MilestonePlace) when is_map(Marking), is_atom(MilestonePlace) ->
+    case pnet_marking:get(Marking, MilestonePlace) of
+        {ok, []} -> false;
+        {ok, Tokens} when is_list(Tokens), length(Tokens) > 0 -> true;
+        _ -> false
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Checks if an activity should be enabled based on milestone state.
+%%
+%% Returns true only if the milestone has been reached (the milestone
+%% place contains tokens). This implements the core Milestone pattern:
+%% activities are enabled only after reaching a specific point in the
+%% workflow.
+%%
+%% @param Marking The current marking of the workflow.
+%% @param MilestonePlace The place atom representing the milestone.
+%% @param ActivityPlace The place atom for the activity to check.
+%% @return true if milestone reached and activity can proceed, false otherwise.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec enable_on_milestone(Marking :: pnet_marking:marking(),
+                          MilestonePlace :: atom(),
+                          ActivityPlace :: atom()) -> boolean().
+
+enable_on_milestone(Marking, MilestonePlace, ActivityPlace)
+        when is_map(Marking), is_atom(MilestonePlace), is_atom(ActivityPlace) ->
+    milestone_reached(Marking, MilestonePlace) andalso
+    case pnet_marking:get(Marking, ActivityPlace) of
+        {ok, Tokens} when is_list(Tokens) -> length(Tokens) =:= 0;
+        _ -> false
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Checks if an activity should be disabled based on milestone state.
+%%
+%% Returns true if the milestone has been reached, meaning activities
+%% that should be disabled after the milestone are prevented from executing.
+%% This is the inverse of enable_on_milestone.
+%%
+%% @param Marking The current marking of the workflow.
+%% @param MilestonePlace The place atom representing the milestone.
+%% @param ActivityPlace The place atom for the activity to check.
+%% @return true if milestone reached (activity disabled), false otherwise.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec disable_on_milestone(Marking :: pnet_marking:marking(),
+                           MilestonePlace :: atom(),
+                           ActivityPlace :: atom()) -> boolean().
+
+disable_on_milestone(Marking, MilestonePlace, ActivityPlace)
+        when is_map(Marking), is_atom(MilestonePlace), is_atom(ActivityPlace) ->
+    not enable_on_milestone(Marking, MilestonePlace, ActivityPlace).
+
+%%--------------------------------------------------------------------
+%% @doc Verifies that the workflow state respects milestone constraints.
+%%
+%% Checks that:
+%% 1. Activities before the milestone are not enabled after milestone reached
+%% 2. Activities after the milestone are only enabled after milestone reached
+%% 3. The milestone place state is consistent with workflow expectations
+%%
+%% @param Marking The current marking of the workflow.
+%% @param MilestoneConfig Configuration map with:
+%%   - milestone_place: Atom for the milestone place
+%%   - disabled_after: List of places to disable after milestone
+%%   - enabled_after: List of places to enable after milestone
+%% @return {ok, true} if constraints satisfied, {error, Reason} otherwise.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec milestone_check(Marking :: pnet_marking:marking(),
+                     MilestoneConfig :: map()) ->
+          {ok, true} | {error, term()}.
+
+milestone_check(Marking, MilestoneConfig) when is_map(Marking), is_map(MilestoneConfig) ->
+    try
+        MilestonePlace = maps:get(milestone_place, MilestoneConfig),
+        DisabledAfter = maps:get(disabled_after, MilestoneConfig, []),
+        EnabledAfter = maps:get(enabled_after, MilestoneConfig, []),
+        Reached = milestone_reached(Marking, MilestonePlace),
+
+        %% Check disabled activities (should be empty if milestone reached)
+        DisabledCheck = lists:all(fun(Place) ->
+            case Reached of
+                true ->
+                    %% After milestone, disabled places should be empty
+                    {ok, Tokens} = pnet_marking:get(Marking, Place),
+                    length(Tokens) =:= 0;
+                false ->
+                    true
+            end
+        end, DisabledAfter),
+
+        %% Check enabled activities (should only have tokens if milestone reached)
+        EnabledCheck = lists:all(fun(Place) ->
+            {ok, Tokens} = pnet_marking:get(Marking, Place),
+            HasTokens = length(Tokens) > 0,
+            case Reached of
+                true -> true;
+                false -> not HasTokens
+            end
+        end, EnabledAfter),
+
+        case DisabledCheck andalso EnabledCheck of
+            true -> {ok, true};
+            false -> {error, milestone_constraint_violation}
+        end
+    catch
+        error:{badkey, Key} -> {error, {missing_config, Key}};
+        _:Reason -> {error, Reason}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Determines if the workflow has passed a specific milestone.
+%%
+%% A milestone is considered "passed" if:
+%% 1. The milestone place is currently empty (not marked)
+%% 2. AND a downstream place has tokens (indicating forward progress)
+%%
+%% This distinguishes between "milestone reached" (currently at the milestone)
+%% and "milestone passed" (moved beyond the milestone).
+%%
+%% @param Marking The current marking of the workflow.
+%% @param MilestoneSpec Specification of the milestone:
+%%   - {milestone_place, DownstreamPlaces} - milestone place and list of downstream places
+%%   - MilestonePlace - just the milestone place (checks if not marked)
+%% @return true if milestone has been passed, false otherwise.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec milestone_passed(Marking :: pnet_marking:marking(),
+                       MilestoneSpec :: atom() | {atom(), [atom()]}) -> boolean().
+
+milestone_passed(Marking, MilestonePlace) when is_atom(MilestonePlace) ->
+    %% Simple check: milestone place is empty
+    not milestone_reached(Marking, MilestonePlace);
+
+milestone_passed(Marking, {MilestonePlace, DownstreamPlaces})
+        when is_map(Marking), is_atom(MilestonePlace), is_list(DownstreamPlaces) ->
+    %% Milestone is passed if:
+    %% 1. Milestone place is empty (we've moved past it)
+    %% 2. At least one downstream place has tokens
+    MilestoneEmpty = not milestone_reached(Marking, MilestonePlace),
+    DownstreamHasTokens = lists:any(fun(Place) ->
+        case pnet_marking:get(Marking, Place) of
+            {ok, Tokens} when is_list(Tokens), length(Tokens) > 0 -> true;
+            _ -> false
+        end
+    end, DownstreamPlaces),
+    MilestoneEmpty andalso DownstreamHasTokens.
 
 %%====================================================================
 %% gen_pnet Callbacks

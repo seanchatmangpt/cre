@@ -1,0 +1,322 @@
+# CRE Cloud Build Configuration
+# Builds multi-architecture Docker images with security scanning and SBOM generation
+# 
+# Triggers:
+#   - GitHub push to main branch
+#   - GitHub pull requests
+#   - Manual invocation via Cloud Build
+#
+# Outputs:
+#   - Docker images pushed to Artifact Registry
+#   - Vulnerability scan results (Trivy)
+#   - SBOM artifacts (Syft)
+#   - Build logs and reports to GCS
+
+steps:
+  # Step 1: Validate build configuration
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'validate-config'
+    args: ['--version']
+    waitFor: ['-']
+
+  # Step 2: Set up buildx for multi-platform builds
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'setup-buildx'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Setting up Docker buildx for multi-platform builds..."
+        docker buildx create --use --name cre-builder 2>/dev/null || true
+        docker buildx inspect --bootstrap
+
+  # Step 3: Build multi-architecture images (AMD64 + ARM64)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-images'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Building multi-architecture CRE images..."
+        docker buildx bake \
+          --set "*.platform=linux/amd64,linux/arm64" \
+          --set "*.output=type=image,push=false" \
+          -f docker-bake.hcl
+    env:
+      - 'DOCKER_CLI_EXPERIMENTAL=enabled'
+
+  # Step 4: Load image for scanning (use amd64 variant for immediate scanning)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-local'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:${SHORT_SHA}'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:latest'
+      - '-f'
+      - 'Dockerfile'
+      - '.'
+
+  # Step 5: Install and run Trivy vulnerability scan
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'install-trivy'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Installing Trivy scanner..."
+        apt-get update -qq
+        apt-get install -y wget > /dev/null 2>&1
+        
+        TRIVY_VERSION="0.50.1"
+        ARCH=$(dpkg --print-architecture)
+        case "$ARCH" in
+          amd64) TRIVY_ARCH="64bit" ;;
+          arm64) TRIVY_ARCH="ARM64" ;;
+          *) TRIVY_ARCH="64bit" ;;
+        esac
+        
+        TRIVY_URL="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz"
+        
+        mkdir -p /tmp/trivy-install
+        cd /tmp/trivy-install
+        wget -q "$TRIVY_URL"
+        tar -xzf trivy*.tar.gz
+        mv trivy /usr/local/bin/
+        chmod +x /usr/local/bin/trivy
+        
+        trivy version
+        echo "Trivy installed successfully"
+
+  # Step 6: Scan image with Trivy (CVEs and misconfigurations)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'trivy-scan'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set +e
+        
+        echo "Running Trivy vulnerability scan..."
+        
+        # Ensure Trivy is available
+        if ! command -v trivy &> /dev/null; then
+          echo "Installing Trivy..."
+          apt-get update -qq && apt-get install -y wget > /dev/null 2>&1
+          TRIVY_VERSION="0.50.1"
+          wget -q "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+            -O /tmp/trivy.tar.gz
+          tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin/
+          chmod +x /usr/local/bin/trivy
+        fi
+        
+        # Create output directory
+        mkdir -p /workspace/security-reports
+        
+        # Scan for vulnerabilities (JSON format)
+        trivy image \
+          --severity HIGH,CRITICAL \
+          --format json \
+          --output /workspace/security-reports/trivy-vulnerabilities.json \
+          gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:${SHORT_SHA}
+        
+        # Scan for vulnerabilities (Table format)
+        trivy image \
+          --severity HIGH,CRITICAL \
+          --format table \
+          gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:${SHORT_SHA} \
+          | tee /workspace/security-reports/trivy-vulnerabilities.txt
+        
+        # Scan for misconfigurations (SARIF format for CI/CD)
+        trivy config \
+          --format sarif \
+          --output /workspace/security-reports/trivy-config.sarif \
+          . || echo "Config scan completed with warnings"
+        
+        echo "Trivy scan completed. Results saved."
+
+  # Step 7: Install and run Syft for SBOM generation
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'install-syft'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Installing Syft for SBOM generation..."
+        apt-get update -qq
+        apt-get install -y wget > /dev/null 2>&1
+        
+        SYFT_VERSION="1.18.1"
+        ARCH=$(dpkg --print-architecture)
+        
+        SYFT_URL="https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_${ARCH}.tar.gz"
+        
+        mkdir -p /tmp/syft-install
+        cd /tmp/syft-install
+        wget -q "$SYFT_URL"
+        tar -xzf syft*.tar.gz
+        mv syft /usr/local/bin/
+        chmod +x /usr/local/bin/syft
+        
+        syft --version
+        echo "Syft installed successfully"
+
+  # Step 8: Generate SBOM (Software Bill of Materials)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'generate-sbom'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set +e
+        
+        echo "Generating Software Bill of Materials (SBOM)..."
+        
+        # Ensure Syft is available
+        if ! command -v syft &> /dev/null; then
+          echo "Installing Syft..."
+          apt-get update -qq && apt-get install -y wget > /dev/null 2>&1
+          SYFT_VERSION="1.18.1"
+          wget -q "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz" \
+            -O /tmp/syft.tar.gz
+          tar -xzf /tmp/syft.tar.gz -C /usr/local/bin/
+          chmod +x /usr/local/bin/syft
+        fi
+        
+        # Create output directory
+        mkdir -p /workspace/security-reports
+        
+        # Generate SPDX JSON SBOM
+        echo "Generating SPDX JSON SBOM..."
+        syft gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:${SHORT_SHA} \
+          -o spdx-json \
+          > /workspace/security-reports/sbom.spdx.json 2>&1 || echo "SPDX SBOM generation warning"
+        
+        # Generate CycloneDX JSON SBOM (GCP Artifact Registry compatible)
+        echo "Generating CycloneDX JSON SBOM..."
+        syft gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:${SHORT_SHA} \
+          -o cyclonedx-json \
+          > /workspace/security-reports/sbom.cyclonedx.json 2>&1 || echo "CycloneDX JSON SBOM generation warning"
+        
+        # Generate CycloneDX XML SBOM
+        echo "Generating CycloneDX XML SBOM..."
+        syft gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:${SHORT_SHA} \
+          -o cyclonedx \
+          > /workspace/security-reports/sbom.cyclonedx.xml 2>&1 || echo "CycloneDX XML SBOM generation warning"
+        
+        echo "SBOM generation completed."
+        ls -lh /workspace/security-reports/sbom* || echo "No SBOM files generated"
+
+  # Step 9: Generate security report summary
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    id: 'generate-report'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        mkdir -p /workspace/security-reports
+        
+        cat > /workspace/security-reports/README.md << 'EOF'
+        # CRE Security Scan Report
+        
+        Build: ${BUILD_ID}
+        Commit: ${COMMIT_SHA}
+        Branch: ${BRANCH_NAME}
+        Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        
+        ## Vulnerability Scanning (Trivy)
+        
+        - **trivy-vulnerabilities.json** - Machine-readable vulnerability report
+        - **trivy-vulnerabilities.txt** - Human-readable vulnerability report
+        - **trivy-config.sarif** - Configuration scanning in SARIF format
+        
+        ## Software Bill of Materials (SBOM)
+        
+        - **sbom.spdx.json** - SPDX format SBOM
+        - **sbom.cyclonedx.json** - CycloneDX format SBOM (JSON)
+        - **sbom.cyclonedx.xml** - CycloneDX format SBOM (XML)
+        
+        ## Compliance
+        
+        All security artifacts are suitable for:
+        - GCP Marketplace security review
+        - Supply chain transparency (SBOM)
+        - CI/CD pipeline integration (SARIF)
+        - Vulnerability management systems
+        
+        EOF
+        
+        echo "Security report summary generated"
+
+  # Step 10: Push images to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-images'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:${SHORT_SHA}'
+    waitFor: ['trivy-scan']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-latest'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:latest'
+    waitFor: ['trivy-scan']
+
+  # Step 11: Upload security reports to Cloud Storage
+  - name: 'gcr.io/cloud-builders/gcs'
+    id: 'upload-reports'
+    args:
+      - 'cp'
+      - '-r'
+      - '/workspace/security-reports'
+      - 'gs://${_REPORTS_BUCKET}/cre/${BUILD_ID}/'
+    waitFor: ['generate-report']
+
+  # Step 12: Display scan summary
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'summary'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "=== CRE Security Scan Summary ==="
+        echo "Image: gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:${SHORT_SHA}"
+        echo "Build ID: ${BUILD_ID}"
+        echo "Commit: ${COMMIT_SHA:0:8}"
+        echo ""
+        echo "Security artifacts generated:"
+        ls -lh /workspace/security-reports/ || echo "No artifacts found"
+        echo ""
+        echo "Reports uploaded to:"
+        echo "gs://${_REPORTS_BUCKET}/cre/${BUILD_ID}/"
+
+# Image configurations
+images:
+  - 'gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:${SHORT_SHA}'
+  - 'gcr.io/$PROJECT_ID/${_REPO_NAME}/cre:latest'
+
+# Substitution variables
+substitutions:
+  _REPO_NAME: 'cre'
+  _REPORTS_BUCKET: '${PROJECT_ID}-security-reports'
+
+# Build configuration
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+  
+# Artifact storage
+artifacts:
+  objects:
+    location: 'gs://${_REPORTS_BUCKET}/cre/${BUILD_ID}/artifacts'
+    paths:
+      - '/workspace/security-reports/**/*'
+
+# Timeout (in seconds)
+timeout: 3600s
+
+# Logging
+logsBucket: 'gs://${PROJECT_ID}_cloudbuild'
+

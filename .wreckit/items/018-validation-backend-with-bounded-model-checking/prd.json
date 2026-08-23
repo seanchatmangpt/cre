@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "id": "018-validation-backend-with-bounded-model-checking",
+  "branch_name": "wreckit/018-validation-backend-with-bounded-model-checking",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Create validation backend module structure",
+      "acceptance_criteria": [
+        "Module yawl_model_checker.erl created in /Users/sac/cre/src/validate/",
+        "Module exports validate/1 and validate/2 functions",
+        "Module exports check_deadlock/1, check_dead_transitions/1, check_completion/1 functions",
+        "Type specifications defined for validation_result(), bounds()",
+        "Module compiles without errors or dialyzer warnings"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Foundation module that provides the main API for validation. Must follow existing validation patterns from yawl_validate.erl."
+    },
+    {
+      "id": "US-002",
+      "title": "Implement YAWL to Petri net compiler",
+      "acceptance_criteria": [
+        "Module yawl_pnet_compiler.erl created",
+        "compile/1 function accepts YAWL specification map",
+        "Returns {ok, InitialMarking, Transitions} or {error, Reason}",
+        "Initial marking correctly identifies input conditions with start tokens",
+        "Transitions have correct preset/postset from flow definitions",
+        "Places created for all tasks and conditions",
+        "Integration with pnet_types:marking() for marking representation",
+        "Handles basic control flow: sequence, parallel split, synchronization, exclusive choice"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Critical compilation step. Must leverage existing pnet_types infrastructure from /Users/sac/cre/src/pnet/pnet_types.erl:164 for marking representation."
+    },
+    {
+      "id": "US-003",
+      "title": "Implement bounded state space explorer",
+      "acceptance_criteria": [
+        "Module yawl_explorer.erl created",
+        "explore/3 function accepts InitialMarking, Transitions, and Bounds",
+        "Performs depth-limited DFS with configurable depth bound (default 15)",
+        "Enforces token bound per place (default 10 tokens)",
+        "Tracks visited states using pnet_marking:hash/1 for cycle detection",
+        "Returns {ok, [Traces]} where each trace is a list of markings",
+        "Terminates within reasonable time for workflows up to 50 tasks",
+        "Handles dead states (no enabled transitions) correctly"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Core exploration algorithm. Must use pnet_marking:hash/1 from /Users/sac/cre/src/pnet/pnet_marking.erl:320 for stable state hashing."
+    },
+    {
+      "id": "US-004",
+      "title": "Implement deadlock detection",
+      "acceptance_criteria": [
+        "check_deadlock/1 function implemented in yawl_model_checker",
+        "Analyzes exploration traces to detect deadlock states",
+        "Deadlock = no enabled transitions but not in final marking",
+        "Returns validation_error with code deadlock_detected",
+        "Error message includes location information (marking snapshot)",
+        "Detects known deadlock case (XOR split with AND join mismatch)",
+        "No false positives on correct workflows"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Key validation property. Must distinguish between deadlock and proper completion at output conditions."
+    },
+    {
+      "id": "US-005",
+      "title": "Implement dead transition detection",
+      "acceptance_criteria": [
+        "check_dead_transitions/2 function implemented",
+        "Extracts fired transitions from exploration traces",
+        "Identifies transitions that never fired within depth bound",
+        "Returns validation_error with code dead_transition",
+        "Error severity is warning (not error)",
+        "Reports location (transition ID) for each dead transition",
+        "Detects isolated/unreachable tasks"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Helps identify workflow design issues. Requires trace tracking to be enhanced in yawl_explorer to record which transitions fired."
+    },
+    {
+      "id": "US-006",
+      "title": "Implement completion option check",
+      "acceptance_criteria": [
+        "check_completion/1 function implemented",
+        "Checks if any trace reaches final marking (tokens at output condition)",
+        "Returns validation_error with code no_completion_path",
+        "Detects workflows that cannot complete (e.g., infinite loops)",
+        "Error severity is error (blocking issue)",
+        "Correctly identifies final markings based on output conditions"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Critical soundness property. Workflow must have option to complete to be valid."
+    },
+    {
+      "id": "US-007",
+      "title": "Enhance trace tracking for transition history",
+      "acceptance_criteria": [
+        "yawl_explorer trace type modified to include transition IDs",
+        "trace_step() type defined as {TransitionId, Marking}",
+        "explore/3 returns traces with transition information",
+        "extract_fired_transitions/1 can identify all transitions in trace",
+        "Backward compatible with existing code"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Required for dead transition detection. Must modify DFS to record which transition fired between states."
+    },
+    {
+      "id": "US-008",
+      "title": "Create comprehensive test suite",
+      "acceptance_criteria": [
+        "Module yawl_model_checker_tests.erl created",
+        "Test for simple sequence workflow (should pass validation)",
+        "Test for deadlock workflow (XOR split / AND join mismatch)",
+        "Test for dead transition (unreachable task)",
+        "Test for no completion (infinite loop)",
+        "All tests pass with rebar3 eunit",
+        "Test coverage > 80% for new modules"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Ensure tests cover all three validation properties. Use create_*_spec helper functions to build test specifications."
+    },
+    {
+      "id": "US-009",
+      "title": "Integrate with existing validation infrastructure",
+      "acceptance_criteria": [
+        "yawl_validate.erl updated to call model checker",
+        "check_model_properties/1 function added to yawl_validate",
+        "Model checking is opt-in via application:get_env(cre, enable_model_checking, false)",
+        "Returns errors in same format as existing validation",
+        "No interference with existing validation when disabled",
+        "Combined error reports from structural and model checking"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Integration must be non-breaking. Follow pattern from /Users/sac/cre/src/core/yawl_validate.erl:158-186."
+    },
+    {
+      "id": "US-010",
+      "title": "Add performance monitoring and optimization",
+      "acceptance_criteria": [
+        "Timing added to validation (monotonic time measurement)",
+        "State count logged after exploration",
+        "Validation completes in < 30 seconds for typical workflows (10-50 tasks)",
+        "Memory usage fits within system limits for 50-task workflows",
+        "Depth and token bounds are configurable via Options map",
+        "Performance metrics logged to console"
+      ],
+      "priority": 4,
+      "status": "done",
+      "notes": "Performance requirements from success criteria. Default bounds (depth=15, token_bound=10) should be reasonable for most workflows."
+    }
+  ]
+}

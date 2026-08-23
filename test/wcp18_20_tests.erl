@@ -441,3 +441,154 @@ performance_test_() ->
          ?assert(Time2 < 1000),
          ?assert(Time3 < 1000)
      end}.
+
+%%====================================================================
+%% Milestone Utility Functions Tests (WCP-18 State-Based API)
+%%====================================================================
+
+milestone_reached_test_() ->
+    [
+     {"milestone_reached/2 returns true when milestone place has tokens",
+      fun() ->
+              Marking = #{'p_milestone_reached' => [reached], 'p_activity' => []},
+              ?assert(milestone:milestone_reached(Marking, 'p_milestone_reached'))
+      end},
+
+     {"milestone_reached/2 returns false when milestone place is empty",
+      fun() ->
+              Marking = #{'p_milestone_reached' => [], 'p_activity' => []},
+              ?assertNot(milestone:milestone_reached(Marking, 'p_milestone_reached'))
+      end},
+
+     {"milestone_reached/2 returns false for non-existent place",
+      fun() ->
+              Marking = #{'p_activity' => []},
+              ?assertNot(milestone:milestone_reached(Marking, 'p_milestone_reached'))
+      end}
+    ].
+
+enable_on_milestone_test_() ->
+    [
+     {"enable_on_milestone/3 returns true only after milestone reached and activity empty",
+      fun() ->
+              %% Milestone reached, activity empty
+              Marking1 = #{'p_milestone_reached' => [reached], 'p_activity' => []},
+              ?assert(milestone:enable_on_milestone(Marking1, 'p_milestone_reached', 'p_activity')),
+
+              %% Milestone reached, activity has tokens
+              Marking2 = #{'p_milestone_reached' => [reached], 'p_activity' => [active]},
+              ?assertNot(milestone:enable_on_milestone(Marking2, 'p_milestone_reached', 'p_activity')),
+
+              %% Milestone not reached, activity empty
+              Marking3 = #{'p_milestone_reached' => [], 'p_activity' => []},
+              ?assertNot(milestone:enable_on_milestone(Marking3, 'p_milestone_reached', 'p_activity'))
+      end}
+    ].
+
+disable_on_milestone_test_() ->
+    [
+     {"disable_on_milestone/3 is inverse of enable_on_milestone",
+      fun() ->
+              Marking1 = #{'p_milestone_reached' => [reached], 'p_activity' => []},
+              ?assertNot(milestone:disable_on_milestone(Marking1, 'p_milestone_reached', 'p_activity')),
+
+              Marking2 = #{'p_milestone_reached' => [], 'p_activity' => []},
+              ?assert(milestone:disable_on_milestone(Marking2, 'p_milestone_reached', 'p_activity'))
+      end}
+    ].
+
+milestone_check_test_() ->
+    [
+     {"milestone_check/2 validates satisfied constraints",
+      fun() ->
+              Marking = #{
+                  'p_milestone' => [reached],
+                  'p_before' => [],
+                  'p_after' => [active]
+              },
+              Config = #{
+                  milestone_place => 'p_milestone',
+                  disabled_after => ['p_before'],
+                  enabled_after => ['p_after']
+              },
+              ?assertEqual({ok, true}, milestone:milestone_check(Marking, Config))
+      end},
+
+     {"milestone_check/2 detects disabled-after violation",
+      fun() ->
+              Marking = #{
+                  'p_milestone' => [reached],
+                  'p_before' => [active],  %% Should be empty after milestone
+                  'p_after' => [active]
+              },
+              Config = #{
+                  milestone_place => 'p_milestone',
+                  disabled_after => ['p_before'],
+                  enabled_after => ['p_after']
+              },
+              ?assertEqual({error, milestone_constraint_violation},
+                          milestone:milestone_check(Marking, Config))
+      end},
+
+     {"milestone_check/2 detects enabled-before-milestone violation",
+      fun() ->
+              Marking = #{
+                  'p_milestone' => [],  %% Not reached yet
+                  'p_before' => [],
+                  'p_after' => [active]  %% Should not have tokens before milestone
+              },
+              Config = #{
+                  milestone_place => 'p_milestone',
+                  disabled_after => ['p_before'],
+                  enabled_after => ['p_after']
+              },
+              ?assertEqual({error, milestone_constraint_violation},
+                          milestone:milestone_check(Marking, Config))
+      end},
+
+     {"milestone_check/2 returns error for missing config",
+      fun() ->
+              Marking = #{'p_milestone' => []},
+              Config = #{disabled_after => []},
+              ?assertMatch({error, {missing_config, milestone_place}},
+                          milestone:milestone_check(Marking, Config))
+      end}
+    ].
+
+milestone_passed_test_() ->
+    [
+     {"milestone_passed/2 returns true when milestone place is empty",
+      fun() ->
+              Marking1 = #{'p_milestone' => [], 'p_downstream' => [token]},
+              ?assert(milestone:milestone_passed(Marking1, 'p_milestone')),
+
+              Marking2 = #{'p_milestone' => [reached], 'p_downstream' => [token]},
+              ?assertNot(milestone:milestone_passed(Marking2, 'p_milestone'))
+      end},
+
+     {"milestone_passed/2 with downstream places checks forward progress",
+      fun() ->
+              %% Milestone empty AND downstream has tokens = passed
+              Marking1 = #{
+                  'p_milestone' => [],
+                  'p_downstream' => [token],
+                  'p_other' => []
+              },
+              ?assert(milestone:milestone_passed(Marking1, {'p_milestone', ['p_downstream']})),
+
+              %% Milestone empty but no downstream tokens = not passed
+              Marking2 = #{
+                  'p_milestone' => [],
+                  'p_downstream' => [],
+                  'p_other' => []
+              },
+              ?assertNot(milestone:milestone_passed(Marking2, {'p_milestone', ['p_downstream']})),
+
+              %% Milestone has tokens = not passed regardless of downstream
+              Marking3 = #{
+                  'p_milestone' => [reached],
+                  'p_downstream' => [token]
+              },
+              ?assertNot(milestone:milestone_passed(Marking3, {'p_milestone', ['p_downstream']}))
+      end}
+    ].

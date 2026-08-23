@@ -1,0 +1,481 @@
+---
+name: GCP Cloud Build CI/CD
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      deploy_env:
+        description: 'Deployment environment'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - staging
+          - production
+      skip_tests:
+        description: 'Skip tests (build only)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  ARTIFACT_REGISTRY: us-central1-docker.pkg.dev
+  REGION: us-central1
+  GKE_CLUSTER: cre-prod-cluster
+  GKE_ZONE: us-central1-a
+
+jobs:
+  # ============================================
+  # Stage 1: Trigger Cloud Build
+  # ============================================
+  trigger-cloud-build:
+    name: Trigger Cloud Build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    outputs:
+      image_digest: ${{ steps.trigger.outputs.digest }}
+      image_tag: ${{ steps.meta.outputs.tags }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Authenticate to GCP
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_CLOUD_BUILD_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '>= 470.0.0'
+
+      - name: Extract metadata for Docker
+        id: meta
+        run: |
+          VERSION=${{ github.ref_name }}
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+
+          if [[ "${{ github.event_name }}" == "tag" ]]; then
+            TAGS="${VERSION},${VERSION#v},latest"
+          else
+            TAGS="${VERSION},${VERSION}-${SHORT_SHA},${VERSION}-${TIMESTAMP}"
+          fi
+
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Enforce immutable version tags
+        run: |
+          if [[ "${{ github.event_name }}" == "tag" ]]; then
+            # Only vX.Y.Z tags allowed for Marketplace
+            if ! [[ "${{ steps.meta.outputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Error: Marketplace requires immutable version tags (vX.Y.Z)"
+              exit 1
+            fi
+          fi
+
+      - name: Validate Marketplace compliance
+        run: |
+          # Check for application.yaml
+          if [ ! -f "k8s/charts/cre/application.yaml" ]; then
+            echo "Error: application.yaml required for Marketplace"
+            exit 1
+          fi
+
+          # Check for secrets in values.yaml
+          if grep -q "existingSecret:" k8s/charts/cre/values.yaml; then
+            echo "Error: Secrets not allowed in values.yaml for Marketplace"
+            exit 1
+          fi
+
+          # Validate Helm chart
+          helm lint k8s/charts/cre
+
+          echo "Marketplace compliance checks passed"
+
+      - name: Submit build to Cloud Build
+        id: trigger
+        run: |
+          IMAGE_NAME="${ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/cre:${{ steps.meta.outputs.sha }}"
+
+          gcloud builds submit . \
+            --config cloudbuild.yaml \
+            --substitutions=_IMAGE_NAME="${IMAGE_NAME}",_VERSION="${{ steps.meta.outputs.version }}",_COMMIT_SHA="${{ github.sha }}",_BUILD_DATE="${{ github.event.head_commit.timestamp }}" \
+            --region=${{ env.REGION }} \
+            --format='value(imageSummary.digest)'
+
+          echo "digest=${IMAGE_NAME}@$(gcloud builds list --limit=1 --format='value(imageSummary.digest)' --region=${{ env.REGION }})" >> $GITHUB_OUTPUT
+
+      - name: Upload build logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cloudbuild-logs
+          path: |
+            cloudbuild-*.json
+          retention-days: 30
+
+  # ============================================
+  # Stage 2: Security Scanning
+  # ============================================
+  security-scan:
+    name: Security Scan
+    needs: trigger-cloud-build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_CLOUD_BUILD_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install Trivy
+        run: |
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Configure Docker for Trivy
+        run: |
+          gcloud auth configure-docker ${ARTIFACT_REGISTRY} \
+            --quiet
+
+      - name: Scan image with Trivy
+        run: |
+          IMAGE_DIGEST="${{ needs.trigger-cloud-build.outputs.image_digest }}"
+          trivy image \
+            --severity CRITICAL,HIGH \
+            --format json \
+            --output trivy-results.json \
+            "${IMAGE_DIGEST}"
+
+      - name: Upload Trivy results
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-results
+          path: trivy-results.json
+          retention-days: 90
+
+      - name: Generate SARIF for GitHub Security
+        run: |
+          trivy image \
+            --format sarif \
+            --output trivy-results.sarif \
+            "${{ needs.trigger-cloud-build.outputs.image_digest }}"
+
+      - name: Upload to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: gcp-cloud-build
+
+  # ============================================
+  # Stage 3: Deploy to GKE
+  # ============================================
+  deploy-gke:
+    name: Deploy to GKE
+    needs: [trigger-cloud-build, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+
+    environment:
+      name: ${{ github.event.inputs.deploy_env || 'production' }}
+      url: https://cre.${{ env.PROJECT_ID }}.appspot.com
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_GKE_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '>= 470.0.0'
+
+      - name: Configure kubectl
+        run: |
+          gcloud container clusters get-credentials "${{ env.GKE_CLUSTER }}" \
+            --region="${{ env.GKE_CLUSTER }}" \
+            --project="${PROJECT_ID}"
+
+      - name: Pre-deployment health check
+        run: |
+          NAMESPACE="cre-${{ github.event.inputs.deploy_env || 'production' }}"
+
+          echo "Checking current deployment health..."
+          kubectl get deployment -n "${NAMESPACE}" -l app=cre || echo "No existing deployment found"
+
+      - name: Deploy using gke-deploy
+        run: |
+          IMAGE="${{ needs.trigger-cloud-build.outputs.image_digest }}"
+          NAMESPACE="cre-${{ github.event.inputs.deploy_env || 'production' }}"
+          VERSION="${{ needs.trigger-cloud-build.outputs.image_tag }}"
+
+          # Create namespace if not exists
+          kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+
+          # Create deployment manifest
+          cat <<EOF | kubectl apply -f -
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: cre
+            namespace: ${NAMESPACE}
+            labels:
+              app: cre
+              version: ${VERSION}
+          spec:
+            replicas: 3
+            selector:
+              matchLabels:
+                app: cre
+            template:
+              metadata:
+                labels:
+                  app: cre
+                  version: ${VERSION}
+              spec:
+                serviceAccountName: cre-ksa
+                containers:
+                - name: cre
+                  image: ${IMAGE}
+                  ports:
+                  - containerPort: 4142
+                    name: http
+                  - containerPort: 4369
+                    name: epmd
+                  env:
+                  - name: CRE_NODE_NAME
+                    value: "cre@cre.${NAMESPACE}.svc.cluster.local"
+                  - name: CRE_MODE
+                    value: "init"
+                  - name: ERL_MAX_PORTS
+                    value: "65536"
+                  - name: ERL_MAX_ETS_TABLES
+                    value: "2000"
+                  resources:
+                    requests:
+                      cpu: "500m"
+                      memory: "512Mi"
+                    limits:
+                      cpu: "2000m"
+                      memory: "2Gi"
+                  livenessProbe:
+                    httpGet:
+                      path: /api/v1/health
+                      port: 4142
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                    timeoutSeconds: 5
+                    failureThreshold: 3
+                  readinessProbe:
+                    httpGet:
+                      path: /api/v1/health
+                      port: 4142
+                    initialDelaySeconds: 10
+                    periodSeconds: 5
+                    timeoutSeconds: 3
+                    failureThreshold: 3
+          EOF
+
+      - name: Wait for rollout
+        run: |
+          NAMESPACE="cre-${{ github.event.inputs.deploy_env || 'production' }}"
+
+          kubectl rollout status deployment/cre \
+            -n "${NAMESPACE}" \
+            --timeout=10m
+
+      - name: Post-deployment health verification
+        run: |
+          NAMESPACE="cre-${{ github.event.inputs.deploy_env || 'production' }}"
+
+          # Wait for deployment to be ready
+          kubectl wait --for=condition=available \
+            deployment/cre \
+            -n "${NAMESPACE}" \
+            --timeout=300s
+
+          # Get service endpoint
+          ENDPOINT=$(kubectl get svc cre \
+            -n "${NAMESPACE}" \
+            -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          if [ -z "$ENDPOINT" ]; then
+            # Try using cluster IP for internal check
+            ENDPOINT=$(kubectl get svc cre \
+              -n "${NAMESPACE}" \
+              -o jsonpath='{.spec.clusterIP}')
+            PORT=4142
+          else
+            PORT=4142
+          fi
+
+          # Health check with retries
+          for i in {1..20}; do
+            if kubectl exec -n "${NAMESPACE}" deployment/cre -- \
+              curl -f http://localhost:4142/api/v1/health; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Health check failed, retrying... ($i/20)"
+            sleep 10
+          done
+
+          echo "Health check failed after 20 attempts"
+          exit 1
+
+      - name: Verify deployment metrics
+        run: |
+          NAMESPACE="cre-${{ github.event.inputs.deploy_env || 'production' }}"
+
+          echo "=== Pod Status ==="
+          kubectl get pods -n "${NAMESPACE}" -l app=cre
+
+          echo "=== Deployment Status ==="
+          kubectl describe deployment/cre -n "${NAMESPACE}"
+
+          echo "=== Recent Logs ==="
+          kubectl logs -n "${NAMESPACE}" -l app=cre --tail=50
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          NAMESPACE="cre-${{ github.event.inputs.deploy_env || 'production' }}"
+
+          echo "Deployment failed, initiating rollback..."
+          kubectl rollout undo deployment/cre -n "${NAMESPACE}"
+
+          echo "Waiting for rollback to complete..."
+          kubectl rollout status deployment/cre -n "${NAMESPACE}" --timeout=10m
+
+          echo "Rollback completed. Previous version restored."
+
+      - name: Deployment notification
+        if: success()
+        run: |
+          echo "==================================="
+          echo "Deployment Successful!"
+          echo "Environment: ${{ github.event.inputs.deploy_env || 'production' }}"
+          echo "Image: ${{ needs.trigger-cloud-build.outputs.image_digest }}"
+          echo "Version: ${{ needs.trigger-cloud-build.outputs.image_tag }}"
+          echo "Time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+          echo "==================================="
+
+  # ============================================
+  # Stage 4: SBOM Generation
+  # ============================================
+  generate-sbom:
+    name: Generate SBOM
+    needs: trigger-cloud-build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_CLOUD_BUILD_SA }}
+
+      - name: Generate SBOM with Syft
+        run: |
+          # Install Syft
+          wget -qO- https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+          # Configure Docker for GCP
+          gcloud auth configure-docker ${ARTIFACT_REGISTRY} --quiet
+
+          # Generate SBOM
+          IMAGE="${{ needs.trigger-cloud-build.outputs.image_digest }}"
+
+          syft "${IMAGE}" \
+            -o spdx-json \
+            --file sbom.spdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-gcp
+          path: sbom.spdx.json
+          retention-days: 90
+
+      - name: Upload SBOM to Artifact Registry
+        run: |
+          IMAGE_NAME="${ARTIFACT_REGISTRY}/${PROJECT_ID}/cre/cre"
+          SHORT_SHA=$(git rev-parse --short HEAD)
+
+          # Attach SBOM as image annotation
+          gcloud artifacts docker images add-label \
+            "${IMAGE_NAME}:${SHORT_SHA}" \
+            --location=${{ env.REGION }} \
+            --update-labels=sbom=generated
+
+  # ============================================
+  # Summary Report
+  # ============================================
+  summary:
+    name: GCP Cloud Build Summary
+    needs: [trigger-cloud-build, security-scan, deploy-gke, generate-sbom]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "# GCP Cloud Build Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Cloud Build | ${{ needs.trigger-cloud-build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| GKE Deploy | ${{ needs.deploy-gke.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SBOM Gen | ${{ needs.generate-sbom.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Digest:** \`${{ needs.trigger-cloud-build.outputs.image_digest }}\`" >> $GITHUB_STEP_SUMMARY

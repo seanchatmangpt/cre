@@ -1,0 +1,425 @@
+---
+# BackendConfig for GKE Load Balancer with IAP (Identity-Aware Proxy)
+# This configuration enables IAP for the CRE API endpoints
+#
+# IAP provides:
+# - Google-authenticated access control
+# - Zero-trust access without VPN
+# - Centralized access management via Google Cloud Console
+# - Audit logging of all access attempts
+
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: cre-backend-config
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+  annotations:
+    description: "Backend configuration for CRE with IAP security and Cloud Armor"
+spec:
+  # ---------------------------------------------------------------------------
+  # IAP Configuration
+  # ---------------------------------------------------------------------------
+  iap:
+    enabled: true
+    # OAuth 2.0 client ID (created via Terraform or gcloud)
+    # Use terraform output iap_client_id to get this value
+    # oauthClientId: YOUR_OAUTH_CLIENT_ID
+    # oauthClientSecret: YOUR_OAUTH_CLIENT_SECRET
+
+  # ---------------------------------------------------------------------------
+  # Security Policy (Cloud Armor)
+  # ---------------------------------------------------------------------------
+  securityPolicy:
+    # Reference to Cloud Armor security policy
+    # This policy provides additional security layer before IAP
+    name: cre-cloud-armor-policy
+
+  # ---------------------------------------------------------------------------
+  # Timeout Settings
+  # ---------------------------------------------------------------------------
+  timeoutSec: 3600  # 1 hour timeout for long-running workflow operations
+
+  # ---------------------------------------------------------------------------
+  # Connection Draining
+  # ---------------------------------------------------------------------------
+  connectionDraining:
+    drainingTimeoutSec: 300  # 5 minutes to drain existing connections
+
+  # ---------------------------------------------------------------------------
+  # Health Check Configuration
+  # ---------------------------------------------------------------------------
+  healthCheck:
+    # Health check interval
+    checkIntervalSec: 10
+    # Health check timeout
+    timeoutSec: 5
+    # Number of successful checks before marking healthy
+    healthyThreshold: 2
+    # Number of failed checks before marking unhealthy
+    unhealthyThreshold: 3
+    # Health check type
+    type: HTTP
+    # Health check request path
+    requestPath: /status.json
+    # Health check port
+    port: 4142
+    # Health check protocol
+    protocol: HTTP
+    # Health check response expectations
+    # response: '{"status":"ok"}'
+
+  # ---------------------------------------------------------------------------
+  # Session Affinity
+  # ---------------------------------------------------------------------------
+  sessionAffinity: CLIENT_IP
+  # sessionAffinityTtlSec: 3600  # 1 hour
+
+  # ---------------------------------------------------------------------------
+  # CDN Configuration (Optional - disable for API endpoints)
+  # ---------------------------------------------------------------------------
+  # cdn:
+  #   enabled: false  # CDN disabled for API with IAP
+
+  # ---------------------------------------------------------------------------
+  # Logging
+  # ---------------------------------------------------------------------------
+  logging:
+    enabled: true
+    sampleRate: 1.0  # Log 100% of requests for security audit
+
+---
+# BackendConfig for API-specific IAP enforcement
+# This config is used for /api/* endpoints only
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: cre-api-backend-config
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: api
+  annotations:
+    description: "IAP-secured backend configuration for CRE API endpoints"
+spec:
+  # ---------------------------------------------------------------------------
+  # IAP Configuration - Strict Mode for API
+  # ---------------------------------------------------------------------------
+  iap:
+    enabled: true
+    # oauthClientId: YOUR_OAUTH_CLIENT_ID
+    # oauthClientSecret: YOUR_OAUTH_CLIENT_SECRET
+
+  # ---------------------------------------------------------------------------
+  # Security Policy - Stricter for API
+  # ---------------------------------------------------------------------------
+  securityPolicy:
+    name: cre-api-cloud-armor-policy  # Separate stricter policy for API
+
+  # ---------------------------------------------------------------------------
+  # Timeout Settings
+  # ---------------------------------------------------------------------------
+  timeoutSec: 300  # 5 minutes for API calls (shorter than workflows)
+
+  # ---------------------------------------------------------------------------
+  # Connection Draining
+  # ---------------------------------------------------------------------------
+  connectionDraining:
+    drainingTimeoutSec: 60  # 1 minute for API connections
+
+  # ---------------------------------------------------------------------------
+  # Health Check Configuration
+  # ---------------------------------------------------------------------------
+  healthCheck:
+    checkIntervalSec: 5
+    timeoutSec: 3
+    healthyThreshold: 2
+    unhealthyThreshold: 2
+    type: HTTP
+    requestPath: /health
+    port: 4142
+    protocol: HTTP
+
+  # ---------------------------------------------------------------------------
+  # Logging - Critical for API audit
+  # ---------------------------------------------------------------------------
+  logging:
+    enabled: true
+    sampleRate: 1.0  # Log 100% of API requests
+
+---
+# BackendConfig for Internal Services (IAP Disabled)
+# For service-to-service communication within VPC
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: cre-internal-backend-config
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: internal
+  annotations:
+    description: "Internal backend configuration without IAP for service mesh traffic"
+spec:
+  # ---------------------------------------------------------------------------
+  # IAP DISABLED for internal services
+  # ---------------------------------------------------------------------------
+  # iap:
+  #   enabled: false
+
+  # ---------------------------------------------------------------------------
+  # Security Policy - Internal VPC Only
+  # ---------------------------------------------------------------------------
+  # No Cloud Armor for internal traffic (rely on network policies)
+  # securityPolicy:
+  #   name: cre-internal-policy
+
+  # ---------------------------------------------------------------------------
+  # Timeout Settings
+  # ---------------------------------------------------------------------------
+  timeoutSec: 3600
+
+  # ---------------------------------------------------------------------------
+  # Connection Draining
+  # ---------------------------------------------------------------------------
+  connectionDraining:
+    drainingTimeoutSec: 300
+
+  # ---------------------------------------------------------------------------
+  # Health Check Configuration
+  # ---------------------------------------------------------------------------
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /status.json
+    port: 4142
+    protocol: HTTP
+
+  # ---------------------------------------------------------------------------
+  # Logging
+  # ---------------------------------------------------------------------------
+  logging:
+    enabled: true
+    sampleRate: 0.1  # Sample 10% of internal traffic
+
+---
+# Staging BackendConfig with IAP (Optional)
+# Enable IAP in staging for testing if needed
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: cre-backend-config-staging
+  namespace: cre-staging
+  labels:
+    app: cre
+    environment: staging
+  annotations:
+    description: "Backend configuration for CRE staging with optional IAP"
+spec:
+  # ---------------------------------------------------------------------------
+  # IAP Configuration - Optional for Staging
+  # ---------------------------------------------------------------------------
+  # iap:
+  #   enabled: false  # Set to true to enable IAP in staging
+
+  # ---------------------------------------------------------------------------
+  # Security Policy
+  # ---------------------------------------------------------------------------
+  securityPolicy:
+    name: cre-staging-cloud-armor-policy
+
+  # ---------------------------------------------------------------------------
+  # Timeout Settings
+  # ---------------------------------------------------------------------------
+  timeoutSec: 3600
+
+  # ---------------------------------------------------------------------------
+  # Connection Draining
+  # ---------------------------------------------------------------------------
+  connectionDraining:
+    drainingTimeoutSec: 60
+
+  # ---------------------------------------------------------------------------
+  # Health Check Configuration
+  # ---------------------------------------------------------------------------
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /status.json
+    port: 4142
+    protocol: HTTP
+
+  # ---------------------------------------------------------------------------
+  # Logging
+  # ---------------------------------------------------------------------------
+  logging:
+    enabled: true
+    sampleRate: 0.5
+
+---
+# Service with IAP BackendConfig Reference
+# This service uses the IAP-enabled BackendConfig
+apiVersion: v1
+kind: Service
+metadata:
+  name: cre-api
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: api
+  annotations:
+    # Reference the IAP-enabled BackendConfig
+    cloud.google.com/backend-config: '{"default": "cre-api-backend-config"}'
+    # Enable NEG for better performance
+    cloud.google.com/neg: '{"ingress": true}'
+    description: "CRE API Service with IAP authentication"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 4142
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: cre
+    component: workflow-engine
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 300
+
+---
+# Ingress with IAP-Secured Backend
+# This ingress references the IAP-enabled service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cre-api-ingress
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: api-ingress
+  annotations:
+    # GKE Ingress controller
+    kubernetes.io/ingress.class: "gce"
+    # Static IP
+    kubernetes.io/ingress.global-static-ip-name: "cre-api-static-ip"
+    # BackendConfig reference
+    cloud.google.com/backend-config: '{"default": "cre-api-backend-config"}'
+    # SSL/HTTPS
+    networking.gke.io/v1beta1.PreconfiguredCertificates: "cre-api-tls-cert"
+    networking.gke.io/ssl-policy: "cre-api-ssl-policy"
+    # Security
+    cloud.google.com/app-protocols: '{"4142":"HTTPS"}'
+    # IAP specific annotations
+    # ingress.kubernetes.io/ssl-redirect: "true"
+    # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://cre.example.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    # Rate limiting via Cloud Armor (configured in BackendConfig security policy)
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    # Timeouts for API calls
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  # TLS configuration
+  tls:
+    - hosts:
+        - api.cre.example.com
+      secretName: cre-api-tls-secret
+  rules:
+    - host: api.cre.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: cre-api
+                port:
+                  number: 4142
+          - path: /workflows
+            pathType: Prefix
+            backend:
+              service:
+                name: cre-api
+                port:
+                  number: 4142
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: cre-api
+                port:
+                  number: 4142
+
+---
+# Managed Certificate for API
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: cre-api-managed-cert
+  namespace: cre-prod
+spec:
+  domains:
+    - api.cre.example.com
+
+---
+# ConfigMap for IAP Configuration
+# Store IAP-related configuration for the application
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cre-iap-config
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: iap-config
+data:
+  # IAP settings
+  iap.enabled: "true"
+  iap.audience: "/projects/PROJECT_NUMBER/apps/PROJECT_ID"
+  iap.token-header: "X-Goog-IAP-JWT-Assertion"
+
+  # Expected JWT claims (for validation)
+  iap.expected-issuer: "https://cloud.google.com/iap"
+  iap.expected-audience-prefix: "/projects/"
+
+  # Public key URL for IAP JWT verification
+  iap.public-key-url: "https://www.gstatic.com/iap/verify/public_key"
+
+  # Logging settings
+  iap.log-headers: "true"
+  iap.log-user-info: "true"
+
+  # Security settings
+  iap.skip-health-check: "true"
+  iap.health-check-paths: "/health,/ready,/status.json"
+
+---
+# Secret for IAP OAuth Credentials
+# Store the OAuth client credentials (created via Terraform)
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: cre-iap-oauth
+#   namespace: cre-prod
+# type: Opaque
+# data:
+#   # Base64 encoded OAuth client ID and secret
+#   # Use: echo -n "CLIENT_ID" | base64
+#   client-id: "YOUR_BASE64_ENCODED_CLIENT_ID"
+#   client-secret: "YOUR_BASE64_ENCODED_CLIENT_SECRET"
+---

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "011-compiler-from-pattern-terms-to-executable-form",
+  "title": "Compiler from pattern terms to executable form",
+  "section": "backend",
+  "state": "researched",
+  "overview": "Pattern terms are convenient for authoring but inefficient for runtime execution. Need compilation strategy that produces efficient executable forms without interpretation overhead.\n\n**Motivation:** Achieves performance goals by eliminating runtime dispatch overhead, enables optimization opportunities, produces forms suitable for deterministic replay and efficient cancellation.\n\n**Technical constraints:**\n- No runtime 'case NodeType of' dispatch in hot loops\n- Must support Strategy S1 (bytecode VM) or S2 (continuation network)\n- Opcodes: SEQ_ENTER, PAR_FORK, JOIN_WAIT, XOR_CHOOSE, LOOP_BACK, CANCEL_SCOPE, MI_SPAWN, EFFECT_YIELD\n- Or continuation network of closures/frames\n- Must support efficient cancellation propagation\n- Must support join policies without graph scanning\n\n**Signals:** priority: critical, urgency: Required before any pattern execution is possible",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Agent failed with exit code 1",
+  "created_at": "2026-02-11T01:57:00.425Z",
+  "updated_at": "2026-02-11T03:41:31.985Z",
+  "problem_statement": "Pattern terms are convenient for authoring but inefficient for runtime execution. Need compilation strategy that produces efficient executable forms without interpretation overhead.",
+  "motivation": "Achieves performance goals by eliminating runtime dispatch overhead, enables optimization opportunities, produces forms suitable for deterministic replay and efficient cancellation.",
+  "technical_constraints": [
+    "No runtime 'case NodeType of' dispatch in hot loops",
+    "Must support Strategy S1 (bytecode VM) or S2 (continuation network)",
+    "Opcodes: SEQ_ENTER, PAR_FORK, JOIN_WAIT, XOR_CHOOSE, LOOP_BACK, CANCEL_SCOPE, MI_SPAWN, EFFECT_YIELD",
+    "Or continuation network of closures/frames",
+    "Must support efficient cancellation propagation",
+    "Must support join policies without graph scanning"
+  ],
+  "priority_hint": "critical",
+  "urgency_hint": "Required before any pattern execution is possible"
+}

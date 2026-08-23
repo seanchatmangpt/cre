@@ -1,0 +1,130 @@
+# k8s/gcp/network-policy.yaml
+# Network policies for GCP Marketplace compliance - pod-to-pod traffic control
+# Uses default-deny with explicit whitelist approach for security
+
+---
+# Default deny all ingress traffic (whitelist approach)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+
+---
+# Default deny all egress traffic (whitelist approach)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+
+---
+# Allow CRE pods to communicate with each other
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cre-allow-internal
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: cre
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: cre
+    ports:
+    - protocol: TCP
+      port: 4369  # EPMD - Erlang Port Mapper Daemon
+    - protocol: TCP
+      port: 9100  # Metrics exporter
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: cre
+    ports:
+    - protocol: TCP
+      port: 4369
+    - protocol: TCP
+      port: 9100
+
+---
+# Allow egress to Cloud Monitoring/Logging and DNS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cre-allow-gcp-services
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: cre
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS (required for service discovery)
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow communication with kube-system namespace (kube-proxy, etc.)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow Cloud Monitoring and Logging APIs
+  - to:
+    - ipBlock:
+        cidr: 199.36.153.8/30  # Cloud Monitoring/Logging
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow Stackdriver/OTLP ingress
+  - to:
+    - ipBlock:
+        cidr: 108.177.96.0/20  # Google APIs (alternate range)
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+# Allow health check probes from kubelet
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cre-allow-health-checks
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: cre
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    # Allow from all namespaces for health checks (kubelet probes)
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8080  # Liveness/readiness probes
+    - protocol: TCP
+      port: 9100  # metrics endpoint

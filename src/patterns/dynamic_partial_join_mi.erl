@@ -54,7 +54,7 @@ fire(t_create_instances, _Mode, UsrInfo) ->
     {produce, #{p_instances => [inst1, inst2, inst3, inst4, inst5]}, UsrInfo};
 fire(t_complete_instance, _Mode, UsrInfo) ->
     {produce, #{p_instances => [completed]}, UsrInfo};
-fire(t_compute_threshold, Mode, UsrInfo) ->
+fire(t_compute_threshold, _Mode, UsrInfo) ->
     State = get_state(UsrInfo),
     Threshold = compute_threshold(State),
     NewState = State#state{threshold = Threshold},
@@ -68,7 +68,7 @@ fire(t_threshold, Mode, UsrInfo) ->
     {produce, #{p_threshold_met => [met]}, NewState};
 fire(t_finish, _Mode, UsrInfo) ->
     {produce, #{p_end => [done]}, UsrInfo};
-fire(_Trsn, _Mode, UsrInfo) ->
+fire(_Trsn, _Mode, _UsrInfo) ->
     abort.
 
 compute_threshold(State) ->
@@ -105,3 +105,57 @@ handle_cast(_Request, State) -> {noreply, State}.
 handle_info(_Info, State) -> {noreply, State}.
 terminate(_Reason, _State) -> ok.
 trigger(_Place, _Token, _NetState) -> pass.
+
+%%====================================================================
+%% Unit Tests
+%%====================================================================
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+%% Test place_lst/0
+place_lst_test() ->
+    Places = place_lst(),
+    ?assert(lists:member(p_start, Places)),
+    ?assert(lists:member(p_instances, Places)),
+    ?assert(lists:member(p_threshold_met, Places)),
+    ?assert(lists:member(p_end, Places)).
+
+%% Test trsn_lst/0
+trsn_lst_test() ->
+    Transitions = trsn_lst(),
+    ?assert(lists:member(t_create_instances, Transitions)),
+    ?assert(lists:member(t_complete_instance, Transitions)),
+    ?assert(lists:member(t_compute_threshold, Transitions)),
+    ?assert(lists:member(t_threshold, Transitions)),
+    ?assert(lists:member(t_finish, Transitions)).
+
+%% Test compute_threshold/1
+compute_threshold_default_test() ->
+    State = #state{threshold_expr = <<>>, threshold = undefined, completed = 0},
+    ?assertEqual(3, compute_threshold(State)).
+
+compute_threshold_expression_test() ->
+    State = #state{threshold_expr = <<"ceil(attendance_estimate*0.08)">>,
+                    threshold = undefined, completed = 0},
+    ?assertEqual(64, compute_threshold(State)).
+
+compute_threshold_existing_test() ->
+    State = #state{threshold_expr = <<>>, threshold = 10, completed = 0},
+    ?assertEqual(10, compute_threshold(State)).
+
+%% Test get_state/1
+get_state_with_map_test() ->
+    UsrInfo = #{threshold_expr => <<"test">>, threshold => 5, completed => 1},
+    State = get_state(UsrInfo),
+    ?assertEqual(<<"test">>, State#state.threshold_expr),
+    ?assertEqual(5, State#state.threshold),
+    ?assertEqual(1, State#state.completed).
+
+get_state_default_test() ->
+    State = get_state(undefined),
+    ?assertEqual(<<>>, State#state.threshold_expr),
+    ?assertEqual(undefined, State#state.threshold),
+    ?assertEqual(0, State#state.completed).
+
+-endif.

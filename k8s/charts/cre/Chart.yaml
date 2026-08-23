@@ -1,0 +1,32 @@
+apiVersion: v2
+name: cre
+description: A Helm chart for CRE (Common Runtime Environment) - YAWL Workflow Engine
+type: application
+version: 0.3.0
+appVersion: "0.3.0"
+keywords:
+  - workflow
+  - yawl
+  - erlang
+  - petri-net
+home: https://github.com/joergen7/cre
+sources:
+  - https://github.com/joergen7/cre
+maintainers:
+  - name: CRE Team
+    email: cre@example.com
+icon: https://raw.githubusercontent.com/joergen7/cre/main/docs/images/cre-logo.png
+annotations:
+  artifacthub.io/category: integration-delivery
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://github.com/joergen7/cre/blob/main/docs/DEPLOYMENT.md
+    - name: API Reference
+      url: https://github.com/joergen7/cre/blob/main/docs/API_REFERENCE.md
+  artifacthub.io/operator: "false"
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/containsSecurityUpdates: "false"
+  # Google Cloud Marketplace annotations
+  marketplace.cloud.google.com/deployer: "Helm"
+  marketplace.cloud.google.com/verified: "false"

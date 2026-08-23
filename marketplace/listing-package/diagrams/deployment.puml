@@ -1,0 +1,105 @@
+@startuml CRE GKE Deployment Architecture
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+
+title CRE GKE Deployment Architecture
+
+package "Google Cloud Platform" {
+  package "GKE Cluster (us-central1)" {
+
+    package "CRE Namespace" {
+
+      component "CRE Pod 0" as pod0 {
+        component "CRE Application" as app0
+        component "Mnesia DB" as db0
+        database "Persistent Volume" as pv0
+        app0 --> db0
+        db0 --> pv0
+      }
+
+      component "CRE Pod 1" as pod1 {
+        component "CRE Application" as app1
+        component "Mnesia DB" as db1
+        database "Persistent Volume" as pv1
+        app1 --> db1
+        db1 --> pv1
+      }
+
+      component "CRE Pod 2" as pod2 {
+        component "CRE Application" as app2
+        component "Mnesia DB" as db2
+        database "Persistent Volume" as pv2
+        app2 --> db2
+        db2 --> pv2
+      }
+
+      pod0 -down-> pod1 : Erlang Distribution\n(Mnesia Replication)
+      pod1 -down-> pod2 : Erlang Distribution\n(Mnesia Replication)
+      pod0 -right-> pod2 : Erlang Distribution
+
+      component "CRE Service\n(ClusterIP)" as svc
+      svc -down-> pod0
+      svc -down-> pod1
+      svc -down-> pod2
+    }
+
+    component "Load Balancer\n(External IP)" as lb
+    lb -down-> svc : Port 4142
+  }
+
+  package "Google Cloud Services" {
+    database "Cloud Logging" as logging
+    database "Cloud Monitoring" as monitoring
+    database "Cloud Trace" as trace
+    database "Cloud Storage\n(Backups)" as storage
+  }
+
+  package "External Access" {
+    actor "Client" as client
+  }
+}
+
+client -down-> lb : HTTPS
+app0 -right-> logging : Export Logs
+app1 -right-> logging
+app2 -right-> logging
+
+app0 -right-> monitoring : Export Metrics
+app1 -right-> monitoring
+app2 -right-> monitoring
+
+app0 -right-> trace : Export Traces
+app1 -right-> trace
+app2 -right-> trace
+
+app0 -left-> storage : Backups
+app1 -left-> storage
+app2 -left-> storage
+
+note right of pod0
+  **CRE Pod Specifications**
+  - CPU: 2 cores (2000m)
+  - Memory: 4 GiB
+  - Storage: 50 GiB SSD
+  - Replicas: 3
+  - Image: ghcr.io/joergen7/cre:0.3.0
+end note
+
+note left of storage
+  **Backup Configuration**
+  - Frequency: Daily
+  - Retention: 30 days
+  - Storage Class: Standard
+  - Encryption: CMEK (optional)
+end note
+
+note bottom of logging
+  **Observability Stack**
+  - Structured JSON logs
+  - OpenTelemetry metrics/traces
+  - 30-day log retention
+  - Real-time dashboards
+end note
+
+@enduml

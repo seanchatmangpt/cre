@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "013-deterministic-scheduling-with-replay-support",
+  "title": "Deterministic scheduling with replay support",
+  "section": "backend",
+  "state": "idea",
+  "overview": "Testing and debugging workflows requires deterministic execution. Need scheduler that eliminates nondeterminism from the Erlang VM while still supporting exploration and exact replay.\n\n**Motivation:** Enables property-based testing, reproducible debugging, trace validation, and verification that implementations are correct by comparing deterministic runs against recorded nondeterministic runs.\n\n**Success criteria:**\n- Deterministic policy produces identical traces across runs\n- Replay mode reproduces nondeterministic run exactly\n- Choices are recorded for effect ordering and branch selection\n\n**Technical constraints:**\n- Stable ordering of enabled actions in deterministic mode\n- Record all nondeterministic choices\n- Replay mode must not deviate from recorded choices\n\n**Signals:** priority: high, urgency: Required for testing infrastructure and debugging",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Research phase detected unauthorized file modifications:\n\n  Untracked src/ln_ctrl.erl\n  Untracked src/ln_vm.erl\n  Untracked test/ln_compile_test.erl\n  Untracked test/ln_plan_test.erl\n  Untracked test/ln_sched_test.erl\n\nThe research phase must be read-only. Only research.md may be created.\nAny code changes should be made during the implementation phase.",
+  "created_at": "2026-02-11T01:57:00.427Z",
+  "updated_at": "2026-02-11T03:50:40.882Z",
+  "problem_statement": "Testing and debugging workflows requires deterministic execution. Need scheduler that eliminates nondeterminism from the Erlang VM while still supporting exploration and exact replay.",
+  "motivation": "Enables property-based testing, reproducible debugging, trace validation, and verification that implementations are correct by comparing deterministic runs against recorded nondeterministic runs.",
+  "success_criteria": [
+    "Deterministic policy produces identical traces across runs",
+    "Replay mode reproduces nondeterministic run exactly",
+    "Choices are recorded for effect ordering and branch selection"
+  ],
+  "technical_constraints": [
+    "Stable ordering of enabled actions in deterministic mode",
+    "Record all nondeterministic choices",
+    "Replay mode must not deviate from recorded choices"
+  ],
+  "priority_hint": "high",
+  "urgency_hint": "Required for testing infrastructure and debugging"
+}

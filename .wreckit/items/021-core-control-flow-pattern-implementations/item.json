@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "021-core-control-flow-pattern-implementations",
+  "title": "Core control-flow pattern implementations",
+  "section": "backend",
+  "state": "researched",
+  "overview": "Need complete implementation of fundamental workflow control-flow patterns with correct semantics, efficient execution, and comprehensive test coverage.\n\n**Motivation:** Provides essential workflow building blocks, ensures pattern coverage from workflow patterns canon, enables users to express common workflow structures, validates that the substrate works correctly.\n\n**Success criteria:**\n- All listed patterns implemented and tested\n- Each pattern has executable semantics\n- Tests verify correctness\n- Documentation mapping patterns to terms\n\n**Technical constraints:**\n- Implement as kernel or derived patterns\n- Include property-based tests where applicable\n- Document mapping in docs/PATTERNS.md\n- Scaffolding for remaining patterns with TODO stubs\n\n**Signals:** priority: critical, urgency: Primary deliverable - defines substrate capabilities",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Story quality validation failed:\nStory \"US-005\" (Create performance benchmarks for pattern execution): Priority 5 outside valid range [1, 4]\nStory \"US-006\" (Document performance characteristics in PATTERNS.md): Priority 6 outside valid range [1, 4]\nStory \"US-007\" (Add TODO stubs for any remaining patterns): Priority 7 outside valid range [1, 4]",
+  "created_at": "2026-02-11T01:57:00.430Z",
+  "updated_at": "2026-02-11T05:09:33.874Z",
+  "problem_statement": "Need complete implementation of fundamental workflow control-flow patterns with correct semantics, efficient execution, and comprehensive test coverage.",
+  "motivation": "Provides essential workflow building blocks, ensures pattern coverage from workflow patterns canon, enables users to express common workflow structures, validates that the substrate works correctly.",
+  "success_criteria": [
+    "All listed patterns implemented and tested",
+    "Each pattern has executable semantics",
+    "Tests verify correctness",
+    "Documentation mapping patterns to terms"
+  ],
+  "technical_constraints": [
+    "Implement as kernel or derived patterns",
+    "Include property-based tests where applicable",
+    "Document mapping in docs/PATTERNS.md",
+    "Scaffolding for remaining patterns with TODO stubs"
+  ],
+  "priority_hint": "critical",
+  "urgency_hint": "Primary deliverable - defines substrate capabilities"
+}

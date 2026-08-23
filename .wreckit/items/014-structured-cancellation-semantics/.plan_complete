@@ -1,0 +1,24 @@
+# Planning Complete
+
+Implementation plan and PRD have been created for structured cancellation semantics.
+
+## Files Created
+1. `/Users/sac/cre/.wreckit/items/014-structured-cancellation-semantics/plan.md` - Detailed implementation plan
+2. PRD saved via MCP tool with 13 user stories
+
+## Summary
+- **3 Phases**: Scope tokens, Runtime processing, Compensation hooks
+- **13 User Stories**: Prioritized from P1 (critical) to P4 (documentation)
+- **O(scope size)**: Achieved via trigger/3 callback, no marking scans
+- **Backward compatible**: Legacy tokens still work
+- **Pure functional**: All logic in pure modules
+
+## Key Decisions Made
+1. Scope hierarchy: Derived from binding table (not explicit tree)
+2. Hook failures: Log and continue strategy
+3. Token persistence: Keep tokens with processed_at timestamp
+4. Integration: trigger/3 callback (not new messages)
+5. Performance: O(N_tokens × log N_scopes + N_hooks × H_depth)
+
+## Ready for Implementation
+All open questions resolved. Ready to begin Phase 1.

@@ -1,0 +1,181 @@
+---
+# GKE Production Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: cre
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+    environment: production
+  annotations:
+    # GKE Internal Load Balancer annotation
+    # Uncomment for Internal TCP/UDP Load Balancer
+    # cloud.google.com/load-balancer-type: "Internal"
+    # GKE NEG annotation for Serverless NEGs
+    # cloud.google.com/neg: '{"exposed_ports": {"4142":{"name":"cre-neg"}}}'
+    # Cloud Armor policy for external LB
+    # cloud.google.com/backend-config: '{"ports": {"4142":"cre-backend-config"}}'
+    # GKE service description
+    description: "CRE Workflow Engine API Service"
+spec:
+  type: ClusterIP  # Use LoadBalancer for external access, ClusterIP for internal
+  # loadBalancerClass: "gke-l7-global"  # For GKE Global Load Balancer
+  ports:
+    - name: http
+      port: 4142
+      targetPort: http
+      protocol: TCP
+    - name: epmd
+      port: 4369
+      targetPort: epmd
+      protocol: TCP
+    - name: dist
+      port: 9100
+      targetPort: dist
+      protocol: TCP
+  selector:
+    app: cre
+    component: workflow-engine
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800  # 3 hours for long-running workflows
+
+---
+# Headless service for Erlang node discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: cre-headless
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+    description: "Headless service for Erlang cluster discovery"
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true  # Critical for Erlang clustering
+  ports:
+    - name: http
+      port: 4142
+      targetPort: http
+      protocol: TCP
+    - name: epmd
+      port: 4369
+      targetPort: epmd
+      protocol: TCP
+    - name: dist
+      port: 9100
+      targetPort: dist
+      protocol: TCP
+  selector:
+    app: cre
+
+---
+# BackendConfig for GKE Internal Load Balancer with Cloud Armor
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: cre-backend-config
+  namespace: cre-prod
+  annotations:
+    description: "Backend configuration for CRE with Cloud Armor security"
+spec:
+  # Cloud Armor security policy
+  securityPolicy:
+    name: cre-cloud-armor-policy
+  # Timeout settings for long-running workflows
+  timeoutSec: 3600
+  # Connection draining
+  connectionDraining:
+    drainingTimeoutSec: 300
+  # Health check configuration
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    unhealthyThreshold: 3
+    healthyThreshold: 2
+    type: HTTP
+    requestPath: /status.json
+    port: 4142
+  # CDN configuration (optional)
+  # cdn:
+  #   enabled: true
+  #   cachePolicy:
+  #     includeHost: true
+  #     includeProtocol: true
+  #     includeQueryString: true
+
+---
+# Staging Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: cre
+  namespace: cre-staging
+  labels:
+    app: cre
+    component: workflow-engine
+    environment: staging
+  annotations:
+    # Use Network Endpoint Group for better scalability
+    cloud.google.com/neg: '{"exposed_ports": {"4142":{"name":"cre-staging-neg"}}}'
+    description: "CRE Workflow Engine API Service - Staging"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 4142
+      targetPort: http
+      protocol: TCP
+    - name: epmd
+      port: 4369
+      targetPort: epmd
+      protocol: TCP
+    - name: dist
+      port: 9100
+      targetPort: dist
+      protocol: TCP
+  selector:
+    app: cre
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+
+---
+# Headless service for Staging
+apiVersion: v1
+kind: Service
+metadata:
+  name: cre-headless
+  namespace: cre-staging
+  labels:
+    app: cre
+    environment: staging
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: http
+      port: 4142
+      targetPort: http
+      protocol: TCP
+    - name: epmd
+      port: 4369
+      targetPort: epmd
+      protocol: TCP
+    - name: dist
+      port: 9100
+      targetPort: dist
+      protocol: TCP
+  selector:
+    app: cre

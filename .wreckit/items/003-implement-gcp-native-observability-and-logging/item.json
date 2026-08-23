@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "003-implement-gcp-native-observability-and-logging",
+  "title": "Implement GCP-native observability and logging",
+  "section": "observability",
+  "state": "idea",
+  "overview": "Running CRE on GKE requires GCP-native observability integrations for operational visibility, debugging, and monitoring in production environments.\n\n**Motivation:** GCP customers expect logs, metrics, and traces in Google Cloud console. Required for operational readiness and support.\n\n**Success criteria:**\n- Structured logs with correlation IDs and workflow/case identifiers exported to Cloud Logging\n- Cloud Monitoring export for workflow throughput, task latency, worker utilization, failure counts\n- OpenTelemetry → Cloud Trace integration (toggleable)\n- Liveness, readiness, and startup probes for Erlang nodes\n\n**Technical constraints:**\n- Structured logging format\n- Correlation IDs must propagate\n- Tracing must be cost-aware (toggleable)\n\n**Signals:** priority: high, urgency: Required for production operations on GKE",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Research quality validation failed:\nInsufficient citations: found 3, required at least 5 file:line references",
+  "created_at": "2026-02-10T07:04:09.909Z",
+  "updated_at": "2026-02-11T02:15:17.162Z",
+  "problem_statement": "Running CRE on GKE requires GCP-native observability integrations for operational visibility, debugging, and monitoring in production environments.",
+  "motivation": "GCP customers expect logs, metrics, and traces in Google Cloud console. Required for operational readiness and support.",
+  "success_criteria": [
+    "Structured logs with correlation IDs and workflow/case identifiers exported to Cloud Logging",
+    "Cloud Monitoring export for workflow throughput, task latency, worker utilization, failure counts",
+    "OpenTelemetry → Cloud Trace integration (toggleable)",
+    "Liveness, readiness, and startup probes for Erlang nodes"
+  ],
+  "technical_constraints": [
+    "Structured logging format",
+    "Correlation IDs must propagate",
+    "Tracing must be cost-aware (toggleable)"
+  ],
+  "priority_hint": "high",
+  "urgency_hint": "Required for production operations on GKE"
+}

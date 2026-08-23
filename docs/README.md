@@ -4,9 +4,21 @@
 ![OTP](https://img.shields.io/badge/OTP%2025%2B-green)
 ![License](https://img.shields.io/badge/APACHE%202.0-orange)
 
-Welcome to the official documentation for CRE (Cuneiform Runtime Environment) - a powerful YAWL workflow engine with human-in-the-loop capabilities, OpenTelemetry observability, and a web-based dashboard.
+Welcome to the official documentation for **CRE (Common Runtime Environment)** - a powerful YAWL workflow engine with human-in-the-loop capabilities, OpenTelemetry observability, and a web-based dashboard.
 
-## 🎯 What is CRE?
+---
+
+## Table of Contents
+
+- [What is CRE?](#what-is-cre)
+- [Quick Start](#quick-start)
+- [Documentation Structure](#documentation-structure)
+- [Key Resources](#key-resources)
+- [Version Compatibility](#version-compatibility)
+
+---
+
+## What is CRE?
 
 CRE is a **YAWL (Yet Another Workflow Language)** workflow engine implemented in Erlang/OTP. Starting from its origins as a Cuneiform runtime environment, CRE has evolved into a comprehensive workflow management system that combines:
 
@@ -17,59 +29,138 @@ CRE is a **YAWL (Yet Another Workflow Language)** workflow engine implemented in
 - **XES logging** for audit and compliance
 - **Distributed execution** across Erlang clusters
 
-## ✨ Key Features
+---
 
-| Feature | Description | Release |
-|---------|-------------|---------|
-| **YAWL Patterns** | Complete set of 43 workflow patterns for process modeling | v0.3.0 |
-| **Human-in-the-Loop** | Approval workflows with LLM integration and checkpointing | v0.3.0 |
-| **OpenTelemetry** | Structured logging, metrics, and distributed tracing | v0.3.0 |
-| **Web Dashboard** | Real-time workflow visualization and monitoring | v0.3.0 |
-| **XES Logging** | Event log standard for process mining and analysis | v0.3.0 |
-| **OTP 25+ Support** | Modern Erlang/OTP with improved performance | v0.3.0 |
+## Quick Start
 
-## 📚 Where to Start?
+| Resource | Time | Description |
+|----------|------|-------------|
+| [Quick Start Guide](QUICK_START.md) | 5 min | Get running immediately |
+| [Quick Reference](reference/QUICK_REF.md) | 5 min | Essential commands & API |
+| [INDEX.md](INDEX.md) | - | Complete documentation catalog |
 
-### 🚀 New Users (5 minutes)
-- **Start here**: [Quick Start Guide](./QUICK_START.md) - Get running immediately
-- **Try the examples**: [Basic Examples](../examples/)
+---
 
-### 🏗️ Developers & Architects
-- **API Reference**: [Complete API Documentation](./API_REFERENCE.md)
-- **System Design**: [Architecture Overview](./ARCHITECTURE.md)
-- **Patterns Guide**: [YAWL Patterns Reference](./YAWL_PATTERNS_REFERENCE.md)
-- **Deployment**: [Production Guide](./DEPLOYMENT.md)
-
-### 📖 Specific Topics
-- **Human-in-the-Loop**: [Approval Workflows](./HUMAN_IN_THE_LOOP.md)
-- **Telemetry**: [OpenTelemetry Integration](./YAWL_TELEMETRY_GUIDE.md)
-- **Migration**: [v0.1 to v0.2 Migration](./old/MIGRATION_V0.1_TO_V0.2.md) (archived)
-
-## 🔗 Documentation Map
+## Documentation Structure
 
 ```
 docs/
-├── README.md                           # This file
-├── QUICK_START.md                     # 🚀 5-minute getting started
-├── API_REFERENCE.md                   # 📖 Complete API reference
-├── ARCHITECTURE.md                    # 🏗️ System architecture
-├── DEPLOYMENT.md                      # 🚀 Production deployment
-├── CONTRIBUTING.md                    # 🤝 Developer guide
-├── MIGRATION.md                       # 📥 Upgrade guides
-├── YAWL_PATTERNS_REFERENCE.md         # 🔍 Pattern details
-├── YAWL_PATTERN_EXAMPLES.md          # 💯 Pattern examples
-├── YAWL_TELEMETRY_GUIDE.md          # 📊 Monitoring setup
-├── YAWL_TIMEOUT_REFERENCE.md          # ⏱️ Timeout configuration
-├── HUMAN_IN_THE_LOOP.md               # 👥 Human approval flows
-├── examples/                          # 💻 Working code examples
-│   ├── basic_workflow.erl
-│   ├── approval_workflow.erl
-│   └── parallel_processing.erl
-└── old/                               # 📦 Archived docs
-    └── PERSISTENT_TERM_OPTIMIZATIONS.md
+|-- README.md                           # This file - Project overview
+|-- INDEX.md                            # Complete documentation index
+|
+|-- api/                                # API References
+|   |-- core/                           # Core API documentation
+|   |   |-- COMPLETE_API_REFERENCE.md   # Full API reference
+|   |   |-- CLIENT_API_COMPLETE_REFERENCE.md  # Client API
+|   |-- patterns/                       # Pattern APIs
+|   |   |-- patterns_api.md             # Pattern module APIs
+|   |-- mining/                         # Process Mining APIs
+|       |-- MINING_MODULES_API_REFERENCE.md  # Mining modules
+|
+|-- guides/                             # How-to Guides
+|   |-- migration/                      # Migration guides
+|   |   |-- migration_guide.md          # General migration
+|   |   |-- otp_25_28.md                # Erlang/OTP migration
+|   |-- human_in_the_loop.md            # Approval workflows
+|   |-- telemetry.md                    # Monitoring setup
+|   |-- timeout_configuration.md        # Timeout configuration
+|   |-- order_fulfillment_example.md    # Real-world example
+|   |-- tool_configuration.md           # Tool configuration
+|
+|-- reference/                          # Reference Materials
+|   |-- QUICK_REF.md                    # Consolidated quick reference
+|   |-- api_reference.md                # API reference section
+|   |-- bibliography.md                 # References and citations
+|   |-- EXCEPTION_HANDLING.md           # Exception handling
+|   |-- faq.md                          # Frequently asked questions
+|   |-- glossary.md                     # Terminology and definitions
+|
+|-- papers/                             # Research Papers
+|   |-- README.md                       # Papers index
+|   |-- PAPER_SUMMARIES.md              # Paper summaries
+|   |-- paper_algorithm_mapping.csv    # Algorithm mapping
+|   |-- *.pdf                           # Process mining papers
+|
+|-- patterns/                           # YAWL Pattern Documentation
+|   |-- PATTERN_IMPLEMENTATION_GUIDE.md # Implementation guide
+|   |-- ADVANCED_PATTERNS.md            # Advanced patterns
+|   |-- WDP_PATTERNS.md                 # Data patterns
+|   |-- WRP_PATTERNS.md                 # Resource patterns
+|   |-- anti_patterns_guide.md          # Anti-patterns
+|
+|-- pnet/                               # Petri Net Core
+|   |-- types/                          # Type system docs
+|   |-- marking/                        # Marking algebra docs
+|   |-- mode/                           # Mode enumeration docs
+|
+|-- tutorials/                          # Tutorial Series
+|   |-- getting_started.md              # First workflow
+|   |-- basic_patterns_tutorial.md      # Basic patterns
+|   |-- advanced_patterns_tutorial.md   # Advanced patterns
+|   |-- HANDLER_DEVELOPMENT.md          # Handler development
+|
+|-- operations/                         # Operations & Support
+|   |-- testing/                        # Testing documentation
+|   |-- performance/                    # Performance tuning
+|   |-- troubleshooting/                # Troubleshooting guides
+|
+|-- architecture/                       # Architecture Documentation
+|   |-- system-overview.md              # System architecture
+|   |-- design_principles.md            # Design principles
+|   |-- diagrams/                       # Architecture diagrams
+|
+|-- diagrams/                           # Diagram Collections
+|   |-- c4/                             # C4 model diagrams
+|   |-- mermaid/                        # Mermaid diagram sources
+|
+|-- examples/                           # Code Examples
+|-- example_workflows/                  # Workflow YAML examples
+|-- training/                           # Training Materials
+|-- case-studies/                       # Case Study Documentation
+|-- development/                        # Developer Resources
+|-- planning/                           # Planning & Roadmap
+|-- rust/                               # Rust Modules
+|-- features/                           # Feature Documentation
+|-- analysis/                           # Technical Analysis
+|-- yawl_patterns/                      # YAWL Architecture
+|-- verification_scripts/               # Verification Scripts
+|-- archive/                            # Archived Documentation
+|   |-- tutorials/                      # Superseded tutorials
+|   |-- papers/                         # Old paper analysis
+|   |-- architecture/                   # Duplicate architecture docs
+|   |-- reference/                      # Consolidated references
+|   |-- patterns/                       # Old pattern docs
+|   `-- yawl/                           # Superseded YAWL docs
+|-- old/                                # Legacy archived files
 ```
 
-## 🎯 Version Compatibility
+---
+
+## Key Resources
+
+### New Users
+- [Quick Start Guide](QUICK_START.md) - Get running in 5 minutes
+- [Quick Reference](reference/QUICK_REF.md) - Essential commands & API
+- [Basic Examples](../examples/) - Working code examples
+
+### Developers
+- [Complete API Reference](api/core/COMPLETE_API_REFERENCE.md) - Full API documentation
+- [Architecture Overview](ARCHITECTURE.md) - System design and internals
+- [YAWL Patterns Reference](YAWL_PATTERNS_REFERENCE.md) - 43 workflow patterns
+
+### Operations
+- [Deployment Guide](DEPLOYMENT.md) - Production setup
+- [Testing Guide](operations/testing/testing.md) - Testing documentation
+- [Troubleshooting](operations/troubleshooting/troubleshooting.md) - Common issues
+
+### Research
+- [Process Mining Papers](papers/) - Research paper collection
+- [Pattern Catalog](YAWL_PATTERNS_REFERENCE.md) - Complete pattern catalog
+- [Archived Documentation](archive/) - Superseded materials
+
+---
+
+## Version Compatibility
 
 | Component | Supported Versions |
 |-----------|-------------------|
@@ -79,52 +170,28 @@ docs/
 | **Web Dashboard** | Requires modern browser (ES6+) |
 | **OpenTelemetry** | OTLP 1.0+ compatible |
 
-## 🚀 Quick Links
+---
 
-### Core Features
-- [43 YAWL Patterns](./YAWL_PATTERNS_REFERENCE.md) - Complete workflow pattern library
-- [Human-in-the-Loop Workflows](./HUMAN_IN_THE_LOOP.md) - Approval flows with LLM integration
-- [OpenTelemetry Integration](./YAWL_TELEMETRY_GUIDE.md) - Observability and monitoring
-- [Web Dashboard](https://github.com/your-org/cre-dashboard) - Real-time visualization
+## Key Features
 
-### Getting Started
-- [Quick Start Tutorial](./QUICK_START.md) - Your first workflow in 5 minutes
-- [Basic Examples](../examples/basic_workflow.erl) - Simple workflow implementation
-- [API Reference](./API_REFERENCE.md) - Complete function documentation
-- [Architecture Overview](./ARCHITECTURE.md) - System design and internals
-
-### Production
-- [Deployment Guide](./DEPLOYMENT.md) - Production setup and scaling
-- [Performance Tuning](./DEPLOYMENT.md#performance-tuning) - Optimization guide
-- [Security Considerations](./DEPLOYMENT.md#security) - Hardening guidelines
-
-### Community & Support
-- [GitHub Issues](https://github.com/your-org/cre/issues) - Bug reports and features
-- [Contributing Guide](./CONTRIBUTING.md) - How to contribute code
-- [Migration Guide](./MIGRATION.md) - Upgrade instructions
-
-## 📝 What Happened to Cuneiform?
-
-CRE was originally developed as the **Cuneiform runtime environment** for distributed programming. Starting with **v0.3.0**, CRE has evolved into a YAWL workflow engine while maintaining backward compatibility with the original CRE client/worker APIs. The core execution engine remains compatible, but the focus has shifted to workflow modeling and human-in-the-loop processes.
-
-> **Note**: All existing CRE applications continue to work without changes. The evolution adds YAWL patterns on top of the existing foundation.
-
-## 🎯 Questions?
-
-- **Documentation Issues**: [Report on GitHub](https://github.com/your-org/cre/issues)
-- **Technical Questions**: [Stack Overflow](https://stackoverflow.com/questions/tagged/cre-workflow)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/cre/discussions)
+| Feature | Description | Release |
+|---------|-------------|---------|
+| **YAWL Patterns** | Complete set of 43 workflow patterns | v0.3.0 |
+| **Human-in-the-Loop** | Approval workflows with LLM integration | v0.3.0 |
+| **OpenTelemetry** | Structured logging and metrics | v0.3.0 |
+| **Web Dashboard** | Real-time visualization | v0.3.0 |
+| **XES Logging** | Event log standard | v0.3.0 |
+| **OTP 25+ Support** | Modern Erlang/OTP | v0.3.0 |
 
 ---
 
-## 📊 CRE v0.3.0 Highlights
+## Support
 
-- ✅ **43 YAWL patterns** - Complete pattern library for complex workflows
-- ✅ **Human-in-the-loop** - Approval workflows with LLM integration
-- ✅ **OpenTelemetry** - Structured logging and metrics
-- ✅ **Web dashboard** - Real-time workflow visualization
-- ✅ **XES logging** - Standard event logging for process mining
-- ✅ **OTP 28 support** - Latest Erlang/OTP compatibility
-- ✅ **Improved timeouts** - Better resource management
+- **Documentation Index**: See [INDEX.md](INDEX.md) for complete catalog
+- **FAQ**: [reference/faq.md](reference/faq.md)
+- **Glossary**: [reference/glossary.md](reference/glossary.md)
+- **Contributing**: [development/contributing.md](development/contributing.md)
 
-**Ready to start?** Head over to the [Quick Start Guide](./QUICK_START.md) and build your first workflow!
+---
+
+**Last Updated:** 2026-02-08 | **Version:** 0.3.0 | **Pattern Count:** 43 YAWL patterns

@@ -1,0 +1,96 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cre-ingress
+  labels:
+    app: cre
+    component: workflow-engine
+  annotations:
+    # NGINX Ingress annotations
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/websocket-services: "cre"
+
+    # CORS headers (adjust as needed)
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://cre.example.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-CRE-API-Key"
+
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "2"
+
+    # Cert-manager for TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/issue-temporary-certificate: "true"
+
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - cre.example.com
+        - api.cre.example.com
+      secretName: cre-tls
+  rules:
+    - host: cre.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cre
+                port:
+                  number: 4142
+    - host: api.cre.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cre
+                port:
+                  number: 4142
+---
+# Ingress for monitoring endpoints (internal only)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cre-monitoring-ingress
+  labels:
+    app: cre
+    component: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: cre-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "CRE Monitoring - Authentication Required"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+spec:
+  ingressClassName: nginx-internal
+  rules:
+    - host: cre-monitoring.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cre
+                port:
+                  number: 4142

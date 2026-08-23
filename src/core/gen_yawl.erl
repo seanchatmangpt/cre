@@ -184,7 +184,7 @@ The fire/3 callback can return:
           active_fires = 0 :: non_neg_integer(),
           %% Cycle detection: bounded marking history to detect repeated states
           marking_history = [] :: [non_neg_integer()],
-          max_marking_history = 10 :: pos_integer(),
+          max_marking_history = 10 :: non_neg_integer(),
           continue_count = 0 :: non_neg_integer(),
           max_continue = 1000 :: pos_integer(),
           regions = #{} :: #{binary() | atom() => [atom()]},
@@ -601,31 +601,37 @@ drain(Name, MaxSteps) when is_integer(MaxSteps), MaxSteps >= 0 ->
 %% Net state accessor functions (forwarded from gen_pnet)
 %%====================================================================
 
--doc """
-Extract tokens on a place from a net state.
-
-Throws an error if the place does not exist.
-""".
+%%--------------------------------------------------------------------
+%% @doc Extract tokens on a place from a net state.
+%%
+%%      Throws an error if the place does not exist.
+%%
+%% @end
+%%--------------------------------------------------------------------
 -spec get_ls(Place :: atom(), NetState :: #net_state{}) -> [term()].
 
 get_ls(Place, #net_state{marking = Marking}) ->
     maps:get(Place, Marking).
 
--doc """
-Extract user info from a net state.
-
-Returns the user info field from the net_state record.
-""".
+%%--------------------------------------------------------------------
+%% @doc Extract user info from a net state.
+%%
+%%      Returns the user info field from the net_state record.
+%%
+%% @end
+%%--------------------------------------------------------------------
 -spec get_usr_info(NetState :: #net_state{}) -> term().
 
 get_usr_info(#net_state{usr_info = UsrInfo}) ->
     UsrInfo.
 
--doc """
-Extract stats from a net state.
-
-Returns the statistics record from the net_state.
-""".
+%%--------------------------------------------------------------------
+%% @doc Extract stats from a net state.
+%%
+%%      Returns the statistics record from the net_state.
+%%
+%% @end
+%%--------------------------------------------------------------------
 -spec get_stats(NetState :: #net_state{}) -> #stats{}.
 
 get_stats(#net_state{stats = Stats}) ->
@@ -857,8 +863,8 @@ handle_call(step, _From,
             NetState3 = handle_trigger(Pm, NetState2, NetMod),
             continue(self()),
             {reply, {ok, Receipt}, WrapperState#wrapper_state{net_state = NetState3}};
-        {error, Reason, NetState1} ->
-            {reply, {error, Reason}, WrapperState#wrapper_state{net_state = NetState1}}
+        {error, Reason} ->
+            {reply, {error, Reason}, WrapperState}
     end;
 
 handle_call({drain, MaxSteps, _Acc}, _From, WrapperState) when MaxSteps =< 0 ->
@@ -888,7 +894,8 @@ handle_call({drain, MaxSteps, Acc}, _From,
             case yawl_recovery:maybe_checkpoint(StepCount, CheckpointInterval,
                     NetArg, NetState3#net_state.marking, NetState3#net_state.usr_info) of
                 {do_checkpoint, SpecId, CaseId, Marking, Data} ->
-                    _ = yawl_recovery:checkpoint(SpecId, CaseId, Marking, Data);
+                    _ = yawl_recovery:checkpoint(SpecId, CaseId, Marking, Data),
+                    ok;
                 ok -> ok
             end,
             continue(self()),
@@ -897,8 +904,8 @@ handle_call({drain, MaxSteps, Acc}, _From,
                 drain_step_count = StepCount
             },
             handle_call({drain, MaxSteps - 1, [Receipt | Acc]}, _From, WrapperState1);
-        {error, Reason, NetState1} ->
-            {reply, {error, Reason}, WrapperState#wrapper_state{net_state = NetState1}}
+        {error, Reason} ->
+            {reply, {error, Reason}, WrapperState}
     end;
 
 handle_call(_Request, _From, WrapperState) ->
@@ -987,7 +994,8 @@ handle_cast(continue,
                     case yawl_recovery:maybe_checkpoint(StepCount, CheckpointInterval,
                             NetArg, NetState3#net_state.marking, NetState3#net_state.usr_info) of
                         {do_checkpoint, SpecId, CaseId, Marking, Data} ->
-                            _ = yawl_recovery:checkpoint(SpecId, CaseId, Marking, Data);
+                            _ = yawl_recovery:checkpoint(SpecId, CaseId, Marking, Data),
+                            ok;
                         ok -> ok
                     end,
 
@@ -1032,10 +1040,10 @@ handle_cast(continue,
                         continue_count = ContCount + 1
                     }};
 
-                {error, Reason, NetState1} ->
+                {error, Reason} ->
                     logger:error("gen_yawl progress error: ~p", [Reason]),
                     continue(self()),
-                    {noreply, WrapperState#wrapper_state{net_state = NetState1}}
+                    {noreply, WrapperState}
             end
     end;
 
@@ -1242,9 +1250,9 @@ update_stats(NetState, Stats, T1, Cnt) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec progress(NetState :: #net_state{}, FireTimeout :: pos_integer()) ->
+-spec progress(NetState :: #net_state{}, FireTimeout :: pos_integer() | infinity) ->
           abort | {delta, #{atom() => [term()]}, #{atom() => [term()]}, term() | undefined} |
-          {error, term(), #net_state{}}.
+          {error, term()}.
 
 progress(#net_state{} = NetState, FireTimeout) ->
     {ModeMap, NetMod, UsrInfo} = build_enabled_mode_map(NetState),
@@ -1295,9 +1303,9 @@ build_enabled_mode_map(#net_state{
 -spec attempt_progress(ModeMap :: #{atom() => [#{atom() => [term()]}]},
                        NetMod :: atom(),
                        UsrInfo :: term(),
-                       FireTimeout :: pos_integer()) ->
+                       FireTimeout :: pos_integer() | infinity) ->
           abort | {delta, #{atom() => [term()]}, #{atom() => [term()]}, term() | undefined} |
-          {error, term(), #net_state{}}.
+          {error, term()}.
 
 attempt_progress(ModeMap, NetMod, UsrInfo, FireTimeout) ->
     case maps:size(ModeMap) of
@@ -1376,9 +1384,9 @@ attempt_progress(ModeMap, NetMod, UsrInfo, FireTimeout) ->
         #{atom() => [_]},
         atom(),
         term(),
-        pos_integer()) ->
+        pos_integer() | infinity) ->
     abort | {delta, #{atom() => [term()]}, #{atom() => [term()]}, term() | undefined} |
-    {error, term(), #net_state{}}.
+    {error, term()}.
 
 attempt_progress_with_mode_removed(ModeMap, Trsn, ModeLst, Mode, NetMod, UsrInfo, FireTimeout) ->
     ModeLst1 = ModeLst -- [Mode],
@@ -1491,7 +1499,7 @@ enum_mode(Preset, Marking) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec pick_from([T]) -> T.
+-spec pick_from([T, ...]) -> T.
 
 pick_from([]) ->
     error(empty_list);

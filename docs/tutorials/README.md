@@ -18,8 +18,8 @@ This tutorial series provides comprehensive, hands-on learning for the YAWL (Yet
 | [4. Colored Tokens](colored_tokens_tutorial.md) | 45 min | Tutorial 1 | Data-carrying tokens |
 | [5. Pattern Examples](PATTERN_EXAMPLES.md) | 45 min | Tutorial 2 | Real-world pattern implementations |
 | [6. Handler Development](HANDLER_DEVELOPMENT.md) | 60 min | Tutorial 2 | Business logic integration |
-| [7. Migration Guide](workflow_migration_tutorial.md) | 60 min | Tutorial 1 | Migrate from gen_statem |
-| [8. Study Plan Template](YAWL_PATTERNS_STUDY_PLAN_TEMPLATE.md) | 3-6 hours | None | Personalized YAWL learning path |
+| [7. Migration Guide](../archive/tutorials/workflow_migration_tutorial.md) | 60 min | Tutorial 1 | Migrate from gen_statem (archived) |
+| [8. Study Plan Template](../archive/tutorials/YAWL_PATTERNS_STUDY_PLAN_TEMPLATE.md) | 3-6 hours | None | Personalized YAWL learning path (archived) |
 
 ---
 
@@ -91,7 +91,7 @@ If you're new to YAWL and gen_pnet, start here:
 - Transform tokens between tasks
 
 ### Migrate Existing Code
-- Follow [Migration Guide](workflow_migration_tutorial.md)
+- Follow [Migration Guide](../archive/tutorials/workflow_migration_tutorial.md) (archived)
 - Convert gen_statem to gen_pnet
 - Run dual-mode for testing
 
@@ -142,8 +142,9 @@ If you get stuck:
 
 - [YAWL Patterns Reference](../YAWL_PATTERNS_REFERENCE.md) - Complete pattern catalog
 - [gen_pnet API Specification](../yawl_patterns/GEN_PNET_API_SPECIFICATION.md) - API details
-- [gen_pnet Architecture](../yawl_patterns/GEN_PNET_INTEGRATION_ARCHITECTURE.md) - System design
+- [gen_pnet Architecture](../archive/architecture/GEN_PNET_INTEGRATION_ARCHITECTURE.md) - System design (archived)
 - [Examples](../examples/) - Working code examples
+- [Quick Reference](../reference/QUICK_REF.md) - Consolidated quick reference
 
 ---
 
@@ -158,8 +159,12 @@ docs/tutorials/
 ├── basic_patterns_tutorial.md       (basic patterns)
 ├── advanced_patterns_tutorial.md    (advanced patterns)
 ├── colored_tokens_tutorial.md       (data flow)
-├── workflow_migration_tutorial.md   (migration guide)
-└── YAWL_PATTERNS_STUDY_PLAN_TEMPLATE.md (personalized learning path)
+├── PATTERN_EXAMPLES.md              (pattern examples)
+└── HANDLER_DEVELOPMENT.md           (handler development)
+
+docs/archive/tutorials/              (archived materials)
+├── workflow_migration_tutorial.md   (migration guide - archived)
+└── YAWL_PATTERNS_STUDY_PLAN_TEMPLATE.md (study plan - archived)
 ```
 
 ---

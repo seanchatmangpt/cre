@@ -1,0 +1,129 @@
+# CRE Docker Compose - Development Environment
+# Single-node development setup with live code mounting
+#
+# Usage:
+#   docker-compose up       - Start CRE in development mode
+#   docker-compose up -d    - Start in detached mode
+#   docker-compose down     - Stop and remove containers
+#   docker-compose logs -f  - Follow logs
+
+version: "3.9"
+
+services:
+  # Main CRE service
+  cre:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: cre:dev
+    container_name: cre-dev
+
+    # Environment variables
+    environment:
+      # Node configuration
+      CRE_NODE_NAME: cre
+      CRE_HOSTNAME: cre
+      CRE_MODE: init
+      CRE_COOKIE: dev_cookie
+
+      # VM configuration
+      ERL_MAX_PORTS: 65536
+      ERL_MAX_ETS_TABLES: 2000
+
+      # Development settings
+      ERL_AFLAGS: "-kernel shell_history enabled"
+      CRE_LOG_LEVEL: debug
+
+    # Port mappings
+    ports:
+      - "4142:4142"   # CRE HTTP API
+      - "4369:4369"   # EPMD (Erlang Port Mapper Daemon)
+      - "9100:9100"   # Distribution port
+
+    # Volume mounts for development
+    volumes:
+      # Persistent data
+      - cre-data:/opt/cre/data
+      - cre-log:/opt/cre/log
+      - cre-mnesia:/opt/cre/mnesia
+      - cre-checkpoints:/opt/cre/checkpoints
+
+      # Optional: Live code mounting (uncomment for development)
+      # - ./src:/opt/cre/src:ro
+      # - ./include:/opt/cre/include:ro
+      # - ./config:/opt/cre/config:ro
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4142/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Resource limits (adjust for your system)
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+    # Network
+    networks:
+      - cre-network
+
+  # Optional: CRE cluster node (uncomment for multi-node testing)
+  # cre-replica:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     target: runtime
+  #   image: cre:dev
+  #   container_name: cre-replica
+  #   environment:
+  #     CRE_NODE_NAME: cre_replica
+  #     CRE_HOSTNAME: cre-replica
+  #     CRE_MODE: replica
+  #     CRE_CLUSTER_PEERS: "cre@cre"
+  #     CRE_COOKIE: dev_cookie
+  #   ports:
+  #     - "4143:4142"
+  #     - "9101:9100"
+  #   depends_on:
+  #     cre:
+  #       condition: service_healthy
+  #   volumes:
+  #     - cre-replica-data:/opt/cre/data
+  #     - cre-replica-log:/opt/cre/log
+  #     - cre-replica-mnesia:/opt/cre/mnesia
+  #   networks:
+  #     - cre-network
+
+# Named volumes for persistent data
+volumes:
+  cre-data:
+    driver: local
+  cre-log:
+    driver: local
+  cre-mnesia:
+    driver: local
+  cre-checkpoints:
+    driver: local
+  # cre-replica-data:
+  #   driver: local
+  # cre-replica-log:
+  #   driver: local
+  # cre-replica-mnesia:
+  #   driver: local
+
+# Network configuration
+networks:
+  cre-network:
+    driver: bridge

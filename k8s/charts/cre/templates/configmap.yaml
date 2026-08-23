@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cre.fullname" . }}-config
+  labels:
+    {{- include "cre.labels" . | nindent 4 }}
+data:
+  # CRE Configuration
+  cre-default-port: {{ .Values.config.defaultPort | quote }}
+  cre-status-route: "/status.json"
+  cre-history-route: "/history.json"
+  cre-client-poll-interval: {{ .Values.config.clientPollInterval | quote }}
+  cre-auth-pbkdf2-iterations: "100000"
+  cre-auth-default-session-timeout: {{ .Values.config.sessionTimeout | quote }}
+  cre-auth-min-password-length: "8"
+
+  # YAWL Configuration
+  yawl-stateless-checkpoint-dir: {{ .Values.config.checkpointDir | quote }}
+  yawl-stateless-max-executions: {{ .Values.config.maxExecutions | quote }}
+  yawl-stateless-execution-ttl: {{ .Values.config.executionTtl | quote }}
+  yawl-stateless-ttl-cleanup-interval: "60000"
+  yawl-timeout-default-timeout: "30000"
+  yawl-timeout-deadlock-interval: "5000"
+  yawl-timeout-resource-check-interval: "60000"
+
+  # Logging
+  log-level: {{ .Values.config.logLevel | quote }}
+
+  # Mnesia Configuration
+  mnesia-dump-log-write-threshold: "5000"
+  mnesia-dc-import-limit: "40"
+  mnesia-max-writes-per-cycle: "100"
+
+  # Erlang VM Settings
+  erl-async-threads: {{ .Values.erlang.asyncThreads | quote }}
+  erl-scheduler-threads: "available"
+  erl-smp-enable: {{ .Values.erlang.smpEnable | quote }}

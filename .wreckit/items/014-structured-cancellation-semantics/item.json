@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "014-structured-cancellation-semantics",
+  "title": "Structured cancellation semantics",
+  "section": "backend",
+  "state": "implementing",
+  "overview": "Workflows need predictable, safe cancellation at different granularities without corrupting state in other parts of the workflow. Need efficient propagation without scanning entire graphs.\n\n**Motivation:** Provides clean error handling and timeout semantics, enables resource cleanup through compensation, supports long-running workflow management, and is essential for production reliability.\n\n**Success criteria:**\n- Cancellation terminates targeted scopes\n- Unrelated scopes remain uncorrupted\n- Compensation hooks execute correctly\n- Cancellation propagation is O(scope size)\n\n**Technical constraints:**\n- Three scope types: activity, case, region\n- Efficient propagation (no whole-graph scanning)\n- Integration with cancellation tokens in exec state\n\n**Signals:** priority: high, urgency: Core reliability feature required for production use",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Agent failed with exit code 1",
+  "created_at": "2026-02-11T01:57:00.427Z",
+  "updated_at": "2026-02-11T04:12:14.097Z",
+  "problem_statement": "Workflows need predictable, safe cancellation at different granularities without corrupting state in other parts of the workflow. Need efficient propagation without scanning entire graphs.",
+  "motivation": "Provides clean error handling and timeout semantics, enables resource cleanup through compensation, supports long-running workflow management, and is essential for production reliability.",
+  "success_criteria": [
+    "Cancellation terminates targeted scopes",
+    "Unrelated scopes remain uncorrupted",
+    "Compensation hooks execute correctly",
+    "Cancellation propagation is O(scope size)"
+  ],
+  "technical_constraints": [
+    "Three scope types: activity, case, region",
+    "Efficient propagation (no whole-graph scanning)",
+    "Integration with cancellation tokens in exec state"
+  ],
+  "priority_hint": "high",
+  "urgency_hint": "Core reliability feature required for production use"
+}

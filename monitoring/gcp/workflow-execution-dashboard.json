@@ -1,0 +1,356 @@
+{
+  "displayName": "CRE Workflow Execution Metrics",
+  "gridLabels": {},
+  "layout": {
+    "columns": "2",
+    "widgets": [
+      {
+        "title": "Active Workflows",
+        "scorecard": {
+          "gaugeView": {
+            "lowerBound": 0,
+            "upperBound": 500
+          },
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/cre/workflow/active\""
+                }
+              },
+              "minAlignmentPeriod": "60s",
+              "plotType": "HEATMAP",
+              "targetAxis": "Y1"
+            }
+          ],
+          "thresholds": {
+            "colorStyle": "COLOR_STYLE_GREEN_TO_YELLOW_TO_RED",
+            "thresholds": [
+              {
+                "direction": "DIRECTION_INCREASING",
+                "value": 100
+              },
+              {
+                "direction": "DIRECTION_INCREASING",
+                "value": 500
+              }
+            ]
+          }
+        }
+      },
+      {
+        "title": "Workflow Throughput",
+        "scorecard": {
+          "gaugeView": {
+            "lowerBound": 0,
+            "upperBound": 1000
+          },
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_SUM",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/cre/workflow/completed_total\""
+                }
+              },
+              "minAlignmentPeriod": "60s",
+              "plotType": "HEATMAP",
+              "targetAxis": "Y1"
+            }
+          ],
+          "thresholds": {
+            "colorStyle": "COLOR_STYLE_GREEN_TO_YELLOW",
+            "thresholds": [
+              {
+                "direction": "DIRECTION_DECREASING",
+                "value": 100
+              }
+            ]
+          }
+        }
+      },
+      {
+        "title": "Workflow Completion Rate",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/cre/workflow/completed_total\""
+                }
+              }
+            },
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/cre/workflow/failed_total\""
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Workflows/sec",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Workflow Success Rate",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "300s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "300s",
+                    "perSeriesAligner": "ALIGN_FRACTION"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND (metric.type=\"workload.googleapis.com/cre/workflow/completed_total\" OR metric.type=\"workload.googleapis.com/cre/workflow/failed_total\")",
+                  "secondaryAggregation": {
+                    "alignmentPeriod": "300s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "perSeriesAligner": "ALIGN_FRACTION"
+                  }
+                }
+              }
+            }
+          ],
+          "thresholds": [
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 95,
+              "color": "green"
+            },
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 90,
+              "color": "yellow"
+            },
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 85,
+              "color": "red"
+            }
+          ],
+          "yAxis": {
+            "label": "Success %",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Pattern Execution Duration (p99)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "groupByFields": ["metric.label.pattern_name"],
+                    "perSeriesAligner": "ALIGN_PERCENTILE99"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/cre/pattern/execution_duration\" AND unit=\"s\""
+                }
+              }
+            }
+          ],
+          "thresholds": [
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 1.0,
+              "color": "yellow"
+            },
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 5.0,
+              "color": "red"
+            }
+          ],
+          "yAxis": {
+            "label": "Duration (s)",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Pattern Execution Duration (Average)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "groupByFields": ["metric.label.pattern_name"],
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/cre/pattern/execution_duration\" AND unit=\"s\""
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Duration (s)",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Transition Firing Rate",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_SUM",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/cre/pnet/transition/total\""
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Transitions/sec",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Mining Algorithm Duration",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "groupByFields": ["metric.label.algorithm"],
+                    "perSeriesAligner": "ALIGN_MEAN"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/cre/mining/execution_duration\" AND unit=\"s\""
+                }
+              }
+            }
+          ],
+          "thresholds": [
+            {
+              "targetAxis": "Y1",
+              "thresholdValue": 60,
+              "color": "yellow"
+            }
+          ],
+          "yAxis": {
+            "label": "Duration (s)",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Mining Throughput (Events/sec)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "minAlignmentPeriod": "60s",
+              "plotType": "LINE",
+              "targetAxis": "Y1",
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_NONE",
+                    "groupByFields": ["metric.label.algorithm"],
+                    "perSeriesAligner": "ALIGN_RATE"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/cre/mining/events_processed_total\""
+                }
+              }
+            }
+          ],
+          "yAxis": {
+            "label": "Events/sec",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Models Discovered",
+        "scorecard": {
+          "gaugeView": {
+            "lowerBound": 0,
+            "upperBound": 1000
+          },
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "crossSeriesReducer": "REDUCE_SUM",
+                    "perSeriesAligner": "ALIGN_SUM"
+                  },
+                  "filter": "resource.type=\"generic_task\" AND metric.type=\"workload.googleapis.com/cre/mining/models_discovered_total\""
+                }
+              },
+              "minAlignmentPeriod": "60s",
+              "plotType": "HEATMAP",
+              "targetAxis": "Y1"
+            }
+          ],
+          "thresholds": {
+            "colorStyle": "COLOR_STYLE_GREEN_TO_YELLOW",
+            "thresholds": [
+              {
+                "direction": "DIRECTION_DECREASING",
+                "value": 10
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

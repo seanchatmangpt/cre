@@ -1,0 +1,318 @@
+# Default values for CRE Helm chart
+# This is a YAML-formatted file.
+
+# -- Override the chart name
+nameOverride: ""
+# -- Override the full chart name
+fullnameOverride: ""
+
+# -- Create namespace if it doesn't exist
+createNamespace: false
+
+# -- Namespace to install into
+namespace: cre
+
+# -- Number of CRE replicas (Mnesia cluster nodes)
+replicaCount: 3
+
+image:
+  # -- Container image repository
+  repository: cre
+  # -- Container image tag (defaults to chart appVersion)
+  tag: "0.3.0"
+  # -- Container image pull policy
+  pullPolicy: IfNotPresent
+
+# -- Image pull secrets for private registries
+imagePullSecrets: []
+
+# -- Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# -- Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# -- CRE configuration
+config:
+  # Default HTTP port
+  defaultPort: 4142
+
+  # Logging level: debug, info, notice, warning, error, critical, alert, emergency
+  logLevel: info
+
+  # Client poll interval in milliseconds
+  clientPollInterval: 250
+
+  # Default session timeout in seconds
+  sessionTimeout: 3600
+
+  # Maximum concurrent executions
+  maxExecutions: 1000
+
+  # Execution TTL in milliseconds
+  executionTtl: 3600000
+
+  # Checkpoint directory
+  checkpointDir: /opt/cre/checkpoints
+
+  # Mnesia directory
+  mnesiaDir: /opt/cre/data/mnesia
+
+# -- Erlang VM configuration
+erlang:
+  # Maximum number of ports
+  maxPorts: 65536
+
+  # Maximum number of ETS tables
+  maxEtsTables: 2000
+
+  # Number of async threads
+  asyncThreads: 32
+
+  # SMP enablement
+  smpEnable: "true"
+
+# -- Service account configuration
+serviceAccount:
+  # -- Create service account
+  create: true
+  # -- Service account name
+  name: ""
+  # -- Annotations for service account
+  annotations: {}
+
+# -- RBAC configuration
+rbac:
+  # -- Create RBAC resources
+  create: true
+
+# -- Pod annotations
+podAnnotations: {}
+
+# -- Pod labels
+podLabels: {}
+
+# -- Service configuration
+service:
+  # -- Service type: ClusterIP, NodePort, LoadBalancer
+  type: ClusterIP
+
+  # -- HTTP port
+  port: 4142
+
+  # -- EPMD port
+  epmdPort: 4368
+
+  # -- Distribution port
+  distPort: 9100
+
+  # -- Session affinity
+  sessionAffinity: ClientIP
+
+  # -- Session affinity config
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+  # -- Service annotations
+  annotations: {}
+
+# -- Headless service for cluster communication
+headlessService:
+  # -- Create headless service
+  enabled: true
+
+  # -- Publish not ready addresses (for cluster bootstrapping)
+  publishNotReadyAddresses: true
+
+# -- Resource limits and requests
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+
+# -- Autoscaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+  # -- Custom metrics for autoscaling (e.g., based on workflow queue depth)
+  customMetrics: []
+  # - type: Pods
+  #   pods:
+  #     metric:
+  #       name: cre_workflow_queue_depth
+  #     target:
+  #       type: AverageValue
+  #       averageValue: "100"
+  # -- Autoscaling behavior policies
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 2
+          periodSeconds: 15
+      selectPolicy: Max
+
+# -- Persistent volume configuration
+persistence:
+  # -- Enable persistent storage
+  enabled: true
+
+  # -- Storage class (GKE: standard-rwo, premium-rwo, standard, premium)
+  storageClass: standard-rwo
+
+  # -- Access modes
+  accessModes:
+    - ReadWriteOnce
+
+  # -- Storage size
+  size: 10Gi
+
+  # -- Additional data volume claims
+  additionalClaim: []
+
+# -- Health check probes
+probes:
+  liveness:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readiness:
+    httpGet:
+      path: /ready
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  startup:
+    httpGet:
+      path: /startup
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 30
+
+# -- Node selector
+nodeSelector: {}
+
+# -- Tolerations
+tolerations: []
+
+# -- Affinity rules
+affinity: {}
+
+# -- Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# -- Ingress configuration
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: cre.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: cre-tls
+  #    hosts:
+  #      - cre.example.com
+
+# -- Backup configuration
+backup:
+  enabled: false
+
+  # Schedule (cron format)
+  schedule: "0 2 * * *"
+
+  # Retention days
+  retentionDays: 30
+
+  # S3 configuration
+  s3:
+    bucket: s3://cre-backups
+    region: us-east-1
+
+  # Note: For backup credentials, use External Secrets Operator or Secret Manager
+  # Do not specify existingSecret in values.yaml for Marketplace deployments
+
+# -- Monitoring configuration
+monitoring:
+  # Enable Prometheus ServiceMonitor
+  enabled: false
+
+  # ServiceMonitor labels
+  serviceMonitorLabels: {}
+
+  # ServiceMonitor interval
+  interval: 30s
+
+  # ServiceMonitor scrape timeout
+  scrapeTimeout: 10s
+
+# -- External configuration (for reference only)
+# NOTE: For Marketplace deployments, secrets must be provided via External Secrets
+# Operator or Google Secret Manager. Do not use existingSecret pattern in values.yaml
+# as it violates Marketplace security requirements.
+# See README.md for secret management configuration.
+externalConfig:
+  dbHost: ""
+  dbPort: ""
+  dbName: ""
+
+# -- License configuration for Google Cloud Marketplace BYOL model
+license:
+  # -- EULA acceptance (must be true for Marketplace deployment)
+  # Set to true in Marketplace UI to accept the Apache License 2.0
+  acceptEula: false
+
+  # -- Grace period in days (for deployments without EULA acceptance)
+  # CRE will run for this many days without EULA acceptance
+  gracePeriodDays: 30
+
+  # -- License file mount path (where EULA acceptance is stored)
+  licenseFile: /opt/cre/data/license/eula_acceptance.json
+
+  # -- Usage data directory (for v2 usage-based billing migration)
+  usageDataDir: /opt/cre/data/usage

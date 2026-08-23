@@ -1,0 +1,22 @@
+# AWS CodeBuild - Platform-agnostic CICD script
+#
+# Usage: Add as buildspec in CodeBuild project, or:
+#   aws codebuild start-build --project-name cre-cicd
+#
+# Env in CodeBuild: CICD_REGISTRY, CICD_PUSH
+#
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "CRE CI/CD Pipeline"
+      - chmod +x scripts/cicd-pipeline.sh
+  build:
+    commands:
+      - ./scripts/cicd-pipeline.sh
+
+artifacts:
+  files:
+    - cicd-artifacts/**/*
+  name: cicd-artifacts-$(date +%Y%m%d-%H%M%S)

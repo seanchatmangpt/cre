@@ -1,0 +1,19 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cre-prod
+  labels:
+    name: cre-prod
+    environment: production
+    app: cre-workflow-engine
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cre-staging
+  labels:
+    name: cre-staging
+    environment: staging
+    app: cre-workflow-engine

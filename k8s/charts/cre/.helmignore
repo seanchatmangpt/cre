@@ -1,0 +1,19 @@
+# Erlang build artifacts (should not be in chart directory anyway)
+*.beam
+ebin/
+
+# Build directories
+_build/
+rebar3.crashdump
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store

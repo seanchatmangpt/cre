@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "id": "006-create-cre-documentation-for-google-cloud-marketpl",
+  "branch_name": "wreckit/006-create-cre-documentation-for-google-cloud-marketpl",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Create Third-Party Notices Document",
+      "acceptance_criteria": [
+        "File THIRD_PARTY_NOTICES.md exists at repository root level",
+        "All 9 dependencies from rebar.config:35-45 are listed with correct licenses",
+        "License types are accurate: gen_pnet (Apache 2.0), lib_combin (Apache 2.0), cowboy/cowlib/ranch (ISC), jsx (MIT), jsone/jiffy (Apache 2.0), yamerl (BSD)",
+        "Version tags match rebar.config exactly",
+        "Full license text or links to licenses are provided",
+        "Apache 2.0 Section 4(d) attribution requirements are met",
+        "Document passes markdown syntax validation",
+        "Links to all dependency repositories are valid"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Critical legal requirement for Apache 2.0 compliance and GCP Marketplace submission. Quick win - straightforward research and documentation task."
+    },
+    {
+      "id": "US-002",
+      "title": "Create Upgrade Guide for GCP Marketplace",
+      "acceptance_criteria": [
+        "File docs/gcp/marketplace/UPGRADE.md exists",
+        "Document covers rolling upgrade procedure for 3+ node clusters",
+        "Document covers blue-green upgrade strategy",
+        "Document explains why hot code loading is not recommended for Marketplace deployments",
+        "Version compatibility matrix includes current version (0.3.0) and upgrade paths",
+        "Rollback procedures are documented and tested",
+        "Pre-upgrade checklist is complete",
+        "Post-upgrade validation steps are documented",
+        "Known issues section includes OTP version upgrade considerations",
+        "All links to runbooks and external documentation are valid"
+      ],
+      "priority": 1,
+      "status": "done",
+      "notes": "Critical Marketplace requirement. Some content exists in DEPLOYMENT.md:630-655 but needs extraction and Marketplace-specific context."
+    },
+    {
+      "id": "US-003",
+      "title": "Create Marketplace Listing Package Directory Structure",
+      "acceptance_criteria": [
+        "Directory marketplace/listing-package/ exists",
+        "Directory marketplace/listing-package/diagrams/ exists",
+        "File marketplace/listing-package/README.md exists with overview and quick links",
+        "File marketplace/listing-package/overview.md exists (extracted from README.md:1-108)",
+        "File marketplace/listing-package/architecture.md exists (extracted from ARCHITECTURE.md)",
+        "File marketplace/listing-package/deployment-guide.md exists (consolidated from DEPLOYMENT.md and runbooks)",
+        "File marketplace/listing-package/operations-guide.md exists (index of runbooks)",
+        "File marketplace/listing-package/security-model.md exists (extracted from SECURITY_WHITEPAPER.md)",
+        "File marketplace/listing-package/cost-model.md exists (extracted from PRICING.md)",
+        "All markdown files pass syntax validation",
+        "All relative links work correctly"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Consolidation task - extract and organize existing content. Focus on extraction, not rewriting. Customer-facing documentation."
+    },
+    {
+      "id": "US-004",
+      "title": "Export Critical Architecture Diagrams to PNG",
+      "acceptance_criteria": [
+        "File marketplace/listing-package/diagrams/architecture.png exists (exported from level1-container-diagram-v2.puml)",
+        "File marketplace/listing-package/diagrams/components.png exists (exported from level2-yawl-engine-component.puml)",
+        "File marketplace/listing-package/diagrams/deployment.png exists (new simplified GKE deployment diagram)",
+        "All PNG files are under 1MB in size",
+        "All diagrams are readable at 100% zoom",
+        "PlantUML or equivalent tool is installed and documented",
+        "Export commands are documented in plan.md",
+        "Diagrams are referenced correctly in architecture.md and deployment-guide.md"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Marketplace requires image formats, not just source PlantUML. Only export 3 critical diagrams for submission."
+    },
+    {
+      "id": "US-005",
+      "title": "Create Marketplace Submission Package for Google Technical Review",
+      "acceptance_criteria": [
+        "Directory marketplace/submission-package/ exists",
+        "Subdirectory technical-assessment/ exists with architecture diagram, security whitepaper (PDF), compliance matrix (Excel), infrastructure-as-code.zip",
+        "Subdirectory legal/ exists with LICENSE.txt, THIRD_PARTY_NOTICES.txt, PRIVACY_POLICY.txt, SUPPORT_SLA.txt, TERMS_OF_SERVICE.txt",
+        "Subdirectory listing/ exists with logo 128x128px, screenshots/ directory, description-short.txt (80 chars), description-long.txt (2000 chars)",
+        "infrastructure-as-code.zip contains terraform/gcp/*.tf, k8s/gcp/*.yaml, k8s/charts/cre/",
+        "description-short.txt is exactly 80 characters or less",
+        "description-long.txt is 2000 characters or less",
+        "Logo is exactly 128x128 pixels PNG format",
+        "Screenshots directory contains 3-5 screenshots showing CRE features",
+        "All legal documents are plain text format (.txt)"
+      ],
+      "priority": 2,
+      "status": "done",
+      "notes": "Package for Google's technical review team. Most content is copied/converted from existing files."
+    },
+    {
+      "id": "US-006",
+      "title": "Create Runbooks Index and Navigation",
+      "acceptance_criteria": [
+        "File docs/gcp/runbooks/README.md exists",
+        "Runbooks index links to all 5 runbooks (deployment, scaling, backup, rollback, troubleshooting)",
+        "Quick reference table maps common issues to correct runbooks",
+        "Incident response flowchart is clear and accurate",
+        "Escalation contacts section is complete",
+        "File docs/gcp/marketplace/README.md exists or is updated",
+        "Marketplace documentation index links to all legal, operational, and technical docs",
+        "Links to runbooks from marketplace index work correctly",
+        "All links in both index files pass markdown-link-check validation"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Simple navigation aids. Focus on clarity and helpfulness, not fancy formatting."
+    },
+    {
+      "id": "US-007",
+      "title": "Validate All Documentation Links and References",
+      "acceptance_criteria": [
+        "All internal links in marketplace/listing-package/*.md pass markdown-link-check",
+        "All internal links in docs/gcp/marketplace/*.md pass markdown-link-check",
+        "All internal links in docs/gcp/runbooks/*.md pass markdown-link-check",
+        "All file references (src/..., terraform/..., k8s/...) are verified to exist",
+        "All code:line references are spot-checked for accuracy (sample 10 random references)",
+        "All version references are consistent (0.3.0 for CRE, 25-28 for OTP, >=1.25.0 for GKE)",
+        "All region examples are consistent (us-central1)",
+        "All external links (GitHub repositories, GCP documentation) are current and accessible"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Quality assurance task. Run automated link checkers first, then manual verification of critical references."
+    },
+    {
+      "id": "US-008",
+      "title": "Test Customer Documentation Journeys",
+      "acceptance_criteria": [
+        "Scenario 1 (first-time customer) works end-to-end: overview → architecture → deployment → operations → troubleshooting",
+        "Scenario 2 (upgrading customer) works end-to-end: UPGRADE.md → rolling upgrade → rollback if needed",
+        "Scenario 3 (troubleshooting customer) works end-to-end: operations-guide → troubleshooting runbook → diagnostic flowchart → fix or escalate",
+        "No dead ends or circular references in any scenario",
+        "All required information is present for each scenario",
+        "Support information is easy to find in all scenarios",
+        "Documentation flows are logical and intuitive",
+        "At least one person (not the author) successfully navigates each scenario"
+      ],
+      "priority": 3,
+      "status": "done",
+      "notes": "Manual testing. Simulate real customer journeys to identify gaps or confusion points."
+    },
+    {
+      "id": "US-009",
+      "title": "Final Package Assembly and Pre-Submission Checklist",
+      "acceptance_criteria": [
+        "File marketplace/submission-package/README.md exists with package overview for Google",
+        "Directory marketplace/submission-package/customer-documentation/ exists with links to listing-package/",
+        "All legal documents are present in submission-package/legal/",
+        "All technical assessment artifacts are present in submission-package/technical-assessment/",
+        "All listing artifacts are present in submission-package/listing/",
+        "All items in marketplace/SUBMISSION_CHECKLIST.md are verified as complete",
+        "Legal review confirms Apache 2.0 compliance",
+        "Technical review confirms all procedures are accurate",
+        "Final package is ready for GCP Marketplace submission"
+      ],
+      "priority": 4,
+      "status": "done",
+      "notes": "Final phase. Assemble complete package and verify against submission checklist. Should not proceed until all previous stories are done."
+    }
+  ]
+}

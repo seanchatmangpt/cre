@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "001-centralize-genyawl-as-single-workflow-execution-au",
+  "title": "Centralize gen_yawl as single workflow execution authority",
+  "section": "backend",
+  "state": "implementing",
+  "overview": "Multiple entry points to gen_pnet create split-brain execution engine with hidden state mutation paths, duplicate logic, and semantic drift. Without centralization, the codebase accumulates accidental complexity and bypasses that make state non-replayable.\n\n**Motivation:** Makes CRE semantics enforceable, human-in-the-loop state correct, and GCP/enterprise readiness straightforward. Prevents future bugs where state updates happen outside observable execution paths.\n\n**Success criteria:**\n- All fire/3 implementations return {produce, Map, NewUsrInfo} 3-tuple explicitly\n- No direct gen_pnet calls outside gen_yawl (only internal dependency)\n- All external usr_info mutation moved into fire/3 or trigger/3 callbacks\n- Every state mutation representable as (Marking_before, Fire, Marking_after, UsrInfo_after)\n- No module spins its own continue loop or calls fire/3 directly\n- All execution passes through gen_yawl:step/1, gen_yawl:drain/2, or continue(self())\n\n**Technical constraints:**\n- gen_pnet becomes internal dependency, not public API\n- usr_info is transition-scoped, not process-scoped\n- Checkpoints must capture marking + usr_info\n- Replay must re-enter via gen_yawl:init/1 + marking injection\n\n**In scope:**\n- Inventory and containment of gen_pnet entry points\n- Refactor all YAWL pattern modules to support 3-tuple fire/3\n- Eliminate external usr_info mutations\n- Enforce single progress loop authority\n- API surface cleanup to emphasize gen_yawl over gen_pnet\n- Recovery and checkpoint coherence\n- Mechanical guard rails and assertions\n**Out of scope:**\n- Changing the fundamental gen_pnet implementation\n- Removing gen_pnet (mark as internal instead)\n- Modifying core Petri net semantics\n\n**Signals:** priority: high, urgency: This is a critical architectural spine - refactor until no meaningful workflow logic can execute without passing through gen_yawl",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Not all stories are done",
+  "created_at": "2026-02-10T07:04:09.907Z",
+  "updated_at": "2026-02-11T01:58:16.622Z",
+  "problem_statement": "Multiple entry points to gen_pnet create split-brain execution engine with hidden state mutation paths, duplicate logic, and semantic drift. Without centralization, the codebase accumulates accidental complexity and bypasses that make state non-replayable.",
+  "motivation": "Makes CRE semantics enforceable, human-in-the-loop state correct, and GCP/enterprise readiness straightforward. Prevents future bugs where state updates happen outside observable execution paths.",
+  "success_criteria": [
+    "All fire/3 implementations return {produce, Map, NewUsrInfo} 3-tuple explicitly",
+    "No direct gen_pnet calls outside gen_yawl (only internal dependency)",
+    "All external usr_info mutation moved into fire/3 or trigger/3 callbacks",
+    "Every state mutation representable as (Marking_before, Fire, Marking_after, UsrInfo_after)",
+    "No module spins its own continue loop or calls fire/3 directly",
+    "All execution passes through gen_yawl:step/1, gen_yawl:drain/2, or continue(self())"
+  ],
+  "technical_constraints": [
+    "gen_pnet becomes internal dependency, not public API",
+    "usr_info is transition-scoped, not process-scoped",
+    "Checkpoints must capture marking + usr_info",
+    "Replay must re-enter via gen_yawl:init/1 + marking injection"
+  ],
+  "scope_in_scope": [
+    "Inventory and containment of gen_pnet entry points",
+    "Refactor all YAWL pattern modules to support 3-tuple fire/3",
+    "Eliminate external usr_info mutations",
+    "Enforce single progress loop authority",
+    "API surface cleanup to emphasize gen_yawl over gen_pnet",
+    "Recovery and checkpoint coherence",
+    "Mechanical guard rails and assertions"
+  ],
+  "scope_out_of_scope": [
+    "Changing the fundamental gen_pnet implementation",
+    "Removing gen_pnet (mark as internal instead)",
+    "Modifying core Petri net semantics"
+  ],
+  "priority_hint": "high",
+  "urgency_hint": "This is a critical architectural spine - refactor until no meaningful workflow logic can execute without passing through gen_yawl"
+}

@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "id": "001-centralize-genyawl-as-single-workflow-execution-au",
+  "branch_name": "wreckit/001-centralize-genyawl-as-single-workflow-execution-au",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Fix yawl_execution to call gen_yawl instead of gen_pnet",
+      "acceptance_criteria": [
+        "yawl_execution:start_link/2 calls gen_yawl:start_link/3 instead of gen_pnet:start_link/3",
+        "yawl_execution:start_link/4 calls gen_yawl:start_link/4 instead of gen_pnet:start_link/4",
+        "yawl_execution:stop/1 calls gen_yawl:stop/1 instead of gen_pnet:stop/1",
+        "All yawl_execution tests pass after the change",
+        "Module documentation updated to reflect gen_yawl usage",
+        "Type specs updated from gen_pnet:server_name() to gen_yawl:server_name()"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "This is the highest impact, lowest risk change. Fixes the high-level API immediately for all users. 4 specific code edits required in /Users/sac/cre/src/wf/yawl_execution.erl at lines 148, 175, 244, and documentation."
+    },
+    {
+      "id": "US-002",
+      "title": "Migrate order_fulfillment module from gen_pnet to gen_yawl",
+      "acceptance_criteria": [
+        "order_fulfillment uses -behaviour(gen_yawl) instead of -behaviour(gen_pnet)",
+        "order_fulfillment:start/1 calls gen_yawl:start_link instead of gen_pnet:start_link",
+        "order_fulfillment:run/1 calls gen_yawl:stop instead of gen_pnet:stop",
+        "order_fulfillment:get_status/1 calls gen_yawl:call instead of gen_pnet:call",
+        "order_fulfillment:get_state/1 calls gen_yawl:call instead of gen_pnet:call",
+        "All fire/3 callbacks return 3-tuples {produce, Map, UsrInfo}",
+        "No usr_info mutations in handle_call/3 or handle_cast/2",
+        "order_fulfillment tests pass",
+        "Order fulfillment workflow can be checkpointed and recovered"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Update behavior declaration at line 40, start/1 at line 153, run/1 at lines 166/169, get_status/1 at line 182, get_state/1 at line 193, and all fire/3 clauses to return 3-tuples."
+    },
+    {
+      "id": "US-003",
+      "title": "Migrate freight_in_transit module from gen_pnet to gen_yawl",
+      "acceptance_criteria": [
+        "freight_in_transit uses -behaviour(gen_yawl) instead of -behaviour(gen_pnet)",
+        "freight_in_transit:start/1 calls gen_yawl:start_link",
+        "All fire/3 callbacks return 3-tuples {produce, Map, UsrInfo}",
+        "No usr_info mutations in handle_call/3 or handle_cast/2",
+        "freight_in_transit tests pass",
+        "Freight tracking workflow can be checkpointed and recovered"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Similar migration to order_fulfillment. Update behavior declaration at line 34, start/1 at line 142, and all fire/3 clauses."
+    },
+    {
+      "id": "US-004",
+      "title": "Migrate cre_worker module from gen_pnet to gen_yawl",
+      "acceptance_criteria": [
+        "cre_worker uses -behaviour(gen_yawl) instead of -behaviour(gen_pnet)",
+        "cre_worker gen_pnet:start_link calls updated to gen_yawl:start_link (lines 229, 249)",
+        "All fire/3 callbacks return 3-tuples {produce, Map, UsrInfo}",
+        "No usr_info mutations in handle_call/3 or handle_cast/2",
+        "cre_worker tests pass",
+        "Worker processes can be checkpointed and recovered"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Update behavior declaration and start_link calls at lines 229 and 249."
+    },
+    {
+      "id": "US-005",
+      "title": "Migrate cre_yawl_exception module from gen_pnet to gen_yawl",
+      "acceptance_criteria": [
+        "cre_yawl_exception uses -behaviour(gen_yawl) instead of -behaviour(gen_pnet)",
+        "All gen_pnet API calls updated to gen_yawl",
+        "All fire/3 callbacks return 3-tuples {produce, Map, UsrInfo}",
+        "No usr_info mutations in handle_call/3 or handle_cast/2",
+        "cre_yawl_exception tests pass",
+        "Exception handling workflows can be checkpointed and recovered"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Update behavior declaration at line 41 and all gen_pnet API calls."
+    },
+    {
+      "id": "US-006",
+      "title": "Eliminate hidden usr_info mutations in workflow modules",
+      "acceptance_criteria": [
+        "No usr_info mutations in handle_call/3 in any workflow module",
+        "No usr_info mutations in handle_cast/2 in any workflow module",
+        "All state mutations happen in fire/3 via 3-tuple returns",
+        "usr_info mutations in handle_call/handle_cast are detected and logged as warnings",
+        "Telemetry events emitted for all usr_info changes",
+        "All tests pass after migration"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Audit all workflow modules for NetState#net_state{usr_info = NewValue} patterns. Move state mutations from handle_call/handle_cast into fire/3. Add runtime assertion in gen_yawl to detect usr_info mutations in handle_call."
+    },
+    {
+      "id": "US-007",
+      "title": "Mark gen_pnet as internal with deprecation warnings",
+      "acceptance_criteria": [
+        "gen_pnet module documentation includes deprecation notice",
+        "gen_pnet:start_link/3 logs deprecation warning when called",
+        "gen_pnet:start_link/4 logs deprecation warning when called",
+        "gen_pnet:step/1 logs deprecation warning when called",
+        "gen_pnet:drain/2 logs deprecation warning when called",
+        "gen_pnet callback documentation references gen_yawl as replacement",
+        "Migration guide created at /Users/sac/cre/docs/migration_gen_pnet_to_gen_yawl.md",
+        "Migration guide is clear and complete"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Add @warning to moduledoc, logger:warning calls to API functions, update callback docs, create comprehensive migration guide."
+    },
+    {
+      "id": "US-008",
+      "title": "Add checkpoint/replay integration tests",
+      "acceptance_criteria": [
+        "Test verifies checkpoint + replay produces identical state",
+        "Test covers sequence pattern",
+        "Test covers structured_loop pattern with state updates",
+        "Test covers order_fulfillment workflow",
+        "Test verifies usr_info is preserved in checkpoint",
+        "Test verifies marking is preserved in checkpoint",
+        "Replay from checkpoint produces same final state as direct execution",
+        "Tests are added to CI/CD pipeline"
+      ],
+      "priority": 5,
+      "status": "pending",
+      "notes": "Create /Users/sac/cre/test/checkpoint_replay_test.erl with comprehensive tests for checkpoint/replay correctness."
+    },
+    {
+      "id": "US-009",
+      "title": "Add usr_info mutation detection tests",
+      "acceptance_criteria": [
+        "Test verifies usr_info mutations in handle_call are detected",
+        "Test logs warning when usr_info is mutated in handle_call",
+        "Test verifies usr_info updates in fire/3 work correctly",
+        "Test covers structured_loop pattern which updates state",
+        "Test verifies state updates are observable in telemetry",
+        "All new tests pass"
+      ],
+      "priority": 5,
+      "status": "pending",
+      "notes": "Create /Users/sac/cre/test/usr_info_mutation_test.erl to verify mutation detection and correct fire/3 usage."
+    },
+    {
+      "id": "US-010",
+      "title": "Add state observability tests",
+      "acceptance_criteria": [
+        "Test verifies every state mutation is representable as (Marking_before, Fire, Marking_after, UsrInfo_after)",
+        "Test verifies all transitions are captured in telemetry",
+        "Test verifies checkpoint interval works correctly",
+        "Test covers end-to-end workflow execution",
+        "All new tests pass"
+      ],
+      "priority": 5,
+      "status": "pending",
+      "notes": "Create /Users/sac/cre/test/state_observability_test.erl to verify all state mutations are observable."
+    },
+    {
+      "id": "US-011",
+      "title": "Add end-to-end workflow checkpoint tests",
+      "acceptance_criteria": [
+        "Test covers order_fulfillment workflow with checkpointing",
+        "Test verifies workflow completes successfully",
+        "Test verifies checkpoint captures marking + usr_info",
+        "Test verifies final state is correct",
+        "All new tests pass"
+      ],
+      "priority": 5,
+      "status": "pending",
+      "notes": "Create /Users/sac/cre/test/e2e_workflow_checkpoint_test.erl for end-to-end workflow testing with checkpointing."
+    }
+  ]
+}

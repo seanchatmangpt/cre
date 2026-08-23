@@ -1,0 +1,32 @@
+# Azure DevOps Pipeline - Platform-agnostic CICD script
+#
+# Usage: Create pipeline, point to this file
+# Set variables: CICD_REGISTRY (e.g. myregistry.azurecr.io/cre), CICD_PUSH
+#
+trigger:
+  - main
+  - master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  CICD_OUTPUT_DIR: '$(Build.ArtifactStagingDirectory)/cicd-artifacts'
+
+steps:
+  - task: Bash@3
+    displayName: 'Run CRE CI/CD Pipeline'
+    env:
+      CICD_REGISTRY: $(CICD_REGISTRY)
+      CICD_PUSH: $(CICD_PUSH)
+      CICD_OUTPUT_DIR: $(CICD_OUTPUT_DIR)
+    inputs:
+      filePath: 'scripts/cicd-pipeline.sh'
+      workingDirectory: '$(Build.SourcesDirectory)'
+
+  - task: PublishBuildArtifacts@1
+    condition: succeeded()
+    inputs:
+      pathToPublish: '$(Build.ArtifactStagingDirectory)/cicd-artifacts'
+      artifactName: 'cicd-artifacts'
+      publishLocation: 'Container'

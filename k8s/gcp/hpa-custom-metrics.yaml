@@ -1,0 +1,339 @@
+---
+# GKE Horizontal Pod Autoscaler with Custom Metrics
+# Uses Prometheus Adapter for business-logic based autoscaling
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cre-hpa-custom-metrics
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+    autoscaling: custom-metrics
+  annotations:
+    # Metric collection configuration for Prometheus Adapter
+    metric-config.external.active-workflows.prometheus/prometheus: |
+      {
+        "query": "sum(cre_autoscaling_active_workflows)",
+        "metricName": "active-workflows",
+        "metricSelector": {
+          "matchLabels": {
+            "app": "cre"
+          }
+        }
+      }
+    metric-config.external.workflow-queue-depth.prometheus/prometheus: |
+      {
+        "query": "sum(cre_autoscaling_workflow_queue_depth)",
+        "metricName": "workflow-queue-depth",
+        "metricSelector": {
+          "matchLabels": {
+            "app": "cre"
+          }
+        }
+      }
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cre
+  # Replica limits for GKE e2-medium node pool
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    # -----------------------------------------------------------------
+    # Primary: Scale based on active workflow count (business logic)
+    # -----------------------------------------------------------------
+    - type: Pods
+      pods:
+        metric:
+          name: active_workflows
+        target:
+          type: AverageValue
+          averageValue: "50"
+
+    # -----------------------------------------------------------------
+    # Secondary: Scale based on workflow queue depth
+    # -----------------------------------------------------------------
+    - type: Pods
+      pods:
+        metric:
+          name: workflow_queue_depth
+        target:
+          type: AverageValue
+          averageValue: "100"
+
+    # -----------------------------------------------------------------
+    # Tertiary: Scale based on Erlang process count (system resource)
+    # -----------------------------------------------------------------
+    - type: Pods
+      pods:
+        metric:
+          name: erlang_process_count
+        target:
+          type: AverageValue
+          averageValue: "50000"
+
+    # -----------------------------------------------------------------
+    # Fallback: CPU-based autoscaling (standard)
+    # -----------------------------------------------------------------
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+    # -----------------------------------------------------------------
+    # Fallback: Memory-based autoscaling
+    # -----------------------------------------------------------------
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+  # -----------------------------------------------------------------
+  # Scaling behavior policies to prevent thrashing
+  # -----------------------------------------------------------------
+  behavior:
+    # Scale down settings (prevent too aggressive scale-down)
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5 minutes - wait before scaling down
+      policies:
+        - type: Percent
+          value: 50  # Max 50% of pods can be scaled down
+          periodSeconds: 60
+        - type: Pods
+          value: 2   # Or max 2 pods at a time
+          periodSeconds: 60
+        - type: Pods
+          value: 1   # Conservative: 1 pod per minute
+          periodSeconds: 30
+      selectPolicy: Min  # Use the policy that changes the least
+
+    # Scale up settings (rapid response to load spikes)
+    scaleUp:
+      stabilizationWindowSeconds: 0  # No delay for scaling up
+      policies:
+        - type: Percent
+          value: 100  # Can double pod count
+          periodSeconds: 30
+        - type: Pods
+          value: 4    # Or add 4 pods
+          periodSeconds: 30
+        - type: Pods
+          value: 10   # Max burst: add 10 pods
+          periodSeconds: 60
+      selectPolicy: Max  # Use the most aggressive policy
+
+---
+# Service for exposing custom metrics endpoint
+apiVersion: v1
+kind: Service
+metadata:
+  name: cre-autoscaling-metrics
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: autoscaling-metrics
+  annotations:
+    description: "CRE Custom Autoscaling Metrics Endpoint"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9091"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9091
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: cre
+    component: workflow-engine
+
+---
+# ServiceMonitor for Prometheus Operator (if using Prometheus Operator)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cre-autoscaling
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: autoscaling-metrics
+spec:
+  selector:
+    matchLabels:
+      app: cre
+      component: workflow-engine
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      scheme: http
+      relabelings:
+        - sourceLabels: [__address__]
+          targetLabel: instance
+          replacement: 'cre'
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+
+---
+# Prometheus Metrics Discovery Config (External Prometheus)
+# This config should be added to your prometheus.yml scrape_configs
+# Commented here for documentation purposes
+# scrape_configs:
+#   - job_name: 'cre-autoscaling-metrics'
+#     kubernetes_sd_configs:
+#       - role: pod
+#         namespaces:
+#           names:
+#             - cre-prod
+#     relabel_configs:
+#       - source_labels: [__meta_kubernetes_pod_label_app]
+#         regex: cre
+#         action: keep
+#       - source_labels: [__meta_kubernetes_pod_label_component]
+#         regex: workflow-engine
+#         action: keep
+#       - source_labels: [__meta_kubernetes_pod_name]
+#         target_label: pod
+#       - source_labels: [__meta_kubernetes_pod_node_name]
+#         target_label: node
+#       - source_labels: [__meta_kubernetes_namespace]
+#         target_label: namespace
+#       - source_labels: [__meta_kubernetes_pod_ip]
+#         target_label: __address__
+#         replacement: $1:9091
+#     metric_relabel_configs:
+#       - source_labels: [__name__]
+#         regex: 'cre_autoscaling_.*'
+#         action: keep
+
+---
+# Staging HPA with Custom Metrics
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cre-hpa-custom-metrics
+  namespace: cre-staging
+  labels:
+    app: cre
+    environment: staging
+    autoscaling: custom-metrics
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cre
+  # Lower limits for staging (cost optimization)
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Pods
+      pods:
+        metric:
+          name: active_workflows
+        target:
+          type: AverageValue
+          averageValue: "30"
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+      selectPolicy: Max
+
+---
+# PodDisruptionBudget for graceful scaling
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cre-autoscaling-pdb
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: cre
+      component: workflow-engine
+
+---
+# ConfigMap for Prometheus Adapter rules
+# This configures the Prometheus Adapter to expose CRE metrics to HPA
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-adapter-cre-rules
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: autoscaling-metrics
+data:
+  rules.yaml: |
+    # External metrics for CRE autoscaling
+    - seriesQuery: 'cre_autoscaling_active_workflows'
+      resources:
+        overrides:
+          namespace: {resource: "namespace"}
+          pod: {resource: "pod"}
+      name:
+        matches: "cre_autoscaling_(.+)"
+        as: "cre_${1}"
+      metricsQuery: 'sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+
+    - seriesQuery: 'cre_autoscaling_workflow_queue_depth'
+      resources:
+        overrides:
+          namespace: {resource: "namespace"}
+          pod: {resource: "pod"}
+      name:
+        matches: "cre_autoscaling_(.+)"
+        as: "cre_${1}"
+      metricsQuery: 'sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+
+    - seriesQuery: 'cre_autoscaling_erlang_process_count'
+      resources:
+        overrides:
+          namespace: {resource: "namespace"}
+          pod: {resource: "pod"}
+      name:
+        matches: "cre_autoscaling_(.+)"
+        as: "cre_${1}"
+      metricsQuery: 'avg(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+
+    - seriesQuery: 'cre_autoscaling_mnesia_table_size'
+      resources:
+        overrides:
+          namespace: {resource: "namespace"}
+          pod: {resource: "pod"}
+      name:
+        matches: "cre_autoscaling_(.+)"
+        as: "cre_${1}"
+      metricsQuery: 'sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)'

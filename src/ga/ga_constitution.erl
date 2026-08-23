@@ -38,80 +38,14 @@
 -export([to_yaml/1, from_yaml/1]).
 
 %%====================================================================
-%% Records
+%% Includes
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc Constitution record for GA compiler.
-%%
-%% Contains all components needed to compile a workflow specification
-%% into executable gen_yawl modules.
-%%--------------------------------------------------------------------
--record(constitution, {
-    id :: binary(),                           %% Unique constitution identifier
-    version :: binary(),                      %% Version string
-    sigma = #{} :: #{}                        %% Σ - Typing profile
-}).
-
--record(sigma, {
-    type_system = behavioral :: behavioral | static | dynamic,
-    type_bindings = [] :: [type_binding()]
-}).
-
--record(type_binding, {
-    term :: binary(),
-    type :: binary(),
-    token_contract :: #{
-        shape := singleton | multiple | optional,
-        validity := eager | lazy
-    }
-}).
-
--record(refusal, {
-    state :: binary(),
-    refused_transitions = [] :: [binary()],
-    refusal_reason :: binary()
-}).
-
--record(quality_gate, {
-    name :: binary(),
-    invariant :: binary(),
-    replay_enabled = false :: boolean(),
-    provenance_enabled = false :: boolean()
-}).
-
--record(lambda, {
-    compilation_strategy = topological :: topological | sequential | parallel,
-    pattern_sequence = [] :: [pattern_instance()]
-}).
-
--record(pattern_instance, {
-    pattern :: binary(),
-    instance_id :: binary(),
-    config = #{} :: map()
-}).
-
-%%--------------------------------------------------------------------
-%% @doc Token contract specification.
-%%--------------------------------------------------------------------
--record(token_contract, {
-    shape :: singleton | multiple | optional,
-    validity :: eager | lazy,
-    lifespan :: temporary | permanent
-}).
+-include("ga_constitution.hrl").
 
 %%====================================================================
 %% Types
 %%====================================================================
-
--type constitution() :: #constitution{}.
--type sigma() :: #sigma{}.
--type type_binding() :: #type_binding{}.
--type refusal() :: #refusal{}.
--type quality_gate() :: #quality_gate{}.
--type lambda() :: #lambda{}.
--type pattern_instance() :: #pattern_instance{}.
--type token_contract() :: #token_contract{}.
 
 -type refusal_category() ::
     missing_evidence |
@@ -335,12 +269,21 @@ to_map(#constitution{
 %%--------------------------------------------------------------------
 %% @doc Creates a constitution from a map.
 %%
+%% @throws {invalid_constitution, Reason} if map is missing required fields
 %% @end
 %%--------------------------------------------------------------------
 -spec from_map(map()) -> constitution().
 
 from_map(Map) when is_map(Map) ->
-    new(Map).
+    case maps:get(<<"id">>, Map, undefined) of
+        undefined -> error({invalid_constitution, missing_id});
+        Id when is_binary(Id) ->
+            case maps:get(<<"version">>, Map, undefined) of
+                undefined -> error({invalid_constitution, missing_version});
+                Version when is_binary(Version) ->
+                    new(Map)
+            end
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Converts a constitution to YAML format.
@@ -352,9 +295,7 @@ from_map(Map) when is_map(Map) ->
 -spec to_yaml(constitution()) -> binary().
 
 to_yaml(Constitution) ->
-    Map = to_map(Constitution),
-    %% Simple YAML generation - for production use a proper YAML library
-    yaml_encode(Map).
+    ga_yaml:to_yaml(Constitution).
 
 %%--------------------------------------------------------------------
 %% @doc Parses a constitution from YAML format.
@@ -364,13 +305,7 @@ to_yaml(Constitution) ->
 -spec from_yaml(binary()) -> {ok, constitution()} | {error, term()}.
 
 from_yaml(YamlBinary) when is_binary(YamlBinary) ->
-    try
-        Map = yaml_decode(YamlBinary),
-        {ok, from_map(Map)}
-    catch
-        Type:Error:Stack ->
-            {error, {yaml_parse_error, Type, Error, Stack}}
-    end.
+    ga_yaml:from_yaml(YamlBinary).
 
 %%====================================================================
 %% Internal Functions
@@ -554,73 +489,7 @@ pattern_instance_to_map(#pattern_instance{pattern = Pattern, instance_id = Id, c
     }.
 
 %% @private
-%% Simple YAML encoding - for production, use a proper YAML library
--spec yaml_encode(map()) -> binary().
-
-yaml_encode(Map) when is_map(Map) ->
-    Lines = [
-        <<"constitution:">>,
-        encode_map(<<"  ">, Map)
-    ],
-    iolist_to_binary(lists:flatten(Lines)).
-
-%% @private
-encode_map(Prefix, Map) when is_map(Map) ->
-    lists:map(
-        fun({K, V}) ->
-            case V of
-                L when is_list(L) ->
-                    [
-                        <<Prefix/binary, K/binary, ":\n">>,
-                        encode_list(<<Prefix/binary, "  ">>, L)
-                    ];
-                M when is_map(M) ->
-                    [
-                        <<Prefix/binary, K/binary, ":\n">>,
-                        encode_map(<<Prefix/binary, "  ">>, M)
-                    ];
-                A when is_atom(A) ->
-                    <<Prefix/binary, K/binary, ": ", (atom_to_binary(A))/binary, "\n">>;
-                B when is_binary(B) ->
-                    <<Prefix/binary, K/binary, ": ", B/binary, "\n">>;
-                I when is_integer(I) ->
-                    <<Prefix/binary, K/binary, ": ", (integer_to_binary(I))/binary, "\n">>;
-                _ ->
-                    <<Prefix/binary, K/binary, ": null\n">>
-            end
-        end,
-        lists:sort(maps:to_list(Map))
-    ).
-
-%% @private
-encode_list(_Prefix, []) ->
-    <<"[]\n">>;
-encode_list(Prefix, List) when is_list(List) ->
-    lists:map(
-        fun(Item) when is_map(Item) ->
-            [
-                <<Prefix/binary, "- \n">>,
-                encode_map(<<Prefix/binary, "  ">>, Item)
-            ];
-           (Item) when is_binary(Item) ->
-            [<<Prefix/binary, "- ", Item/binary, "\n">>];
-           (Item) ->
-            [<<Prefix/binary, "- ", (iolist_to_binary(io_lib:format("~p", [Item])))/binary, "\n">>]
-        end,
-        List
-    ).
-
-%% @private
-%% Simple YAML decoding - placeholder for production YAML parser
--spec yaml_decode(binary()) -> map().
-
-yaml_decode(_YamlBinary) ->
-    %% TODO: Implement proper YAML parsing
-    %% For now, return empty map as placeholder
-    #{}.
-
-%% @private
--spec maps_get(Key, Map, Default) -> term().
+-spec maps_get(term(), map(), term()) -> term().
 
 maps_get(Key, Map, Default) ->
     case maps:find(Key, Map) of

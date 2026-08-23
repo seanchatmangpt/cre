@@ -1,0 +1,317 @@
+---
+# GKE Spot VM Node Pool Configuration
+#
+# This file defines the Spot VM node pool configuration for CRE on GKE.
+# Spot VMs provide 60-80% cost savings compared to regular VMs but can be
+# preempted with 30 seconds notice.
+#
+# Usage: Apply node pool configuration via gcloud command or Terraform
+#
+# gcloud container node-pools create "cre-spot-pool" \
+#   --cluster=cre-cluster \
+#   --region=us-central1 \
+#   --machine-type=e2-medium \
+#   --spot \
+#   --enable-autoscaling \
+#   --min-nodes=0 \
+#   --max-nodes=10 \
+#   --node-labels=cloud.google.com/gke-spot=true,node-pool=cre-spot \
+#   --node-taints=cloud.google.com/gke-spot=true:NoSchedule \
+#   --num-nodes=0
+#
+# @doc Spot VM Node Pool Configuration
+# @end
+# -------------------------------------------------------------------
+
+---
+# Resource Quota for Spot VM Workloads
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: cre-spot-quota
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+    workload-type: spot
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: "40Gi"
+    requests.ephemeral-storage: "100Gi"
+    pods: "50"
+  scopeSelector:
+    matchExpressions:
+      - key: workload-type
+        operator: In
+        values: ["spot"]
+---
+# Resource Quota for Staging Spot Workloads
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: cre-spot-quota
+  namespace: cre-staging
+  labels:
+    app: cre
+    component: workflow-engine
+    environment: staging
+    workload-type: spot
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: "20Gi"
+    requests.ephemeral-storage: "50Gi"
+    pods: "20"
+  scopeSelector:
+    matchExpressions:
+      - key: workload-type
+        operator: In
+        values: ["spot"]
+
+---
+# Limit Range for Spot VM Pods
+# Ensures pods on Spot VMs have appropriate resource limits
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cre-spot-limits
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+    workload-type: spot
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "500m"
+        memory: "1Gi"
+      defaultRequest:
+        cpu: "250m"
+        memory: "512Mi"
+      max:
+        cpu: "2000m"
+        memory: "4Gi"
+    - type: Pod
+      max:
+        cpu: "4000m"
+        memory: "8Gi"
+---
+# Limit Range for Staging
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cre-spot-limits
+  namespace: cre-staging
+  labels:
+    app: cre
+    component: workflow-engine
+    environment: staging
+    workload-type: spot
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "250m"
+        memory: "512Mi"
+      defaultRequest:
+        cpu: "100m"
+        memory: "256Mi"
+      max:
+        cpu: "1000m"
+        memory: "2Gi"
+
+---
+# Pod Disruption Budget for Spot VM Workloads
+# Spot VMs can be preempted, so we need to ensure minimum availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cre-spot-pdb
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+    workload-type: spot
+spec:
+  minAvailable: 0
+  selector:
+    matchLabels:
+      app: cre
+      workload-type: spot
+---
+# PDB for Staging
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cre-spot-pdb
+  namespace: cre-staging
+  labels:
+    app: cre
+    component: workflow-engine
+    environment: staging
+    workload-type: spot
+spec:
+  minAvailable: 0
+  selector:
+    matchLabels:
+      app: cre
+      workload-type: spot
+
+---
+# Network Policy for Spot VM Isolation
+# Ensures Spot VM pods can communicate with regular nodes
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cre-spot-netpol
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+    workload-type: spot
+spec:
+  podSelector:
+    matchLabels:
+      app: cre
+      workload-type: spot
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from all CRE pods (both regular and spot)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: cre
+      ports:
+        - protocol: TCP
+          port: 4142
+        - protocol: TCP
+          port: 4369
+        - protocol: TCP
+          port: 9100
+    # Allow from Ingress
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 4142
+  egress:
+    # Allow to all CRE pods
+    - to:
+        - podSelector:
+            matchLabels:
+              app: cre
+      ports:
+        - protocol: TCP
+          port: 4142
+        - protocol: TCP
+          port: 4369
+        - protocol: TCP
+          port: 9100
+    # Allow to DNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow to OTEL collector
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: opentelemetry-collector
+      ports:
+        - protocol: TCP
+          port: 4317
+
+---
+# Horizontal Pod Autoscaler for Spot VM Workloads
+# Aggressive scaling for cost-optimized Spot VMs
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cre-spot-hpa
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+    workload-type: spot
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cre-spot
+  minReplicas: 0
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 30
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+---
+# HPA for Staging
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cre-spot-hpa
+  namespace: cre-staging
+  labels:
+    app: cre
+    component: workflow-engine
+    environment: staging
+    workload-type: spot
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cre-spot
+  minReplicas: 0
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15

@@ -1,0 +1,53 @@
+---
+# GKE Pod Disruption Budget for Production
+# Ensures minimum availability during voluntary disruptions
+# (node upgrades, cluster autoscaling, manual eviction)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cre-pdb
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+  annotations:
+    description: "Ensures minimum availability for CRE workflow engine during disruptions"
+    # GKE maintenance exclusion annotation
+    # cloud.google.com/gke-maintenance-exclusion: "true"
+spec:
+  # Minimum available pods during disruption
+  # For 3-replica deployment: allows 1 pod to be down
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: cre
+      component: workflow-engine
+
+---
+# GKE Pod Disruption Budget for Staging
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cre-pdb
+  namespace: cre-staging
+  labels:
+    app: cre
+    environment: staging
+  annotations:
+    description: "PDB for CRE staging - allows 1 pod disruption"
+spec:
+  # For 2-replica staging deployment: allows 1 pod to be down
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: cre
+
+---
+# Budget policy for cluster autoscaler interaction
+# GKE Cluster Autoscaler respects PDB when scaling down
+# To enable cluster autoscaler with PDB:
+# gcloud container clusters update [CLUSTER_NAME] \
+#   --enable-autoscaling \
+#   --min-nodes=3 \
+#   --max-nodes=10 \
+#   --autoscaling-profile=balanced

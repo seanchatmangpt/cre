@@ -1,0 +1,11 @@
+# Extract line metadata
+PREFIX ln: <http://linecontroller.factory/ontology/ln#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?lineName ?lineDescription
+WHERE {
+    ?line rdf:type ln:Line .
+    ?line ln:lineName ?lineName .
+    ?line ln:lineDescription ?lineDescription .
+}
+ORDER BY ?lineName

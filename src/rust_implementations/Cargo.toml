@@ -1,0 +1,77 @@
+[package]
+name = "cre_rust_nif"
+version = "0.1.0"
+edition = "2021"
+authors = ["CRE Team <cre@common-runtime.org>"]
+description = "Rust NIF bindings for CRE - Process Mining Algorithms"
+license = "Apache-2.0"
+
+[lib]
+name = "cre_rust_nif"
+path = "lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+# NIF dependencies
+rustler = "0.34"
+rustler_codegen = "0.34"
+lazy_static = "1.4"
+
+# Core algorithm dependencies (reuse from paper_algorithms)
+itertools = "0.13.0"
+rayon = "1.8.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+crossbeam = "0.8"
+petgraph = "0.6"
+ndarray = "0.15"
+rand = "0.8"
+smallvec = "1.11"
+hashbrown = "0.14"
+parking_lot = "0.12"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# Chrono for timestamps
+chrono = { version = "0.4", features = ["serde"] }
+
+# Process mining dependencies
+csv = "1.3"
+polars = { version = "0.39", features = ["ndarray", "serde"], optional = true }
+arrow2 = { version = "0.18", features = ["io_parquet"], optional = true }
+
+[dev-dependencies]
+rustler = "0.34"
+
+[features]
+default = ["std"]
+std = []
+full = ["polars", "arrow2"]
+# Enable this feature when paper_algorithms crate is properly configured
+# with_paper_algorithms = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+
+# Use specific Rustler settings for Erlang NIF
+[package.metadata.rustler]
+# Erlang OTP version to target
+otp_version = "25"
+
+# NIF-specific settings
+[package.metadata.rustler.nif_versions]
+# Minimum NIF version supported (2.15 for Erlang 25+)
+min_nif_version = "2.15"

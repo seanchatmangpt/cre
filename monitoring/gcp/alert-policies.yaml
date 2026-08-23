@@ -1,0 +1,371 @@
+# CRE Cloud Monitoring Alert Policies
+#
+# This file defines alert policies for CRE monitoring in GCP Cloud Monitoring.
+# Deploy these policies using the gcloud command-line tool or the Cloud Monitoring API.
+#
+# Deployment:
+#   gcloud alpha monitoring policies create --policy-from-file=<policy>.yaml
+
+policies:
+  # ------------------------------------------------------------
+  # Performance Alerts
+  # ------------------------------------------------------------
+  - displayName: "CRE - High Pattern Execution Time"
+    description: "Alert when pattern execution p99 exceeds threshold"
+    conditions:
+      - displayName: "Pattern execution p99 > 5s"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/cre/pattern/execution_duration"
+            AND metric.label.pattern_name = "*"
+          aggregation:
+            alignmentPeriod: 300s
+            perSeriesAligner: ALIGN_PERCENTILE99
+            crossSeriesReducer: REDUCE_NONE
+            groupByFields:
+              - metric.label.pattern_name
+          comparison: COMPARISON_GT
+          thresholdValue: 5.0
+          duration: 300s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "WARNING"
+    enabled: true
+
+  - displayName: "CRE - Critical Pattern Execution Time"
+    description: "Alert when pattern execution p99 exceeds critical threshold"
+    conditions:
+      - displayName: "Pattern execution p99 > 10s"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/cre/pattern/execution_duration"
+          aggregation:
+            alignmentPeriod: 120s
+            perSeriesAligner: ALIGN_PERCENTILE99
+          comparison: COMPARISON_GT
+          thresholdValue: 10.0
+          duration: 120s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "CRITICAL"
+    enabled: true
+
+  - displayName: "CRE - High Latency"
+    description: "Alert when workflow latency exceeds threshold"
+    conditions:
+      - displayName: "Workflow latency > 30s"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/cre/workflow/latency"
+          aggregation:
+            alignmentPeriod: 300s
+            perSeriesAligner: ALIGN_PERCENTILE95
+          comparison: COMPARISON_GT
+          thresholdValue: 30.0
+          duration: 300s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "WARNING"
+    enabled: true
+
+  # ------------------------------------------------------------
+  # Error Rate Alerts
+  # ------------------------------------------------------------
+  - displayName: "CRE - High Error Rate"
+    description: "Alert when workflow error rate exceeds threshold"
+    conditions:
+      - displayName: "Error rate > 5%"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/cre/workflow/error_rate"
+          aggregation:
+            alignmentPeriod: 300s
+            perSeriesAligner: ALIGN_RATE
+          comparison: COMPARISON_GT
+          thresholdValue: 0.05
+          duration: 300s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "WARNING"
+    enabled: true
+
+  - displayName: "CRE - Critical Error Rate"
+    description: "Alert when workflow error rate exceeds critical threshold"
+    conditions:
+      - displayName: "Error rate > 15%"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/cre/workflow/error_rate"
+          aggregation:
+            alignmentPeriod: 120s
+            perSeriesAligner: ALIGN_RATE
+          comparison: COMPARISON_GT
+          thresholdValue: 0.15
+          duration: 120s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "CRITICAL"
+    enabled: true
+
+  # ------------------------------------------------------------
+  # Throughput Alerts
+  # ------------------------------------------------------------
+  - displayName: "CRE - Low Throughput"
+    description: "Alert when workflow throughput drops below threshold"
+    conditions:
+      - displayName: "Throughput < 10 workflows/min"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/cre/workflow/completed_total"
+          aggregation:
+            alignmentPeriod: 300s
+            perSeriesAligner: ALIGN_DELTA
+            crossSeriesReducer: REDUCE_SUM
+          comparison: COMPARISON_LT
+          thresholdValue: 10.0
+          duration: 600s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "WARNING"
+    enabled: true
+
+  # ------------------------------------------------------------
+  # Resource Alerts
+  # ------------------------------------------------------------
+  - displayName: "CRE - High Memory Usage"
+    description: "Alert when Erlang VM memory usage exceeds threshold"
+    conditions:
+      - displayName: "Memory > 2GB"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/erlang/memory/total"
+          aggregation:
+            alignmentPeriod: 300s
+            perSeriesAligner: ALIGN_MAX
+          comparison: COMPARISON_GT
+          thresholdValue: 2147483648.0
+          duration: 600s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "WARNING"
+    enabled: true
+
+  - displayName: "CRE - Critical Memory Usage"
+    description: "Alert when Erlang VM memory usage exceeds critical threshold"
+    conditions:
+      - displayName: "Memory > 4GB"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/erlang/memory/total"
+          aggregation:
+            alignmentPeriod: 300s
+            perSeriesAligner: ALIGN_MAX
+          comparison: COMPARISON_GT
+          thresholdValue: 4294967296.0
+          duration: 300s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "CRITICAL"
+    enabled: true
+
+  - displayName: "CRE - High Process Count"
+    description: "Alert when Erlang process count exceeds threshold"
+    conditions:
+      - displayName: "Process count > 50,000"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/erlang/process/count"
+          aggregation:
+            alignmentPeriod: 300s
+            perSeriesAligner: ALIGN_MAX
+          comparison: COMPARISON_GT
+          thresholdValue: 50000.0
+          duration: 600s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "WARNING"
+    enabled: true
+
+  - displayName: "CRE - High GC Rate"
+    description: "Alert when garbage collection rate is excessive"
+    conditions:
+      - displayName: "GC rate > 100 ops/sec"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/erlang/gc/count"
+          aggregation:
+            alignmentPeriod: 60s
+            perSeriesAligner: ALIGN_RATE
+          comparison: COMPARISON_GT
+          thresholdValue: 100.0
+          duration: 600s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "WARNING"
+    enabled: true
+
+  # ------------------------------------------------------------
+  # Mnesia Alerts
+  # ------------------------------------------------------------
+  - displayName: "CRE - Mnesia Transaction Failure Rate"
+    description: "Alert when Mnesia transaction failure rate exceeds threshold"
+    conditions:
+      - displayName: "Mnesia failure rate > 1%"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND (metric.type="workload.googleapis.com/erlang/mnesia/transactions_committed"
+                 OR metric.type="workload.googleapis.com/erlang/mnesia/transactions_failed")
+          aggregation:
+            alignmentPeriod: 300s
+            perSeriesAligner: ALIGN_FRACTION
+            crossSeriesReducer: REDUCE_NONE
+          comparison: COMPARISON_GT
+          thresholdValue: 0.01
+          duration: 300s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "WARNING"
+    enabled: true
+
+  - displayName: "CRE - Mnesia Partition Detected"
+    description: "Alert when Mnesia partition is detected"
+    conditions:
+      - displayName: "Mnesia partition detected"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/erlang/mnesia/partitioned_nodes"
+          aggregation:
+            alignmentPeriod: 60s
+            perSeriesAligner: ALIGN_MAX
+          comparison: COMPARISON_GT
+          thresholdValue: 0.0
+          duration: 60s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 600s
+    severity: "CRITICAL"
+    enabled: true
+
+  # ------------------------------------------------------------
+  # Mining Alerts
+  # ------------------------------------------------------------
+  - displayName: "CRE - Mining Algorithm Slow"
+    description: "Alert when mining algorithm execution time exceeds threshold"
+    conditions:
+      - displayName: "Mining duration > 60s"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/cre/mining/execution_duration"
+          aggregation:
+            alignmentPeriod: 300s
+            perSeriesAligner: ALIGN_MEAN
+            crossSeriesReducer: REDUCE_NONE
+            groupByFields:
+              - metric.label.algorithm
+          comparison: COMPARISON_GT
+          thresholdValue: 60.0
+          duration: 600s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "WARNING"
+    enabled: true
+
+  # ------------------------------------------------------------
+  # Availability Alerts
+  # ------------------------------------------------------------
+  - displayName: "CRE - Service Down"
+    description: "Alert when CRE service is not responding"
+    conditions:
+      - displayName: "Service check failed"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/cre/health/check"
+          aggregation:
+            alignmentPeriod: 60s
+            perSeriesAligner: ALIGN_FRACTION_TRUE
+          comparison: COMPARISON_LT
+          thresholdValue: 1.0
+          duration: 120s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 600s
+    severity: "CRITICAL"
+    enabled: true
+
+  - displayName: "CRE - No Metrics Received"
+    description: "Alert when no metrics are received from CRE service"
+    conditions:
+      - displayName: "No metrics for 5 minutes"
+        conditionAbsent:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/cre/workflow/active"
+          duration: 300s
+    alertStrategy:
+      autoClose: 600s
+    severity: "WARNING"
+    enabled: true
+
+  # ------------------------------------------------------------
+  # Workflow-Specific Alerts
+  # ------------------------------------------------------------
+  - displayName: "CRE - Too Many Active Workflows"
+    description: "Alert when active workflow count is excessive"
+    conditions:
+      - displayName: "Active workflows > 500"
+        conditionThreshold:
+          filter: |
+            resource.type="generic_task"
+            AND metric.type="workload.googleapis.com/cre/workflow/active"
+          aggregation:
+            alignmentPeriod: 300s
+            perSeriesAligner: ALIGN_MEAN
+          comparison: COMPARISON_GT
+          thresholdValue: 500.0
+          duration: 600s
+          trigger:
+            count: 1
+    alertStrategy:
+      autoClose: 1800s
+    severity: "WARNING"
+    enabled: true

@@ -2,7 +2,7 @@
 %%%% @doc Workflow execution helpers for YAWL compiled nets.
 %%
 %% This module provides utilities for executing compiled YAWL workflows
-%% with gen_pnet. It offers a high-level API for starting workflows,
+%% with gen_yawl. It offers a high-level API for starting workflows,
 %% injecting input data, executing steps, draining workflows to completion,
 %% and extracting results.
 %%

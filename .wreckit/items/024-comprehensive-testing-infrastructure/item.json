@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "024-comprehensive-testing-infrastructure",
+  "title": "Comprehensive testing infrastructure",
+  "section": "tooling",
+  "state": "idea",
+  "overview": "Complex concurrent workflow system needs comprehensive validation beyond basic unit tests to ensure correctness, determinism, and performance.\n\n**Motivation:** Provides confidence in correctness, catches edge cases, validates determinism guarantees, ensures performance targets are met, supports regression testing.\n\n**Success criteria:**\n- Unit tests for all primitives\n- Property tests validate key invariants\n- Bounded model checks detect deadlocks\n- Determinism/replay tests pass\n- Performance benchmarks run with reported metrics\n\n**Technical constraints:**\n- Implement minimal generator framework for property tests (no PropEr in stdlib)\n- Bounded exploration up to depth D and token bound K\n- Microbench: 10k task steps, 100 branch par join, repeated discriminator\n- Targets: bounded overhead per step, efficient cancellation\n\n**Signals:** priority: critical, urgency: Mandatory validation per acceptance criteria",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Research phase detected unauthorized file modifications:\n\n  Modified M src/ln_compile.erl\n  Modified M src/ln_plan.erl\n  Modified M test/ln_plan_test.erl\n\nThe research phase must be read-only. Only research.md may be created.\nAny code changes should be made during the implementation phase.",
+  "created_at": "2026-02-11T01:57:00.431Z",
+  "updated_at": "2026-02-11T05:19:15.206Z",
+  "problem_statement": "Complex concurrent workflow system needs comprehensive validation beyond basic unit tests to ensure correctness, determinism, and performance.",
+  "motivation": "Provides confidence in correctness, catches edge cases, validates determinism guarantees, ensures performance targets are met, supports regression testing.",
+  "success_criteria": [
+    "Unit tests for all primitives",
+    "Property tests validate key invariants",
+    "Bounded model checks detect deadlocks",
+    "Determinism/replay tests pass",
+    "Performance benchmarks run with reported metrics"
+  ],
+  "technical_constraints": [
+    "Implement minimal generator framework for property tests (no PropEr in stdlib)",
+    "Bounded exploration up to depth D and token bound K",
+    "Microbench: 10k task steps, 100 branch par join, repeated discriminator",
+    "Targets: bounded overhead per step, efficient cancellation"
+  ],
+  "priority_hint": "critical",
+  "urgency_hint": "Mandatory validation per acceptance criteria"
+}

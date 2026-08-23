@@ -1,0 +1,330 @@
+{
+  "schema_version": 1,
+  "id": "016-effect-system-with-receipts",
+  "branch_name": "wreckit/016-effect-system-with-receipts",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Implement UUID v4 generation module (ln_uuid)",
+      "acceptance_criteria": [
+        "ln_uuid:new/0 generates RFC 4122 UUID v4 with 128 bits",
+        "ln_uuid:to_string/1 converts UUID to xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx format",
+        "ln_uuid:from_string/1 parses string format back to UUID binary",
+        "Property test: 10,000 UUIDs generated, all unique",
+        "Unit tests: UUID format validated (version 4, variant RFC 4122)",
+        "No dialyzer warnings"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "Foundation for all other features. Use crypto:strong_rand_bytes/1 for randomness."
+    },
+    {
+      "id": "US-002",
+      "title": "Update ln_effect to use UUID instead of make_ref",
+      "acceptance_criteria": [
+        "effect_id type changed from reference() to ln_uuid:causal_id()",
+        "ln_effect:request/4 generates UUID via ln_uuid:new/0",
+        "ln_effect:get_receipts/1 returns receipts with UUID effect_id",
+        "Unit tests verify UUID in receipts",
+        "No dialyzer warnings"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "notes": "Bug fix: request/4 currently ignores input state and creates fresh state each time. This breaks effect state management. Must be fixed."
+    },
+    {
+      "id": "US-003",
+      "title": "Add idempotency_key to effect_spec and receipt",
+      "acceptance_criteria": [
+        "effect_spec type includes optional idempotency_key field",
+        "ln_receipt record includes idempotency_key field",
+        "ln_receipt:storage record includes idempotency_index ETS table",
+        "ln_receipt:add/2 inserts into idempotency_index when key present",
+        "ln_receipt:lookup_by_key/3 finds receipt by {ScopeId, Key} tuple",
+        "Unit tests verify idempotency index lookup"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Enables deduplication. Key is optional - effects without key execute every time."
+    },
+    {
+      "id": "US-004",
+      "title": "Implement idempotency check in ln_effect:request/4",
+      "acceptance_criteria": [
+        "ln_effect:request/4 checks for existing receipt with matching idempotency_key",
+        "When receipt found: returns {ok, cached, Receipt, State}",
+        "When receipt not found: proceeds with effect creation",
+        "find_receipt_by_key/3 helper function scans receipts list",
+        "Property test: same idempotency_key returns cached result",
+        "Property test: different idempotency_keys create new effects",
+        "Unit tests verify state management bug fixed"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "notes": "Fixes the state management bug where request/4 ignored input state."
+    },
+    {
+      "id": "US-005",
+      "title": "Create ln_receipt_store gen_server for persistence",
+      "acceptance_criteria": [
+        "ln_receipt_store:start_link/1 starts gen_server with log file path",
+        "DETS table opened at LogFile/receipts.dets",
+        "ETS cache table created for fast access",
+        "dets:to_ets/2 replays receipts into ETS on startup",
+        "ln_receipt_store:store/1 writes to DETS then ETS",
+        "ln_receipt_store:lookup/1 reads from ETS cache",
+        "ln_receipt_store:lookup_by_key/2 reads from ETS cache",
+        "Unit tests verify receipts persist across gen_server restart",
+        "Unit tests verify DETS file created in specified directory"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "DETS provides single-node persistence. Can migrate to Mnesia for distributed later."
+    },
+    {
+      "id": "US-006",
+      "title": "Integrate ln_receipt_store into ln_effect:complete/3",
+      "acceptance_criteria": [
+        "ln_effect:complete/3 stores receipt via ln_receipt_store:store/1",
+        "Receipt includes idempotency_key from effect_spec",
+        "Unit tests verify receipt persisted to DETS",
+        "Integration test: store receipt, kill process, restart, receipt restored"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "notes": "Write-ahead logging: store to DETS before updating in-memory state."
+    },
+    {
+      "id": "US-007",
+      "title": "Add compensation function to effect_spec and receipt",
+      "acceptance_criteria": [
+        "effect_spec type includes optional compensation fun field",
+        "ln_receipt type includes compensation field",
+        "ln_effect:complete/3 stores compensation from spec into receipt",
+        "Unit tests verify compensation function stored in receipt"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Compensation is optional - effects without compensation cannot be undone."
+    },
+    {
+      "id": "US-008",
+      "title": "Implement compensation execution in cancel_effects/2",
+      "acceptance_criteria": [
+        "ln_effect:cancel_effects/2 compensates completed effects in scope",
+        "compensate_effects/2 helper iterates receipts by scope_id",
+        "Calls compensation function with effect result",
+        "Logs error if compensation fails, continues with other effects",
+        "Returns list of compensated effects",
+        "Unit tests verify compensation function called",
+        "Unit tests verify compensation failure logged but doesn't block"
+      ],
+      "priority": 4,
+      "status": "pending",
+      "notes": "Integrates with ln_cancel hierarchical scope cancellation."
+    },
+    {
+      "id": "US-009",
+      "title": "Create wf_effect_handler gen_server for async execution",
+      "acceptance_criteria": [
+        "wf_effect_handler:start_link/1 starts process for single effect",
+        "wf_effect_handler:execute/2 sends execute request",
+        "Handler executes spec via apply(Module, Function, Args)",
+        "Handler sends {effect_complete, EffectId, Result} to caller",
+        "Handler terminates after execution",
+        "Unit tests verify effect executes in separate process",
+        "Unit tests verify handler process terminates after completion"
+      ],
+      "priority": 5,
+      "status": "pending",
+      "notes": "Provides isolation. One process per effect (simplest error isolation)."
+    },
+    {
+      "id": "US-010",
+      "title": "Update ln_effect:request/4 to use async handler",
+      "acceptance_criteria": [
+        "ln_effect:request/4 spawns wf_effect_handler process",
+        "Sends execute request to handler",
+        "Sets pending effect status to in_flight",
+        "ln_effect:handle_info/2 handles {effect_complete, EffectId, Result} message",
+        "Calls callback_mod:resume/2 with result",
+        "Generates receipt via complete/3",
+        "Unit tests verify async handler created",
+        "Integration tests verify effect result returned to caller"
+      ],
+      "priority": 5,
+      "status": "pending",
+      "notes": "Changes execution model from synchronous to asynchronous."
+    },
+    {
+      "id": "US-011",
+      "title": "Add effect opcodes to ln_compile",
+      "acceptance_criteria": [
+        "opcode() type includes {op_effect_yield, effect_spec(), scope_id()}",
+        "opcode() type includes {op_effect_resume, label()}",
+        "ln_compile:opcode_name/1 handles effect opcodes",
+        "Unit tests verify opcodes defined"
+      ],
+      "priority": 6,
+      "status": "pending",
+      "notes": "Enables bytecode representation of effect operations."
+    },
+    {
+      "id": "US-012",
+      "title": "Add effect constructor to ln_plan",
+      "acceptance_criteria": [
+        "ln_plan:effect/1 creates {effect, Spec} plan term",
+        "plan() type includes {effect, effect_spec()}",
+        "ln_plan:validate/1 validates effect spec has module and function",
+        "Unit tests verify effect constructor",
+        "Unit tests verify validation rejects invalid specs"
+      ],
+      "priority": 6,
+      "status": "pending",
+      "notes": "Enables effects in workflow plans."
+    },
+    {
+      "id": "US-013",
+      "title": "Implement effect compilation in ln_compile",
+      "acceptance_criteria": [
+        "ln_compile:compile_plan/4 handles {effect, Spec} case",
+        "Generates op_effect_yield and op_effect_resume opcodes",
+        "Yield opcode includes effect_spec and scope_id",
+        "Resume opcode jumps to next instruction",
+        "Unit tests verify bytecode generation",
+        "Integration tests compile plan with effect"
+      ],
+      "priority": 6,
+      "status": "pending",
+      "notes": "Scope tracking during compilation needed (current scope). TODO in implementation."
+    },
+    {
+      "id": "US-014",
+      "title": "Add effect state to ln_vm:vm_state record",
+      "acceptance_criteria": [
+        "vm_state record includes effect_state field (ln_effect:state())",
+        "vm_state record includes waiting_for_effect field (effect_id())",
+        "vm_state status includes waiting_effect",
+        "ln_vm:init/1 initializes effect_state with wf_effect_handler",
+        "Unit tests verify VM state initialization"
+      ],
+      "priority": 6,
+      "status": "pending",
+      "notes": "Enables VM to track effect execution."
+    },
+    {
+      "id": "US-015",
+      "title": "Implement op_effect_yield execution in ln_vm",
+      "acceptance_criteria": [
+        "ln_vm:execute_opcode/2 handles {op_effect_yield, Spec, ScopeId}",
+        "Calls ln_effect:request/4 to request effect",
+        "Sets VM status to waiting_effect",
+        "Sets waiting_for_effect to effect ID",
+        "Returns {ok, NewState}",
+        "Unit tests verify VM yields effect request",
+        "Integration tests verify VM blocks until effect completes"
+      ],
+      "priority": 6,
+      "status": "pending",
+      "notes": "Yield semantics: VM suspends execution until async handler completes."
+    },
+    {
+      "id": "US-016",
+      "title": "Implement op_effect_resume execution in ln_vm",
+      "acceptance_criteria": [
+        "ln_vm:execute_opcode/2 handles {op_effect_resume, NextLabel}",
+        "Sets VM status to running",
+        "Clears waiting_for_effect",
+        "Sets program counter to NextLabel",
+        "Unit tests verify VM resumes after effect"
+      ],
+      "priority": 6,
+      "status": "pending",
+      "notes": "Resume semantics: VM continues execution at next instruction."
+    },
+    {
+      "id": "US-017",
+      "title": "Implement effect completion handling in ln_vm",
+      "acceptance_criteria": [
+        "ln_vm:handle_effect_complete/3 handles effect result",
+        "Calls ln_effect:complete/3 to generate receipt",
+        "Resumes VM execution via step/1",
+        "ln_vm:step/1 returns {ok, State} when status = waiting_effect",
+        "Unit tests verify VM resumes after effect complete",
+        "Integration tests verify effect executes and VM continues"
+      ],
+      "priority": 6,
+      "status": "pending",
+      "notes": "Coordinates between async handler and VM execution loop."
+    },
+    {
+      "id": "US-018",
+      "title": "Add trace field to ln_effect:effect_state",
+      "acceptance_criteria": [
+        "effect_state record includes trace field (ln_trace:state())",
+        "ln_effect:init/1 initializes trace with full level, 10000 max events",
+        "ln_effect:get_trace_events/1 returns all trace events",
+        "Unit tests verify trace state initialized"
+      ],
+      "priority": 7,
+      "status": "pending",
+      "notes": "Enables observability for all effect operations."
+    },
+    {
+      "id": "US-019",
+      "title": "Emit effect_requested trace event in ln_effect:request/4",
+      "acceptance_criteria": [
+        "ln_effect:request/4 emits effect_requested event",
+        "Event data includes idempotency_key, spec_hash, scope_id",
+        "Event includes timestamp and sequence number",
+        "Unit tests verify event emitted",
+        "Integration tests verify event in trace export"
+      ],
+      "priority": 7,
+      "status": "pending",
+      "notes": "Trace events defined in ln_trace.erl:31-32 but not yet emitted."
+    },
+    {
+      "id": "US-020",
+      "title": "Emit effect_cached trace event for idempotent requests",
+      "acceptance_criteria": [
+        "ln_effect:request/4 emits effect_cached event when idempotency hit",
+        "Event data includes idempotency_key",
+        "Unit tests verify event emitted on cache hit",
+        "Unit tests verify no event emitted on cache miss"
+      ],
+      "priority": 7,
+      "status": "pending",
+      "notes": "Distinguishes between new effect execution and cached result."
+    },
+    {
+      "id": "US-021",
+      "title": "Emit effect_completed trace event in ln_effect:complete/3",
+      "acceptance_criteria": [
+        "ln_effect:complete/3 emits effect_completed event",
+        "Event data includes causal_id, result, duration",
+        "Duration calculated as completed_at - started_at",
+        "Unit tests verify event emitted",
+        "Integration tests verify duration calculated"
+      ],
+      "priority": 7,
+      "status": "pending",
+      "notes": "Provides execution time metrics."
+    },
+    {
+      "id": "US-022",
+      "title": "Emit effect_cancelled trace event in ln_effect:cancel_effects/2",
+      "acceptance_criteria": [
+        "ln_effect:cancel_effects/2 emits effect_cancelled event",
+        "Event data includes scope_id, cancelled_count, compensated_count",
+        "cancelled_count = number of pending effects cancelled",
+        "compensated_count = number of completed effects compensated",
+        "Unit tests verify event emitted",
+        "Unit tests verify counts accurate"
+      ],
+      "priority": 7,
+      "status": "pending",
+      "notes": "Tracks cancellation propagation through effect scope."
+    }
+  ]
+}

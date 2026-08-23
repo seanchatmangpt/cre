@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "006-create-cre-documentation-for-google-cloud-marketpl",
+  "title": "Create CRE documentation for Google Cloud Marketplace",
+  "section": "docs",
+  "state": "implementing",
+  "overview": "Google Cloud Marketplace requires extensive documentation for listing approval, customer onboarding, operational support, and legal compliance.\n\n**Motivation:** Marketplace approval requires documentation completeness. Customers need clear deployment, operation, and support guidance.\n\n**Success criteria:**\n- Marketplace listing: product overview, architecture diagram, deployment guide, upgrade guide, security model, cost model\n- Operational docs: scaling, backup & restore, disaster recovery, debugging playbook\n- Legal documents: license (Apache 2.0), third-party notices, privacy policy, support terms\n\n**Signals:** priority: medium, urgency: Required for Marketplace review and customer onboarding",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Failed to checkout base branch main",
+  "created_at": "2026-02-10T07:04:09.910Z",
+  "updated_at": "2026-02-11T03:14:27.929Z",
+  "problem_statement": "Google Cloud Marketplace requires extensive documentation for listing approval, customer onboarding, operational support, and legal compliance.",
+  "motivation": "Marketplace approval requires documentation completeness. Customers need clear deployment, operation, and support guidance.",
+  "success_criteria": [
+    "Marketplace listing: product overview, architecture diagram, deployment guide, upgrade guide, security model, cost model",
+    "Operational docs: scaling, backup & restore, disaster recovery, debugging playbook",
+    "Legal documents: license (Apache 2.0), third-party notices, privacy policy, support terms"
+  ],
+  "priority_hint": "medium",
+  "urgency_hint": "Required for Marketplace review and customer onboarding"
+}

@@ -1,0 +1,160 @@
+---
+# GKE Horizontal Pod Autoscaler for Production
+# Uses GKE's autoscaler with custom metrics support
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cre-hpa
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+  annotations:
+    # GKE autoscaling annotations
+    autoscaling.gke.io/safe-to-evict: "true"
+    # Metric collection configuration
+    metric-config.external.workflow-queue-length.prometheus/prometheus: |
+      {
+        "query": "sum(cre_workflow_queue_length)",
+        "metricName": "workflow-queue-length",
+        "metricSelector": {
+          "matchLabels": {
+            "app": "cre"
+          }
+        }
+      }
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cre
+  # Replica limits for GKE e2-medium node pool
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+    # CPU-based autoscaling (standard)
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    # Memory-based autoscaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    # Custom metric: Active workflows
+    - type: Pods
+      pods:
+        metric:
+          name: active_workflows
+        target:
+          type: AverageValue
+          averageValue: "50"
+    # Custom metric: Request rate (if Prometheus adapter is available)
+    - type: Object
+      object:
+        metric:
+          name: requests-per-second
+        describedObject:
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          name: cre-ingress
+        target:
+          type: Value
+          value: "1000"
+  # Scaling behavior policies
+  behavior:
+    # Scale down settings (prevent too aggressive scale-down)
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5 minutes
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+      selectPolicy: Min
+    # Scale up settings (rapid response to load spikes)
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 4
+          periodSeconds: 30
+        - type: Pods
+          value: 10
+          periodSeconds: 60
+      selectPolicy: Max
+
+---
+# GKE Horizontal Pod Autoscaler for Staging
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cre-hpa
+  namespace: cre-staging
+  labels:
+    app: cre
+    environment: staging
+  annotations:
+    autoscaling.gke.io/safe-to-evict: "true"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cre
+  # Lower limits for staging (cost optimization)
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+      selectPolicy: Max
+
+---
+# PodMetrics for Custom Metrics Autoscaling
+# Requires Prometheus Adapter or Cloud Monitoring adapter
+apiVersion: metrics.k8s.io/v1beta1
+kind: PodMetrics
+metadata:
+  name: cre-pod-metrics
+  namespace: cre-prod
+  labels:
+    app: cre
+spec:
+  # Example custom metrics for autoscaling
+  # These would be provided by Cloud Monitoring or Prometheus

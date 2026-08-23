@@ -1,6 +1,10 @@
 # CRE - YAWL Workflow Engine
 
 [![hex.pm](https://img.shields.io/hexpm/v/cre.svg?style=flat-square)](https://hex.pm/packages/cre)
+[![CI/CD](https://github.com/joergen7/cre/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/joergen7/cre/actions/workflows/ci-cd.yml)
+[![Docker](https://img.shields.io/badge/docker-latest-blue.svg)](https://github.com/joergen7/cre/pkgs/container/cre)
+[![OTP](https://img.shields.io/badge/OTP-25%20%7C%2026%20%7C%2027%20%7C%2028-informational.svg)](https://www.erlang.org)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 CRE is a **YAWL (Yet Another Workflow Language)** workflow engine implemented in Erlang/OTP. Starting from its origins as a Cuneiform runtime environment, CRE has evolved into a comprehensive workflow management system with **36 of 43 YAWL workflow patterns** implemented, human-in-the-loop approval flows, OpenTelemetry observability, and a web-based dashboard.
 
@@ -33,6 +37,8 @@ CRE provides a comprehensive workflow management platform with the following key
 
 
 ## Quick Start
+
+> **[START HERE](docs/START_HERE.md)** - New to CRE? Begin with our navigation hub for personalized guidance based on your role.
 
 Get started with CRE in minutes! For a detailed tutorial, see the [Quick Start Guide](docs/QUICK_START.md).
 

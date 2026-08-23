@@ -1,0 +1,71 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cre-headless
+  labels:
+    app: cre
+    component: workflow-engine
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: cre
+  ports:
+    - name: epmd
+      port: 4368
+      targetPort: epmd
+      protocol: TCP
+    - name: dist
+      port: 9100
+      targetPort: dist
+      protocol: TCP
+    - name: http
+      port: 4142
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cre
+  labels:
+    app: cre
+    component: workflow-engine
+spec:
+  type: ClusterIP
+  selector:
+    app: cre
+  ports:
+    - name: http
+      port: 4142
+      targetPort: http
+      protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cre-discovery
+  labels:
+    app: cre
+    component: workflow-engine
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: cre
+  ports:
+    - name: epmd
+      port: 4368
+      targetPort: epmd
+      protocol: TCP
+    - name: dist
+      port: 9100
+      targetPort: dist
+      protocol: TCP

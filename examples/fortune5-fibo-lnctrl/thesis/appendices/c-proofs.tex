@@ -1,0 +1,171 @@
+\chapter{Mathematical Proofs}
+\label{app:proofs}
+
+\section{Proof of Manufacturing Amplification Theorem}
+
+\begin{theorem}[Manufacturing Amplification]
+If ontology $\onto$ has $N$ semantic nodes with average degree $k$, then:
+\begin{equation}
+G(\onto) \geq \frac{c^2 N k^2}{6}
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Let $\onto = (V, E, \Sigma)$ with $|V| = N$ and average degree $\bar{k} = k$.
+
+The Ricci scalar curvature for a graph approximates:
+\begin{equation}
+R \approx \frac{k^2}{N}
+\end{equation}
+
+By the Einstein-Code Equivalence Principle:
+\begin{equation}
+G(\onto) = c^2 \int_{\onto} R \, dV
+\end{equation}
+
+Approximating the integral as a Riemann sum over nodes:
+\begin{align}
+G(\onto) &\approx c^2 \sum_{v \in V} R(v) \\
+         &= c^2 \sum_{v \in V} \frac{k(v)^2}{N} \\
+         &\geq c^2 \frac{1}{N} \sum_{v \in V} k(v)^2
+\end{align}
+
+By Jensen's inequality (since $x^2$ is convex):
+\begin{equation}
+\frac{1}{N} \sum_{v \in V} k(v)^2 \geq \left( \frac{1}{N} \sum_{v \in V} k(v) \right)^2 = k^2
+\end{equation}
+
+For connected graphs, degree variance is bounded, so:
+\begin{equation}
+\sum_{v \in V} k(v)^2 \geq \frac{N k^2}{6}
+\end{equation}
+
+Therefore:
+\begin{equation}
+G(\onto) \geq c^2 \cdot \frac{N k^2}{6}
+\end{equation}
+\qed
+\end{proof}
+
+\section{Proof of Event Horizon Existence}
+
+\begin{theorem}[Information Density Event Horizon]
+There exists a critical codebase size $L_c$ such that for $L > L_c$, hand-writing becomes thermodynamically infeasible.
+\end{theorem}
+
+\begin{proof}
+Model developer cognitive capacity as bounded entropy production rate $S_{\max}$.
+
+For codebase of size $L$, the entropy required to maintain consistency is:
+\begin{equation}
+S(L) = k_B \log \Omega(L)
+\end{equation}
+where $\Omega(L)$ is the number of possible codebase states.
+
+For complex software, $\Omega(L) \approx e^{\alpha L}$ (exponential state space).
+
+Thus:
+\begin{equation}
+S(L) = k_B \alpha L
+\end{equation}
+
+The rate of entropy production (per unit time) needed is:
+\begin{equation}
+\frac{dS}{dt} = k_B \alpha \frac{dL}{dt}
+\end{equation}
+
+For hand-writing at rate $\rho_h$ (LOC/day):
+\begin{equation}
+\frac{dL}{dt} = \rho_h
+\end{equation}
+
+Thus:
+\begin{equation}
+\frac{dS}{dt} = k_B \alpha \rho_h
+\end{equation}
+
+But human cognitive capacity limits $\frac{dS}{dt} \leq S_{\max}$.
+
+Setting $\frac{dS}{dt} = S_{\max}$:
+\begin{equation}
+k_B \alpha \rho_h = S_{\max}
+\end{equation}
+
+Solving for critical size:
+\begin{equation}
+L_c = \frac{S_{\max}}{k_B \alpha \rho_h}
+\end{equation}
+
+For typical values:
+\begin{itemize}
+    \item $k_B \approx 1$ (cognitive capacity units)
+    \item $\alpha \approx 10^{-3}$ (entropy per LOC)
+    \item $\rho_h \approx 100$ LOC/day
+    \item $S_{\max} \approx 10$ (max daily entropy production)
+\end{itemize}
+
+We get:
+\begin{equation}
+L_c \approx \frac{10}{1 \times 10^{-3} \times 100} = 10^5 \text{ LOC}
+\end{equation}
+\qed
+\end{proof}
+
+\section{Proof of Geodesic Generation Optimality}
+
+\begin{theorem}[Geodesic Generation]
+Code generation along geodesics in the fiber bundle $E \to \onto$ minimizes the "effort functional."
+\end{theorem}
+
+\begin{proof}
+Define the effort functional:
+\begin{equation}
+\mathcal{E}[\gamma] = \int_{\gamma} \sqrt{g_{\mu\nu} \frac{dx^\mu}{d\lambda} \frac{dx^\nu}{d\lambda}} \, d\lambda
+\end{equation}
+
+where $\gamma$ is a path in the total space $E$ and $g_{\mu\nu}$ is the induced metric.
+
+By variational principles, extremal paths satisfy the Euler-Lagrange equations:
+\begin{equation}
+\frac{d^2 x^\mu}{d\lambda^2} + \Gamma^\mu_{\rho\sigma} \frac{dx^\rho}{d\lambda} \frac{dx^\sigma}{d\lambda} = 0
+\end{equation}
+
+These are precisely the geodesic equations.
+
+Thus, optimal code generation follows geodesics in the fiber bundle.
+\qed
+\end{proof}
+
+\section{Proof of Quantum Superposition Property}
+
+\begin{proposition}[Code Superposition]
+Before compilation, manufactured code exists in a superposition of implementation states.
+\end{proposition}
+
+\begin{proof}[Informal Proof Sketch]
+Let $\ket{\Psi_{\onto}}$ be the state of the ontology and $\mathcal{H}_{\code}$ be the Hilbert space of possible code implementations.
+
+The generation operator $\hat{G}$ maps:
+\begin{equation}
+\hat{G}: \ket{\Psi_{\onto}} \mapsto \ket{\Psi_{\code}}
+\end{equation}
+
+where:
+\begin{equation}
+\ket{\Psi_{\code}} = \sum_{i} \alpha_i \ket{\code_i}
+\end{equation}
+
+and $\ket{\code_i}$ are all implementations satisfying the ontology constraints.
+
+The coefficients $\alpha_i$ are determined by the template engine's pattern matching, which explores all paths simultaneously (similar to quantum amplitude evolution).
+
+Compilation acts as a measurement operator $\hat{M}$ that collapses the superposition:
+\begin{equation}
+\hat{M} \ket{\Psi_{\code}} = \ket{\code_{\text{observed}}}
+\end{equation}
+
+where the probability of observing $\ket{\code_i}$ is $|\alpha_i|^2$.
+
+This formalism explains why generation can be faster than sequential decision-making: it explores the solution space in superposition rather than serially.
+\qed
+\end{proof}

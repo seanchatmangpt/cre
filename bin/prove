@@ -1,0 +1,3 @@
+#!/bin/bash
+# Shortcut for ./dot prove
+exec "$(dirname "$0")/dot" prove "$@"

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "009-pure-erlang-workflow-pattern-substrate",
+  "title": "Pure Erlang workflow pattern substrate",
+  "section": "backend",
+  "state": "idea",
+  "overview": "Current workflow engines interpret workflow data at runtime through slow dispatch loops rather than making workflow control native and performant. Need tight latency, full testability, replayability, observability, and failure safety without external dependencies.\n\n**Motivation:** Creates a performant, reliable foundation for workflow orchestration with zero external dependencies (pure Erlang/OTP), enabling deterministic execution, structured cancellation, comprehensive testing through property-based and model checking approaches, and production-ready observability.\n\n**Technical constraints:**\n- Pure Erlang only (no Rust, NIFs, ports, external deps)\n- Use OTP behaviors (gen_server/gen_statem/supervisor)\n- No runtime interpretation of node types in hot loops\n- One coherent state store per case/shard with atomic commits\n- Pattern algebra as source of truth for user authoring\n- Every reduction step produces structured trace events\n- Support deterministic replay\n- Compilation to bytecode or continuation network\n\n**Signals:** priority: critical, urgency: Core foundation - must be built first before any workflow features",
+  "branch": null,
+  "pr_url": null,
+  "pr_number": null,
+  "last_error": "Agent failed with exit code 1",
+  "created_at": "2026-02-11T01:57:00.423Z",
+  "updated_at": "2026-02-11T03:26:44.216Z",
+  "problem_statement": "Current workflow engines interpret workflow data at runtime through slow dispatch loops rather than making workflow control native and performant. Need tight latency, full testability, replayability, observability, and failure safety without external dependencies.",
+  "motivation": "Creates a performant, reliable foundation for workflow orchestration with zero external dependencies (pure Erlang/OTP), enabling deterministic execution, structured cancellation, comprehensive testing through property-based and model checking approaches, and production-ready observability.",
+  "technical_constraints": [
+    "Pure Erlang only (no Rust, NIFs, ports, external deps)",
+    "Use OTP behaviors (gen_server/gen_statem/supervisor)",
+    "No runtime interpretation of node types in hot loops",
+    "One coherent state store per case/shard with atomic commits",
+    "Pattern algebra as source of truth for user authoring",
+    "Every reduction step produces structured trace events",
+    "Support deterministic replay",
+    "Compilation to bytecode or continuation network"
+  ],
+  "priority_hint": "critical",
+  "urgency_hint": "Core foundation - must be built first before any workflow features"
+}

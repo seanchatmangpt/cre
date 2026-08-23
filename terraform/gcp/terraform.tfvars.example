@@ -1,0 +1,106 @@
+# terraform/gcp/terraform.tfvars.example
+# Example configuration file for CRE GCP deployment
+# Copy this file to terraform.tfvars and update with your values
+
+# Required
+project_id = "your-project-id"
+
+# Optional - defaults provided
+region      = "us-central1"
+zone        = "us-central1-a"
+environment = "production"
+
+# VPC Configuration
+vpc_config = {
+  name       = "cre-vpc"
+  cidr       = "10.0.0.0/16"
+  enable_nat = true
+  subnets = {
+    primary = {
+      cidr                        = "10.0.1.0/24"
+      availability_zones          = ["us-central1-a", "us-central1-b", "us-central1-c"]
+      enable_flow_logs           = true
+      enable_private_ip_google_access = true
+    }
+  }
+}
+
+# GKE Cluster Configuration
+gke_config = {
+  cluster_name = "cre-cluster"
+  release_channel = "STABLE"
+  master_ipv4_cidr_block = "172.16.0.0/28"
+  private_cluster = {
+    enable_private_endpoint  = true
+    enable_private_nodes     = true
+    master_global_access     = false
+    master_authorized_networks = []
+  }
+  node_pools = {
+    general = {
+      machine_type      = "e2-medium"
+      node_count        = 3
+      min_count         = 1
+      max_count         = 10
+      disk_size_gb      = 100
+      disk_type         = "pd-standard"
+      auto_repair       = true
+      auto_upgrade      = true
+      spot             = false
+      preemptible      = false
+      max_pods_per_node = 110
+    }
+    memory_optimized = {
+      machine_type      = "e2-highmem-4"
+      node_count        = 2
+      min_count         = 1
+      max_count         = 5
+      disk_size_gb      = 200
+      disk_type         = "pd-ssd"
+      auto_repair       = true
+      auto_upgrade      = true
+      spot             = false
+      preemptible      = false
+      max_pods_per_node = 110
+    }
+  }
+}
+
+# Storage Configuration
+storage_config = {
+  enable_snapshots = true
+  backup_enabled   = false
+  backup_schedule  = "0 2 * * *"
+  retention_days   = 30
+}
+
+# Load Balancer Configuration
+lb_config = {
+  internal = {
+    enabled           = true
+    name              = "cre-internal-lb"
+    ip_address        = "10.0.1.100"
+    ports             = [8080, 9100, 4369]
+    health_check_path = "/health"
+  }
+  external = {
+    enabled           = true
+    name              = "cre-external-lb"
+    ports = {
+      http = {
+        port     = 80
+        target   = 8080
+        protocol = "HTTP"
+      }
+      https = {
+        port     = 443
+        target   = 8080
+        protocol = "HTTPS"
+      }
+    }
+    health_check_path = "/health"
+    ssl_enabled       = false
+  }
+  enable_cloud_armor = true
+  enable_cdn         = false
+}

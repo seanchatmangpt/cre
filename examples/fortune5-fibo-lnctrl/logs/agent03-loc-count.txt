@@ -1,0 +1,9 @@
+Erlang File Count and Lines of Code Analysis
+==============================================
+
+Location: /home/user/cre/examples/fortune5-fibo-lnctrl/apps
+
+Total .erl files: 8643
+Total lines of code: 79998
+
+Generated: 2026-02-11

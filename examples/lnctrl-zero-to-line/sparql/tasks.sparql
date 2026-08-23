@@ -1,0 +1,17 @@
+# Extract all tasks with their effects
+PREFIX ln: <http://linecontroller.factory/ontology/ln#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?taskId ?taskDescription ?effectType ?effectEndpoint
+WHERE {
+    ?task rdf:type ln:Task .
+    ?task ln:taskId ?taskId .
+    ?task ln:taskDescription ?taskDescription .
+
+    OPTIONAL {
+        ?task ln:hasEffect ?effect .
+        ?effect ln:effectType ?effectType .
+        ?effect ln:effectEndpoint ?effectEndpoint .
+    }
+}
+ORDER BY ?taskId

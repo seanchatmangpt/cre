@@ -1,0 +1,88 @@
+---
+# GKE Production Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cre-config
+  namespace: cre-prod
+  labels:
+    app: cre
+    component: workflow-engine
+  annotations:
+    # Cloud Operations configuration
+    configmanagement.gke.io/managed: "false"
+data:
+  # CRE Configuration
+  CRE_DEFAULT_PORT: "4142"
+  CRE_CLIENT_POLL_INTERVAL: "250"
+  CRE_LOG_LEVEL: "info"
+
+  # YAWL Configuration
+  YAWL_STATELESS_CHECKPOINT_DIR: "/opt/cre/checkpoints"
+  YAWL_STATELESS_MAX_EXECUTIONS: "1000"
+  YAWL_TIMEOUT_DEFAULT_TIMEOUT: "30000"
+
+  # GCP-specific: Cloud Logging integration
+  CLOUD_LOGGING_ENABLED: "true"
+  CLOUD_LOGGING_LOG_NAME: "cre-workflow-engine"
+
+  # GCP-specific: Cloud Trace integration
+  CLOUD_TRACE_ENABLED: "true"
+  CLOUD_TRACE_PROJECT_ID: "REPLACE_WITH_YOUR_PROJECT_ID"
+
+  # OpenTelemetry Configuration for GKE
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317"
+  OTEL_SERVICE_NAME: "cre-workflow-engine"
+  OTEL_RESOURCE_ATTRIBUTES: "service.name=cre,deployment.environment=production,cloud.provider=gcp"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+
+  # Erlang VM configuration for GKE e2-medium (2 vCPU, 4GB memory)
+  ERL_FLAGS: "+K true +A 32 +SDio 128 +P 65536"
+  ERL_MAX_PORTS: "65536"
+  ERL_MAX_ETS_TABLES: "2000"
+
+  # GCP-specific: Node selection hints
+  NODE_SELECTOR_CPU_PLATFORM: "Intel Cascade Lake"
+
+---
+# GKE Staging Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cre-config
+  namespace: cre-staging
+  labels:
+    app: cre
+    component: workflow-engine
+    environment: staging
+  annotations:
+    configmanagement.gke.io/managed: "false"
+data:
+  # CRE Configuration
+  CRE_DEFAULT_PORT: "4142"
+  CRE_CLIENT_POLL_INTERVAL: "250"
+  CRE_LOG_LEVEL: "debug"
+
+  # YAWL Configuration
+  YAWL_STATELESS_CHECKPOINT_DIR: "/opt/cre/checkpoints"
+  YAWL_STATELESS_MAX_EXECUTIONS: "500"
+  YAWL_TIMEOUT_DEFAULT_TIMEOUT: "30000"
+
+  # GCP-specific: Cloud Logging integration
+  CLOUD_LOGGING_ENABLED: "true"
+  CLOUD_LOGGING_LOG_NAME: "cre-workflow-engine-staging"
+
+  # GCP-specific: Cloud Trace integration
+  CLOUD_TRACE_ENABLED: "true"
+  CLOUD_TRACE_PROJECT_ID: "REPLACE_WITH_YOUR_PROJECT_ID"
+
+  # OpenTelemetry Configuration for GKE
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317"
+  OTEL_SERVICE_NAME: "cre-workflow-engine-staging"
+  OTEL_RESOURCE_ATTRIBUTES: "service.name=cre,deployment.environment=staging,cloud.provider=gcp"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+
+  # Erlang VM configuration for GKE e2-small
+  ERL_FLAGS: "+K true +A 16 +SDio 64 +P 32768"
+  ERL_MAX_PORTS: "32768"
+  ERL_MAX_ETS_TABLES: "1400"

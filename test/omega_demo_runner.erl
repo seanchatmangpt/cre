@@ -150,10 +150,9 @@ run_omega_loop(Pid, Executor, Spec, CaseId, Agents, TranscriptMode, Round, MaxRo
             case find_and_complete_human_task(Pid, Executor, Spec, Marking, Agents, CaseId) of
                 ok ->
                     run_omega_loop(Pid, Executor, Spec, CaseId, Agents, TranscriptMode, Round + 1, MaxRounds);
-                done ->
-                    #{status => completed, rounds => Round};
                 none ->
-                    case check_completed(Marking, Executor) of
+                    FreshMarking = gen_yawl:marking(Pid),
+                    case check_completed(FreshMarking, Executor) of
                         true -> #{status => completed, rounds => Round};
                         false ->
                             maybe_dump_blocked_state(Pid, Executor, Spec),
@@ -212,7 +211,10 @@ find_and_complete_human_task(Pid, Executor, Spec, Marking, Agents, CaseId) ->
                 ok
         end
     catch
-        _:_ -> none
+        Class:Reason:Stack ->
+            io:format(standard_error, "find_and_complete_human_task error: ~p:~p~n~p~n",
+                [Class, Reason, Stack]),
+            none
     end.
 
 %% Run subnets that have tokens in their entry places. Injects subnet outputs into root.
@@ -277,8 +279,14 @@ run_ready_subnets(Pid, Marking, SubnetModules, SubnetDefs, Executor) ->
                             %% Inject into P3 sync place (p_gonogo_branch1..3) when subnet completes.
                             %% P3 uses separate namespace to avoid collision with P38 (p_close_branch1..3).
                             InjectPlace = p_branch_place_for_subnet(Index),
-                            run_one_subnet(Pid, Mod, EntryAtom, ExitAtom, InjectPlace, T),
-                            true
+                            case run_one_subnet(Pid, Mod, EntryAtom, ExitAtom, InjectPlace, T) of
+                                ok -> true;
+                                {error, skip_injection} -> Acc;
+                                {error, Reason} ->
+                                    io:format(standard_error, "Subnet ~p failed: ~p~n", [NetId, Reason]),
+                                    _ = gen_yawl:inject(Pid, #{WithdrawPlace => [T]}),
+                                    Acc
+                            end
                     end;
                 undefined -> Acc
             end
@@ -289,14 +297,14 @@ run_ready_subnets(Pid, Marking, SubnetModules, SubnetDefs, Executor) ->
     Ran.
 
 subnet_index(NetId, SubnetModules) ->
-    I = find_index(NetId, SubnetModules, 1),
-    min(I, 4).  %% thread_split has at most 4 branch places
+    find_index(NetId, SubnetModules, 1).
 
 %% P3 sync preset uses p_gonogo_branch1..3 (separate from P38 p_close_branch1..3).
+%% P3 waits_for only [ProgramExit, OpsExit, CommsExit]; indices 4+ (IncidentThread, etc.) complete via P41.
 p_branch_place_for_subnet(1) -> p_gonogo_branch1;
 p_branch_place_for_subnet(2) -> p_gonogo_branch2;
 p_branch_place_for_subnet(3) -> p_gonogo_branch3;
-p_branch_place_for_subnet(_) -> p_gonogo_branch3.  %% fallback for IncidentThread, etc.
+p_branch_place_for_subnet(_) -> undefined.
 
 find_index(NetId, [{NetId, _} | _], N) -> N;
 find_index(NetId, [_ | Rest], N) -> find_index(NetId, Rest, N + 1);
@@ -328,6 +336,7 @@ subnet_id_match(_, _) -> false.
 
 %% EntryPlace: subnet entry. ExitPlace: subnet exit (check completion). BranchPlace: root place to inject (F-003).
 %% Drains subnet, auto-completing human tasks with default_agent until exit or max steps.
+%% Returns ok only when a token was injected to the root net; {error, Reason} otherwise.
 run_one_subnet(RootPid, SubnetMod, EntryPlace, ExitPlace, BranchPlace, Token) ->
     try
         SubnetOpts = [{max_marking_history, 0}],
@@ -338,21 +347,26 @@ run_one_subnet(RootPid, SubnetMod, EntryPlace, ExitPlace, BranchPlace, Token) ->
                     _ = drain_subnet_with_human_tasks(SubPid, SubnetMod, 500),
                     SubMarking = gen_yawl:marking(SubPid),
                     ExitTokens = maps:get(ExitPlace, SubMarking, []),
-                    case ExitTokens of
-                        [] -> ok;
-                        [T | _] -> gen_yawl:inject(RootPid, #{BranchPlace => [T]})
+                    case {ExitTokens, BranchPlace} of
+                        {[T | _], P} when P =/= undefined ->
+                            _ = gen_yawl:inject(RootPid, #{P => [T]}),
+                            ok;
+                        {[], _} ->
+                            {error, no_exit_token};
+                        {[_ | _], undefined} ->
+                            {error, skip_injection}
                     end
                 after
                     gen_yawl:stop(SubPid)
                 end;
             {error, StartErr} ->
                 io:format(standard_error, "Subnet ~p start failed: ~p~n", [SubnetMod, StartErr]),
-                ok
+                {error, StartErr}
         end
     catch
         Class:Err:Stack ->
             io:format(standard_error, "Subnet ~p error: ~p:~p~n~p~n", [SubnetMod, Class, Err, Stack]),
-            ok
+            {error, {Class, Err}}
     end.
 
 %% Drain subnet; when abort, find human task and inject with default_agent.
@@ -589,7 +603,11 @@ check_completed(Marking, Executor) ->
                         length(maps:get(EndPlace, Marking, [])) > 0
                 end
         end
-    catch _:_ -> false
+    catch
+        Class:Reason:Stack ->
+            io:format(standard_error, "check_completed error: ~p:~p~n~p~n",
+                [Class, Reason, Stack]),
+            false
     end.
 
 place_is_end(P) when is_atom(P) ->

@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cre-config
+  labels:
+    app: cre
+    component: workflow-engine
+data:
+  # CRE Configuration
+  cre-default-port: "4142"
+  cre-status-route: "/status.json"
+  cre-history-route: "/history.json"
+  cre-client-poll-interval: "250"
+  cre-auth-pbkdf2-iterations: "100000"
+  cre-auth-default-session-timeout: "3600"
+  cre-auth-min-password-length: "8"
+
+  # YAWL Configuration
+  yawl-stateless-checkpoint-dir: "/opt/cre/checkpoints"
+  yawl-stateless-max-executions: "1000"
+  yawl-stateless-execution-ttl: "3600000"
+  yawl-stateless-ttl-cleanup-interval: "60000"
+  yawl-timeout-default-timeout: "30000"
+  yawl-timeout-deadlock-interval: "5000"
+  yawl-timeout-resource-check-interval: "60000"
+
+  # Logging
+  log-level: "info"
+
+  # Mnesia Configuration
+  mnesia-dump-log-write-threshold: "5000"
+  mnesia-dc-import-limit: "40"
+  mnesia-max-writes-per-cycle: "100"
+
+  # Erlang VM Settings
+  erl-async-threads: "32"
+  erl-scheduler-threads: "available"
+  erl-smp-enable: "true"

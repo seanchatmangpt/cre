@@ -1,0 +1,67 @@
+## 2025-01-18 Implementation Complete
+
+Implemented BYOL licensing and usage tracking for Google Cloud Marketplace deployment.
+
+### Completed Tasks:
+
+1. **License Enforcement Module (US-001, US-002, US-003, US-004)**
+   - Created `src/license/license_enforcer.erl` - gen_server for license validation
+   - Created `src/license/license_sup.erl` - supervisor for license modules
+   - Added license modules to `src/cre.app.src`
+   - Integrated license supervisor into CRE supervision tree (`src/app/cre_sup.erl`)
+
+2. **Health Check Integration (US-005)**
+   - Added license check to `/startup` endpoint in `src/api/cre_health.erl`
+   - License is marked as critical subsystem for Marketplace compliance
+   - Returns healthy when EULA accepted or in grace period
+   - Returns unhealthy when grace period expires
+
+3. **Usage Tracking Infrastructure (US-006, US-007)**
+   - Implemented `export_to_gcp/1` in `src/telemetry/cre_cost_reporter.erl`
+   - Added metering unit calculation (workflow_hours, node_hours)
+   - Created usage metrics storage at `/opt/cre/data/usage/usage_metrics.jsonl`
+   - Added `/usage` endpoint to `src/api/cre_health.erl` for accessing usage data
+
+4. **Helm Chart Configuration (US-008, US-009, US-010, US-011)**
+   - Added license configuration section to `k8s/charts/cre/values.yaml`
+   - Added license volume mounts to StatefulSet template
+   - Added license environment variables (CRE_LICENSE_ACCEPT_EULA, CRE_LICENSE_GRACE_PERIOD_DAYS, CRE_LICENSE_FILE)
+   - Created init container to pre-accept EULA from Marketplace UI
+   - Added emptyDir volumes for license-data and usage-data
+
+5. **Documentation (US-012, US-013, US-014)**
+   - Created `docs/license/BYOL_LICENSING_GUIDE.md` - comprehensive BYOL guide
+   - Created `docs/license/ENTERPRISE_SUPPORT.md` - enterprise support options
+   - Created `docs/metering/USAGE_TRACKING.md` - usage tracking documentation
+
+### Key Design Decisions:
+
+- **BYOL Model**: Chose BYOL for v1 to align with Item 002 (Marketplace packaging) decision
+- **Grace Period**: 30-day grace period for deployments without EULA acceptance
+- **Usage Tracking**: Collected locally for v2 migration to usage-based billing
+- **No Marketplace Metering API**: Deferred to v2 to avoid blocking v1 Marketplace submission
+- **License as Critical**: License validation blocks startup if EULA not accepted after grace period
+
+### Technical Implementation:
+
+- **License Validation**: gen_server pattern following cre_cost_reporter
+- **EULA Persistence**: JSON file at `/opt/cre/data/license/eula_acceptance.json`
+- **Usage Storage**: JSONL file at `/opt/cre/data/usage/usage_metrics.jsonl`
+- **Health Integration**: License check integrated into startup probe
+- **Init Container**: Busybox container to create license file from Marketplace parameter
+
+### Testing:
+
+- Compilation successful: `rebar3 compile` passes
+- Helm chart valid: `helm lint k8s/charts/cre` passes
+- No dialyzer errors introduced
+- All 14 user stories completed
+
+### Next Steps (v2):
+
+- Implement Marketplace Metering API client
+- Define metering units based on v1 usage data
+- Add usage-based billing option alongside BYOL
+- Implement quota enforcement for usage-based billing
+
+[2026-02-11T02:34:05.523Z] Completed iteration 1 for story US-001

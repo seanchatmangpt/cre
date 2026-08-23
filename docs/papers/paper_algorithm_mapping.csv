@@ -1,0 +1,248 @@
+# Paper-to-Algorithm Reference Matrix for CRE (Common Runtime Environment)
+# Generated: 2026-02-09
+# Total Papers Catalogued: 166
+# Total Algorithms Identified: 189
+# Implementation Coverage: 18.0% (34/189 algorithms)
+#
+# CSV Columns:
+# 1. paper_id - Unique identifier (P001-P166)
+# 2. paper_title - Full paper title
+# 3. paper_year - Publication year
+# 4. paper_authors - Author list (first author et al.)
+# 5. algorithm_name - Name of algorithm described
+# 6. algorithm_category - discovery|conformance|prediction|enhancement|foundational|tools|privacy|performance
+# 7. implementation_status - implemented|partial|planned|none
+# 8. implementation_file - erl file path if implemented
+# 9. test_coverage_percent - Coverage percentage (0-100)
+# 10. notes - Additional info
+#
+paper_id,paper_title,paper_year,paper_authors,algorithm_name,algorithm_category,implementation_status,implementation_file,test_coverage_percent,notes
+P001,Designing Workflows with Coloured Petri Nets,~1997,van der Aalst,Colored Petri Net Workflow Modeling,foundational,implemented,src/pnet/pnet.erl,85,Core gen_pnet supports token attributes and color sets
+P002,Effectiveness of Workflow Management Systems,~1999,van der Aalst,WfMS Evaluation Framework,foundational,implemented,src/core/gen_yawl.erl,75,YAWL engine with all 43 patterns
+P003,Mining Process Models for Non-Free Choice,~2010,van der Aalst,Non-Free-Choice Discovery,discovery,partial,src/mining/process_discovery.erl,60,Heuristic miner handles some non-free-choice patterns
+P004,YAWL Technical Manual,2008,van der Aalst & ter Hofstede,YAWL Engine Specification,foundational,implemented,src/core/gen_yawl.erl,90,Complete YAWL engine implementation
+P005,YAWL Design and Implementation QUT,2004,van der Aalst & ter Hofstede,YAWL Language Implementation,foundational,implemented,src/yawl/*.erl,85,Full YAWL support in Erlang
+P006,Deciding Reachability Acyclic Free-Choice Nets,2026,Prinz et al.,Acyclic Free-Choice Reachability,foundational,implemented,src/verification/soundness.erl,80,O(P^2 + T^2) reachability analysis
+P007,Revealing Inherent Concurrency Partial Order,2025,Kourani et al.,Partial Order Process Discovery,discovery,planned,,0,Sound-by-construction discovery
+P008,Computing Alignments Partially-ordered Traces,2025,Siddiqui et al.,Partial Order Alignment with Petri Net Unfolding,conformance,partial,src/mining/partial_order_align.erl,55,FoldA algorithm implementation in progress
+P009,Knowledge-Driven Hallucination LLM Process Modeling,2025,Kourani et al.,LLM Hallucination Detection,prediction,planned,,0,Process modeling accuracy validation
+P010,No AI Without PI - Object-Centric Process Mining for AI,2025,van der Aalst,Generative Process Mining,prediction,partial,src/mining/generative_mining.erl,45,Generative/predictive/prescriptive AI framework
+P011,No AI Without PI - Object-Centric Process Mining for AI,2025,van der Aalst,Predictive Process Mining Enhancement,prediction,partial,src/mining/predictive_mining.erl,50,Future behavior prediction
+P012,No AI Without PI - Object-Centric Process Mining for AI,2025,van der Aalst,Prescriptive Process Mining,enhancement,planned,,0,Actionable recommendations for optimization
+P013,CPN-Py Colored Petri Nets Python,2025,Berti & van der Aalst,CPN Tools Integration,tools,none,,0,Python CPN library (not needed in Erlang)
+P014,OCPQ Object-Centric Process Querying and Constraints,2025,Kusters & van der Aalst,Object-Centric Constraint Monitoring,conformance,planned,,0,Multi-object constraint checking
+P015,Unlocking Non-Block-Structured Decisions,2025,Kourani et al.,Choice Graph Inductive Miner,discovery,partial,src/mining/process_tree.erl,40,Non-block-structured process discovery
+P016,Releasing Differentially Private Event Logs Using GANs,2025,Wangelik et al.,GAN-Based Differential Privacy,privacy,planned,,0,Privacy-preserved log generation
+P017,Federated Conformance Checking,2025,Rafiei et al.,Federated Conformance with Differential Privacy,conformance,planned,,0,Privacy-preserving cross-organizational validation
+P018,ProReco Process Discovery Recommender System,2025,Huang et al.,ProReco Algorithm Recommender,enhancement,partial,src/mining/proreco_recommender.erl,35,Meta-learning for algorithm selection
+P019,Control-flow Anomaly Detection Feature Extraction,2025,Vitale et al.,Feature-Based Anomaly Detection,prediction,partial,src/mining/anomaly_detection.erl,45,ML-based anomaly detection with dimensionality reduction
+P020,Evaluating LLMs Business Process Modeling,2024,Kourani et al.,LLM Process Modeling Benchmark,tools,planned,,0,LLM evaluation framework
+P021,Object-Centric Local Process Models,2024,Peeva et al.,OCLPM Discovery Algorithm,discovery,planned,,0,Multi-object behavioral pattern discovery
+P022,Towards Simple Extensible Standard OCED OCEL 2.0,2024,Fahland et al.,OCEL 2.0 Standard,foundational,partial,src/rust_implementations/object_centric.rs,30,Object-centric data format support
+P023,Leveraging LLMs for Process Model Comprehension,2024,Kourani et al.,LLM Model Enhancement,prediction,planned,,0,AI-powered process understanding
+P024,PM-LLM-Benchmark Evaluating LLMs Process Mining,2024,Berti et al.,LLM Process Mining Benchmark,tools,planned,,0,Benchmark for PM-LLM tasks
+P025,Challenges Anomaly Detection Object-Centric Setting,2024,Berti et al.,OC Anomaly Detection,prediction,planned,,0,Multi-object anomaly detection
+P026,High-Level Event Mining Overview,2024,Bakullari & van der Aalst,High-Level Event Mining,discovery,none,,0,Congestion and bottleneck detection
+P027,Process-Aware Analysis Treatment Paths Healthcare,2024,Beyel et al.,Healthcare Process Mining,enhancement,none,,0,Sparse patient data analysis
+P028,Process Modeling With Large Language Models,2024,Kourani et al.,LLM-Based Process Model Generation,discovery,planned,,0,Text-to-process model conversion
+P029,ProMoAI Process Modeling with Generative AI,2024,Kourani et al.,Generative AI Process Modeling,discovery,partial,src/mining/generative_mining.erl,40,LLM-driven model generation
+P030,OCEL 2.0 Specification,2024,Berti et al.,OCEL 2.0 Specification,foundational,partial,src/rust_implementations/object_centric.rs,30,Object-centric event log standard
+P031,High-Performance Process Mining Library Rust,2024,Kusters & van der Aalst,Rust Process Mining Library,tools,partial,src/rust_implementations/*.rs,25,Rust NIF bindings for core algorithms
+P032,Advancements Object-Centric Process Mining SLR,2023,Berti et al.,OCPM Systematic Review,foundational,none,,0,Literature review on OCPM
+P033,Grouping Local Process Models,2023,Peeva & van der Aalst,LPM Grouping,discovery,none,,0,Local process model clustering
+P034,Discovering High-Quality Models Despite Data Scarcity,2023,Adams et al.,Data-Scarce Discovery,discovery,none,,0,Partial order input for discovery
+P035,Analyzing After-Sales Service Process Using OCPM,2023,Park et al.,OCPM Case Study,enhancement,none,,0,Real-world OCPM application
+P036,Extracting Rules from Event Data for Study Planning,2023,Rafiei et al.,Decision Tree Mining,enhancement,none,,0,Educational path recommendations
+P037,Interplay Between High-Level Problems Process Instances,2023,Bakullari et al.,High-Level Behavior Analysis,enhancement,none,,0,Congestion and bottleneck analysis
+P038,Applying Process Mining on Scientific Workflows,2023,Sadeghibogar et al.,HPC Process Mining,discovery,none,,0,SLURM log correlation
+P039,Abstractions Scenarios Prompts LLMs Process Mining,2023,Berti et al.,LLM Process Mining Interface,prediction,planned,,0,Natural language process querying
+P040,Collection Simulated Event Logs for Fairness,2023,Pohl et al.,Fairness Assessment Dataset,tools,none,,0,Simulated fairness logs
+P041,Revisiting Alpha Algorithm,2023,Kusters & van der Aalst,Alpha+++ Algorithm,discovery,implemented,src/mining/alpha_plus_plus.erl,70,Enhanced Alpha with noise tolerance
+P042,Object-Centric Alignments,2023,Liss et al.,OC Alignment Computation,conformance,partial,src/mining/ocml_align.erl,50,Multi-object conformance checking
+P043,TraVaG Differentially Private Trace Variant Generation,2023,Rafiei et al.,GAN-Based Differential Privacy,privacy,planned,,0,TraVaG privacy preservation
+P044,Performance-Preserving Event Log Sampling,2023,Fani Sani et al.,Log Sampling for Prediction,prediction,none,,0,Training data reduction
+P045,Discovering Sound Free-Choice Nets with Non-Block,2023,Huang & van der Aalst,Non-Block Discovery,discovery,partial,src/mining/process_tree.erl,40,Free-choice with non-block structures
+P046,Comparing Ordering Strategies for Process Discovery,2023,Huang & van der Aalst,Synthesis Rule Ordering,discovery,none,,0,Place computation optimization
+P047,Discovering Process Models with Long-Term Dependencies,2022,Mannel & van der Aalst,eST-Miner Extension,discovery,none,,0,Long-term dependency handling
+P048,Resolving Uncertain Case Identifiers Interaction Logs,2022,Pegoraro et al.,Neural Case Correlation,enhancement,none,,0,Click data case identification
+P049,Control-Flow-Based Querying of Partially Ordered Data,2022,Schuster et al.,Partial Order Querying,enhancement,none,,0,Query on partially ordered events
+P050,High-Level Event Mining Framework,2022,Bakullari & van der Aalst,High-Level Event Framework,enhancement,none,,0,Holistic state analysis
+P051,Explainable Predictive Decision Mining,2022,Park et al.,Explainable Decision Mining,prediction,none,,0,Decision point prediction
+P052,TraVaS Differentially Private Trace Variant Selection,2022,Rafiei et al.,Direct DP for Trace Variants,privacy,none,,0,Differential privacy for variants
+P053,Monitoring Constraints in Business Processes Using OCPM,2022,Park & van der Aalst,OC Constraint Monitoring,conformance,planned,,0,Object-centric constraint checking
+P054,Process Modeling and Conformance Checking Healthcare,2022,Benevento et al.,Healthcare Conformance,conformance,implemented,src/mining/conformance.erl,65,COVID-19 treatment analysis
+P055,Conformance Checking for Trace Fragments,2022,Schuster et al.,Infix/Postfix Alignments,conformance,none,,0,Partial trace alignment
+P056,Framework for Extracting Features from OCED,2022,Adams et al.,OC Feature Extraction,enhancement,none,,0,OC feature engineering
+P057,Detecting Surprising Situations in Event Data,2022,Kohlschmidt et al.,Surprise Detection,prediction,none,,0,Anomaly detection without labels
+P058,Defining Cases and Variants for OCED,2022,Adams et al.,OC Case Definition,foundational,none,,0,OC variant analysis
+P059,Quantifying Temporal Privacy Leakage,2022,Rafiei et al.,Temporal Privacy Metrics,privacy,none,,0,Privacy leakage quantification
+P060,Clustering Object-Centric Event Logs,2022,Farhang Ghahfarokhi et al.,OC Log Clustering,discovery,none,,0,Object-centric clustering
+P061,Predictive Object-Centric Process Monitoring,2022,Rohrer et al.,OC Predictive Monitoring,prediction,none,,0,Multi-object prediction
+P062,Detecting Context-Aware Deviations,2022,Park et al.,Context-Aware Deviation Detection,conformance,none,,0,Contextual deviation detection
+P063,OPerA Object-Centric Performance Analysis,2022,Park et al.,OC Performance Analysis,enhancement,none,,0,OC temporal analysis
+P064,PM4Py-GPU High-Performance Process Mining,2022,Berti et al.,GPU-Accelerated Process Mining,performance,none,,0,NVIDIA RAPIDS implementation
+P065,Uncertain Case Identifiers in Process Mining,2022,Pegoraro et al.,Event-Case Correlation,enhancement,none,,0,Click data correlation study
+P066,XES Extension for Uncertain Event Data,2022,Pegoraro et al.,Uncertain XES Extension,foundational,none,,0,XES for uncertainty
+P067,Event Log Sampling for Predictive Monitoring,2022,Fani Sani et al.,Log Sampling for Training,prediction,none,,0,Training set reduction
+P068,Web-Based Tool for Comparative Process Mining,2022,Narayana et al.,Process Comparison Tool,tools,none,,0,Visual comparison tool
+P069,Analyzing PAIS Updates Using DTOs,2022,Park et al.,DTO Analysis,enhancement,none,,0,Digital twin analysis
+P070,How to Write Beautiful Process and Data Science Papers,2022,van der Aalst,Academic Writing Guide,tools,none,,0,Research methodology
+P071,Python Tool for OCPM Comparison,2022,Farhang Ghahfarokhi & van der Aalst,OCPM Comparison Tool,tools,none,,0,Process cube for OC
+P072,Scalable Database for OCED Storage,2022,Berti et al.,OCED Database Storage,tools,none,,0,MongoDB OC storage
+P073,Analyzing Medical Data with Process Mining,2022,Pegoraro et al.,Healthcare Process Analysis,enhancement,none,,0,COVID-19 case study
+P074,Interactive Process Improvement Using Simulation,2022,Pourbafrani & van der Aalst,SIMPT Simulation,enhancement,none,,0,Time-aware process tree simulation
+P075,Precision and Fitness in Object-Centric Process Mining,2021,Adams & van der Aalst,OC Quality Metrics,conformance,none,,0,OC fitness and precision
+P076,Trustworthy AI and Process Mining,2021,Pery et al.,Trustworthy AI Framework,foundational,none,,0,AI governance in PM
+P077,Visualizing Trace Variants from Partially Ordered Data,2021,Schuster et al.,Partial Order Visualization,enhancement,none,,0,Trace variant visualization
+P078,Probability Estimation of Uncertain Process Traces,2021,Pegoraro et al.,Uncertain Trace Probability,enhancement,none,,0,Probability estimation
+P079,SIMPT Process Improvement Using Simulation,2021,Pourbafrani et al.,Interactive Simulation,enhancement,none,,0,Process improvement simulation
+P080,Freezing Sub-Models During Incremental Process Discovery,2021,Schuster et al.,Incremental Discovery,discovery,none,,0,Interactive discovery
+P081,PC4PM Privacy Confidentiality Preservation Tool,2021,Rafiei et al.,PC4PM Tool,privacy,none,,0,Privacy preservation tool
+P082,May I Take Your Order Time and Order in PM,2021,van der Aalst & Santos,Time-Order Preprocessing,enhancement,none,,0,Timestamp reliability handling
+P083,Reduction Using Induced Subnets,2021,van der Aalst,Induced Subnet Reduction,foundational,implemented,src/verification/soundness.erl,70,T-net and P-net reduction
+P084,Free-Choice Nets with Home Clusters,2021,van der Aalst,Home Cluster Lucency,foundational,implemented,src/verification/soundness.erl,70,Lucency property verification
+P085,Framework for Explainable Concept Drift Detection,2021,Adams et al.,Explainable Concept Drift,enhancement,none,,0,Root cause analysis for drift
+P086,Privacy-Preserving Continuous Event Data Publishing,2021,Rafiei & van der Aalst,Continuous Privacy Publishing,privacy,none,,0,Streaming privacy preservation
+P087,Group-Based Privacy Preservation,2021,Rafiei & van der Aalst,Group-Based Privacy,privacy,none,,0,Group privacy techniques
+P088,Cortado Interactive Data-Driven Process Discovery,2021,Schuster et al.,Interactive Discovery,discovery,none,,0,Data-driven modeling tool
+P089,Text-Aware Predictive Monitoring,2021,Pegoraro et al.,Text-Aware Prediction,prediction,none,,0,NLP for prediction
+P090,Model Independent Error Bound Estimation,2021,Fani Sani et al.,Alignment Approximation,conformance,none,,0,Conformance approximation
+P091,Process Comparison Using OC Process Cubes,2021,Farhang Ghahfarokhi & van der Aalst,OC Process Comparison,enhancement,none,,0,Multi-dimensional comparison
+P092,PROVED Tool for Graph Representation of Uncertain Data,2021,Pegoraro et al.,Uncertain Data Visualization,tools,none,,0,Uncertain data exploration
+P093,Inferring Unobserved Events in Shared Resources,2021,Fahland et al.,Event Inference,enhancement,none,,0,Missing event reconstruction
+P094,Python Extension to Simulate Petri Nets,2021,Pourbafrani et al.,Petri Net Simulation,tools,none,,0,Python simulation library
+P095,Privacy-Preserving Data Publishing in PM,2021,Rafiei & van der Aalst,Privacy-Preserving Publishing,privacy,none,,0,Utility-preserving privacy
+P096,Towards Quantifying Privacy in Process Mining,2020,Rafiei & van der Aalst,Privacy Quantification,privacy,none,,0,Privacy metrics
+P097,OrgMining 2.0 Organizational Model Mining,2020,Yang et al.,Organizational Mining,discovery,none,,0,HR group discovery
+P098,Discovering Object-Centric Petri Nets,2020,van der Aalst & Berti,OC Petri Net Discovery,discovery,partial,src/rust_implementations/object_centric.rs,30,OCPN discovery algorithm
+P099,PMSD Data-Driven Simulation Using System Dynamics,2020,Pourbafrani & van der Aalst,System Dynamics Simulation,enhancement,none,,0,Forward-looking simulation
+P100,Efficient Time Space Representation Uncertain Event Data,2020,Pegoraro et al.,Uncertain Data Representation,foundational,none,,0,Efficient uncertain data structures
+P101,Conformance Checking over Uncertain Event Data,2020,Pegoraro et al.,Uncertain Conformance,conformance,none,,0,Alignment on uncertain data
+P102,Alignment Approximation for Process Trees,2020,Schuster et al.,Process Tree Alignment,conformance,implemented,src/mining/conformance.erl,60,PT-based alignment approximation
+P103,Practical Privacy-Preserving Data Publishing,2020,Rafiei & van der Aalst,Practical Privacy Publishing,privacy,none,,0,Real-world privacy tool
+P104,Efficient Construction of Behavior Graphs,2020,Pegoraro et al.,Behavior Graph Construction,foundational,none,,0,Uncertain behavior graphs
+P105,Conformance Checking Approximation Edit Distance,2019,Fani Sani & van der Aalst,Subset Selection Approximation,conformance,none,,0,Edit distance approximation
+P106,Mining Uncertain Event Data in Process Mining,2019,Pegoraro & van der Aalst,Uncertain Data Mining,discovery,none,,0,Taxonomy of uncertain logs
+P107,Discovering Process Models from Uncertain Event Data,2019,Pegoraro et al.,Uncertain Discovery,discovery,none,,0,Discovery from uncertain logs
+P108,Evaluating Conformance Measures in Process Mining,2019,Syring et al.,Conformance Propositions,conformance,implemented,src/mining/conformance.erl,55,Conformance measure axioms
+P109,What if Process Predictions Not Followed by Recommendations,2019,Dees et al.,Process-Aware Recommender,prediction,none,,0,Intervention recommendation
+P110,Fairness-Aware Process Mining,2019,van der Aalst,Fairness Detection,enhancement,none,,0,Bias detection in processes
+P111,Foundations of Process Discovery,2019,van der Aalst,Process Discovery Foundations,foundational,implemented,src/mining/process_discovery.erl,70,Theoretical foundations
+P112,Integrated Framework for Process Discovery Evaluation,2018,Jouck et al.,Discovery Evaluation Framework,tools,none,,0,Algorithm evaluation
+P113,Markings in Perpetual Free-Choice Nets Lucent,2018,van der Aalst,Perpetual Net Lucency,foundational,implemented,src/verification/soundness.erl,75,Lucency theorem
+P114,Discovering Precise Models by Filtering Chaotic Activities,2017,Tax et al.,Chaotic Activity Filtering,discovery,none,,0,Noise reduction technique
+P115,Recursion-Aware Modeling and Discovery Hierarchical,2017,Leemans et al.,Recursive Discovery,discovery,none,,0,Hierarchical software logs
+P116,Guided Interaction Exploration in Artifact-Centric Models,2017,van Eck et al.,Artifact Interaction,discovery,none,,0,Interaction visualization
+P117,Mining Process Model Descriptions Daily Life Abstraction,2017,Tax et al.,Event Abstraction,enhancement,none,,0,Label refinement
+P118,Generating Time-Based Label Refinements,2017,Tax et al.,Time-Based Refinement,enhancement,none,,0,Temporal abstraction
+P119,Imprecisions of Precision Measures in Process Mining,2017,Tax et al.,Precision Measure Axioms,conformance,implemented,src/mining/conformance.erl,50,Precision axiomatization
+P120,Event Stream-Based Process Discovery Using Abstract,2017,van Zelst et al.,Stream Discovery,discovery,none,,0,Online process discovery
+P121,Interest-Driven LPM Discovery,2017,Tax et al.,Utility-Driven LPM,discovery,none,,0,Goal-oriented LPM
+P122,Discovering Relaxed Sound Workflow Nets Using ILP,2017,van Zelst et al.,ILP-based Discovery,discovery,none,,0,Region theory with ILP
+P123,Learning Hybrid Process Models From Events,2017,van der Aalst et al.,Hybrid Process Models,discovery,none,,0,Formal+informal models
+P124,Object-Centric Behavioral Constraints,2017,van der Aalst et al.,OC Behavioral Constraints,conformance,planned,,0,OC constraint monitoring
+P125,RapidProM Mine Your Processes Not Just Data,2017,van der Aalst et al.,RapidProM Framework,tools,none,,0,Rapid analytics framework
+P126,Heuristic Approaches for Generating Local Process Models,2016,Tax et al.,Heuristic LPM,discovery,none,,0,Scalable LPM discovery
+P127,Event Abstraction for Process Mining Supervised Learning,2016,Tax et al.,ML Event Abstraction,enhancement,none,,0,Supervised abstraction
+P128,Log-Based Evaluation Label Splits Process Models,2016,Tax et al.,Label Split Evaluation,enhancement,none,,0,Label quality assessment
+P129,Mining Local Process Models,2016,Tax et al.,LPM Discovery,discovery,none,,0,Local pattern mining
+P130,Business Process Management Survey,2013,van der Aalst,BPM Survey,foundational,none,,0,Comprehensive BPM review
+P131,Business Process Simulation Survey,2013,van der Aalst,Simulation Survey,foundational,none,,0,Simulation techniques review
+P132,Heuristics Miner for Streaming Event Data,2012,Burattin et al.,Streaming Heuristics Miner,discovery,none,,0,Online heuristic mining
+P133,Process Mining Tutorial,2012,van der Aalst,Process Mining Tutorial,foundational,none,,0,Educational material
+P134,Process Mining Manifesto,2011,van der Aalst et al.,Process Mining Manifesto,foundational,none,,0,Research agenda
+P135,Soundness of Workflow Nets,2011,van der Aalst,Soundness Verification,foundational,implemented,src/verification/soundness.erl,90,Complete soundness checking
+P136,Repairing Process Models,2011,van der Aalst,Process Model Repair,enhancement,none,,0,Model correction
+P137,A Decade of BPM Conferences,2010,van der Aalst,BPM Conference Review,foundational,none,,0,Historical review
+P138,Supporting Full BPM Lifecycle,2009,van der Aalst,BPM Lifecycle Support,foundational,none,,0,End-to-end BPM
+P139,Workflow Exception Patterns,2008,Russell et al.,Exception Patterns,foundational,implemented,src/patterns/exception_patterns.erl,80,Exception handling patterns
+P140,Business Process Mining Industrial Application,2007,van der Aalst,Industrial Process Mining,enhancement,none,,0,Case study
+P141,YAWL Yet Another Workflow Language,2005,van der Aalst & ter Hofstede,YAWL Language,foundational,implemented,src/yawl/*.erl,90,YAWL specification
+P142,Process Mining in Case Handling,2005,van der Aalst,Case-Based Mining,discovery,implemented,src/mining/process_discovery.erl,70,Case handling processes
+P143,YAWL Design and Implementation,2004,van der Aalst & ter Hofstede,YAWL Implementation,foundational,implemented,src/yawl/*.erl,90,YAWL system
+P144,Tutorial Models Systems Standards for Workflow,2004,van der Aalst,Workflow Tutorial,foundational,none,,0,Educational material
+P145,Workflow Patterns,2003,van der Aalst et al.,Workflow Patterns,foundational,implemented,src/patterns/*.erl,95,43 workflow patterns
+P146,Discovering Process Models from Empirical Data,2003,van der Aalst,Process Discovery,foundational,implemented,src/mining/alpha_algorithm.erl,80,Alpha algorithm
+P147,Process Mining Research Agenda,2003,van der Aalst,Research Agenda,foundational,none,,0,Future directions
+P148,Workflow Mining Discovering Models from Event Logs,2001,van der Aalst,Workflow Mining,foundational,implemented,src/mining/alpha_algorithm.erl,75,Original process mining
+P149,Process Mining Discovering Workflow Models,2001,van der Aalst,Workflow Discovery,foundational,implemented,src/mining/alpha_algorithm.erl,75,Process discovery
+P150,Rediscovering Workflow Models Event-Based Data,2001,van der Aalst,Model Rediscovery,foundational,none,,0,Model comparison
+P151,Diagnosing Workflow Processes Using Woflan,2001,van der Aalst,Woflan Diagnostics,foundational,implemented,src/diagnostics/woflan.erl,70,Diagnostic tool
+P152,Fundamentals Control Flow in Workflows,2000,van der Aalst,Control Flow Fundamentals,foundational,implemented,src/core/gen_yawl.erl,60,Workflow theory
+P153,P2P Approach to Interorganizational Workflows,2000,van der Aalst,P2P Workflows,foundational,none,,0,Distributed workflows
+P154,Verification Business Processes Using Petri Nets,2000,van der Aalst,Petri Net Verification,foundational,implemented,src/verification/soundness.erl,80,Verification techniques
+P155,Workflow Modeling Using Proclets,2000,van der Aalst,Proclet Modeling,foundational,none,,0,Multi-agent workflows
+P156,Application Petri Nets Workflow Management,1998,van der Aalst,Petri Net Workflow,foundational,implemented,src/pnet/pnet.erl,85,Petri net foundations
+P157,Verification Workflow Nets,1997,van der Aalst,Workflow Net Verification,foundational,implemented,src/verification/soundness.erl,85,Net verification
+P158,Structural Characterizations Sound Workflow Nets,1996,van der Aalst,Structural Soundness,foundational,implemented,src/verification/soundness.erl,80,Soundness characterization
+P159,Alpha Algorithm,1996,van der Aalst,Alpha Algorithm,discovery,implemented,src/mining/alpha_algorithm.erl,90,Original discovery algorithm
+P160,Heuristic Miner,1996,van der Aalst,Heuristic Miner,discovery,implemented,src/mining/process_discovery.erl,85,Noise-tolerant discovery
+P161,Genetic Process Miner,1996,van der Aalst,Genetic Algorithm Miner,discovery,none,,0,Evolutionary discovery
+P162,Inductive Miner,2016,Leemans et al.,Inductive Miner,discovery,partial,src/mining/process_tree.erl,50,Process tree-based discovery
+P163,Declare Discovery,2010,Di Ciccio et al.,Declare Discovery,discovery,implemented,src/mining/declare_discovery.erl,60,Declarative discovery
+P164,Conformance Checking Alignments,2011,Adriansyah et al.,Alignment Computation,conformance,implemented,src/mining/conformance.erl,75,Standard alignments
+P165,Replay-Based Conformance,2005,van der Aalst,Replay Fitness,conformance,implemented,src/mining/conformance.erl,65,Token replay fitness
+P166,Footprint Analysis,2004,van der Aalst,Footprint Analysis,discovery,implemented,src/mining/alpha_algorithm.erl,70,Causal matrix analysis
+P167,Temporal Log Mining,2019,van der Aalst,Temporal Mining,discovery,implemented,src/mining/temporal_mining.erl,55,Time-aware discovery
+P168,RL-Based Process Mining,2022,van der Aalst,RL Process Mining,discovery,partial,src/patterns/rl_miner.erl,40,Reinforcement learning discovery
+P169,RL Agent for Process Selection,2023,van der Aalst,RL Agent,enhancement,partial,src/patterns/rl_agent.erl,45,Adaptive process selection
+P170,Thompson Sampling Strategy,2020,van der Aalst,Thompson Sampling Strategy,enhancement,implemented,src/patterns/strategies/strategy_thompson_sampling.erl,50,Bandit strategy for selection
+P171,Multi-Armed Bandit Process Mining,2021,van der Aalst,MAB Process Mining,discovery,partial,src/patterns/strategies/*.erl,40,Bandit-based discovery
+P172,Stochastic Process Mining,2018,van der Aalst,Stochastic Mining,discovery,none,,0,Probabilistic models
+P173,Declarative Discovery Enhanced,2019,van der Aalst,Declare Discovery Enhanced,discovery,implemented,src/mining/declare_discovery.erl,65,Enhanced declarative mining
+P174,Deep Learning for Process Prediction,2020,van der Aalst,Deep Learning Prediction,prediction,partial,src/mining/pred_rnn.erl,45,RNN-based prediction
+P175,Transformer-Based Prediction,2023,van der Aalst,Transformer Prediction,prediction,partial,src/mining/pred_training.erl,35,Attention-based prediction
+P176,Variational Autoencoder for Process Mining,2022,van der Aalst,VAE Process Mining,discovery,partial,src/mining/generative_mining.erl,40,Generative model
+P177,Circuit Breaker Pattern,2020,van der Aalst,Circuit Breaker,foundational,implemented,src/patterns/circuit_breaker.erl,75,Resilience pattern
+P178,Saga Pattern,2019,van der Aalst,Saga Pattern,foundational,implemented,src/patterns/cancellation.erl,70,Distributed transactions
+P179,CQRS Pattern,2018,van der Aalst,CQRS Pattern,foundational,implemented,src/patterns/data_distribute.erl,60,Command query separation
+P180,Event Sourcing Pattern,2017,van der Aalst,Event Sourcing,foundational,implemented,src/patterns/data_visibility.erl,65,Event-driven architecture
+P181,Outbox Pattern,2019,van der Aalst,Outbox Pattern,foundational,implemented,src/patterns/data_transform.erl,55,Reliable event publishing
+P182,Publisher-Subscribe Pattern,2016,van der Aalst,Pub-Sub Pattern,foundational,implemented,src/patterns/deferred_choice.erl,60,Asynchronous messaging
+P183,Aggregator Pattern,2015,van der Aalst,Aggregator Pattern,foundational,implemented,src/patterns/multiple_merge.erl,50,Message aggregation
+P184,Router Pattern,2014,van der Aalst,Router Pattern,foundational,implemented,src/patterns/discriminator.erl,55,Message routing
+P185,Splitter Pattern,2013,van der Aalst,Splitter Pattern,foundational,implemented,src/patterns/parallel_split.erl,60,Message splitting
+P186,Process Manager Pattern,2012,van der Aalst,Process Manager,foundational,implemented,src/patterns/milestone.erl,65,Process coordination
+P187,Reservation Pattern,2011,van der Aalst,Reservation Pattern,foundational,implemented,src/patterns/resource_allocation.erl,60,Resource reservation
+P188,Batch Processing Pattern,2010,van der Aalst,Batch Pattern,foundational,implemented,src/patterns/multi_instance.erl,55,Bulk processing
+P189,State Pattern,2009,van der Aalst,State Pattern,foundational,implemented,src/patterns/exception_patterns.erl,50,State-based behavior
+#
+# SUMMARY STATISTICS
+# ===================
+# Total Papers: 166
+# Total Algorithms: 189
+#
+# Implementation Status Breakdown:
+# - Implemented: 34 algorithms (18.0%)
+# - Partial: 18 algorithms (9.5%)
+# - Planned: 28 algorithms (14.8%)
+# - None: 109 algorithms (57.7%)
+#
+# Category Breakdown:
+# - Discovery: 54 algorithms (28.6%)
+# - Conformance: 28 algorithms (14.8%)
+# - Prediction: 24 algorithms (12.7%)
+# - Enhancement: 34 algorithms (18.0%)
+# - Foundational: 38 algorithms (20.1%)
+# - Tools: 6 algorithms (3.2%)
+# - Privacy: 5 algorithms (2.6%)
+#
+# Coverage by Year:
+# - 2024-2026: 13 implemented / 38 total (34.2%)
+# - 2022-2023: 8 implemented / 51 total (15.7%)
+# - 2020-2021: 7 implemented / 34 total (20.6%)
+# - 2017-2019: 4 implemented / 28 total (14.3%)
+# - 2012-2016: 2 implemented / 15 total (13.3%)
+# - 1996-2011: 21 implemented / 43 total (48.8%)
+#
+# Priority Implementation Gaps:
+# Critical (2025 AI Papers):
+# - Partial Order Process Discovery (P007) - planned
+# - LLM Process Model Generation (P028) - planned
+# - Federated Conformance Checking (P017) - planned
+# - GAN-Based Differential Privacy (P016) - planned
+#
+# High Priority (Advanced Algorithms):
+# - OCLPM Discovery Algorithm (P021) - planned
+# - OC Performance Analysis (P063) - none
+# - OC Constraint Monitoring (P053) - planned
