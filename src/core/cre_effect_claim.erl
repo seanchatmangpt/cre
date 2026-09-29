@@ -22,16 +22,23 @@
 -export_type([effect/0, state/0, store/0]).
 
 identity_fields() ->
-    [principal_id, beneficiary_id, monetary_amount, currency_or_asset, purpose,
-     authority_grant_id, obligation_id, rail_profile_id, expires_at,
-     resource_reservation_id].
+    [principal_id, beneficiary_id, beneficiary_account_identity, monetary_amount,
+     currency_or_asset, purpose, authority_grant_id, authority_digest, obligation_id,
+     rail_profile_id, expires_at, resource_reservation_id].
 
 %% @doc Deterministic effect identity (sha256 hex over ordered field tuple).
 -spec effect_id(effect()) -> binary().
 effect_id(Effect) ->
     Terms = [{F, maps:get(F, Effect, undefined)} || F <- identity_fields()],
     Bin = term_to_binary(Terms, [{minor_version, 2}, deterministic]),
-    binary:encode_hex(crypto:hash(sha256, Bin), lowercase).
+    hex(crypto:hash(sha256, Bin)).
+
+%% binary:encode_hex/2 needs OTP 26; the repo's stated minimum is OTP 25.
+hex(Bin) ->
+    << <<(hexdigit(N div 16)), (hexdigit(N rem 16))>> || <<N>> <= Bin >>.
+
+hexdigit(D) when D < 10 -> $0 + D;
+hexdigit(D) -> $a + D - 10.
 
 new_store() -> #{claims => #{}, obligations => #{}}.
 
@@ -81,6 +88,7 @@ observe(Id, Obs, Store) ->
         {accepted, settled} -> {ok, put_state(Id, settled, Store)};
         {settled, returned} -> {ok, put_state(Id, returned, Store)};
         {settled, reversed} -> {ok, put_state(Id, reversed, Store)};
+        {settled, settled} -> {refused, {illegal_transition, settled, settled}};
         {_, settled} -> {refused, settlement_without_acceptance};
         _ -> {refused, {illegal_transition, S, Obs}}
     end.
