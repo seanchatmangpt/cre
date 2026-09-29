@@ -164,3 +164,84 @@ ids(#{claims := Cs}) -> maps:keys(Cs).
 live_count(S = #{claims := Cs}) ->
     length([I || I <- maps:keys(Cs),
                  not lists:member(cre_effect_claim:state(I, S), [rejected, returned, reversed])]).
+
+%% ---- Survivor-killing tests (mutation audit) ----
+
+%% Drive a fresh effect to the given state via legal transitions.
+at_state(prepared) ->
+    {ok, Id, S0} = cre_effect_claim:prepare(eff(), cre_effect_claim:new_store()),
+    {Id, S0};
+at_state(submitted) -> prepared_submitted();
+at_state(unknown) -> via([timeout]);
+at_state(accepted) -> via([accepted]);
+at_state(rejected) -> via([rejected]);
+at_state(settled) -> via([accepted, settled]);
+at_state(returned) -> via([accepted, settled, returned]);
+at_state(reversed) -> via([accepted, settled, reversed]).
+
+via(Obs) ->
+    {Id, S1} = prepared_submitted(),
+    {Id, lists:foldl(fun(O, A) -> {ok, N} = cre_effect_claim:observe(Id, O, A), N end, S1, Obs)}.
+
+%% Settlement requires prior acceptance: refused with the typed refusal from every
+%% non-accepted state, including unknown (kills {unknown,settled}->settled).
+settle_without_acceptance_refused_test_() ->
+    [{atom_to_list(St),
+      fun() ->
+          {Id, S} = at_state(St),
+          ?assertEqual({refused, settlement_without_acceptance},
+                       cre_effect_claim:observe(Id, settled, S)),
+          ?assertEqual(St, cre_effect_claim:state(Id, S)),
+          ?assertEqual(0, cre_effect_claim:settlement_count(<<"o1">>, S))
+      end}
+     || St <- [prepared, submitted, unknown, rejected, returned, reversed]].
+
+%% Settle from unknown also stays refused via replay (state untouched, no settlement).
+replay_settle_from_unknown_does_not_settle_test() ->
+    {Id, S1} = prepared_submitted(),
+    {S2, []} = cre_effect_claim:replay([{Id, timeout}, {Id, settled}], S1),
+    ?assertEqual(unknown, cre_effect_claim:state(Id, S2)),
+    ?assertEqual(0, cre_effect_claim:settlement_count(<<"o1">>, S2)).
+
+%% An accepted effect cannot regress to unknown on timeout (kills {accepted,timeout}->unknown).
+accepted_then_timeout_is_illegal_test() ->
+    {Id, S} = at_state(accepted),
+    ?assertEqual({refused, {illegal_transition, accepted, timeout}},
+                 cre_effect_claim:observe(Id, timeout, S)),
+    ?assertEqual(accepted, cre_effect_claim:state(Id, S)),
+    %% and it still settles exactly once afterwards
+    {ok, S2} = cre_effect_claim:observe(Id, settled, S),
+    ?assertEqual(1, cre_effect_claim:settlement_count(<<"o1">>, S2)).
+
+%% Terminal/other states accept no timeout, accepted or rejected regression.
+no_regression_from_later_states_test_() ->
+    [{atom_to_list(St) ++ "/" ++ atom_to_list(O),
+      fun() ->
+          {Id, S} = at_state(St),
+          ?assertEqual({refused, {illegal_transition, St, O}},
+                       cre_effect_claim:observe(Id, O, S)),
+          ?assertEqual(St, cre_effect_claim:state(Id, S))
+      end}
+     || St <- [accepted, rejected, settled, returned, reversed],
+        O <- [timeout, accepted, rejected]].
+
+%% Re-preparing the identical effect is a pure no-op in EVERY state: it neither resets the
+%% state to prepared, nor rewrites the log, nor duplicates the obligation index entry.
+reprepare_is_noop_in_every_state_test_() ->
+    [{atom_to_list(St),
+      fun() ->
+          {Id, S} = at_state(St),
+          ?assertEqual({ok, Id, S}, cre_effect_claim:prepare(eff(), S)),
+          {ok, Id, S2} = cre_effect_claim:prepare(eff(), S),
+          ?assertEqual(St, cre_effect_claim:state(Id, S2)),
+          ?assertEqual(#{Id => maps:get(Id, maps:get(claims, S))}, maps:get(claims, S2)),
+          ?assertEqual([Id], maps:get(<<"o1">>, maps:get(obligations, S2)))
+      end}
+     || St <- [prepared, submitted, unknown, accepted, rejected, settled, returned, reversed]].
+
+%% Re-prepare of a settled effect must not reopen it for resubmission or a second settlement.
+reprepare_after_settle_cannot_resubmit_test() ->
+    {Id, S} = at_state(settled),
+    {ok, Id, S2} = cre_effect_claim:prepare(eff(), S),
+    ?assertEqual({refused, {not_submittable, settled}}, cre_effect_claim:submit(Id, S2)),
+    ?assertEqual(1, cre_effect_claim:settlement_count(<<"o1">>, S2)).
