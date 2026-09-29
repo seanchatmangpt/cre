@@ -1,0 +1,18 @@
+{
+  "schema": "sa2a-diataxis/v1",
+  "repository": "seanchatmangpt/cre",
+  "role": "prior-art",
+  "authority": [
+    "engineering-standards/semantic/sa2a-diataxis"
+  ],
+  "generator": "ggen-marketplace/packs/sa2a-diataxis-pack",
+  "capabilities": [
+    "cre"
+  ],
+  "depends_on": [],
+  "generated_paths": [
+    ".sa2a/bootstrap",
+    ".sa2a/manifest.json",
+    ".sa2a/diataxis.ttl"
+  ]
+}
