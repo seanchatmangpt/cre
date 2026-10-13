@@ -30,6 +30,7 @@ httpc_options_extra_test() ->
 %% default, would reject an untrusted/self-signed one).
 live_handshake_test() ->
     application:ensure_all_started(inets),
+    application:ensure_all_started(ssl),
     Opts = cre_ssl_opts:httpc_options([{timeout, 15000}, {connect_timeout, 15000}]),
     case httpc:request(get, {"https://erlang.org", []}, Opts, [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, _Body}} ->
