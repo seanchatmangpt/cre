@@ -539,7 +539,7 @@ get_token_from_metadata_server() ->
     Url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
     Headers = [{"Metadata-Flavor", "Google"}],
 
-    case httpc:request(get, {Url, Headers}, [], [{body_format, binary}]) of
+    case httpc:request(get, {Url, Headers}, cre_ssl_opts:httpc_options(), [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->
             case jsone:decode(Body) of
                 #{<<"access_token">> := Token} -> {ok, Token};
@@ -568,7 +568,7 @@ make_http_request(post, Url, Headers, Body) ->
     HeaderList = maps:to_list(Headers),
 
     case httpc:request(post, {UrlStr, HeaderList, <<"application/json">>, Body},
-                       [], [{body_format, binary}]) of
+                       cre_ssl_opts:httpc_options(), [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, _RespBody}} ->
             {ok, 200};
         {ok, {{_, Code, _}, _, RespBody}} ->

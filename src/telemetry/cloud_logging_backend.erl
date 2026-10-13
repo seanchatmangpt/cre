@@ -403,7 +403,7 @@ send_http_request(Json, _Config) ->
             AuthHeaders = [{"Authorization", "Bearer " ++ binary_to_list(Token)} | Headers],
             %% Make HTTP request using httpc
             case httpc:request(post, {Url, AuthHeaders, "application/json", Json},
-                             [], [{body_format, binary}]) of
+                             cre_ssl_opts:httpc_options(), [{body_format, binary}]) of
                 {ok, {{_, StatusCode, _}, _RespHeaders, ResponseBody}} ->
                     {ok, StatusCode, ResponseBody};
                 {error, Reason} ->
@@ -445,7 +445,7 @@ try_metadata_server() ->
     Url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
     Headers = [{"Metadata-Flavor", "Google"}],
 
-    case httpc:request(get, {Url, Headers}, [], [{body_format, binary}, {timeout, 1000}]) of
+    case httpc:request(get, {Url, Headers}, cre_ssl_opts:httpc_options([{timeout, 1000}]), [{body_format, binary}]) of
         {ok, {{_, 200, _}, _RespHeaders, Body}} ->
             case jsone:decode(Body) of
                 #{<<"access_token">> := Token} -> {ok, Token};
