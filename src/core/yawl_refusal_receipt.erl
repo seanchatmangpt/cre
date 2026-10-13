@@ -256,8 +256,9 @@ init([]) ->
           {reply, term(), #receipt_state{}}.
 
 handle_call({get_receipt, ReceiptId}, _From, State = #receipt_state{receipts = Receipts}) ->
-    Reply = case maps:get(ReceiptId, Receipts, undefined) of
-        undefined -> {error, not_found};
+    Reply = maybe
+        undefined ?= maps:get(ReceiptId, Receipts, undefined) -> {error, not_found}
+    else
         Receipt -> {ok, Receipt}
     end,
     {reply, Reply, State};
@@ -270,19 +271,23 @@ handle_call({list_receipts, Transition}, _From, State = #receipt_state{receipts 
     {reply, Filtered, State};
 
 handle_call({acknowledge, ReceiptId}, _From, State = #receipt_state{receipts = Receipts}) ->
-    case maps:get(ReceiptId, Receipts, undefined) of
-        undefined ->
-            {reply, {error, not_found}, State};
+    case maybe
+        undefined ?= maps:get(ReceiptId, Receipts, undefined) -> {error, not_found}
+    else
         Receipt ->
             Receipt1 = Receipt#refusal_receipt{acknowledged = true},
-            {reply, ok, State#receipt_state{receipts = maps:put(ReceiptId, Receipt1, Receipts)}}
+            State1 = State#receipt_state{receipts = maps:put(ReceiptId, Receipt1, Receipts)},
+            {ok, State1}
+    end of
+        {error, not_found} ->
+            {reply, {error, not_found}, State};
+        {ok, State1} ->
+            {reply, ok, State1}
     end;
 
 handle_call({apply_remediation, ReceiptId, Action}, _From, State) ->
-    Reply = case maps:get(ReceiptId, State#receipt_state.receipts, undefined) of
-        undefined ->
-            {error, not_found};
-        #refusal_receipt{category = Category} ->
+    Reply = maybe
+        #refusal_receipt{category = Category} ?= maps:get(ReceiptId, State#receipt_state.receipts, undefined) ->
             %% Apply remediation based on action
             case Action of
                 retry ->
@@ -294,6 +299,9 @@ handle_call({apply_remediation, ReceiptId, Action}, _From, State) ->
                 _ ->
                     {error, unsupported_action}
             end
+    else
+        undefined ->
+            {error, not_found}
     end,
     {reply, Reply, State};
 
