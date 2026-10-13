@@ -320,8 +320,8 @@ load_case(CaseId) when is_binary(CaseId) ->
             ),
             {ok, Case#wf_case{work_items = WIMap}}
         else
-            {error, Reason} ->
-                ?LOG_WARNING("Failed to load work items for case ~p: ~p", [CaseId, Reason]),
+            {error, WIReason} ->
+                ?LOG_WARNING("Failed to load work items for case ~p: ~p", [CaseId, WIReason]),
                 {ok, Case#wf_case{work_items = #{}}}
         end
     else
@@ -748,7 +748,8 @@ deserialize_receipts(Maps) when is_list(Maps) ->
 %% @private
 deserialize_receipt(#{data := Data} = Map) when is_binary(Data) ->
     maybe
-        undefined ?= maps:get(before_hash, Map, undefined) -> binary_to_term(Data)
+        undefined ?= maps:get(before_hash, Map, undefined),
+        binary_to_term(Data)
     else
         _ -> Map
     end;

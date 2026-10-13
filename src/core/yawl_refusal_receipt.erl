@@ -257,7 +257,8 @@ init([]) ->
 
 handle_call({get_receipt, ReceiptId}, _From, State = #receipt_state{receipts = Receipts}) ->
     Reply = maybe
-        undefined ?= maps:get(ReceiptId, Receipts, undefined) -> {error, not_found}
+        undefined ?= maps:get(ReceiptId, Receipts, undefined),
+        {error, not_found}
     else
         Receipt -> {ok, Receipt}
     end,
@@ -272,7 +273,8 @@ handle_call({list_receipts, Transition}, _From, State = #receipt_state{receipts 
 
 handle_call({acknowledge, ReceiptId}, _From, State = #receipt_state{receipts = Receipts}) ->
     case maybe
-        undefined ?= maps:get(ReceiptId, Receipts, undefined) -> {error, not_found}
+        undefined ?= maps:get(ReceiptId, Receipts, undefined),
+        {error, not_found}
     else
         Receipt ->
             Receipt1 = Receipt#refusal_receipt{acknowledged = true},
@@ -281,15 +283,15 @@ handle_call({acknowledge, ReceiptId}, _From, State = #receipt_state{receipts = R
     end of
         {error, not_found} ->
             {reply, {error, not_found}, State};
-        {ok, State1} ->
-            {reply, ok, State1}
+        {ok, StateUpdated} ->
+            {reply, ok, StateUpdated}
     end;
 
 handle_call({apply_remediation, ReceiptId, Action}, _From, State) ->
     Reply = maybe
-        #refusal_receipt{category = Category} ?= maps:get(ReceiptId, State#receipt_state.receipts, undefined) ->
-            %% Apply remediation based on action
-            case Action of
+        #refusal_receipt{category = Category} ?= maps:get(ReceiptId, State#receipt_state.receipts, undefined),
+        %% Apply remediation based on action
+        case Action of
                 retry ->
                     {ok, <<(remediation_text(Action))/binary, " for ", (atom_to_binary(Category))/binary>>};
                 skip ->

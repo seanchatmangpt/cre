@@ -116,8 +116,8 @@ save_state(Workflow) when element(1, Workflow) =:= workflow ->
                 {error, {Kind, Reason}}
         end
     else
-        {error, Reason} ->
-            {error, {mnesia_not_available, Reason}}
+        {error, EnsureReason} ->
+            {error, {mnesia_not_available, EnsureReason}}
     end.
 
 %%--------------------------------------------------------------------
@@ -151,8 +151,8 @@ load_state(CaseId) when is_binary(CaseId) ->
                         {error, {invalid_case_format, {Kind, Reason}}}
                 end
             else
-                {error, Reason} ->
-                    {error, Reason}
+                {error, CaseReason} ->
+                    {error, CaseReason}
             end;
         {error, Reason} ->
             {error, {mnesia_not_available, Reason}}
