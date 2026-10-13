@@ -230,7 +230,7 @@ invoke_soap(Endpoint, Operation, Params) when is_binary(Endpoint), is_binary(Ope
 %%--------------------------------------------------------------------
 -spec parse_wsdl(wsdl_url() | binary()) -> {ok, wsdl_data()} | {error, term()}.
 parse_wsdl(WsdlUrl) when is_binary(WsdlUrl) ->
-    case httpc:request(get, {binary_to_list(WsdlUrl), []}, [], [{body_format, binary}]) of
+    case httpc:request(get, {binary_to_list(WsdlUrl), []}, cre_ssl_opts:httpc_options(), [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, WsdlXml}} ->
             parse_wsdl_xml(WsdlXml);
         {ok, {{_, Code, _}, _, _}} ->
@@ -514,14 +514,14 @@ do_rest_request(Method, Url, Params) ->
                 "" -> UrlStr;
                 _ -> UrlStr ++ "?" ++ QueryParams
             end,
-            case httpc:request(get, {FullUrl, Headers}, [], [{body_format, binary}]) of
+            case httpc:request(get, {FullUrl, Headers}, cre_ssl_opts:httpc_options(), [{body_format, binary}]) of
                 {ok, {{_, 200, _}, _, Body}} -> {ok, Body};
                 {ok, {{_, Code, _}, _, Body}} -> {error, {http_error, Code, Body}};
                 {error, Reason} -> {error, Reason}
             end;
         post ->
             Body = encode_json(Params),
-            case httpc:request(post, {UrlStr, Headers, "application/json", Body}, [], [{body_format, binary}]) of
+            case httpc:request(post, {UrlStr, Headers, "application/json", Body}, cre_ssl_opts:httpc_options(), [{body_format, binary}]) of
                 {ok, {{_, 200, _}, _, RespBody}} -> {ok, RespBody};
                 {ok, {{_, 201, _}, _, RespBody}} -> {ok, RespBody};
                 {ok, {{_, Code, _}, _, RespBody}} -> {error, {http_error, Code, RespBody}};
@@ -529,13 +529,13 @@ do_rest_request(Method, Url, Params) ->
             end;
         put ->
             Body = encode_json(Params),
-            case httpc:request(put, {UrlStr, Headers, "application/json", Body}, [], [{body_format, binary}]) of
+            case httpc:request(put, {UrlStr, Headers, "application/json", Body}, cre_ssl_opts:httpc_options(), [{body_format, binary}]) of
                 {ok, {{_, 200, _}, _, RespBody}} -> {ok, RespBody};
                 {ok, {{_, Code, _}, _, RespBody}} -> {error, {http_error, Code, RespBody}};
                 {error, Reason} -> {error, Reason}
             end;
         delete ->
-            case httpc:request(delete, {UrlStr, Headers}, [], [{body_format, binary}]) of
+            case httpc:request(delete, {UrlStr, Headers}, cre_ssl_opts:httpc_options(), [{body_format, binary}]) of
                 {ok, {{_, 200, _}, _, RespBody}} -> {ok, RespBody};
                 {ok, {{_, 204, _}, _, _}} -> {ok, <<"">>};
                 {ok, {{_, Code, _}, _, RespBody}} -> {error, {http_error, Code, RespBody}};
@@ -556,7 +556,7 @@ do_soap_request(Endpoint, Operation, Params) ->
                {"SOAPAction", lists:flatten([$", binary_to_list(Operation), $"])}],
 
     case httpc:request(post, {binary_to_list(Endpoint), Headers, "text/xml", SoapEnvelope},
-                       [], [{body_format, binary}]) of
+                       cre_ssl_opts:httpc_options(), [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->
             case parse_soap_fault(Body) of
                 no_fault ->
@@ -1022,7 +1022,7 @@ do_test_connection(Endpoint, _State) ->
 -spec test_endpoint(endpoint_url()) -> {ok, binary()} | {error, term()}.
 test_endpoint(Endpoint) ->
     UrlStr = binary_to_list(Endpoint),
-    case httpc:request(head, {UrlStr, []}, [], []) of
+    case httpc:request(head, {UrlStr, []}, cre_ssl_opts:httpc_options(), []) of
         {ok, {{_, Code, _}, _, _}} when Code >= 200, Code < 500 ->
             {ok, <<"Connected">>};
         {ok, {{_, Code, _}, _, _}} ->

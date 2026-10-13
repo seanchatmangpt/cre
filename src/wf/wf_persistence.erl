@@ -269,10 +269,11 @@ save_case(#wf_case{case_id = CaseId} = Case) ->
         mnesia:write(PersistentCase)
     end,
 
-    case mnesia:transaction(Transaction) of
-        {atomic, ok} ->
-            ?LOG_DEBUG("Saved case: ~p", [CaseId]),
-            ok;
+    maybe
+        {atomic, ok} ?= mnesia:transaction(Transaction),
+        ?LOG_DEBUG("Saved case: ~p", [CaseId]),
+        ok
+    else
         {aborted, Reason} ->
             ?LOG_ERROR("Failed to save case ~p: ~p", [CaseId, Reason]),
             {error, Reason}
@@ -306,22 +307,24 @@ load_case(CaseId) when is_binary(CaseId) ->
         end
     end,
 
-    case mnesia:transaction(Transaction) of
-        {atomic, {ok, Case}} ->
-            %% Load associated work items
-            case load_workitems(CaseId) of
-                {ok, WorkItems} ->
-                    WIMap = lists:foldl(
-                        fun(WI, Acc) -> maps:put(WI#wf_persistent_workitem.wi_id,
-                                                 workitem_to_wf_workitem(WI), Acc) end,
-                        #{},
-                        WorkItems
-                    ),
-                    {ok, Case#wf_case{work_items = WIMap}};
-                {error, Reason} ->
-                    ?LOG_WARNING("Failed to load work items for case ~p: ~p", [CaseId, Reason]),
-                    {ok, Case#wf_case{work_items = #{}}}
-            end;
+    maybe
+        {atomic, {ok, Case}} ?= mnesia:transaction(Transaction),
+        %% Load associated work items
+        maybe
+            {ok, WorkItems} ?= load_workitems(CaseId),
+            WIMap = lists:foldl(
+                fun(WI, Acc) -> maps:put(WI#wf_persistent_workitem.wi_id,
+                                         workitem_to_wf_workitem(WI), Acc) end,
+                #{},
+                WorkItems
+            ),
+            {ok, Case#wf_case{work_items = WIMap}}
+        else
+            {error, WIReason} ->
+                ?LOG_WARNING("Failed to load work items for case ~p: ~p", [CaseId, WIReason]),
+                {ok, Case#wf_case{work_items = #{}}}
+        end
+    else
         {atomic, {error, not_found}} ->
             {error, not_found};
         {aborted, Reason} ->
@@ -363,10 +366,11 @@ delete_case(CaseId) when is_binary(CaseId) ->
         end
     end,
 
-    case mnesia:transaction(Transaction) of
-        {atomic, ok} ->
-            ?LOG_INFO("Deleted case: ~p", [CaseId]),
-            ok;
+    maybe
+        {atomic, ok} ?= mnesia:transaction(Transaction),
+        ?LOG_INFO("Deleted case: ~p", [CaseId]),
+        ok
+    else
         {atomic, {error, not_found}} ->
             {error, not_found};
         {aborted, Reason} ->
@@ -459,9 +463,10 @@ load_workitems(CaseId) when is_binary(CaseId) ->
         mnesia:index_read(wf_persistent_workitem, CaseId, #wf_persistent_workitem.case_id)
     end,
 
-    case mnesia:transaction(Transaction) of
-        {atomic, WorkItems} ->
-            {ok, WorkItems};
+    maybe
+        {atomic, WorkItems} ?= mnesia:transaction(Transaction),
+        {ok, WorkItems}
+    else
         {aborted, Reason} ->
             ?LOG_ERROR("Failed to load work items for case ~p: ~p", [CaseId, Reason]),
             {error, Reason}
@@ -532,10 +537,11 @@ save_event(CaseId, Event) when is_binary(CaseId) ->
         mnesia:write(PersistentEvent)
     end,
 
-    case mnesia:transaction(Transaction) of
-        {atomic, ok} ->
-            ?LOG_DEBUG("Saved event ~p for case ~p", [EventType, CaseId]),
-            ok;
+    maybe
+        {atomic, ok} ?= mnesia:transaction(Transaction),
+        ?LOG_DEBUG("Saved event ~p for case ~p", [EventType, CaseId]),
+        ok
+    else
         {aborted, Reason} ->
             ?LOG_ERROR("Failed to save event for case ~p: ~p", [CaseId, Reason]),
             {error, Reason}
@@ -561,13 +567,14 @@ load_events(CaseId) when is_binary(CaseId) ->
         mnesia:index_read(wf_persistent_event, CaseId, #wf_persistent_event.case_id)
     end,
 
-    case mnesia:transaction(Transaction) of
-        {atomic, Events} ->
-            %% Reconstruct events and sort by timestamp
-            Reconstructed = [reconstruct_event(E) || E <- Events],
-            Sorted = lists:keysort(1, Reconstructed),  %% Sort by timestamp
-            EventTerms = [Term || {_Ts, Term} <- Sorted],
-            {ok, EventTerms};
+    maybe
+        {atomic, Events} ?= mnesia:transaction(Transaction),
+        %% Reconstruct events and sort by timestamp
+        Reconstructed = [reconstruct_event(E) || E <- Events],
+        Sorted = lists:keysort(1, Reconstructed),  %% Sort by timestamp
+        EventTerms = [Term || {_Ts, Term} <- Sorted],
+        {ok, EventTerms}
+    else
         {aborted, Reason} ->
             ?LOG_ERROR("Failed to load events for case ~p: ~p", [CaseId, Reason]),
             {error, Reason}
@@ -740,8 +747,10 @@ deserialize_receipts(Maps) when is_list(Maps) ->
 
 %% @private
 deserialize_receipt(#{data := Data} = Map) when is_binary(Data) ->
-    case maps:get(before_hash, Map, undefined) of
-        undefined -> binary_to_term(Data);
+    maybe
+        undefined ?= maps:get(before_hash, Map, undefined),
+        binary_to_term(Data)
+    else
         _ -> Map
     end;
 deserialize_receipt(Map) when is_map(Map) ->

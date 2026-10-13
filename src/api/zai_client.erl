@@ -116,7 +116,7 @@ do_request(Messages, Options) ->
             case httpc:request(
                 post,
                 {?BASE_URL, Headers, "application/json", Body},
-                [{timeout, Timeout}, {connect_timeout, 10000}],
+                cre_ssl_opts:httpc_options([{timeout, Timeout}, {connect_timeout, 10000}]),
                 [{body_format, binary}]
             ) of
                 {ok, {{_, 200, _}, _, RespBody}} ->

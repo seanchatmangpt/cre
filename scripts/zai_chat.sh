@@ -12,7 +12,12 @@ if [ -z "$API_KEY" ]; then
   exit 1
 fi
 
-BASE_URL="https://api.z.ai/api/paas/v4/chat/completions"
+# Default targets the Z.AI Coding Plan endpoint (not the pay-as-you-go
+# endpoint) -- a Coding Plan subscription key authenticates only against
+# this one; the pay-as-you-go endpoint returns a real "Insufficient
+# balance" error for such a key (confirmed live in autofde-lab, 2026-09-12).
+# Override via ZAI_API_BASE if using a genuine pay-as-you-go key instead.
+BASE_URL="${ZAI_API_BASE:-https://api.z.ai/api/coding/paas/v4}/chat/completions"
 MODEL="${ZAI_MODEL:-glm-4.7-flash}"
 MODE="${1:-simple}"
 PROMPT="${2:-}"

@@ -105,18 +105,19 @@
 %%--------------------------------------------------------------------
 -spec save_state(Workflow :: cre_yawl:workflow()) -> {ok, binary()} | {error, term()}.
 save_state(Workflow) when element(1, Workflow) =:= workflow ->
-    case ensure_mnesia_running() of
-        ok ->
-            try
-                CaseMap = workflow_to_case_map(Workflow),
-                yawl_persistence:save_case(CaseMap)
-            catch
-                Kind:Reason:Stack ->
-                    logger:error("Failed to save workflow state: ~p:~p~n~p", [Kind, Reason, Stack]),
-                    {error, {Kind, Reason}}
-            end;
-        {error, Reason} ->
-            {error, {mnesia_not_available, Reason}}
+    maybe
+        ok ?= ensure_mnesia_running(),
+        try
+            CaseMap = workflow_to_case_map(Workflow),
+            yawl_persistence:save_case(CaseMap)
+        catch
+            Kind:Reason:Stack ->
+                logger:error("Failed to save workflow state: ~p:~p~n~p", [Kind, Reason, Stack]),
+                {error, {Kind, Reason}}
+        end
+    else
+        {error, EnsureReason} ->
+            {error, {mnesia_not_available, EnsureReason}}
     end.
 
 %%--------------------------------------------------------------------
@@ -140,17 +141,18 @@ save_state(Workflow) when element(1, Workflow) =:= workflow ->
 load_state(CaseId) when is_binary(CaseId) ->
     case ensure_mnesia_running() of
         ok ->
-            case yawl_persistence:load_case(CaseId) of
-                {ok, CaseMap} ->
-                    try {ok, case_map_to_workflow(CaseMap)}
-                    catch
-                        Kind:Reason:Stack ->
-                            logger:error("Failed to restore workflow from case ~p: ~p:~p~n~p",
-                                        [CaseId, Kind, Reason, Stack]),
-                            {error, {invalid_case_format, {Kind, Reason}}}
-                    end;
-                {error, Reason} ->
-                    {error, Reason}
+            maybe
+                {ok, CaseMap} ?= yawl_persistence:load_case(CaseId),
+                try {ok, case_map_to_workflow(CaseMap)}
+                catch
+                    Kind:Reason:Stack ->
+                        logger:error("Failed to restore workflow from case ~p: ~p:~p~n~p",
+                                    [CaseId, Kind, Reason, Stack]),
+                        {error, {invalid_case_format, {Kind, Reason}}}
+                end
+            else
+                {error, CaseReason} ->
+                    {error, CaseReason}
             end;
         {error, Reason} ->
             {error, {mnesia_not_available, Reason}}
@@ -202,10 +204,11 @@ delete_state(CaseId) when is_binary(CaseId) ->
 list_states() ->
     case ensure_mnesia_running() of
         ok ->
-            case yawl_persistence:list_active_cases() of
-                {ok, Cases} ->
-                    CaseIds = [maps:get(case_id, Case) || Case <- Cases],
-                    {ok, CaseIds};
+            maybe
+                {ok, Cases} ?= yawl_persistence:list_active_cases(),
+                CaseIds = [maps:get(case_id, Case) || Case <- Cases],
+                {ok, CaseIds}
+            else
                 {error, Reason} ->
                     {error, Reason}
             end;
@@ -230,8 +233,9 @@ ensure_mnesia_running() ->
     case whereis(mnesia) of
         undefined ->
             %% Mnesia not started, try to initialize
-            case yawl_persistence:init_schema() of
-                ok -> ok;
+            maybe
+                ok ?= yawl_persistence:init_schema()
+            else
                 {error, Reason} -> {error, Reason}
             end;
         _Pid ->

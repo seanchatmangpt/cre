@@ -66,3 +66,18 @@ terraform/gcp/.terraform/
 terraform/gcp/**/.terraform/
 *.tfstate
 *.tfstate.*
+
+# Rust build artifacts (cargo target dirs)
+target/
+**/target/
+
+# Python bytecode cache
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Example run logs / generated evidence (scratch output, not source)
+examples/**/logs/
+
+# macOS Finder metadata
+.DS_Store

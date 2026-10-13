@@ -101,15 +101,17 @@ _
 %% Timer entry: {Deadline, Event}
 -type timer_entry() :: {deadline(), timer_event()}.
 
-%% Deadline-sorted list of timer entries (ascending order)
--type deadline_list() :: [timer_entry()].
-
 %% Map from timer keys to deadline entries
 %% This enables O(log n) lookup by key and O(1) key replacement
 -type key_map() :: #{timer_key() => timer_entry()}.
 
-%% Timer queue combining map for key lookup and list for deadline ordering
--opaque timerq() :: #{keys := key_map(), deadlines := deadline_list()}.
+%% GB-tree ordered by composite {Deadline, Key} entries (ascending).
+%% The composite key is unique because timer keys are unique.
+-type deadline_tree() :: gb_trees:tree({deadline(), timer_key()},
+                                       timer_event()).
+
+%% Timer queue combining map for key lookup and gb_tree for deadline ordering
+-opaque timerq() :: #{keys := key_map(), deadlines := deadline_tree()}.
 
 -export_type([timerq/0, timer_key/0, deadline/0, timer_event/0]).
 -export_type([duration_ms/0, iso8601_duration/0, duration_error/0]).
@@ -128,13 +130,13 @@ _
 -spec new() -> timerq().
 
 new() ->
-    #{keys => #{}, deadlines => []}.
+    #{keys => #{}, deadlines => gb_trees:empty()}.
 
 %%--------------------------------------------------------------------
 %% @doc Arms a new timer or replaces an existing timer with the same key.
 %%
 %% If a timer with the same key already exists, it is replaced with the
-%% new deadline and event. The deadlines list is maintained in sorted order
+%% new deadline and event. The deadline tree is maintained in sorted order
 %% (ascending) for efficient polling.
 %%
 %% @param TimerQ The current timer queue
@@ -148,27 +150,27 @@ new() ->
 -spec arm(TimerQ :: timerq(), Key :: timer_key(),
          Deadline :: deadline(), Event :: timer_event()) -> timerq().
 
-arm(#{keys := KeyMap, deadlines := DeadlineList}, Key, Deadline, Event) ->
+arm(#{keys := KeyMap, deadlines := Tree}, Key, Deadline, Event) ->
     %% Create new timer entry
     Entry = {Deadline, Event},
 
-    %% Remove any existing timer with the same key from deadlines list
-    NewDeadlineList = case maps:find(Key, KeyMap) of
+    %% Remove any existing timer with the same key from the deadline tree
+    Tree0 = case maps:find(Key, KeyMap) of
         {ok, {OldDeadline, _OldEvent}} ->
-            %% Key exists: remove its old entry from deadlines list
-            lists:keydelete(OldDeadline, 1, DeadlineList);
+            %% Key exists: remove its old entry from the tree
+            gb_trees:delete_any({OldDeadline, Key}, Tree);
         error ->
-            %% Key doesn't exist: keep list as is
-            DeadlineList
+            %% Key doesn't exist: keep tree as is
+            Tree
     end,
 
-    %% Insert new entry into deadlines list (sorted by deadline)
-    UpdatedDeadlineList = insert_sorted(Entry, NewDeadlineList),
+    %% Insert new entry into the deadline tree (ordered by {Deadline, Key})
+    UpdatedTree = gb_trees:insert({Deadline, Key}, Event, Tree0),
 
     %% Update the key map
     UpdatedKeyMap = KeyMap#{Key => Entry},
 
-    #{keys => UpdatedKeyMap, deadlines => UpdatedDeadlineList}.
+    #{keys => UpdatedKeyMap, deadlines => UpdatedTree}.
 
 %%--------------------------------------------------------------------
 %% @doc Disarms (removes) a timer by its key.
@@ -184,15 +186,15 @@ arm(#{keys := KeyMap, deadlines := DeadlineList}, Key, Deadline, Event) ->
 %%--------------------------------------------------------------------
 -spec disarm(TimerQ :: timerq(), Key :: timer_key()) -> timerq().
 
-disarm(#{keys := KeyMap, deadlines := DeadlineList}, Key) ->
+disarm(#{keys := KeyMap, deadlines := Tree}, Key) ->
     case maps:take(Key, KeyMap) of
         {{OldDeadline, _OldEvent}, UpdatedKeyMap} ->
-            %% Key existed: remove from deadlines list and update key map
-            UpdatedDeadlineList = lists:keydelete(OldDeadline, 1, DeadlineList),
-            #{keys => UpdatedKeyMap, deadlines => UpdatedDeadlineList};
+            %% Key existed: remove from deadline tree and update key map
+            UpdatedTree = gb_trees:delete_any({OldDeadline, Key}, Tree),
+            #{keys => UpdatedKeyMap, deadlines => UpdatedTree};
         error ->
             %% Key didn't exist: return queue unchanged
-            #{keys => KeyMap, deadlines => DeadlineList}
+            #{keys => KeyMap, deadlines => Tree}
     end.
 
 %%--------------------------------------------------------------------
@@ -213,19 +215,42 @@ disarm(#{keys := KeyMap, deadlines := DeadlineList}, Key) ->
 -spec poll(TimerQ :: timerq(), Now :: deadline()) ->
           {[timer_event()], timerq()}.
 
-poll(#{keys := KeyMap, deadlines := DeadlineList}, Now) ->
-    %% Split deadlines list into expired and remaining
-    {ExpiredEntries, RemainingDeadlines} = take_expired(DeadlineList, Now, []),
+poll(#{keys := KeyMap, deadlines := Tree}, Now) ->
+    %% Take expired entries from the front of the tree, removing their keys
+    %% from the key map as we go (no full-map rebuild)
+    {ReadyEvents, UpdatedKeyMap, UpdatedTree} = take_expired(Tree, Now, [], KeyMap),
+    {lists:reverse(ReadyEvents), #{keys => UpdatedKeyMap,
+                                   deadlines => UpdatedTree}}.
 
-    %% Extract events from expired entries
-    ReadyEvents = [Event || {_Deadline, Event} <- ExpiredEntries],
+%% @private
+%% @doc Takes expired entries from the deadline tree.
+%%
+%% Repeatedly takes the smallest {Deadline, Key} entry while its deadline is
+%% =< Now, collecting events (outermost first, reversed by caller) and
+%% dropping each expired key from the key map. O(k log n) for k expired.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec take_expired(deadline_tree(), deadline(), [timer_event()], key_map()) ->
+          {[timer_event()], key_map(), deadline_tree()}.
 
-    %% Remove expired keys from key map
-    %% We need to find which keys correspond to expired entries
-    %% Since we don't have a reverse mapping, we rebuild the map
-    UpdatedKeyMap = maps:filter(fun(_K, {D, _E}) -> D > Now end, KeyMap),
-
-    {ReadyEvents, #{keys => UpdatedKeyMap, deadlines => RemainingDeadlines}}.
+take_expired(Tree, Now, Acc, KeyMap) ->
+    case gb_trees:is_empty(Tree) of
+        true ->
+            {Acc, KeyMap, Tree};
+        false ->
+            {{Deadline, Key}, Event, Smaller} = gb_trees:take_smallest(Tree),
+            case Deadline =< Now of
+                true ->
+                    take_expired(Smaller, Now, [Event | Acc],
+                                 maps:remove(Key, KeyMap));
+                false ->
+                    %% Entry is in the future; tree remains ordered, so
+                    %% reinsert the taken entry and stop
+                    {Acc, KeyMap, gb_trees:insert({Deadline, Key}, Event,
+                                                  Smaller)}
+            end
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Checks if the timer queue is empty.
@@ -266,10 +291,14 @@ size(#{keys := KeyMap}) ->
 %%--------------------------------------------------------------------
 -spec peek(TimerQ :: timerq()) -> {deadline(), timer_event()} | undefined.
 
-peek(#{deadlines := []}) ->
-    undefined;
-peek(#{deadlines := [{Deadline, Event} | _]}) ->
-    {Deadline, Event}.
+peek(#{deadlines := Tree}) ->
+    case gb_trees:is_empty(Tree) of
+        true ->
+            undefined;
+        false ->
+            {{Deadline, _Key}, Event} = gb_trees:smallest(Tree),
+            {Deadline, Event}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Arms a timer with a deadline relative to the current monotonic time.
@@ -551,43 +580,6 @@ parse_digits_until([Ch | Rest], Delimiter, Digits) when Ch >= $0, Ch =< $9 ->
 parse_digits_until(_Other, _Delimiter, _Digits) ->
     erlang:error(bad_duration).
 
-%% @private
-%% @doc Inserts a timer entry into a sorted list, maintaining deadline order.
-%%
-%% The list is kept in ascending order by deadline for efficient polling.
-%% Uses linear insertion which is O(n) but simple and pure.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec insert_sorted(timer_entry(), deadline_list()) -> deadline_list().
-
-insert_sorted(Entry, []) ->
-    [Entry];
-insert_sorted({Deadline, _} = Entry, [{D, _} | _] = Rest) when Deadline =< D ->
-    [Entry | Rest];
-insert_sorted(Entry, [Head | Rest]) ->
-    [Head | insert_sorted(Entry, Rest)].
-
-%% @private
-%% @doc Takes expired entries from the deadline list.
-%%
-%% Traverses the sorted list from the front, collecting all entries with
-%% deadline <= Now and returning the remaining list.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec take_expired(deadline_list(), deadline(), [timer_entry()]) ->
-          {[timer_entry()], deadline_list()}.
-
-take_expired([], _Now, Acc) ->
-    {lists:reverse(Acc), []};
-take_expired([{Deadline, _} = Entry | Rest], Now, Acc) when Deadline =< Now ->
-    %% This timer is expired, collect it and continue
-    take_expired(Rest, Now, [Entry | Acc]);
-take_expired(Remaining, _Now, Acc) ->
-    %% Remaining timers are in the future (sorted list)
-    {lists:reverse(Acc), Remaining}.
-
 %%====================================================================
 %% EUnit Tests
 %%====================================================================
@@ -701,10 +693,76 @@ poll_twice_test() ->
     ?assertEqual([{inject, p1, a}], E1),
     ?assertEqual(1, size(Qy)),
 
-    %% Third poll gets remaining event
+    %% Third poll drains remaining event
     {E2, Qz} = poll(Qy, 1200),
     ?assertEqual([{inject, p2, b}], E2),
     ?assertEqual(0, size(Qz)).
+
+%% Equal deadlines: all fire, one per key, poll order deterministic
+equal_deadlines_test() ->
+    Q0 = new(),
+    Q1 = arm(Q0, b, 1100, e_b),
+    Q2 = arm(Q1, a, 1100, e_a),
+    Q3 = arm(Q2, c, 1100, e_c),
+    {Events, Q4} = poll(Q3, 1100),
+    ?assertEqual(3, length(Events)),
+    ?assertEqual(lists:sort([e_a, e_b, e_c]), lists:sort(Events)),
+    ?assertEqual(0, size(Q4)),
+    %% Re-arming one key at a shared deadline does not orphan the others
+    Q5 = arm(Q0, b, 1100, e_b2),
+    {Events2, Q6} = poll(Q5, 1100),
+    ?assertEqual([e_b2], Events2),
+    ?assertEqual(0, size(Q6)).
+
+%%====================================================================
+%% Benchmark Test (hot-path perf: gb_trees vs linear list)
+%%====================================================================
+
+%% Timing sanity at 10k entries: gb_trees arm/disarm/poll must not be
+%% slower than the old linear-list implementation's asymptotics. We assert
+%% on elapsed time staying far below the O(n)-per-op list bound.
+bench_test() ->
+    N = 10000,
+    Now = erlang:monotonic_time(millisecond),
+
+    %% Arm 10k distinct timers (old: O(n) insert each -> O(n^2) total)
+    T0 = erlang:monotonic_time(millisecond),
+    Q = lists:foldl(fun(I, Acc) ->
+            arm(Acc, I, Now + 100000 + I, {inject, p, I})
+        end, new(), lists:seq(1, N)),
+    ArmMs = erlang:monotonic_time(millisecond) - T0,
+    ?assertEqual(N, size(Q)),
+
+    %% Disarm half (old: O(n) keydelete each)
+    T1 = erlang:monotonic_time(millisecond),
+    Q2 = lists:foldl(fun(I, Acc) when I rem 2 =:= 0 ->
+                            disarm(Acc, I);
+                        (_, Acc) -> Acc
+                     end, Q, lists:seq(1, N)),
+    ?assertEqual(N div 2, size(Q2)),
+    DisarmMs = erlang:monotonic_time(millisecond) - T1,
+
+    %% Poll: nothing expired yet (full traversal of front must stop early)
+    T2 = erlang:monotonic_time(millisecond),
+    {[], Q3} = poll(Q2, Now),
+    PollNoneMs = erlang:monotonic_time(millisecond) - T2,
+    ?assertEqual(N div 2, size(Q3)),
+
+    %% Poll: everything expires
+    T3 = erlang:monotonic_time(millisecond),
+    {Events, Q4} = poll(Q3, Now + 200000),
+    PollAllMs = erlang:monotonic_time(millisecond) - T3,
+    ?assertEqual(N div 2, length(Events)),
+    ?assertEqual(0, size(Q4)),
+
+    %% Asymptotic guard: all four phases complete well under one second,
+    %% which the O(n^2) list implementation cannot meet at 10k entries.
+    ?assert(ArmMs < 1000),
+    ?assert(DisarmMs < 1000),
+    ?assert(PollNoneMs < 1000),
+    ?assert(PollAllMs < 1000),
+    io:format("~nbench(10k): arm=~pms disarm=~pms poll_none=~pms poll_all=~pms~n",
+              [ArmMs, DisarmMs, PollNoneMs, PollAllMs]).
 
 %%====================================================================
 %% Extended API Tests

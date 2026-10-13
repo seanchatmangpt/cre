@@ -152,7 +152,8 @@
          get_pending_messages/0,
 
          %% Testing
-         doctest_test/0]).
+         doctest_test/0,
+         alias_monitor_test/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -187,7 +188,8 @@
     id :: handler_id(),
     message_type :: message_type(),
     pid :: pid(),
-    metadata :: map()
+    metadata :: map(),
+    alias :: reference() | undefined
 }).
 
 -type handler() :: #handler{}.
@@ -203,7 +205,7 @@
 
 -record(ipc_state, {
     handlers :: #{message_type() => [handler()]},
-    case_subscribers :: #{case_id() => [{pid(), reference()}]},
+    case_subscribers :: #{case_id() => [{reference(), pid(), reference()}]},
     queues :: #{binary() => queue()},
     message_stats :: #{atom() => number()},
     pending_messages :: [message()]
@@ -612,6 +614,46 @@ doctest_test() ->
 
     ok.
 
+%%--------------------------------------------------------------------
+%% @doc Regression test: DOWN cleanup matches on the process alias
+%% reference, not the pid. A DOWN message carrying an unrelated
+%% reference (as happens with pid reuse, or any forged/spurious DOWN)
+%% must NOT remove entries belonging to a still-alive process.
+%%
+%% @end
+%%--------------------------------------------------------------------
+alias_monitor_test() ->
+    {ok, _} = yawl_ipc:start_link(#{}),
+    HandlerPid = spawn(fun() -> receive after 30000 -> ok end end),
+
+    %% Register a live handler and a live case subscriber.
+    {ok, HandlerId} = register_handler(<<"alias_test_type">>, HandlerPid),
+    {ok, SubRef} = subscribe_to_case(<<"alias_test_case">>, HandlerPid),
+
+    %% Deliver a DOWN whose reference does not match the alias and
+    %% whose pid equals the live handler pid (the pid-reuse shape).
+    whereis(yawl_ipc) ! {'DOWN', make_ref(), process, HandlerPid, kill},
+    timer:sleep(100),
+
+    %% Handler and subscriber must survive.
+    [HandlerPid] = list_handlers(<<"alias_test_type">>),
+    [HandlerPid] = list_case_subscribers(<<"alias_test_case">>),
+
+    %% Now kill the real process: the true alias DOWN arrives.
+    exit(HandlerPid, kill),
+    timer:sleep(100),
+
+    %% Handler and subscriber are now cleaned up by alias match.
+    [] = list_handlers(<<"alias_test_type">>),
+    [] = list_case_subscribers(<<"alias_test_case">>),
+
+    %% unsubscribe APIs still work against the new tuple shape.
+    ok = unregister_handler(HandlerId),
+    ok = unsubscribe_from_case(SubRef),
+
+    ok = yawl_ipc:stop(),
+    ok.
+
 %%====================================================================
 %% gen_server Callback Functions
 %%====================================================================
@@ -655,15 +697,19 @@ init(Config) ->
 
 handle_call({register_handler, MessageType, Pid, Metadata}, _From, State) ->
     HandlerId = make_ref(),
+
+    %% Monitor the handler process via a process alias so the DOWN
+    %% cleanup matches on the alias reference, never on the pid alone
+    %% (a raw pid match is unsafe because pids can be reused).
+    Alias = erlang:monitor(process, Pid, [{alias, demonitor}]),
+
     Handler = #handler{
         id = HandlerId,
         message_type = MessageType,
         pid = Pid,
-        metadata = Metadata
+        metadata = Metadata,
+        alias = Alias
     },
-
-    %% Monitor the handler process
-    erlang:monitor(process, Pid),
 
     Handlers = maps:update_with(MessageType,
         fun(Existing) -> [Handler | Existing] end,
@@ -674,11 +720,12 @@ handle_call({register_handler, MessageType, Pid, Metadata}, _From, State) ->
 
 handle_call({subscribe_to_case, CaseId, Pid}, _From, State) ->
     SubRef = make_ref(),
-    erlang:monitor(process, Pid),
+    %% Alias monitor: DOWN carries the alias, immune to pid reuse.
+    Alias = erlang:monitor(process, Pid, [{alias, demonitor}]),
 
     Subscribers = maps:update_with(CaseId,
-        fun(Existing) -> [{Pid, SubRef} | Existing] end,
-        [{Pid, SubRef}],
+        fun(Existing) -> [{Alias, Pid, SubRef} | Existing] end,
+        [{Alias, Pid, SubRef}],
         State#ipc_state.case_subscribers),
 
     {reply, {ok, SubRef}, State#ipc_state{case_subscribers = Subscribers}};
@@ -702,7 +749,7 @@ handle_call({list_handlers, MessageType}, _From, State) ->
 handle_call({list_case_subscribers, CaseId}, _From, State) ->
     Subscribers = case maps:get(CaseId, State#ipc_state.case_subscribers, []) of
         [] -> [];
-        SubList -> [Pid || {Pid, _Ref} <- SubList]
+        SubList -> [Pid || {_Alias, Pid, _Ref} <- SubList]
     end,
     {reply, Subscribers, State};
 
@@ -845,7 +892,7 @@ handle_cast({unsubscribe_from_case, SubscriberRef}, State) ->
     Subscribers = maps:map(
         fun(_CaseId, SubList) ->
             lists:filter(
-                fun({_Pid, Ref}) -> Ref =/= SubscriberRef end,
+                fun({_Alias, _Pid, Ref}) -> Ref =/= SubscriberRef end,
                 SubList
             )
         end,
@@ -858,7 +905,7 @@ handle_cast({unsubscribe_from_case, CaseId, Pid}, State) ->
         [] -> State#ipc_state.case_subscribers;
         SubList ->
             Filtered = lists:filter(
-                fun({P, _Ref}) -> P =/= Pid end,
+                fun({_Alias, P, _Ref}) -> P =/= Pid end,
                 SubList
             ),
             maps:put(CaseId, Filtered, State#ipc_state.case_subscribers)
@@ -921,12 +968,14 @@ handle_cast(_Request, State) ->
 -spec handle_info(Info :: term(), State :: ipc_state()) ->
           {noreply, ipc_state()}.
 
-handle_info({'DOWN', _Ref, process, Pid, _Reason}, State) ->
-    %% Remove handlers for dead process
+handle_info({'DOWN', Ref, process, _Pid, _Reason}, State) ->
+    %% Ref is the process alias captured at monitor time. Matching on
+    %% the alias (not the pid) makes cleanup immune to pid reuse: a
+    %% DOWN for a recycled pid cannot remove a live handler's entry.
     Handlers = maps:map(
         fun(_MessageType, HandlerList) ->
             lists:filter(
-                fun(H) -> H#handler.pid =/= Pid end,
+                fun(H) -> H#handler.alias =/= Ref end,
                 HandlerList
             )
         end,
@@ -937,7 +986,7 @@ handle_info({'DOWN', _Ref, process, Pid, _Reason}, State) ->
     Subscribers = maps:map(
         fun(_CaseId, SubList) ->
             lists:filter(
-                fun({P, _Ref2}) -> P =/= Pid end,
+                fun({Alias, _P, _Ref2}) -> Alias =/= Ref end,
                 SubList
             )
         end,

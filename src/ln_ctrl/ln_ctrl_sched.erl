@@ -20,23 +20,9 @@
 ]).
 
 -include_lib("eunit/include/eunit.hrl").
+-include("ln_ctrl_sched.hrl").
 
 %%% TYPES ===================================================================
-
--record(deterministic, {
-    name = deterministic :: atom()
-}).
-
--record(nondeterministic, {
-    name = nondeterministic :: atom(),
-    choice_log = [] :: choice_log()
-}).
-
--record(replay, {
-    name = replay :: atom(),
-    choice_log :: choice_log(),
-    index = 0 :: non_neg_integer()
-}).
 
 -type policy() ::
       #deterministic{}
@@ -105,19 +91,31 @@ apply_policy(Policy = #nondeterministic{}, _State, Choices) when is_list(Choices
 apply_policy(Policy = #replay{}, _State, Choices) when is_list(Choices), length(Choices) > 0 ->
     Index = Policy#replay.index,
     ChoiceLog = Policy#replay.choice_log,
-    case lists:nth(Index + 1, ChoiceLog, undefined) of
-        {ChosenIdx, _ChoicePoint} ->
-            case lists:nth(ChosenIdx + 1, Choices, undefined) of
-                undefined ->
+    case safe_nth(Index + 1, ChoiceLog) of
+        {ok, {ChosenIdx, _ChoicePoint}} ->
+            case safe_nth(ChosenIdx + 1, Choices) of
+                {ok, ChosenBranch} ->
+                    {ChosenBranch, Policy#replay{index = Index + 1}};
+                error ->
                     %% Fallback to first
-                    {hd(Choices), Policy#replay{index = Index + 1}};
-                ChosenBranch ->
-                    {ChosenBranch, Policy#replay{index = Index + 1}}
+                    {hd(Choices), Policy#replay{index = Index + 1}}
             end;
-        undefined ->
+        error ->
             %% No more recorded choices, use first
             {hd(Choices), Policy#replay{index = Index + 1}}
     end.
+
+%%% INTERNAL FUNCTIONS ======================================================
+
+%% @private Safe nth that returns error instead of raising exception
+-spec safe_nth(pos_integer(), [any()]) -> {ok, any()} | error.
+safe_nth(N, List) when is_integer(N), N >= 1, is_list(List) ->
+    case List of
+        [] -> error;
+        _ when N > length(List) -> error;
+        _ -> {ok, lists:nth(N, List)}
+    end;
+safe_nth(_, _) -> error.
 
 %%% TESTS ===================================================================
 

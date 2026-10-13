@@ -687,11 +687,19 @@ perform_shutdown_sequence(Timeout, Reason) ->
 
     %% Initiate VM shutdown if this is a SIGTERM
     case Reason of
-        sigterm -> init:stop();
-        sigint -> init:stop();
-        gke_preemption -> init:stop();
+        sigterm -> maybe_stop_vm();
+        sigint -> maybe_stop_vm();
+        gke_preemption -> maybe_stop_vm();
         _ -> ok
     end.
+
+%% @private Stop the VM on shutdown signals, unless running under eunit
+%% (the test VM halting mid-suite makes rebar3 report a dishonest green).
+-ifndef(TEST).
+maybe_stop_vm() -> init:stop().
+-else.
+maybe_stop_vm() -> ok.
+-endif.
 
 %% @private Stop accepting new workflows
 stop_accepting_workflows() ->

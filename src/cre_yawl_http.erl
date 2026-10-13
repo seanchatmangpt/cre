@@ -170,7 +170,7 @@ handle_create_workflow(Req0) ->
                         {ok, ValidData} ->
                             case create_workflow(ValidData) of
                                 {ok, WorkflowId, Workflow} ->
-                                    Response = jsone:encode(#{
+                                    Response = json_encode(#{
                                         <<"id">> => WorkflowId,
                                         <<"status">> => <<"created">>,
                                         <<"workflow">> => workflow_to_json(Workflow)
@@ -198,7 +198,7 @@ handle_create_workflow(Req0) ->
 handle_list_workflows(Req) ->
     case get_all_workflows() of
         {ok, Workflows} ->
-            Response = jsone:encode(#{
+            Response = json_encode(#{
                 <<"workflows">> => [workflow_to_json(W) || W <- Workflows],
                 <<"count">> => length(Workflows)
             }),
@@ -216,7 +216,7 @@ handle_list_workflows(Req) ->
 handle_get_workflow(WorkflowId, Req) ->
     case get_workflow(WorkflowId) of
         {ok, Workflow} ->
-            Response = jsone:encode(workflow_to_json(Workflow)),
+            Response = json_encode(workflow_to_json(Workflow)),
             Req2 = cowboy_req:reply(200,
                 #{<<"content-type">> => <<"application/json">>},
                 Response, Req),
@@ -237,7 +237,7 @@ handle_update_workflow(WorkflowId, Req0) ->
                 {ok, UpdateData} ->
                     case update_workflow(WorkflowId, UpdateData) of
                         {ok, UpdatedWorkflow} ->
-                            Response = jsone:encode(#{
+                            Response = json_encode(#{
                                 <<"id">> => WorkflowId,
                                 <<"status">> => <<"updated">>,
                                 <<"workflow">> => workflow_to_json(UpdatedWorkflow)
@@ -266,7 +266,7 @@ handle_validate_workflow(WorkflowId, Req) ->
         {ok, Workflow} ->
             case validate_workflow_structure(Workflow) of
                 {ok, Errors} ->
-                    Response = jsone:encode(#{
+                    Response = json_encode(#{
                         <<"id">> => WorkflowId,
                         <<"valid">> => length(Errors) =:= 0,
                         <<"errors">> => Errors
@@ -300,7 +300,7 @@ handle_execute_workflow(WorkflowId, Req0) ->
             end,
             case execute_workflow(WorkflowId, ExecutionParams) of
                 {ok, ExecutionId, ExecutionState} ->
-                    Response = jsone:encode(#{
+                    Response = json_encode(#{
                         <<"workflow_id">> => WorkflowId,
                         <<"execution_id">> => ExecutionId,
                         <<"status">> => <<"started">>,
@@ -329,7 +329,7 @@ handle_execute_workflow(WorkflowId, Req0) ->
 handle_list_patterns(Req) ->
     case get_available_patterns() of
         {ok, Patterns} ->
-            Response = jsone:encode(#{
+            Response = json_encode(#{
                 <<"patterns">> => [pattern_to_json(P) || P <- Patterns],
                 <<"count">> => length(Patterns)
             }),
@@ -351,7 +351,7 @@ handle_create_pattern(PatternName, Req0) ->
                 {ok, PatternData} ->
                     case instantiate_pattern(PatternName, PatternData) of
                         {ok, PatternInstance} ->
-                            Response = jsone:encode(#{
+                            Response = json_encode(#{
                                 <<"pattern">> => PatternName,
                                 <<"status">> => <<"instantiated">>,
                                 <<"instance">> => PatternInstance
@@ -382,7 +382,7 @@ handle_create_pattern(PatternName, Req0) ->
 handle_list_tasks(Req) ->
     case get_all_tasks() of
         {ok, Tasks} ->
-            Response = jsone:encode(#{
+            Response = json_encode(#{
                 <<"tasks">> => [task_to_json(T) || T <- Tasks],
                 <<"count">> => length(Tasks)
             }),
@@ -400,7 +400,7 @@ handle_list_tasks(Req) ->
 handle_get_task(TaskId, Req) ->
     case get_task(TaskId) of
         {ok, Task} ->
-            Response = jsone:encode(task_to_json(Task)),
+            Response = json_encode(task_to_json(Task)),
             Req2 = cowboy_req:reply(200,
                 #{<<"content-type">> => <<"application/json">>},
                 Response, Req),
@@ -423,7 +423,7 @@ handle_complete_task(TaskId, Req0) ->
             end,
             case complete_task(TaskId, TaskData) of
                 {ok, CompletedTask} ->
-                    Response = jsone:encode(#{
+                    Response = json_encode(#{
                         <<"id">> => TaskId,
                         <<"status">> => <<"completed">>,
                         <<"task">> => task_to_json(CompletedTask)
@@ -461,7 +461,7 @@ handle_workflow_events(Req) ->
             {ok, Req2};
         _ ->
             % Return recent events
-            Response = jsone:encode(#{
+            Response = json_encode(#{
                 <<"events">> => [],
                 <<"count">> => 0
             }),
@@ -475,7 +475,7 @@ handle_workflow_events(Req) ->
 -spec handle_health_check(cowboy_req:req()) ->
     {ok, cowboy_req:req()} | {error, term()}.
 handle_health_check(Req) ->
-    Response = jsone:encode(#{
+    Response = json_encode(#{
         <<"status">> => <<"healthy">>,
         <<"timestamp">> => erlang:system_time(millisecond),
         <<"version">> => <<"1.0.0">>
@@ -499,11 +499,11 @@ handle_gcp_liveness(Req) ->
         end,
         ReqFinal = cowboy_req:reply(StatusCode,
             #{<<"content-type">> => <<"application/json">>},
-            jsone:encode(Response), Req),
+            json_encode(Response), Req),
         {ok, ReqFinal}
     catch
         _:Error ->
-            ErrorResponse = jsone:encode(#{
+            ErrorResponse = json_encode(#{
                 <<"status">> => <<"unhealthy">>,
                 <<"error">> => list_to_binary(io_lib:format("~p", [Error])),
                 <<"timestamp">> => erlang:system_time(millisecond)
@@ -528,11 +528,11 @@ handle_gcp_readiness(Req) ->
         end,
         ReqFinal = cowboy_req:reply(StatusCode,
             #{<<"content-type">> => <<"application/json">>},
-            jsone:encode(Response), Req),
+            json_encode(Response), Req),
         {ok, ReqFinal}
     catch
         _:Error ->
-            ErrorResponse = jsone:encode(#{
+            ErrorResponse = json_encode(#{
                 <<"status">> => <<"unhealthy">>,
                 <<"error">> => list_to_binary(io_lib:format("~p", [Error])),
                 <<"timestamp">> => erlang:system_time(millisecond)
@@ -557,11 +557,11 @@ handle_gcp_startup(Req) ->
         end,
         ReqFinal = cowboy_req:reply(StatusCode,
             #{<<"content-type">> => <<"application/json">>},
-            jsone:encode(Response), Req),
+            json_encode(Response), Req),
         {ok, ReqFinal}
     catch
         _:Error ->
-            ErrorResponse = jsone:encode(#{
+            ErrorResponse = json_encode(#{
                 <<"status">> => <<"unhealthy">>,
                 <<"error">> => list_to_binary(io_lib:format("~p", [Error])),
                 <<"timestamp">> => erlang:system_time(millisecond)
@@ -587,25 +587,38 @@ handle_options(Req) ->
 %% Utility Functions - JSON Handling
 %%====================================================================
 
+%% @doc Decode JSON using OTP 27+ native json module.
+-spec json_decode(binary()) -> term().
+json_decode(Body) ->
+    json:decode(Body).
+
+%% @doc Encode to JSON using OTP 27+ native json module.
+%% Native json:encode/1 returns iodata; the previous JSON lib returned a flat
+%% binary, so normalize to keep the surrounding contract unchanged.
+-spec json_encode(term()) -> binary().
+json_encode(Term) ->
+    iolist_to_binary(json:encode(Term)).
+
 %% @doc Parse JSON body
 -spec parse_json(binary()) -> {ok, map()} | {error, term()}.
 parse_json(Body) ->
     try
-        {ok, jsone:decode(Body)}
+        {ok, json_decode(Body)}
     catch
-        _:Error -> {error, Error}
+        error:Error -> {error, Error};
+        exit:Reason -> {error, Reason}
     end.
 
 %% @doc Build error response
 -spec build_error_response(term()) -> binary().
 build_error_response({ErrorType, Detail}) ->
-    jsone:encode(#{
+    json_encode(#{
         <<"error">> => atom_to_binary(ErrorType, utf8),
         <<"message">> => to_binary(Detail),
         <<"timestamp">> => erlang:system_time(millisecond)
     });
 build_error_response(Error) ->
-    jsone:encode(#{
+    json_encode(#{
         <<"error">> => to_binary(Error),
         <<"timestamp">> => erlang:system_time(millisecond)
     }).

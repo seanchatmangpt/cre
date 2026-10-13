@@ -89,20 +89,29 @@ check_effect(Budget, Cost) when is_number(Cost), Cost >= 0 ->
         cost_used_usd = CostUsed
     },
 
-    %% Check effect count
+    %% Check effect count first
     case Budget#budget.max_effects of
         unlimited ->
-            ok;
+            %% Effects unlimited, check cost
+            check_cost(NewBudget, CostUsed);
         MaxEffects when EffectsUsed > MaxEffects ->
-            return_exceeded(NewBudget, {max_effects_exceeded, EffectsUsed, MaxEffects})
-    end,
+            %% Effects exceeded - return immediately
+            ExceededBudget = NewBudget#budget{exceeded = true},
+            {budget_exceeded, {max_effects_exceeded, EffectsUsed, MaxEffects}, ExceededBudget};
+        _ ->
+            %% Effects OK, check cost
+            check_cost(NewBudget, CostUsed)
+    end.
 
-    %% Check cost
-    case Budget#budget.max_cost_usd of
+%% @private Check cost limit
+-spec check_cost(budget(), float()) -> {ok, budget()} | {budget_exceeded, term(), budget()}.
+check_cost(NewBudget, CostUsed) ->
+    case NewBudget#budget.max_cost_usd of
         unlimited ->
             {ok, NewBudget};
         MaxCost when CostUsed > MaxCost ->
-            return_exceeded(NewBudget, {max_cost_exceeded, CostUsed, MaxCost});
+            ExceededBudget = NewBudget#budget{exceeded = true},
+            {budget_exceeded, {max_cost_exceeded, CostUsed, MaxCost}, ExceededBudget};
         _ ->
             {ok, NewBudget}
     end.

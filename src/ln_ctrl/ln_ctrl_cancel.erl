@@ -24,7 +24,7 @@
 
 -record(cancel_signal, {
     scope_id :: atom(),
-    timestamp_ms :: non_neg_integer()
+    timestamp_ms :: integer()
 }).
 
 -type cancel_signal() :: #cancel_signal{}.
@@ -102,7 +102,7 @@ new_cancel_signal_test_() ->
     Signal = new_cancel_signal(my_scope),
     [
         ?_assertEqual(my_scope, Signal#cancel_signal.scope_id),
-        ?_assert(Signal#cancel_signal.timestamp_ms > 0)
+        ?_assert(is_integer(Signal#cancel_signal.timestamp_ms))
     ].
 
 is_cancelled_test_() ->
@@ -120,8 +120,8 @@ propagate_cancel_test_() ->
 
 stop_effects_in_scope_test_() ->
     NowMs = erlang:monotonic_time(millisecond),
-    OldEffect = {eff1, NowMs - 1000, {effect, test, payload}},
-    NewEffect = {eff2, NowMs + 1000, {effect, test, payload}},
+    OldEffect = {eff1, NowMs - 1000, {effect, test, payload}, #{}},
+    NewEffect = {eff2, NowMs + 1000, {effect, test, payload}, #{}},
     EffectLog = [OldEffect, NewEffect],
 
     Signal = #cancel_signal{scope_id = my_scope, timestamp_ms = NowMs},
