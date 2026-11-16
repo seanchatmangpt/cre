@@ -1,0 +1,31 @@
+{
+  "task": "T003",
+  "title": "CRE round-robin scheduler",
+  "approach": "round-robin",
+  "test_pass": true,
+  "status": "complete",
+  "timestamp": "2026-04-26T00:00:00Z",
+  "implementation": {
+    "file": "vendors/vendors/wf-substrate/src/wf_sched.erl",
+    "changes": [
+      "Replaced nondeterministic TODO branch (line 126) with call to rr_next/1",
+      "Added rr_register/1, rr_unregister/1, rr_registered/0, rr_next/1 API",
+      "ETS table wf_sched_rr holds {{sched, Id}, true} entries plus rr_counter",
+      "rr_next/1 uses ets:update_counter for atomic round-robin position, falls back to sorted first when table absent"
+    ]
+  },
+  "tests": {
+    "file": "vendors/vendors/wf-substrate/test/wf_sched_tests.erl",
+    "added": [
+      "rr_register_unregister_test/0",
+      "rr_fallback_when_empty_test/0",
+      "rr_round_robin_distribution_test/0 — N=4 schedulers, M=100 calls, each within ±1 of M/N"
+    ]
+  },
+  "test_run": {
+    "command": "rebar3 eunit --module wf_sched",
+    "cwd": "/Users/sac/cre/vendors/vendors/wf-substrate",
+    "result": "36 tests, 0 failures",
+    "note": "rebar3 eunit blocked by pre-existing duplicate record in wf_exec_tests.erl; tests validated directly via erl -pa"
+  }
+}

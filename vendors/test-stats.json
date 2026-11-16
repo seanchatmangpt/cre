@@ -1,0 +1,11 @@
+{
+  "benchmarkResults": [
+    {
+      "benchmark": "test.benchmark",
+      "p50": 100.0,
+      "p95": 200.0,
+      "mean": 150.0,
+      "stddev": 50.0
+    }
+  ]
+}

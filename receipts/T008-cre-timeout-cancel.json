@@ -1,0 +1,27 @@
+{
+  "task": "T008",
+  "title": "Timeout enforcement: case_timeout triggers wf_cancel:cancel_case/1",
+  "status": "complete",
+  "test_pass": true,
+  "timestamp": "2026-04-26T00:00:00Z",
+  "implementation": {
+    "file": "vendors/vendors/wf-substrate/src/wf_governance.erl",
+    "lines_changed": "214-226",
+    "changes": [
+      "Added call to wf_cancel:cancel_case(CaseId) in handle_info({case_timeout, CaseId}) handler",
+      "Result of cancel_case is discarded (case may already be cancelled or not found — both safe)",
+      "TODO comment replaced with real implementation"
+    ]
+  },
+  "tests": {
+    "file": "vendors/vendors/wf-substrate/test/wf_governance_tests.erl",
+    "added": [
+      "timeout_cancels_case_test_/0 — creates wf_state case, sets 50ms case_timeout via wf_governance, waits 300ms, asserts case status is cancelled"
+    ]
+  },
+  "test_run": {
+    "command": "rebar3 eunit --module wf_governance",
+    "cwd": "/Users/sac/cre/vendors/vendors/wf-substrate",
+    "result": "14 tests, 0 failures"
+  }
+}

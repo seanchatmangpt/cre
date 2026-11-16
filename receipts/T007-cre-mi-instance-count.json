@@ -1,0 +1,34 @@
+{
+  "task": "T007",
+  "title": "Dynamic MI instance count with Fun evaluation",
+  "status": "complete",
+  "test_pass": true,
+  "timestamp": "2026-04-26T00:00:00Z",
+  "implementation": {
+    "files": [
+      "vendors/vendors/wf-substrate/src/wf_mi.erl",
+      "vendors/vendors/wf-substrate/src/wf_vm.erl"
+    ],
+    "changes": [
+      "Extended mi_policy() type in wf_vm.erl to add {dynamic, fun((map()) -> pos_integer()), pos_integer(), pos_integer()} variant",
+      "Added eval_instance_count clause for {dynamic, Fun, Min, Max} pattern",
+      "Fun is called with Ctx, wrapped in try/catch (returns Min on any exception)",
+      "Result clamped between Min and Max using max(Min, min(Max, Raw))",
+      "Preserved backward-compatible {dynamic, Min, Max} clause that returns Min"
+    ]
+  },
+  "tests": {
+    "file": "vendors/vendors/wf-substrate/test/wf_mi_tests.erl",
+    "added": [
+      "eval_instance_count_dynamic_fun_in_range_test/0 — Fun returns 7 in [2,10] → {ok, 7}",
+      "eval_instance_count_dynamic_fun_below_min_test/0 — Fun returns 1, Min=3 → {ok, 3}",
+      "eval_instance_count_dynamic_fun_above_max_test/0 — Fun returns 999, Max=10 → {ok, 10}",
+      "eval_instance_count_dynamic_fun_throws_test/0 — Fun throws → {ok, Min=2}"
+    ]
+  },
+  "test_run": {
+    "command": "rebar3 eunit --module wf_mi",
+    "cwd": "/Users/sac/cre/vendors/vendors/wf-substrate",
+    "result": "18 tests, 0 failures"
+  }
+}

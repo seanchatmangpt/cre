@@ -1,0 +1,12 @@
+---
+description: Session and context window hygiene for consistent agent quality
+alwaysApply: true
+---
+
+# Context and Session Hygiene
+
+- **Context window:** Keep utilization under ~50% for consistent, high-quality responses from the model.
+- **Single-purpose chats:** One clear outcome per chat session. Avoid mixing unrelated topics or tasks in one session.
+- **Task complete → new agent:** When a task is done, start a new agent for a fresh context window instead of extending the same chat.
+- **Handoff between agents:** Prefer a short manual summary (e.g., 2 paragraphs or bullet points) pasted into a new session over @-tagging an old chat. Tagging pulls fine-grained detail from the whole conversation and wastes context.
+- **Summarize as last resort:** Use /summarize or automatic compression only when necessary. Summarizing a multi-topic chat yields shallow overviews that rarely help continue any single initiative.

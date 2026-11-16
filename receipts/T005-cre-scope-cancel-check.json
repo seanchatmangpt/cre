@@ -1,0 +1,32 @@
+{
+  "task": "T005",
+  "title": "Scope cancellation check in wf_exec",
+  "status": "complete",
+  "test_pass": true,
+  "timestamp": "2026-04-26T00:00:00Z",
+  "implementation": {
+    "file": "vendors/vendors/wf-substrate/src/wf_exec.erl",
+    "lines_changed": "1000-1017",
+    "changes": [
+      "Replaced always-false stub with real implementation",
+      "Returns false when exec_state.case_id is undefined",
+      "Returns false when wf_state_store ETS table is not available (guard with ets:whereis)",
+      "Returns false when case not found in ETS",
+      "Calls wf_state:restore_from_ets/1 then wf_cancel:is_cancelled/2 for real check",
+      "Exported is_scope_cancelled/2 from wf_exec module"
+    ]
+  },
+  "tests": {
+    "file": "vendors/vendors/wf-substrate/test/wf_exec_tests.erl",
+    "added": [
+      "is_scope_cancelled_no_case_id_test/0 — returns false when case_id undefined",
+      "is_scope_cancelled_missing_state_test_/0 — returns false when state not in ETS",
+      "is_scope_cancelled_cancelled_scope_test_/0 — returns true for cancelled scope, false for active"
+    ]
+  },
+  "test_run": {
+    "command": "rebar3 eunit --module wf_exec",
+    "cwd": "/Users/sac/cre/vendors/vendors/wf-substrate",
+    "result": "46 tests, 0 failures"
+  }
+}

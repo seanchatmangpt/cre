@@ -1,0 +1,24 @@
+{
+  "task": "T001-cre-effect-cancellation",
+  "functions_implemented": [
+    "wf_cancel:get_effect_for_token/2 - looks up pending effect for token via wf_effects ETS using {CaseId, _, ScopeId} match on effect_id",
+    "wf_cancel:cancel_effect/2 - delegates to wf_effect:cancel_effect/2, treats already-cancelled as success, returns {ok, State}",
+    "wf_cancel:cancel_effects_for_tokens/2 - iterates tokens, calls get_effect_for_token/2 and cancel_effect/2 for each, returns {[EffectIds], State}",
+    "wf_case_runner:cancel_region/2 (running state handler) - finds active tokens in scope from exec_state, calls wf_effect:cancel_effect/2 for each token with current_effect set, marks tokens as cancelled in exec_state"
+  ],
+  "files_changed": [
+    "vendors/vendors/wf-substrate/src/wf_cancel.erl",
+    "vendors/vendors/wf-substrate/src/wf_case_runner.erl"
+  ],
+  "callers_updated": [
+    "wf_cancel:do_cancel_activity/2 - updated to use get_effect_for_token/2 and cancel_effect/2",
+    "wf_cancel:do_cancel_case/1 - updated to use cancel_effects_for_tokens/2",
+    "wf_cancel:do_cancel_region/2 - updated to use cancel_effects_for_tokens/2"
+  ],
+  "test_result": "pass",
+  "test_summary": "31/31 wf_cancel tests pass, 5/5 wf_case_runner tests pass, 302 total tests pass with 0 failures",
+  "pre_existing_issues": [
+    "wf_compiler.erl fails to compile in the top-level cre project (uses 'xor' as function name which is a reserved keyword) - pre-existing, not caused by this change",
+    "1 test cancelled (integration test requiring item 010 effect system - pre-existing skip)"
+  ]
+}
